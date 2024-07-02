@@ -329,7 +329,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
 	}
 
-	if partitionID == 0 {
+	if partitionID == invalidPartitionID {
 		relativePath, err := storage.ValidateRelativePath(storageMgr.path, relativePath)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
@@ -405,6 +405,32 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 	fn(logManager)
 
 	return nil
+}
+
+// StorageKV executes the provided function against the storage's metadata DB. All write operations
+// issued by the function are committed in an atomic fashion. All read operations are performed
+// against a snapshot of the database.
+func (pm *PartitionManager) StorageKV(ctx context.Context, storageName string, readOnly bool, fn func(lm keyvalue.ReadWriter) error) error {
+	storageMgr, ok := pm.storages[storageName]
+	if !ok {
+		return structerr.NewNotFound("unknown storage: %q", storageName)
+	}
+
+	ptn, err := pm.startPartition(ctx, storageMgr, metadataPartitionID)
+	if err != nil {
+		return err
+	}
+	defer storageMgr.finalizeTransaction(ptn)
+
+	transaction, err := ptn.transactionManager.Begin(ctx, "", nil, readOnly)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+
+	if err := fn(transaction.KV()); err != nil {
+		return errors.Join(err, transaction.Rollback())
+	}
+	return transaction.Commit(ctx)
 }
 
 // startPartition starts the TransactionManager for a partition.
