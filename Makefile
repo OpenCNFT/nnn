@@ -140,6 +140,7 @@ OVERRIDE_GIT_VERSION ?= ${GIT_VERSION}
 # if it is either set to the empty string or "default".
 ifeq (${GIT_VERSION:default=},)
     override GIT_VERSION := ${GIT_VERSION_2_45}
+	export WITH_BUNDLED_GIT = YesPlease
 else
     # Support both vX.Y.Z and X.Y.Z version patterns, since callers across GitLab
     # use both.
@@ -310,7 +311,6 @@ build: build-bundled-git
 prepare-tests: build-bundled-git
 install: install-bundled-git
 
-export GITALY_TESTING_BUNDLED_GIT_PATH ?= ${BUILD_DIR}/bin
 else
 prepare-tests: ${DEPENDENCY_DIR}/git-distribution/git
 

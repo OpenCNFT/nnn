@@ -149,6 +149,8 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 
 	cfg.Transactions.Enabled = testhelper.IsWALEnabled()
 
+	cfg.Git.UseBundledBinaries = true
+
 	require.NoError(tb, cfg.Sanitize())
 	require.NoError(tb, cfg.ValidateV2())
 
