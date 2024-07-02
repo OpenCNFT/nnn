@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -20,17 +20,16 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 	t.Run("bootstrap a singular cluster", func(t *testing.T) {
 		t.Parallel()
 		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1"))
 		logger := testhelper.NewLogger(t)
 
 		cluster := newTestRaftCluster(t, 1)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
 		metadataGroup, err := newMetadataRaftGroup(
-			ctx, cluster.nodes[1].nodeHost, dbForGroup(db, MetadataGroupID, 1), cluster.createRaftConfig(1), logger,
+			ctx, cluster.nodes[1].nodeHost, dbForMetadataGroup(ptnMgr, "node-1"), cluster.createRaftConfig(1), logger,
 		)
 		require.NoError(t, err)
 
@@ -53,14 +52,13 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 	t.Run("bootstrap a 3-node cluster", func(t *testing.T) {
 		t.Parallel()
 		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 		logger := testhelper.NewLogger(t)
 
 		cluster := newTestRaftCluster(t, 3)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
 		var wg sync.WaitGroup
 		for i := raftID(1); i <= 3; i++ {
@@ -69,7 +67,7 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 				defer wg.Done()
 
 				metadataGroup, err := newMetadataRaftGroup(
-					ctx, cluster.nodes[i].nodeHost, dbForGroup(db, MetadataGroupID, i), cluster.createRaftConfig(i), logger,
+					ctx, cluster.nodes[i].nodeHost, dbForMetadataGroup(ptnMgr, fmt.Sprintf("node-%d", i)), cluster.createRaftConfig(i), logger,
 				)
 				require.NoError(t, err)
 
@@ -96,14 +94,13 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 	t.Run("bootstrap a 3-node cluster with 2 available nodes", func(t *testing.T) {
 		t.Parallel()
 		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 		logger := testhelper.NewLogger(t)
 
 		cluster := newTestRaftCluster(t, 3)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
 		var wg sync.WaitGroup
 		// Bootstrap using two nodes.
@@ -113,7 +110,7 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 				defer wg.Done()
 
 				metadataGroup, err := newMetadataRaftGroup(
-					ctx, cluster.nodes[i].nodeHost, dbForGroup(db, MetadataGroupID, i), cluster.createRaftConfig(i), logger,
+					ctx, cluster.nodes[i].nodeHost, dbForMetadataGroup(ptnMgr, fmt.Sprintf("node-%d", i)), cluster.createRaftConfig(i), logger,
 				)
 				require.NoError(t, err)
 
@@ -130,7 +127,7 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 
 		// Now node 3 joins.
 		metadataGroup, err := newMetadataRaftGroup(
-			ctx, cluster.nodes[3].nodeHost, dbForGroup(db, MetadataGroupID, 3), cluster.createRaftConfig(3), logger,
+			ctx, cluster.nodes[3].nodeHost, dbForMetadataGroup(ptnMgr, "node-3"), cluster.createRaftConfig(3), logger,
 		)
 		require.NoError(t, err)
 
@@ -148,14 +145,13 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 	t.Run("bootstrap a bootstrapped cluster", func(t *testing.T) {
 		t.Parallel()
 		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 		logger := testhelper.NewLogger(t)
 
 		cluster := newTestRaftCluster(t, 3)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
 		var wg sync.WaitGroup
 		for i := raftID(1); i <= 3; i++ {
@@ -164,7 +160,7 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 				defer wg.Done()
 
 				metadataGroup, err := newMetadataRaftGroup(
-					ctx, cluster.nodes[i].nodeHost, dbForGroup(db, MetadataGroupID, i), cluster.createRaftConfig(i), logger,
+					ctx, cluster.nodes[i].nodeHost, dbForMetadataGroup(ptnMgr, fmt.Sprintf("node-%d", i)), cluster.createRaftConfig(i), logger,
 				)
 				require.NoError(t, err)
 
@@ -185,20 +181,19 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 	t.Run("context cancellation while bootstrapping cluster", func(t *testing.T) {
 		t.Parallel()
 		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 		logger := testhelper.NewLogger(t)
 
 		cluster := newTestRaftCluster(t, 3)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		metadataGroup, err := newMetadataRaftGroup(
-			ctx, cluster.nodes[1].nodeHost, dbForGroup(db, MetadataGroupID, 1), cluster.createRaftConfig(1), logger,
+			ctx, cluster.nodes[1].nodeHost, dbForMetadataGroup(ptnMgr, "node-1"), cluster.createRaftConfig(1), logger,
 		)
 
 		require.NoError(t, err)
@@ -219,7 +214,7 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 func TestMetadataGroup_RegisterStorage(t *testing.T) {
 	t.Parallel()
 
-	bootstrapCluster := func(t *testing.T, cluster *testRaftCluster, db keyvalue.Transactioner) map[raftID]*metadataRaftGroup {
+	bootstrapCluster := func(t *testing.T, cluster *testRaftCluster, ptnMgr *storagemgr.PartitionManager) map[raftID]*metadataRaftGroup {
 		ctx := testhelper.Context(t)
 		logger := testhelper.NewLogger(t)
 
@@ -233,7 +228,7 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 				defer wg.Done()
 
 				metadataGroup, err := newMetadataRaftGroup(
-					ctx, cluster.nodes[i].nodeHost, dbForGroup(db, MetadataGroupID, i), cluster.createRaftConfig(i), logger,
+					ctx, cluster.nodes[i].nodeHost, dbForMetadataGroup(ptnMgr, fmt.Sprintf("node-%d", i)), cluster.createRaftConfig(i), logger,
 				)
 				require.NoError(t, err)
 
@@ -256,16 +251,15 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 
 	t.Run("register storages with a non-bootstrapped cluster", func(t *testing.T) {
 		t.Parallel()
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 
 		cluster := newTestRaftCluster(t, 1)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
 		metadataGroup, err := newMetadataRaftGroup(
-			testhelper.Context(t), cluster.nodes[1].nodeHost, dbForGroup(db, MetadataGroupID, 1), cluster.createRaftConfig(1), testhelper.NewLogger(t),
+			testhelper.Context(t), cluster.nodes[1].nodeHost, dbForMetadataGroup(ptnMgr, "node-1"), cluster.createRaftConfig(1), testhelper.NewLogger(t),
 		)
 		require.NoError(t, err)
 
@@ -277,15 +271,13 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 
 	t.Run("register storages with a bootstrapped cluster", func(t *testing.T) {
 		t.Parallel()
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 
 		cluster := newTestRaftCluster(t, 3)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
-
-		groups := bootstrapCluster(t, cluster, db)
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		groups := bootstrapCluster(t, cluster, ptnMgr)
 
 		for i := raftID(1); i <= 3; i++ {
 			id, err := groups[i].RegisterStorage(fmt.Sprintf("storage-%d", 2*i))
@@ -310,15 +302,13 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 
 	t.Run("register a duplicated storage name", func(t *testing.T) {
 		t.Parallel()
-		cfg := testcfg.Build(t)
+		cfg := testcfg.Build(t, testcfg.WithStorages("node-1", "node-2", "node-3"))
 
 		cluster := newTestRaftCluster(t, 3)
 		defer cluster.closeAll()
 
-		db, closeDB := setupStorageDB(t, cfg)
-		defer closeDB()
-
-		groups := bootstrapCluster(t, cluster, db)
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		groups := bootstrapCluster(t, cluster, ptnMgr)
 
 		id, err := groups[1].RegisterStorage("storage-1")
 		require.NoError(t, err)
