@@ -149,6 +149,10 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 
 	cfg.Transactions.Enabled = testhelper.IsWALEnabled()
 
+	// We force the use of bundled (embedded) binaries unless we're specifically executing tests
+	// against a custom version of Git.
+	cfg.Git.UseBundledBinaries = os.Getenv("GITALY_TESTING_GIT_BINARY") == ""
+
 	require.NoError(tb, cfg.Sanitize())
 	require.NoError(tb, cfg.ValidateV2())
 
