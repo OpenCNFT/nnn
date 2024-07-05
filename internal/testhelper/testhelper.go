@@ -457,3 +457,10 @@ func TestdataAbsolutePath(t *testing.T) string {
 
 	return filepath.Join(filepath.Dir(currentFile), "testdata")
 }
+
+// SourceRoot returns the root directory of the Gitaly repository.
+func SourceRoot(tb testing.TB) string {
+	output, err := exec.Command("go", "env", "GOMOD").CombinedOutput()
+	require.NoError(tb, err, output)
+	return filepath.Dir(string(output))
+}
