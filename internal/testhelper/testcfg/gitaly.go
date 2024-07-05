@@ -3,6 +3,7 @@ package testcfg
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -100,6 +101,27 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 		cfg.RuntimeDir = filepath.Join(root, "runtime.d")
 		require.NoError(tb, os.Mkdir(cfg.RuntimeDir, perm.PrivateDir))
 		require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), perm.SharedDir))
+
+		// We do this symlinking to emulate what happens with the Git binaries in production:
+		// - In production, the Git binaries get unpacked by packed_binaries.go into Gitaly's RuntimeDir, which for
+		//   Omnibus is something like /var/opt/gitlab/gitaly/run/gitaly-<xxx>.
+		// - In testing, the binaries remain in the _build/bin directory of the repository root.
+		for _, suffix := range []string{"-v2.44", "-v2.45"} {
+			for _, bin := range []string{"gitaly-git", "gitaly-git-http-backend", "gitaly-git-remote-http"} {
+				fullBin := bin + suffix
+				targetPath := filepath.Join(testhelper.SourceRoot(tb), "_build", "bin", fullBin)
+				if strings.HasPrefix(targetPath, "/dev") {
+					tb.FailNow()
+				}
+				destinationPath := filepath.Join(cfg.RuntimeDir, fullBin)
+				// It's possible that the same RuntimeDir is used across multiple invocations of
+				// testcfg.Build(), so we simply remove any existing symlinks.
+				if _, err := os.Lstat(destinationPath); err == nil {
+					require.NoError(tb, os.Remove(destinationPath))
+				}
+				require.NoError(tb, os.Symlink(targetPath, destinationPath))
+			}
+		}
 	}
 
 	if len(cfg.Storages) != 0 && len(gc.storages) != 0 {
