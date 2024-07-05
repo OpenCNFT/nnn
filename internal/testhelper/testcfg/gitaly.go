@@ -3,6 +3,7 @@ package testcfg
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -46,6 +47,19 @@ func WithPackObjectsCacheEnabled() Option {
 	}
 }
 
+// WithDisableBundledGitSymlinking stops the builder from symlinking the
+// compiled bundled Git binaries in _build/bin to cfg.RuntimeDir. This is
+// useful for tests like cmd/gitaly/check_test.go which executes a test
+// against a compiled Gitaly binary. If this option is not supplied, both
+// the test and the Gitaly process it spawns will try to populate RuntimeDir
+// with the same binaries, which causes a "file exists" exception in
+// packed_binaries.go
+func WithDisableBundledGitSymlinking() Option {
+	return func(builder *GitalyCfgBuilder) {
+		builder.disableBundledGitSymlinking = true
+	}
+}
+
 // NewGitalyCfgBuilder returns gitaly configuration builder with configured set of options.
 func NewGitalyCfgBuilder(opts ...Option) GitalyCfgBuilder {
 	cfgBuilder := GitalyCfgBuilder{}
@@ -61,8 +75,9 @@ func NewGitalyCfgBuilder(opts ...Option) GitalyCfgBuilder {
 type GitalyCfgBuilder struct {
 	cfg config.Cfg
 
-	storages                []string
-	packObjectsCacheEnabled bool
+	storages                    []string
+	packObjectsCacheEnabled     bool
+	disableBundledGitSymlinking bool
 }
 
 // Build setups required filesystem structure, creates and returns configuration of the gitaly service.
@@ -100,6 +115,29 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 		cfg.RuntimeDir = filepath.Join(root, "runtime.d")
 		require.NoError(tb, os.Mkdir(cfg.RuntimeDir, perm.PrivateDir))
 		require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), perm.SharedDir))
+
+		if !gc.disableBundledGitSymlinking {
+			// We do this symlinking to emulate what happens with the Git binaries in production:
+			// - In production, the Git binaries get unpacked by packed_binaries.go into Gitaly's RuntimeDir, which for
+			//   Omnibus is something like /var/opt/gitlab/gitaly/run/gitaly-<xxx>.
+			// - In testing, the binaries remain in the _build/bin directory of the repository root.
+			for _, suffix := range []string{"-v2.44", "-v2.45"} {
+				for _, bin := range []string{"gitaly-git", "gitaly-git-http-backend", "gitaly-git-remote-http"} {
+					fullBin := bin + suffix
+					targetPath := filepath.Join(testhelper.SourceRoot(tb), "_build", "bin", fullBin)
+					if strings.HasPrefix(targetPath, "/dev") {
+						tb.FailNow()
+					}
+					destinationPath := filepath.Join(cfg.RuntimeDir, fullBin)
+					// It's possible that the same RuntimeDir is used across multiple invocations of
+					// testcfg.Build(), so we simply remove any existing symlinks.
+					if _, err := os.Lstat(destinationPath); err == nil {
+						require.NoError(tb, os.Remove(destinationPath))
+					}
+					require.NoError(tb, os.Symlink(targetPath, destinationPath))
+				}
+			}
+		}
 	}
 
 	if len(cfg.Storages) != 0 && len(gc.storages) != 0 {
