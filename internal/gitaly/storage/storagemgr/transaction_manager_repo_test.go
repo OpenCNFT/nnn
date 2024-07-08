@@ -463,6 +463,71 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 			},
 		},
+		{
+			desc: "begin transaction on with all repositories",
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{"repository-1"},
+				},
+				CreateRepository{
+					TransactionID: 1,
+				},
+				Commit{
+					TransactionID: 1,
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{"repository-2"},
+					ExpectedSnapshotLSN: 1,
+				},
+				CreateRepository{
+					TransactionID: 2,
+				},
+				Commit{
+					TransactionID: 2,
+				},
+				// Start a transaction on all repositories.
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       nil,
+					ReadOnly:            true,
+					ExpectedSnapshotLSN: 2,
+				},
+				RepositoryAssertion{
+					TransactionID: 3,
+					Repositories: RepositoryStates{
+						"repository-1": {
+							DefaultBranch: "refs/heads/main",
+						},
+						"repository-2": {
+							DefaultBranch: "refs/heads/main",
+						},
+					},
+				},
+				Rollback{
+					TransactionID: 3,
+				},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(relativePathKey("repository-1")): string(""),
+					"kv/" + string(relativePathKey("repository-2")): string(""),
+				},
+				Repositories: RepositoryStates{
+					// The setup repository does not have its relative path in the partition KV.
+					setup.RelativePath: {},
+					"repository-1": {
+						Objects: []git.ObjectID{},
+					},
+					"repository-2": {
+						Objects: []git.ObjectID{},
+					},
+				},
+			},
+		},
 	}
 }
 

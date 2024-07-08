@@ -95,9 +95,11 @@ var (
 	keyAppliedLSN = []byte("applied_lsn")
 )
 
+const relativePathKeyPrefix = "r/"
+
 // relativePathKey generates the database key for storing relative paths in a partition.
 func relativePathKey(relativePath string) []byte {
-	return []byte("r/" + relativePath)
+	return []byte(relativePathKeyPrefix + relativePath)
 }
 
 // InvalidReferenceFormatError is returned when a reference name was invalid.
@@ -304,7 +306,8 @@ type BeginOptions struct {
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
 //
 // relativePaths are the repositories that will be part of the snapshot. Only
-// the first repository will be checked for writes.
+// the first repository will be checked for writes. If relativePaths is nil
+// then all repositories in the partition will be included.
 //
 // readOnly indicates whether this is a read-only transaction. Read-only transactions are not
 // configured with a quarantine directory and do not commit a log entry.
@@ -419,6 +422,13 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 	case <-mgr.ctx.Done():
 		return nil, ErrTransactionProcessingStopped
 	case <-readReady:
+		txn.db = mgr.db.NewTransaction(!txn.readOnly)
+		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
+
+		if relativePaths == nil {
+			relativePaths = txn.partitionRelativePaths()
+		}
+
 		if len(relativePaths) > 0 {
 			// Set the first repository as the tracked repository
 			txn.relativePath = relativePaths[0]
@@ -462,9 +472,6 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 			}
 		}
 
-		txn.db = mgr.db.NewTransaction(!txn.readOnly)
-		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
-
 		return txn, nil
 	}
 }
@@ -472,6 +479,24 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 // repositoryTarget returns true if the transaction targets a repository.
 func (txn *Transaction) repositoryTarget() bool {
 	return txn.relativePath != ""
+}
+
+// partitionRelativePaths returns all known repository relative paths for the
+// transactions partition.
+func (txn *Transaction) partitionRelativePaths() []string {
+	it := txn.KV().NewIterator(keyvalue.IteratorOptions{
+		Prefix: []byte(relativePathKeyPrefix),
+	})
+	defer it.Close()
+
+	var relativePaths []string
+	for it.Rewind(); it.Valid(); it.Next() {
+		key := it.Item().Key()
+		relativePath := bytes.TrimPrefix(key, []byte(relativePathKeyPrefix))
+		relativePaths = append(relativePaths, string(relativePath))
+	}
+
+	return relativePaths
 }
 
 // originalPackedRefsFilePath returns the path of the original `packed-refs` file that records the state of the
