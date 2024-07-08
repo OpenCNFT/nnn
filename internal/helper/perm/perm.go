@@ -34,10 +34,6 @@ const (
 	// of gitaly.
 	SharedFile fs.FileMode = 0o644
 
-	// PublicFile is the permission given for a file that may be read or
-	// written outside of gitaly.
-	PublicFile fs.FileMode = 0o666
-
 	// PrivateExecutable is the permissions given for an executable that must
 	// only be used by gitaly.
 	PrivateExecutable fs.FileMode = 0o700
