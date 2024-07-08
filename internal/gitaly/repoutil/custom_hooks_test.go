@@ -324,34 +324,34 @@ func TestNewDirectoryVote(t *testing.T) {
 		{
 			desc: "generated hash matches",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.SharedExecutable},
-				{name: "pre-push.sample", content: "bar", mode: perm.SharedExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateExecutable},
+				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
 			},
-			expectedHash: "91580ffcdc8a41ffedbc7f004c4373eff96331f4",
+			expectedHash: "3c0fd54e0428c5ee04c15ee5a52864694771fb20",
 		},
 		{
 			desc: "generated hash matches with changed file name",
 			files: []testFile{
-				{name: "pre-commit.sample.diff", content: "foo", mode: perm.SharedExecutable},
-				{name: "pre-push.sample", content: "bar", mode: perm.SharedExecutable},
+				{name: "pre-commit.sample.diff", content: "foo", mode: perm.PrivateExecutable},
+				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
 			},
-			expectedHash: "2e350f43b2418484d8a453ee6c4f6ca145ed1b67",
+			expectedHash: "2d5080ef5ed0a52254a794915c8fbbec8c694224",
 		},
 		{
 			desc: "generated hash matches with changed file content",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.SharedExecutable},
-				{name: "pre-push.sample", content: "bar.diff", mode: perm.SharedExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateExecutable},
+				{name: "pre-push.sample", content: "bar.diff", mode: perm.PrivateExecutable},
 			},
-			expectedHash: "76fd824ff0728c94bb4d5bd771ba9288803ca8c4",
+			expectedHash: "18e2d3f9cc9990747b27cf8a7fad281539856194",
 		},
 		{
 			desc: "generated hash matches with changed file mode",
 			files: []testFile{
 				{name: "pre-commit.sample", content: "foo", mode: perm.SharedFile},
-				{name: "pre-push.sample", content: "bar", mode: perm.SharedExecutable},
+				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
 			},
-			expectedHash: "6ed1f5e284ca8193cdab5278f626a07300bfe5c5",
+			expectedHash: "c81ab4e8cca863a4e8d24c080d3daefcf5f0f8aa",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
