@@ -14,10 +14,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
-
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
 func main() {
@@ -71,7 +70,12 @@ func replaceBuildID(inputPath, outputPath, inputBuildID, outputBuildID string) e
 		return fmt.Errorf("could not replace build ID: %w", err)
 	}
 
-	if err := writeBinary(outputPath, data); err != nil {
+	fileInfo, err := os.Stat(inputPath)
+	if err != nil {
+		return fmt.Errorf("stat input: %w", err)
+	}
+
+	if err := writeBinary(outputPath, fileInfo.Mode(), data); err != nil {
 		return fmt.Errorf("writing binary: %w", err)
 	}
 
@@ -97,7 +101,7 @@ func readAndReplace(binaryPath string, inputBuildID, outputBuildID []byte) ([]by
 	return bytes.ReplaceAll(data, inputBuildID, outputBuildID), nil
 }
 
-func writeBinary(binaryPath string, contents []byte) error {
+func writeBinary(binaryPath string, mode fs.FileMode, contents []byte) error {
 	f, err := os.CreateTemp(filepath.Dir(binaryPath), filepath.Base(binaryPath))
 	if err != nil {
 		return fmt.Errorf("could not create binary: %w", err)
@@ -107,12 +111,12 @@ func writeBinary(binaryPath string, contents []byte) error {
 		f.Close()
 	}()
 
-	if err := f.Chmod(perm.SharedExecutable); err != nil {
-		return fmt.Errorf("could not change permissions: %w", err)
-	}
-
 	if _, err := io.Copy(f, bytes.NewReader(contents)); err != nil {
 		return fmt.Errorf("could not write binary: %w", err)
+	}
+
+	if err := f.Chmod(mode); err != nil {
+		return fmt.Errorf("could not change permissions: %w", err)
 	}
 
 	if err := f.Close(); err != nil {
