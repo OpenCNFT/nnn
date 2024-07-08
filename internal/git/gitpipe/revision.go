@@ -45,6 +45,7 @@ const (
 type revlistConfig struct {
 	blobLimit             int
 	objects               bool
+	noObjectName          bool
 	objectType            ObjectType
 	order                 Order
 	reverse               bool
@@ -56,6 +57,7 @@ type revlistConfig struct {
 	regexIgnoreCase       bool
 	commitMessagePatterns [][]byte
 	skipResult            func(*RevisionResult) bool
+	filterPrintOmitted    bool
 }
 
 // RevlistOption is an option for the revlist pipeline step.
@@ -66,6 +68,18 @@ type RevlistOption func(cfg *revlistConfig)
 func WithObjects() RevlistOption {
 	return func(cfg *revlistConfig) {
 		cfg.objects = true
+	}
+}
+
+func WithNoObjectNames() RevlistOption {
+	return func(cfg *revlistConfig) {
+		cfg.noObjectName = true
+	}
+}
+
+func WithFilterPrintOmitted() RevlistOption {
+	return func(cfg *revlistConfig) {
+		cfg.filterPrintOmitted = true
 	}
 }
 
@@ -216,10 +230,17 @@ func Revlist(
 			)
 		}
 
+		if cfg.noObjectName {
+			flags = append(flags, git.Flag{Name: "--no-object-names"})
+		}
+
 		if cfg.blobLimit > 0 {
 			flags = append(flags, git.Flag{
 				Name: fmt.Sprintf("--filter=blob:limit=%d", cfg.blobLimit),
 			})
+			if cfg.filterPrintOmitted {
+				flags = append(flags, git.Flag{Name: "--filter-print-omitted"})
+			}
 		}
 
 		if cfg.objectType != "" {

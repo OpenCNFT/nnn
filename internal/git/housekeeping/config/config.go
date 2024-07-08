@@ -37,6 +37,26 @@ const (
 	// of objects. Loose objects will get soaked up as part of the repack regardless of their
 	// reachability.
 	RepackObjectsStrategyGeometric = RepackObjectsStrategy("geometric")
+
+	// TODO [mark] POC of offloading large objects (OLO)
+	RepackObjectsStrategyOffloading = RepackObjectsStrategy("offloading")
+)
+
+// FilterBlobAction defines what we want to do regarding blob offloading.
+type FilterBlobAction string
+
+const (
+	// FilterBlobActionNoChange means that we should filter blobs only if such filtering is already
+	// setup, and we shouldn't change the blob filtering setup.
+	FilterBlobActionNoChange = FilterBlobAction("no_change")
+	// FilterBlobActionStartFilteringAll means that we should setup filtering all blobs and perform
+	// such filtering. If blob filtering is already setup, this should be the same as
+	// FilterBlobActionNoChange.
+	FilterBlobActionStartFilteringAll = FilterBlobAction("start_filtering_all_blobs")
+	// FilterBlobActionStopFilteringAny means that we should remove any setup for filtering all blobs,
+	// stop performing such filtering and repack all the blobs with the other Git objects. If blob
+	// filtering is not already setup, this should be the same as FilterBlobActionNoChange.
+	FilterBlobActionStopFilteringAny = FilterBlobAction("stop_filtering_any_blob")
 )
 
 // RepackObjectsConfig is configuration for RepackObjects.
@@ -49,6 +69,9 @@ type RepackObjectsConfig struct {
 	WriteBitmap bool
 	// WriteMultiPackIndex determines whether a multi-pack index should be written or not.
 	WriteMultiPackIndex bool
+	// FilterBlobs determines if we want to start or stop filtering out blobs into a separate
+	// packfile, or if we want to continue doing what we already do regarding blob filtering.
+	FilterBlobs FilterBlobAction
 	// CruftExpireBefore determines the cutoff date before which unreachable cruft objects shall
 	// be expired and thus deleted.
 	CruftExpireBefore time.Time
