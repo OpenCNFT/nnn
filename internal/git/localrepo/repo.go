@@ -18,7 +18,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -191,7 +190,7 @@ func (repo *Repo) StorageTempDir() (string, error) {
 		return "", err
 	}
 
-	if err := os.MkdirAll(tempPath, perm.SharedDir); err != nil {
+	if err := os.MkdirAll(tempPath, storage.ModeDirectory.Perm()); err != nil {
 		return "", err
 	}
 

@@ -15,7 +15,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/dontpanic"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
 
 func (c *DiskCache) logWalkErr(err error, path, msg string) {
@@ -141,20 +141,20 @@ func (c *DiskCache) startCleanWalker(cacheDir, stateDir string) {
 
 // moveAndClear will move the cache to the storage location's
 // temporary folder, and then remove its contents asynchronously
-func (c *DiskCache) moveAndClear(storage config.Storage) error {
+func (c *DiskCache) moveAndClear(storageCfg config.Storage) error {
 	if c.cacheConfig.disableMoveAndClear {
 		return nil
 	}
 
-	logger := c.logger.WithField("storage", storage.Name)
+	logger := c.logger.WithField("storage", storageCfg.Name)
 	logger.Info("clearing disk cache object folder")
 
-	tempPath, err := c.locator.TempDir(storage.Name)
+	tempPath, err := c.locator.TempDir(storageCfg.Name)
 	if err != nil {
 		return fmt.Errorf("temp dir: %w", err)
 	}
 
-	if err := os.MkdirAll(tempPath, perm.SharedDir); err != nil {
+	if err := os.MkdirAll(tempPath, storage.ModeDirectory.Perm()); err != nil {
 		return err
 	}
 
@@ -179,7 +179,7 @@ func (c *DiskCache) moveAndClear(storage config.Storage) error {
 
 	logger.Info("moving disk cache object folder")
 
-	cachePath, err := c.locator.CacheDir(storage.Name)
+	cachePath, err := c.locator.CacheDir(storageCfg.Name)
 	if err != nil {
 		return fmt.Errorf("cache dir: %w", err)
 	}

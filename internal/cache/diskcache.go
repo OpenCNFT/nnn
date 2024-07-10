@@ -12,7 +12,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/dontpanic"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -293,7 +292,7 @@ func (c *DiskCache) PutStream(ctx context.Context, repo *gitalypb.Repository, re
 		}
 	}()
 
-	if err := os.MkdirAll(filepath.Dir(reqPath), perm.SharedDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(reqPath), storage.ModeDirectory.Perm()); err != nil {
 		return err
 	}
 

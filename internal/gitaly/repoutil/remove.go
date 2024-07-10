@@ -10,7 +10,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -54,7 +53,7 @@ func remove(
 		return structerr.NewInternal("temporary directory: %w", err)
 	}
 
-	if err := os.MkdirAll(tempDir, perm.SharedDir); err != nil {
+	if err := os.MkdirAll(tempDir, storage.ModeDirectory.Perm()); err != nil {
 		return structerr.NewInternal("%w", err)
 	}
 

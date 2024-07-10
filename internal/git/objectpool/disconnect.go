@@ -13,9 +13,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
@@ -90,7 +90,7 @@ func Disconnect(ctx context.Context, repo *localrepo.Repo, logger log.Logger, tx
 		source := filepath.Join(altObjectDir, path)
 		target := filepath.Join(repoPath, "objects", path)
 
-		if err := os.MkdirAll(filepath.Dir(target), perm.SharedDir); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), storage.ModeDirectory.Perm()); err != nil {
 			return err
 		}
 

@@ -15,7 +15,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -148,7 +148,7 @@ func (repo *Repo) WriteCommit(ctx context.Context, cfg WriteCommitConfig) (git.O
 			return "", errors.New("alternate object directory must be an absolute path")
 		}
 
-		if err := os.MkdirAll(cfg.AlternateObjectDir, perm.SharedDir); err != nil {
+		if err := os.MkdirAll(cfg.AlternateObjectDir, storage.ModeDirectory.Perm()); err != nil {
 			return "", err
 		}
 
