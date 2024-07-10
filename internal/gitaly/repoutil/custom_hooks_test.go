@@ -327,7 +327,7 @@ func TestNewDirectoryVote(t *testing.T) {
 				{name: "pre-commit.sample", content: "foo", mode: perm.SharedExecutable},
 				{name: "pre-push.sample", content: "bar", mode: perm.SharedExecutable},
 			},
-			expectedHash: "8ca11991268de4c9278488a674fc1a88db449566",
+			expectedHash: "91580ffcdc8a41ffedbc7f004c4373eff96331f4",
 		},
 		{
 			desc: "generated hash matches with changed file name",
@@ -335,7 +335,7 @@ func TestNewDirectoryVote(t *testing.T) {
 				{name: "pre-commit.sample.diff", content: "foo", mode: perm.SharedExecutable},
 				{name: "pre-push.sample", content: "bar", mode: perm.SharedExecutable},
 			},
-			expectedHash: "b5ed58ced84103da1ed9d7813a9e39b3b5daf7d7",
+			expectedHash: "2e350f43b2418484d8a453ee6c4f6ca145ed1b67",
 		},
 		{
 			desc: "generated hash matches with changed file content",
@@ -343,7 +343,7 @@ func TestNewDirectoryVote(t *testing.T) {
 				{name: "pre-commit.sample", content: "foo", mode: perm.SharedExecutable},
 				{name: "pre-push.sample", content: "bar.diff", mode: perm.SharedExecutable},
 			},
-			expectedHash: "178083848c8a08e36c4f86c2d318a84b0bb845f2",
+			expectedHash: "76fd824ff0728c94bb4d5bd771ba9288803ca8c4",
 		},
 		{
 			desc: "generated hash matches with changed file mode",
@@ -351,7 +351,7 @@ func TestNewDirectoryVote(t *testing.T) {
 				{name: "pre-commit.sample", content: "foo", mode: perm.SharedFile},
 				{name: "pre-push.sample", content: "bar", mode: perm.SharedExecutable},
 			},
-			expectedHash: "c69574241b83496bb4005b4f7a0dfcda96cb317e",
+			expectedHash: "6ed1f5e284ca8193cdab5278f626a07300bfe5c5",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -375,7 +375,7 @@ func mustWriteCustomHookDirectory(t *testing.T, files []testFile, dirName string
 	tmpDir := testhelper.TempDir(t)
 	hooksPath := filepath.Join(tmpDir, dirName)
 
-	err := os.Mkdir(hooksPath, perm.SharedDir)
+	err := os.Mkdir(hooksPath, perm.PrivateDir)
 	require.NoError(t, err)
 
 	for _, f := range files {
