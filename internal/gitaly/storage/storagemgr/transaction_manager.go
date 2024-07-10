@@ -1449,7 +1449,7 @@ func (mgr *TransactionManager) setupStagingRepository(ctx context.Context, trans
 		if err := os.WriteFile(
 			stats.AlternatesFilePath(mgr.getAbsolutePath(transaction.stagingSnapshot.RelativePath(transaction.relativePath))),
 			[]byte(alternatesContent),
-			perm.PrivateFile,
+			storage.ModeFile.Perm(),
 		); err != nil {
 			return fmt.Errorf("insert modified alternate file: %w", err)
 		}
@@ -3095,7 +3095,7 @@ func (mgr *TransactionManager) appendLogEntry(objectDependencies map[git.ObjectI
 
 	// Finalize the log entry by writing the MANIFEST file into the log entry's directory.
 	manifestPath := manifestPath(logEntryPath)
-	if err := os.WriteFile(manifestPath, manifestBytes, perm.PrivateFile); err != nil {
+	if err := os.WriteFile(manifestPath, manifestBytes, storage.ModeFile.Perm()); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
