@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/fs"
 	"os/exec"
 	"strings"
 	"testing"
@@ -46,13 +45,6 @@ func TestSetHooksSubcommand(t *testing.T) {
 	client := newRepositoryClient(t, ctx, cfg, serverSocketPath)
 
 	configPath := testcfg.WriteTemporaryGitalyConfigFile(t, cfg)
-
-	expectedDirectoryMode := testhelper.WithOrWithoutWAL(
-		// TAR does not store the directory mode in the mode field. It's stored
-		// in the type field of the header. Only match against the permissions.
-		mode.Directory.Perm(),
-		umask.Mask(fs.ModePerm),
-	)
 
 	expectedExecutableMode := testhelper.WithOrWithoutWAL(
 		mode.Executable,
@@ -140,7 +132,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: &bytes.Buffer{},
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/": {Mode: expectedDirectoryMode},
+				"custom_hooks/": {Mode: perm.PrivateDir},
 			},
 		},
 		{
@@ -155,7 +147,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: expectedDirectoryMode},
+				"custom_hooks/":            {Mode: perm.PrivateDir},
 				"custom_hooks/pre-commit":  {Mode: expectedExecutableMode, Content: []byte("pre-commit content")},
 				"custom_hooks/pre-push":    {Mode: expectedExecutableMode, Content: []byte("pre-push content")},
 				"custom_hooks/pre-receive": {Mode: expectedExecutableMode, Content: []byte("pre-receive content")},
@@ -179,7 +171,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: expectedDirectoryMode},
+				"custom_hooks/":            {Mode: perm.PrivateDir},
 				"custom_hooks/pre-commit":  {Mode: expectedExecutableMode, Content: []byte("pre-commit content")},
 				"custom_hooks/pre-push":    {Mode: expectedExecutableMode, Content: []byte("pre-push content")},
 				"custom_hooks/pre-receive": {Mode: expectedExecutableMode, Content: []byte("pre-receive content")},
