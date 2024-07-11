@@ -348,10 +348,10 @@ func TestNewDirectoryVote(t *testing.T) {
 		{
 			desc: "generated hash matches with changed file mode",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.SharedFile},
+				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateWriteOnceFile},
 				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
 			},
-			expectedHash: "c81ab4e8cca863a4e8d24c080d3daefcf5f0f8aa",
+			expectedHash: "ad20a4fea20e9049bb70e084e757fcc5d2cf2cc7",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
