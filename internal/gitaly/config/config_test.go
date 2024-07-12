@@ -2665,9 +2665,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 		},
 		{
@@ -2682,9 +2683,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2705,9 +2707,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2728,9 +2731,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2742,14 +2746,15 @@ func TestRaftConfig_Validate(t *testing.T) {
 		{
 			name: "empty initial members",
 			cfg: Raft{
-				Enabled:         true,
-				ClusterID:       "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
-				NodeID:          1,
-				RaftAddr:        "localhost:3001",
-				InitialMembers:  map[string]string{},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				Enabled:           true,
+				ClusterID:         "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
+				NodeID:            1,
+				RaftAddr:          "localhost:3001",
+				InitialMembers:    map[string]string{},
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2771,9 +2776,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"3": "localhost:3003",
 					"4": "",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2795,9 +2801,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"3": "localhost:3003",
 					"4": "1:2:3",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2818,9 +2825,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 0,
-				ElectionTicks:   20,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   0,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2841,9 +2849,10 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   0,
-				HeartbeatTicks:  2,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     0,
+				HeartbeatTicks:    2,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
@@ -2864,14 +2873,39 @@ func TestRaftConfig_Validate(t *testing.T) {
 					"2": "localhost:3002",
 					"3": "localhost:3003",
 				},
-				RTTMilliseconds: 200,
-				ElectionTicks:   20,
-				HeartbeatTicks:  0,
+				ReplicationFactor: 5,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    0,
 			},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					fmt.Errorf("%w: 0 is not greater than 0", cfgerror.ErrNotInRange),
 					"heartbeat_rtt",
+				),
+			},
+		},
+		{
+			name: "invalid replication factor",
+			cfg: Raft{
+				Enabled:   true,
+				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
+				NodeID:    1,
+				RaftAddr:  "localhost:3001",
+				InitialMembers: map[string]string{
+					"1": "localhost:3001",
+					"2": "localhost:3002",
+					"3": "localhost:3003",
+				},
+				ReplicationFactor: 0,
+				RTTMilliseconds:   200,
+				ElectionTicks:     20,
+				HeartbeatTicks:    2,
+			},
+			expectedErr: cfgerror.ValidationErrors{
+				cfgerror.NewValidationError(
+					fmt.Errorf("%w: 0 is not greater than 0", cfgerror.ErrNotInRange),
+					"replication_factor",
 				),
 			},
 		},
@@ -2905,9 +2939,10 @@ initial_members = {1 = "localhost:4001", 2 = "localhost:4002", 3 = "localhost:40
 				"2": "localhost:4002",
 				"3": "localhost:4003",
 			},
-			RTTMilliseconds: 200,
-			ElectionTicks:   20,
-			HeartbeatTicks:  0,
+			ReplicationFactor: 3,
+			RTTMilliseconds:   200,
+			ElectionTicks:     20,
+			HeartbeatTicks:    0,
 		},
 	}
 	require.NoError(t, expectedCfg.SetDefaults())
