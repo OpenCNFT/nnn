@@ -228,8 +228,8 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		requireLastApplied(t, sm, 1)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name, ReplicationFactor: 5, NodeId: 2})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -237,8 +237,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Value: uint64(resultRegisterStorageSuccessful),
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
-						StorageId: 1,
-						Name:      cfg.Storages[0].Name,
+						StorageId:         1,
+						Name:              cfg.Storages[0].Name,
+						ReplicationFactor: 3,
+						NodeId:            1,
 					},
 				}),
 			}},
@@ -246,8 +248,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Value: uint64(resultRegisterStorageSuccessful),
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
-						StorageId: 2,
-						Name:      cfg.Storages[1].Name,
+						StorageId:         2,
+						Name:              cfg.Storages[1].Name,
+						ReplicationFactor: 5,
+						NodeId:            2,
 					},
 				}),
 			}},
@@ -259,12 +263,16 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 			NextStorageId: 3,
 			Storages: map[uint64]*gitalypb.Storage{
 				1: {
-					StorageId: 1,
-					Name:      cfg.Storages[0].Name,
+					StorageId:         1,
+					Name:              cfg.Storages[0].Name,
+					ReplicationFactor: 3,
+					NodeId:            1,
 				},
 				2: {
-					StorageId: 2,
-					Name:      cfg.Storages[1].Name,
+					StorageId:         2,
+					Name:              cfg.Storages[1].Name,
+					ReplicationFactor: 5,
+					NodeId:            2,
 				},
 			},
 		})
@@ -285,8 +293,8 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		requireLastApplied(t, sm, 1)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 5, NodeId: 2})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -294,8 +302,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Value: uint64(resultRegisterStorageSuccessful),
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
-						StorageId: 1,
-						Name:      cfg.Storages[0].Name,
+						StorageId:         1,
+						Name:              cfg.Storages[0].Name,
+						ReplicationFactor: 3,
+						NodeId:            1,
 					},
 				}),
 			}},
@@ -310,8 +320,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 			NextStorageId: 2,
 			Storages: map[uint64]*gitalypb.Storage{
 				1: {
-					StorageId: 1,
-					Name:      cfg.Storages[0].Name,
+					StorageId:         1,
+					Name:              cfg.Storages[0].Name,
+					ReplicationFactor: 3,
+					NodeId:            1,
 				},
 			},
 		})
@@ -329,7 +341,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		require.NoError(t, err)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 1, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 1, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -459,8 +471,8 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 
 		bootstrapCluster(t, sm)
 		_, err = sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name, ReplicationFactor: 5, NodeId: 2})},
 		})
 		require.NoError(t, err)
 
@@ -471,8 +483,8 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 			ClusterId:     "1234",
 			NextStorageId: 3,
 			Storages: map[uint64]*gitalypb.Storage{
-				1: {StorageId: 1, Name: cfg.Storages[0].Name},
-				2: {StorageId: 2, Name: cfg.Storages[1].Name},
+				1: {StorageId: 1, Name: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1},
+				2: {StorageId: 2, Name: cfg.Storages[1].Name, ReplicationFactor: 5, NodeId: 2},
 			},
 		}}, response)
 	})

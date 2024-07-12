@@ -210,8 +210,10 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 	}
 
 	newStorage := &gitalypb.Storage{
-		StorageId: cluster.NextStorageId,
-		Name:      req.StorageName,
+		StorageId:         cluster.NextStorageId,
+		Name:              req.GetStorageName(),
+		ReplicationFactor: req.GetReplicationFactor(),
+		NodeId:            req.GetNodeId(),
 	}
 	cluster.Storages[cluster.NextStorageId] = newStorage
 	cluster.NextStorageId++
