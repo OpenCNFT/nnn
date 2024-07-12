@@ -218,14 +218,15 @@ func (c *testRaftCluster) createRaftConfig(node raftID) config.Raft {
 		initialMembers[fmt.Sprintf("%d", node)] = addr
 	}
 	return config.Raft{
-		Enabled:         true,
-		ClusterID:       c.clusterID,
-		NodeID:          node.ToUint64(),
-		RaftAddr:        c.initialMembers[node.ToUint64()],
-		InitialMembers:  initialMembers,
-		RTTMilliseconds: config.RaftDefaultRTT,
-		ElectionTicks:   config.RaftDefaultElectionTicks,
-		HeartbeatTicks:  config.RaftDefaultHeartbeatTicks,
+		Enabled:           true,
+		ClusterID:         c.clusterID,
+		NodeID:            node.ToUint64(),
+		RaftAddr:          c.initialMembers[node.ToUint64()],
+		InitialMembers:    initialMembers,
+		ReplicationFactor: 3,
+		RTTMilliseconds:   config.RaftDefaultRTT,
+		ElectionTicks:     config.RaftDefaultElectionTicks,
+		HeartbeatTicks:    config.RaftDefaultHeartbeatTicks,
 	}
 }
 

@@ -292,9 +292,9 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 				ClusterId:     cluster.clusterID,
 				NextStorageId: 4,
 				Storages: map[uint64]*gitalypb.Storage{
-					1: {StorageId: 1, Name: "storage-2"},
-					2: {StorageId: 2, Name: "storage-4"},
-					3: {StorageId: 3, Name: "storage-6"},
+					1: {StorageId: 1, Name: "storage-2", ReplicationFactor: 3, NodeId: 1},
+					2: {StorageId: 2, Name: "storage-4", ReplicationFactor: 3, NodeId: 2},
+					3: {StorageId: 3, Name: "storage-6", ReplicationFactor: 3, NodeId: 3},
 				},
 			}, clusterInfo)
 		}
@@ -327,7 +327,7 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 				ClusterId:     cluster.clusterID,
 				NextStorageId: 2,
 				Storages: map[uint64]*gitalypb.Storage{
-					1: {StorageId: 1, Name: "storage-1"},
+					1: {StorageId: 1, Name: "storage-1", ReplicationFactor: 3, NodeId: 1},
 				},
 			}, clusterInfo)
 		}
