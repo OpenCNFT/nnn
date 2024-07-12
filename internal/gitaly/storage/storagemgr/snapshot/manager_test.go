@@ -11,7 +11,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"golang.org/x/sync/errgroup"
@@ -101,11 +100,11 @@ func TestManager(t *testing.T) {
 				require.ErrorIs(t, os.WriteFile(filepath.Join(fs1.Root(), "some file"), nil, fs.ModePerm), os.ErrPermission)
 
 				expectedDirectoryState := testhelper.DirectoryState{
-					"/":                       {Mode: mode.ReadOnlyDirectory},
-					"/repositories":           {Mode: mode.ReadOnlyDirectory},
-					"/repositories/a":         {Mode: mode.ReadOnlyDirectory},
-					"/repositories/a/refs":    {Mode: mode.ReadOnlyDirectory},
-					"/repositories/a/objects": {Mode: mode.ReadOnlyDirectory},
+					"/":                       {Mode: ModeReadOnlyDirectory},
+					"/repositories":           {Mode: ModeReadOnlyDirectory},
+					"/repositories/a":         {Mode: ModeReadOnlyDirectory},
+					"/repositories/a/refs":    {Mode: ModeReadOnlyDirectory},
+					"/repositories/a/objects": {Mode: ModeReadOnlyDirectory},
 					"/repositories/a/HEAD":    {Mode: umask.Mask(fs.ModePerm), Content: []byte("a content")},
 				}
 
@@ -133,15 +132,15 @@ func TestManager(t *testing.T) {
 				require.Equal(t, fs1.Root(), fs2.Root())
 
 				expectedDirectoryState := testhelper.DirectoryState{
-					"/":                       {Mode: mode.ReadOnlyDirectory},
-					"/repositories":           {Mode: mode.ReadOnlyDirectory},
-					"/repositories/a":         {Mode: mode.ReadOnlyDirectory},
-					"/repositories/a/refs":    {Mode: mode.ReadOnlyDirectory},
-					"/repositories/a/objects": {Mode: mode.ReadOnlyDirectory},
+					"/":                       {Mode: ModeReadOnlyDirectory},
+					"/repositories":           {Mode: ModeReadOnlyDirectory},
+					"/repositories/a":         {Mode: ModeReadOnlyDirectory},
+					"/repositories/a/refs":    {Mode: ModeReadOnlyDirectory},
+					"/repositories/a/objects": {Mode: ModeReadOnlyDirectory},
 					"/repositories/a/HEAD":    {Mode: umask.Mask(fs.ModePerm), Content: []byte("a content")},
-					"/repositories/b":         {Mode: mode.ReadOnlyDirectory},
-					"/repositories/b/refs":    {Mode: mode.ReadOnlyDirectory},
-					"/repositories/b/objects": {Mode: mode.ReadOnlyDirectory},
+					"/repositories/b":         {Mode: ModeReadOnlyDirectory},
+					"/repositories/b/refs":    {Mode: ModeReadOnlyDirectory},
+					"/repositories/b/objects": {Mode: ModeReadOnlyDirectory},
 					"/repositories/b/HEAD":    {Mode: umask.Mask(fs.ModePerm), Content: []byte("b content")},
 				}
 
@@ -162,17 +161,17 @@ func TestManager(t *testing.T) {
 				defer testhelper.MustClose(t, fs1)
 
 				testhelper.RequireDirectoryState(t, fs1.Root(), "", testhelper.DirectoryState{
-					"/":                                       {Mode: mode.ReadOnlyDirectory},
-					"/repositories":                           {Mode: mode.ReadOnlyDirectory},
-					"/repositories/b":                         {Mode: mode.ReadOnlyDirectory},
-					"/repositories/b/refs":                    {Mode: mode.ReadOnlyDirectory},
-					"/repositories/b/objects":                 {Mode: mode.ReadOnlyDirectory},
+					"/":                                       {Mode: ModeReadOnlyDirectory},
+					"/repositories":                           {Mode: ModeReadOnlyDirectory},
+					"/repositories/b":                         {Mode: ModeReadOnlyDirectory},
+					"/repositories/b/refs":                    {Mode: ModeReadOnlyDirectory},
+					"/repositories/b/objects":                 {Mode: ModeReadOnlyDirectory},
 					"/repositories/b/HEAD":                    {Mode: umask.Mask(fs.ModePerm), Content: []byte("b content")},
-					"/repositories/c":                         {Mode: mode.ReadOnlyDirectory},
-					"/repositories/c/refs":                    {Mode: mode.ReadOnlyDirectory},
-					"/repositories/c/objects":                 {Mode: mode.ReadOnlyDirectory},
+					"/repositories/c":                         {Mode: ModeReadOnlyDirectory},
+					"/repositories/c/refs":                    {Mode: ModeReadOnlyDirectory},
+					"/repositories/c/objects":                 {Mode: ModeReadOnlyDirectory},
 					"/repositories/c/HEAD":                    {Mode: umask.Mask(fs.ModePerm), Content: []byte("c content")},
-					"/repositories/c/objects/info":            {Mode: mode.ReadOnlyDirectory},
+					"/repositories/c/objects/info":            {Mode: ModeReadOnlyDirectory},
 					"/repositories/c/objects/info/alternates": {Mode: umask.Mask(fs.ModePerm), Content: []byte("../../b/objects")},
 				})
 			},

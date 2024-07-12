@@ -12,9 +12,6 @@ const (
 	// Directory is the mode directories are stored with in the storage.
 	// It gives the owner read, write, and execute permissions on directories.
 	Directory fs.FileMode = fs.ModeDir | permission.OwnerRead | permission.OwnerWrite | permission.OwnerExecute
-	// ReadOnlyDirectory is the mode given to directories in read-only snapshots.
-	// It gives the owner read and execute permissions on directories.
-	ReadOnlyDirectory fs.FileMode = fs.ModeDir | permission.OwnerRead | permission.OwnerExecute
 	// Executable is the mode executable files are stored with in the storage.
 	// It gives the owner read and execute permissions on the executable files.
 	Executable fs.FileMode = permission.OwnerRead | permission.OwnerExecute

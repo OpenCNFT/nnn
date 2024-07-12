@@ -6,6 +6,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -192,12 +193,12 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 								setup.Commits.First.OID,
 							},
 							CustomHooks: testhelper.DirectoryState{
-								"/": {Mode: mode.ReadOnlyDirectory},
+								"/": {Mode: snapshot.ModeReadOnlyDirectory},
 								"/pre-receive": {
 									Mode:    mode.Executable,
 									Content: []byte("hook content"),
 								},
-								"/private-dir":              {Mode: mode.ReadOnlyDirectory},
+								"/private-dir":              {Mode: snapshot.ModeReadOnlyDirectory},
 								"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 							},
 						},
