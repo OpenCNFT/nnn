@@ -22,8 +22,8 @@ func TestOperations(t *testing.T) {
 		{
 			Operation: &gitalypb.LogEntry_Operation_CreateDirectory_{
 				CreateDirectory: &gitalypb.LogEntry_Operation_CreateDirectory{
-					Path:        []byte("parent/child"),
-					Permissions: uint32(mode.Directory.Perm()),
+					Path: []byte("parent/child"),
+					Mode: uint32(mode.Directory),
 				},
 			},
 		},

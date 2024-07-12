@@ -19,8 +19,8 @@ func (ops *operations) createDirectory(relativePath string) {
 	ops.append(&gitalypb.LogEntry_Operation{
 		Operation: &gitalypb.LogEntry_Operation_CreateDirectory_{
 			CreateDirectory: &gitalypb.LogEntry_Operation_CreateDirectory{
-				Path:        []byte(relativePath),
-				Permissions: uint32(mode.Directory.Perm()),
+				Path: []byte(relativePath),
+				Mode: uint32(mode.Directory),
 			},
 		},
 	})
