@@ -72,7 +72,7 @@ func TestManager_Start(t *testing.T) {
 			ClusterId:     cluster.clusterID,
 			NextStorageId: 2,
 			Storages: map[uint64]*gitalypb.Storage{
-				1: {StorageId: 1, Name: "storage-1"},
+				1: {StorageId: 1, Name: "storage-1", ReplicationFactor: 3},
 			},
 		}, clusterInfo)
 	})
@@ -118,7 +118,7 @@ func TestManager_Start(t *testing.T) {
 					require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 					require.Equal(t, uint64(numNode+1), clusterInfo.NextStorageId)
 					require.Equal(t, &gitalypb.Storage{
-						StorageId: storage.id.ToUint64(), Name: storage.name,
+						StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
 					}, clusterInfo.Storages[storage.id.ToUint64()])
 				})
 			})
@@ -155,7 +155,7 @@ func TestManager_Start(t *testing.T) {
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 						require.Equal(t, &gitalypb.Storage{
-							StorageId: storage.id.ToUint64(), Name: storage.name,
+							StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
 						}, clusterInfo.Storages[storage.id.ToUint64()])
 					})
 
@@ -173,7 +173,7 @@ func TestManager_Start(t *testing.T) {
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 						require.Equal(t, &gitalypb.Storage{
-							StorageId: storage.id.ToUint64(), Name: storage.name,
+							StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
 						}, clusterInfo.Storages[storage.id.ToUint64()])
 					})
 				})
@@ -254,7 +254,7 @@ func TestManager_Start(t *testing.T) {
 				require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 
 				require.Equal(t, &gitalypb.Storage{
-					StorageId: storage.id.ToUint64(), Name: storage.name,
+					StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
 				}, clusterInfo.Storages[storage.id.ToUint64()])
 			}
 		})
@@ -287,7 +287,7 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			require.Equal(t, &gitalypb.Storage{
-				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name,
+				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name, ReplicationFactor: 3,
 			}, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
 		})
 	})
@@ -320,7 +320,7 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			require.Equal(t, &gitalypb.Storage{
-				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name,
+				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name, ReplicationFactor: 3,
 			}, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
 		})
 	})

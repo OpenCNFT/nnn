@@ -69,6 +69,8 @@ message GetClusterResponse{
 message RegisterStorageRequest {
   // storage_name is the human-readable name of the new storage.
   string storage_name = 1;
+  // replication_factor contains the replication factor of this storage.
+  uint64 replication_factor = 2;
 }
 
 // RegisterStorageResponse is the response message for registering a new storage in a cluster.

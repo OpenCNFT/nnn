@@ -168,7 +168,7 @@ func (g *metadataRaftGroup) RegisterStorage(storageName string) (raftID, error) 
 			return 0, fmt.Errorf("storage %q already registered", storageName)
 		}
 	}
-	result, response, err := g.requestRegisterStorage(storageName)
+	result, response, err := g.requestRegisterStorage(storageName, g.clusterConfig.ReplicationFactor)
 	if err != nil {
 		return 0, fmt.Errorf("registering storage: %w", err)
 	}
@@ -236,7 +236,7 @@ func (g *metadataRaftGroup) requestBootstrapCluster() (updateResult, *gitalypb.B
 	return requester.SyncWrite(g.ctx, &gitalypb.BootstrapClusterRequest{ClusterId: g.clusterConfig.ClusterID})
 }
 
-func (g *metadataRaftGroup) requestRegisterStorage(storageName string) (updateResult, *gitalypb.RegisterStorageResponse, error) {
+func (g *metadataRaftGroup) requestRegisterStorage(storageName string, replicationFactor uint64) (updateResult, *gitalypb.RegisterStorageResponse, error) {
 	requester := NewRequester[*gitalypb.RegisterStorageRequest, *gitalypb.RegisterStorageResponse](
 		g.nodeHost, g.groupID, g.logger, requestOption{
 			retry:       defaultRetry,
@@ -244,7 +244,10 @@ func (g *metadataRaftGroup) requestRegisterStorage(storageName string) (updateRe
 			exponential: g.backoffProfile,
 		},
 	)
-	return requester.SyncWrite(g.ctx, &gitalypb.RegisterStorageRequest{StorageName: storageName})
+	return requester.SyncWrite(g.ctx, &gitalypb.RegisterStorageRequest{
+		StorageName:       storageName,
+		ReplicationFactor: replicationFactor,
+	})
 }
 
 func (g *metadataRaftGroup) getLeaderState() (*gitalypb.LeaderState, error) {
