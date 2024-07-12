@@ -2,19 +2,23 @@
 // directories written to the storage must use one of these modes.
 package mode
 
-import "io/fs"
+import (
+	"io/fs"
+
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
+)
 
 const (
 	// Directory is the mode directories are stored with in the storage.
 	// It gives the owner read, write, and execute permissions on directories.
-	Directory fs.FileMode = fs.ModeDir | 0o700
+	Directory fs.FileMode = fs.ModeDir | permission.OwnerRead | permission.OwnerWrite | permission.OwnerExecute
 	// ReadOnlyDirectory is the mode given to directories in read-only snapshots.
 	// It gives the owner read and execute permissions on directories.
-	ReadOnlyDirectory fs.FileMode = fs.ModeDir | 0o500
+	ReadOnlyDirectory fs.FileMode = fs.ModeDir | permission.OwnerRead | permission.OwnerExecute
 	// Executable is the mode executable files are stored with in the storage.
 	// It gives the owner read and execute permissions on the executable files.
-	Executable fs.FileMode = 0o500
+	Executable fs.FileMode = permission.OwnerRead | permission.OwnerExecute
 	// File is the mode files are stored with in the storage.
 	// It gives the owner read permissions on the files.
-	File fs.FileMode = 0o400
+	File fs.FileMode = permission.OwnerRead
 )
