@@ -3,7 +3,7 @@ package wal
 import (
 	"testing"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -23,7 +23,7 @@ func TestOperations(t *testing.T) {
 			Operation: &gitalypb.LogEntry_Operation_CreateDirectory_{
 				CreateDirectory: &gitalypb.LogEntry_Operation_CreateDirectory{
 					Path:        []byte("parent/child"),
-					Permissions: uint32(storage.ModeDirectory.Perm()),
+					Permissions: uint32(mode.Directory.Perm()),
 				},
 			},
 		},

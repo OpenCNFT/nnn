@@ -1,7 +1,7 @@
 package wal
 
 import (
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
@@ -20,7 +20,7 @@ func (ops *operations) createDirectory(relativePath string) {
 		Operation: &gitalypb.LogEntry_Operation_CreateDirectory_{
 			CreateDirectory: &gitalypb.LogEntry_Operation_CreateDirectory{
 				Path:        []byte(relativePath),
-				Permissions: uint32(storage.ModeDirectory.Perm()),
+				Permissions: uint32(mode.Directory.Perm()),
 			},
 		},
 	})

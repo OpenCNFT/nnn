@@ -11,6 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
@@ -44,7 +45,7 @@ func (s *snapshot) RelativePath(relativePath string) string {
 func (s *snapshot) Close() error {
 	if s.readOnly {
 		// Make the directories writable again so we can remove the snapshot.
-		if err := s.setDirectoryMode(storage.ModeDirectory); err != nil {
+		if err := s.setDirectoryMode(mode.Directory); err != nil {
 			return fmt.Errorf("make writable: %w", err)
 		}
 	}
@@ -97,7 +98,7 @@ func newSnapshot(ctx context.Context, rootPath, destinationPath string, relative
 	if readOnly {
 		// Now that we've finished creating the snapshot, change the directory permissions to read-only
 		// to prevent writing in the snapshot.
-		if err := s.setDirectoryMode(storage.ModeReadOnlyDirectory); err != nil {
+		if err := s.setDirectoryMode(mode.ReadOnlyDirectory); err != nil {
 			return nil, fmt.Errorf("make read-only: %w", err)
 		}
 	}

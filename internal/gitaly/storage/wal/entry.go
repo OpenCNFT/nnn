@@ -12,7 +12,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -64,7 +64,7 @@ func (e *Entry) stageFile(path string) (string, error) {
 	// ModeExecutable is used as the mask since it has the widest permission bits we allow
 	// with both read and execute permissions set.
 	actualPerms := info.Mode().Perm()
-	if expectedPerms := actualPerms & (storage.ModeExecutable); actualPerms != expectedPerms {
+	if expectedPerms := actualPerms & (mode.Executable); actualPerms != expectedPerms {
 		if err := os.Chmod(path, expectedPerms); err != nil {
 			return "", fmt.Errorf("chmod: %w", err)
 		}
