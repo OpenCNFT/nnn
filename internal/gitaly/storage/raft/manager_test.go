@@ -22,6 +22,23 @@ func managerTestConfig(bootstrap bool) ManagerConfig {
 func TestManager_Start(t *testing.T) {
 	t.Parallel()
 
+	replicaGroups := func(i raftID, n uint64) []uint64 {
+		wrap := func(i raftID) uint64 {
+			if i.ToUint64() <= n {
+				return i.ToUint64()
+			}
+			return i.ToUint64() % n
+		}
+		switch n {
+		case 1:
+			return []uint64{}
+		case 2:
+			return []uint64{wrap(i + 1)}
+		default:
+			return []uint64{wrap(i + 1), wrap(i + 2)}
+		}
+	}
+
 	startManager := func(t *testing.T) nodeStarter {
 		return func(cluster *testRaftCluster, node raftID) (*testNode, error) {
 			ctx := testhelper.Context(t)
@@ -124,7 +141,11 @@ func TestManager_Start(t *testing.T) {
 					require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 					require.Equal(t, uint64(numNode+1), clusterInfo.NextStorageId)
 					expectedInfo := &gitalypb.Storage{
-						StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3, NodeId: node.ToUint64(),
+						StorageId:         storage.id.ToUint64(),
+						Name:              storage.name,
+						ReplicationFactor: 3,
+						NodeId:            node.ToUint64(),
+						ReplicaGroups:     replicaGroups(storage.id, uint64(numNode)),
 					}
 					testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 				})
@@ -163,12 +184,17 @@ func TestManager_Start(t *testing.T) {
 						storage := mgr.firstStorage
 
 						clusterInfo, err := mgr.ClusterInfo()
+						fmt.Printf("%+v %+v\n", node, clusterInfo)
 						require.NoError(t, err)
 
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 						expectedInfo := &gitalypb.Storage{
-							StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3, NodeId: node.ToUint64(),
+							StorageId:         storage.id.ToUint64(),
+							Name:              storage.name,
+							ReplicationFactor: 3,
+							NodeId:            node.ToUint64(),
+							ReplicaGroups:     replicaGroups(storage.id, 2),
 						}
 						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 					})
@@ -187,7 +213,11 @@ func TestManager_Start(t *testing.T) {
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 						expectedInfo := &gitalypb.Storage{
-							StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3, NodeId: node.ToUint64(),
+							StorageId:         storage.id.ToUint64(),
+							Name:              storage.name,
+							ReplicationFactor: 3,
+							NodeId:            node.ToUint64(),
+							ReplicaGroups:     replicaGroups(storage.id, 3),
 						}
 						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 					})
@@ -275,7 +305,11 @@ func TestManager_Start(t *testing.T) {
 				require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 
 				expectedInfo := &gitalypb.Storage{
-					StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3, NodeId: node.ToUint64(),
+					StorageId:         storage.id.ToUint64(),
+					Name:              storage.name,
+					ReplicationFactor: 3,
+					NodeId:            node.ToUint64(),
+					ReplicaGroups:     replicaGroups(storage.id, 2),
 				}
 				testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 			}
@@ -315,7 +349,11 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			expectedInfo := &gitalypb.Storage{
-				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name, ReplicationFactor: 3, NodeId: node.ToUint64(),
+				StorageId:         mgr.firstStorage.id.ToUint64(),
+				Name:              mgr.firstStorage.name,
+				ReplicationFactor: 3,
+				NodeId:            node.ToUint64(),
+				ReplicaGroups:     replicaGroups(mgr.firstStorage.id, 3),
 			}
 			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
 		})
@@ -355,7 +393,11 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			expectedInfo := &gitalypb.Storage{
-				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name, ReplicationFactor: 3, NodeId: node.ToUint64(),
+				StorageId:         mgr.firstStorage.id.ToUint64(),
+				Name:              mgr.firstStorage.name,
+				ReplicationFactor: 3,
+				NodeId:            node.ToUint64(),
+				ReplicaGroups:     replicaGroups(mgr.firstStorage.id, 3),
 			}
 			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
 		})

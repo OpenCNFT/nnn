@@ -69,3 +69,9 @@ func (*simpleRingReplicaPlacement) apply(storages map[uint64]*gitalypb.Storage) 
 func newSimpleRingReplicaPlacement() replicaPlacement {
 	return &simpleRingReplicaPlacement{}
 }
+
+// newDefaultReplicaPlacement defines a factory that returns the default replica placements strategy
+// used for determining replica groups. At the moment, Gitaly supports a simple ring-based placement
+// strategy. When we involve replica placement strategy in the future, all members of the metadata
+// Raft group must sync up to ensure they have the same replica placement strategy.
+var newDefaultReplicaPlacement = newSimpleRingReplicaPlacement
