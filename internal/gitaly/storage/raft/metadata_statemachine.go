@@ -14,10 +14,11 @@ import (
 )
 
 type metadataStateMachine struct {
-	ctx       context.Context
-	groupID   raftID
-	replicaID raftID
-	accessDB  dbAccessor
+	ctx              context.Context
+	groupID          raftID
+	replicaID        raftID
+	accessDB         dbAccessor
+	replicaPlacement replicaPlacement
 }
 
 const (
@@ -217,6 +218,7 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 	}
 	cluster.Storages[cluster.NextStorageId] = newStorage
 	cluster.NextStorageId++
+	s.replicaPlacement.apply(cluster.Storages)
 
 	response, err := anyProtoMarshal(&gitalypb.RegisterStorageResponse{Storage: newStorage})
 	if err != nil {
@@ -296,9 +298,10 @@ var _ = Statemachine(&metadataStateMachine{})
 
 func newMetadataStatemachine(ctx context.Context, groupID raftID, replicaID raftID, accessDB dbAccessor) *metadataStateMachine {
 	return &metadataStateMachine{
-		ctx:       ctx,
-		groupID:   groupID,
-		replicaID: replicaID,
-		accessDB:  accessDB,
+		ctx:              ctx,
+		groupID:          groupID,
+		replicaID:        replicaID,
+		accessDB:         accessDB,
+		replicaPlacement: newDefaultReplicaPlacement(),
 	}
 }

@@ -279,6 +279,11 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 		ptnMgr := setupTestPartitionManager(t, cfg)
 		groups := bootstrapCluster(t, cluster, ptnMgr)
 
+		expectedReplicaGroups := [][]uint64{
+			nil,    // When node-1 is registered, there is no other storages
+			{1},    // When node-2 is registered, only node-1 is eligible.
+			{1, 2}, // When node-3 is registered, both node-1 and node-2 are eligible.
+		}
 		for i := raftID(1); i <= 3; i++ {
 			info, err := groups[i].RegisterStorage(fmt.Sprintf("storage-%d", 2*i))
 			require.NoError(t, err)
@@ -287,6 +292,7 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 				Name:              fmt.Sprintf("storage-%d", 2*i),
 				ReplicationFactor: 3,
 				NodeId:            i.ToUint64(),
+				ReplicaGroups:     expectedReplicaGroups[i-1],
 			}, info)
 		}
 
@@ -297,9 +303,9 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 				ClusterId:     cluster.clusterID,
 				NextStorageId: 4,
 				Storages: map[uint64]*gitalypb.Storage{
-					1: {StorageId: 1, Name: "storage-2", ReplicationFactor: 3, NodeId: 1},
-					2: {StorageId: 2, Name: "storage-4", ReplicationFactor: 3, NodeId: 2},
-					3: {StorageId: 3, Name: "storage-6", ReplicationFactor: 3, NodeId: 3},
+					1: {StorageId: 1, Name: "storage-2", ReplicationFactor: 3, NodeId: 1, ReplicaGroups: []uint64{2, 3}},
+					2: {StorageId: 2, Name: "storage-4", ReplicationFactor: 3, NodeId: 2, ReplicaGroups: []uint64{3, 1}},
+					3: {StorageId: 3, Name: "storage-6", ReplicationFactor: 3, NodeId: 3, ReplicaGroups: []uint64{1, 2}},
 				},
 			}, clusterInfo)
 		}
