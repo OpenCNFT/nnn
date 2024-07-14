@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -89,7 +90,7 @@ func main() {
 	os.Exit(code)
 }
 
-func (cmd gitalySSHCommand) run(logger log.Logger) (int, error) {
+func (cmd gitalySSHCommand) run(logger log.Logger) (_ int, returnedErr error) {
 	// Configure distributed tracing
 	closer := tracing.Initialize(tracing.WithServiceName("gitaly-ssh"))
 	defer closer.Close()
@@ -114,6 +115,17 @@ func (cmd gitalySSHCommand) run(logger log.Logger) (int, error) {
 	}
 
 	if cmd.workingDir != "" {
+		originalWD, err := os.Getwd()
+		if err != nil {
+			return 0, fmt.Errorf("getwd: %w", err)
+		}
+
+		defer func() {
+			if err := os.Chdir(originalWD); err != nil {
+				returnedErr = errors.Join(err, fmt.Errorf("restore working directory: %w", err))
+			}
+		}()
+
 		if err := os.Chdir(cmd.workingDir); err != nil {
 			return 1, fmt.Errorf("unable to chdir to %v", cmd.workingDir)
 		}
