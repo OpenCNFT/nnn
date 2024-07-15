@@ -244,6 +244,10 @@ service RepositoryService {
 
   // CreateRepositoryFromSnapshot creates a new repository based on a snapshot created with
   // the GetSnapshot RPC. The snapshot is fetched via HTTP.
+  //
+  // Due to the inherent structure of the TAR format, it's challenging to definitively verify 
+  // if a provided TAR file is complete or truncated/malformed. While basic integrity checks 
+  // are performed, users should ensure the completeness and integrity of their TAR files.
   rpc CreateRepositoryFromSnapshot(CreateRepositoryFromSnapshotRequest) returns (CreateRepositoryFromSnapshotResponse) {
     option (op_type) = {
       op: MUTATOR

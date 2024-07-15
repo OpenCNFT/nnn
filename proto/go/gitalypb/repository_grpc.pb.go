@@ -173,6 +173,10 @@ type RepositoryServiceClient interface {
 	GetSnapshot(ctx context.Context, in *GetSnapshotRequest, opts ...grpc.CallOption) (RepositoryService_GetSnapshotClient, error)
 	// CreateRepositoryFromSnapshot creates a new repository based on a snapshot created with
 	// the GetSnapshot RPC. The snapshot is fetched via HTTP.
+	//
+	// Due to the inherent structure of the TAR format, it's challenging to definitively verify
+	// if a provided TAR file is complete or truncated/malformed. While basic integrity checks
+	// are performed, users should ensure the completeness and integrity of their TAR files.
 	CreateRepositoryFromSnapshot(ctx context.Context, in *CreateRepositoryFromSnapshotRequest, opts ...grpc.CallOption) (*CreateRepositoryFromSnapshotResponse, error)
 	// GetRawChanges returns metadata in raw format on the changes between two revisions.
 	GetRawChanges(ctx context.Context, in *GetRawChangesRequest, opts ...grpc.CallOption) (RepositoryService_GetRawChangesClient, error)
@@ -1199,6 +1203,10 @@ type RepositoryServiceServer interface {
 	GetSnapshot(*GetSnapshotRequest, RepositoryService_GetSnapshotServer) error
 	// CreateRepositoryFromSnapshot creates a new repository based on a snapshot created with
 	// the GetSnapshot RPC. The snapshot is fetched via HTTP.
+	//
+	// Due to the inherent structure of the TAR format, it's challenging to definitively verify
+	// if a provided TAR file is complete or truncated/malformed. While basic integrity checks
+	// are performed, users should ensure the completeness and integrity of their TAR files.
 	CreateRepositoryFromSnapshot(context.Context, *CreateRepositoryFromSnapshotRequest) (*CreateRepositoryFromSnapshotResponse, error)
 	// GetRawChanges returns metadata in raw format on the changes between two revisions.
 	GetRawChanges(*GetRawChangesRequest, RepositoryService_GetRawChangesServer) error

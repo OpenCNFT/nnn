@@ -69,6 +69,17 @@ func generateTarFile(t *testing.T, path string) ([]byte, []string) {
 	return data, entries
 }
 
+func corruptTarHeader(data []byte) []byte {
+	// Here the idea is corrupting the checksum (bytes 148-155)
+	// More information regarding header format can be found here:
+	// https://www.gnu.org/software/tar/manual/html_node/Standard.html
+	for i := 148; i < 156; i++ {
+		data[i] = 0
+	}
+
+	return data
+}
+
 func TestCreateRepositoryFromSnapshot_success(t *testing.T) {
 	if testhelper.IsWALEnabled() && gittest.DefaultObjectHash.Format == git.ObjectHashSHA256.Format {
 		t.Skip(`
@@ -244,19 +255,13 @@ func TestCreateRepositoryFromSnapshot_malformedArchive(t *testing.T) {
 	ctx := testhelper.Context(t)
 	cfg, client := setupRepositoryService(t)
 
-	// Note that we are also writing a blob here that is 16kB in size. This is because there is a bug in
-	// CreateRepositoryFromSnapshot that would cause it to succeed when a tiny archive gets truncated. Please refer
-	// to https://gitlab.com/gitlab-org/gitaly/-/issues/5503.
 	_, sourceRepoPath := gittest.CreateRepository(t, ctx, cfg)
-	gittest.WriteCommit(t, cfg, sourceRepoPath, gittest.WithBranch(git.DefaultBranch), gittest.WithTreeEntries(
-		gittest.TreeEntry{Path: "blob", Mode: "100644", Content: string(incompressibleData(16 * 1024))},
-	))
+	gittest.WriteCommit(t, cfg, sourceRepoPath, gittest.WithBranch(git.DefaultBranch))
 
 	data, _ := generateTarFile(t, sourceRepoPath)
-	// Only serve half of the tar file
-	dataReader := io.LimitReader(bytes.NewReader(data), int64(len(data)/2))
+	malformedData := corruptTarHeader(data)
 
-	srv := httptest.NewServer(&tarTesthandler{tarData: dataReader, secret: secret})
+	srv := httptest.NewServer(&tarTesthandler{tarData: bytes.NewReader(malformedData), secret: secret})
 	defer srv.Close()
 
 	repo := &gitalypb.Repository{
