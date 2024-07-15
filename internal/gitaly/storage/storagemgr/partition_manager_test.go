@@ -177,9 +177,8 @@ func TestPartitionManager(t *testing.T) {
 	}
 
 	type setupData struct {
-		steps                       steps
-		transactionManagerFactory   transactionManagerFactory
-		expectedInitializationError error
+		steps                     steps
+		transactionManagerFactory transactionManagerFactory
 	}
 
 	for _, tc := range []struct {
@@ -805,15 +804,10 @@ func TestPartitionManager(t *testing.T) {
 				require.NoError(t, os.Mkdir(readOnlyDir, mode.Directory))
 				require.NoError(t, os.WriteFile(filepath.Join(readOnlyDir, "file-to-remove"), nil, mode.File))
 				require.NoError(t, storage.SetDirectoryMode(readOnlyDir, snapshot.ModeReadOnlyDirectory))
-				t.Cleanup(func() {
-					// Restore the permissions so our general testhelper deleting the test runs directory
-					// doesn't fail.
-					storage.SetDirectoryMode(readOnlyDir, mode.Directory)
-				})
 
-				return setupData{
-					expectedInitializationError: fs.ErrPermission,
-				}
+				// We don't have any steps in the test as we're just asserting that PartitionManager initializes
+				// correctly and removes read-only directories in staging directory.
+				return setupData{}
 			},
 		},
 	} {
@@ -848,10 +842,6 @@ func TestPartitionManager(t *testing.T) {
 			defer dbMgr.Close()
 
 			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
-			if setup.expectedInitializationError != nil {
-				require.ErrorIs(t, err, setup.expectedInitializationError)
-				return
-			}
 			require.NoError(t, err)
 
 			if setup.transactionManagerFactory != nil {

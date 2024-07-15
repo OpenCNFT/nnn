@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
@@ -192,6 +194,25 @@ func (ptn *partition) isClosing() bool {
 	}
 }
 
+func clearStagingDirectory(stagingDir string) error {
+	// Shared snapshots don't have write permissions on them to prevent accidental writes
+	// into them. If Gitaly terminated uncleanly and didn't clean up all of the shared snapshots,
+	// their directories would still be missing the write permission and fail the below
+	// RemoveAll call.
+	//
+	// Restore the write permission in the staging directory so read-only shared snapshots don't
+	// fail the deletion. The staging directory may also not exist so ignore the error.
+	if err := storage.SetDirectoryMode(stagingDir, mode.Directory); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("set directory mode: %w", err)
+	}
+
+	if err := os.RemoveAll(stagingDir); err != nil {
+		return fmt.Errorf("remove all: %w", err)
+	}
+
+	return nil
+}
+
 // NewPartitionManager returns a new PartitionManager.
 func NewPartitionManager(
 	ctx context.Context,
@@ -214,7 +235,7 @@ func NewPartitionManager(
 		stagingDir := stagingDirectoryPath(internalDir)
 		// Remove a possible already existing staging directory as it may contain stale files
 		// if the previous process didn't shutdown gracefully.
-		if err := os.RemoveAll(stagingDir); err != nil {
+		if err := clearStagingDirectory(stagingDir); err != nil {
 			return nil, fmt.Errorf("failed clearing storage's staging directory: %w", err)
 		}
 

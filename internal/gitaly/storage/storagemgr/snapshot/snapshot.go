@@ -64,13 +64,7 @@ func (s *snapshot) Close() error {
 
 // setDirectoryMode walks the snapshot and sets each directory's mode to the given mode.
 func (s *snapshot) setDirectoryMode(mode fs.FileMode) error {
-	return filepath.WalkDir(s.root, func(path string, d fs.DirEntry, err error) error {
-		if !d.IsDir() {
-			return nil
-		}
-
-		return os.Chmod(path, mode)
-	})
+	return storage.SetDirectoryMode(s.root, mode)
 }
 
 // newSnapshot creates a new file system snapshot of the given root directory. The snapshot is created by copying
