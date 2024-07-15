@@ -20,6 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
@@ -48,6 +49,100 @@ func manifestDirectoryEntry(expected *gitalypb.LogEntry) testhelper.DirectoryEnt
 			return &logEntry
 		},
 	}
+}
+
+// buildReftableDirectory builds the testhelper.DirectoryState for reftables.
+// In the file system backend, we know for certain the files which will be included
+// and also their content. But in the reftable backend, we have a binary format
+// which we cannot verify and this is not deterministic. So let's do a best effort
+// basis here. We verify that the number of tables are correct and that the tables.list
+// constituents of reftables. We do not verify the content of the reftable themselves
+// here.
+func buildReftableDirectory(data map[int][]git.ReferenceUpdates) testhelper.DirectoryState {
+	state := testhelper.DirectoryState{
+		"/":    {Mode: mode.Directory},
+		"/wal": {Mode: mode.Directory},
+	}
+
+	for id, updates := range data {
+		prefix := fmt.Sprintf("/wal/000000000000%d", id)
+		numTables := uint(len(updates))
+
+		state[prefix] = testhelper.DirectoryEntry{Mode: mode.Directory}
+		state[prefix+"/MANIFEST"] = testhelper.DirectoryEntry{
+			Mode:    mode.File,
+			Content: true,
+			ParseContent: func(tb testing.TB, path string, content []byte) any {
+				var logEntry gitalypb.LogEntry
+				require.NoError(tb, proto.Unmarshal(content, &logEntry))
+
+				// If there are no reftables being created, we exit early.
+				if numTables == 0 {
+					return true
+				}
+
+				// If there are reftables being created, we need to account for
+				// N tables and +2 for the tables.list being updated.
+				require.Equal(tb, numTables+2, uint(len(logEntry.Operations)))
+
+				// The reftables should only be created.
+				for i := uint(0); i < numTables; i++ {
+					create := logEntry.Operations[i].GetCreateHardLink()
+					require.NotNil(tb, create)
+					require.True(tb, git.ReftableTableNameRegex.Match(create.DestinationPath))
+				}
+
+				// The tables.list should be deleted and create (updated).
+				delete := logEntry.Operations[numTables].GetRemoveDirectoryEntry()
+				require.NotNil(tb, delete)
+				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
+
+				create := logEntry.Operations[numTables].GetRemoveDirectoryEntry()
+				require.NotNil(tb, create)
+				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
+
+				return true
+			},
+		}
+
+		// Parse the reftable and check its references.
+		for i := uint(1); i <= numTables; i++ {
+			state[fmt.Sprintf("%s/%d", prefix, i)] = testhelper.DirectoryEntry{
+				Mode:    mode.File,
+				Content: updates[i-1],
+				ParseContent: func(tb testing.TB, path string, content []byte) any {
+					table, err := git.NewReftable(content)
+					require.NoError(tb, err)
+
+					refUpdates, err := table.IterateRefs()
+					require.NoError(tb, err)
+
+					return refUpdates
+				},
+			}
+		}
+
+		// For tables.list, we can verify that all the lines within that file are
+		// reftables indeed.
+		if numTables > 0 {
+			state[fmt.Sprintf("%s/%d", prefix, numTables+1)] = testhelper.DirectoryEntry{
+				Mode:    mode.File,
+				Content: true,
+				ParseContent: func(tb testing.TB, path string, content []byte) any {
+					for _, file := range strings.Split(string(content), "\n") {
+						if len(file) == 0 {
+							break
+						}
+
+						require.True(tb, git.ReftableTableNameRegex.Match([]byte(file)))
+					}
+					return true
+				},
+			}
+		}
+	}
+
+	return state
 }
 
 func validCustomHooks(tb testing.TB) []byte {
@@ -89,7 +184,7 @@ func validCustomHooks(tb testing.TB) []byte {
 }
 
 func refChangeLogEntry(setup testTransactionSetup, ref string, oid git.ObjectID) *gitalypb.LogEntry {
-	return &gitalypb.LogEntry{
+	entry := &gitalypb.LogEntry{
 		RelativePath: setup.RelativePath,
 		ReferenceTransactions: []*gitalypb.LogEntry_ReferenceTransaction{
 			{
@@ -112,6 +207,25 @@ func refChangeLogEntry(setup testTransactionSetup, ref string, oid git.ObjectID)
 			},
 		},
 	}
+
+	if testhelper.IsReftableEnabled() {
+		entry.Operations = append(entry.Operations, &gitalypb.LogEntry_Operation{
+			Operation: &gitalypb.LogEntry_Operation_RemoveDirectoryEntry_{
+				RemoveDirectoryEntry: &gitalypb.LogEntry_Operation_RemoveDirectoryEntry{
+					Path: []byte(filepath.Join(setup.RelativePath, "reftable/tables.list")),
+				},
+			},
+		}, &gitalypb.LogEntry_Operation{
+			Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
+				CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
+					SourcePath:      []byte("2"),
+					DestinationPath: []byte(filepath.Join(setup.RelativePath, "reftable/tables.list")),
+				},
+			},
+		})
+	}
+
+	return entry
 }
 
 func setupTest(t *testing.T, ctx context.Context, testPartitionID storage.PartitionID, relativePath string) testTransactionSetup {
@@ -198,11 +312,16 @@ func setupTest(t *testing.T, ctx context.Context, testPartitionID storage.Partit
 }
 
 func TestTransactionManager(t *testing.T) {
-	testhelper.SkipWithReftable(t, "WAL moves around packed-refs, which is not present with the reftable backend")
+	t.Parallel()
+	testhelper.NewFeatureSets(featureflag.SymrefUpdate).Run(t, testTransactionManager)
+}
 
+func testTransactionManager(t *testing.T, ctx context.Context) {
 	t.Parallel()
 
-	ctx := testhelper.Context(t)
+	if featureflag.SymrefUpdate.IsDisabled(ctx) {
+		testhelper.SkipWithReftable(t, "reftable tests can only be run with symref-updates feature")
+	}
 
 	// testPartitionID is the partition ID used in the tests for the TransactionManager.
 	const testPartitionID storage.PartitionID = 1
@@ -376,7 +495,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 			},
 			expectedState: StateAssertion{
-				Directory: testhelper.DirectoryState{
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                  {Mode: mode.Directory},
 					"/wal":               {Mode: mode.Directory},
 					"/wal/0000000000001": {Mode: mode.Directory},
@@ -404,7 +523,9 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 						},
 					}),
 					"/wal/0000000000001/1": {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-				},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
 			},
 		},
 		{
@@ -1280,7 +1401,27 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				actualEntry, err := manager.readLogEntry(actual.lsn)
 				require.NoError(t, err)
 
-				testhelper.ProtoEqual(t, expected[i].entry, actualEntry)
+				expectedEntry := expected[i].entry
+
+				if testhelper.IsReftableEnabled() {
+					for idx, op := range expectedEntry.Operations {
+						if chl := op.GetCreateHardLink(); chl != nil {
+							actualCHL := actualEntry.Operations[idx].GetCreateHardLink()
+							require.NotNil(t, actualCHL)
+
+							if filepath.Base(string(actualCHL.DestinationPath)) == "tables.list" {
+								continue
+							}
+
+							// We can't predict the table names, but we can verify
+							// the regex.
+							require.True(t, git.ReftableTableNameRegex.Match(actualCHL.DestinationPath))
+							chl.DestinationPath = actualCHL.DestinationPath
+						}
+					}
+				}
+
+				testhelper.ProtoEqual(t, expectedEntry, actualEntry)
 			}
 			i++
 		}
@@ -1560,15 +1701,20 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, walFilesPath(tm.stateDirectory), "", testhelper.DirectoryState{
-						"/":                       {Mode: mode.Directory},
-						"/0000000000002":          {Mode: mode.Directory},
-						"/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
-						"/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/0000000000003":          {Mode: mode.Directory},
-						"/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
-						"/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-					})
+					testhelper.RequireDirectoryState(t, tm.stateDirectory, "",
+						gittest.FilesOrReftables(testhelper.DirectoryState{
+							"/":                           {Mode: mode.Directory},
+							"/wal":                        {Mode: mode.Directory},
+							"/wal/0000000000002":          {Mode: mode.Directory},
+							"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
+							"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+							"/wal/0000000000003":          {Mode: mode.Directory},
+							"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
+							"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+						}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+							2: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+							3: {{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+						})))
 				}),
 				StartManager{},
 				AssertManager{},
@@ -1602,6 +1748,9 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 		},
 		{
 			desc: "transaction manager cleans up left-over committed entries when appliedLSN < appendedLSN",
+			skip: func(t *testing.T) {
+				testhelper.SkipWithReftable(t, "test requires manual log addition")
+			},
 			steps: steps{
 				StartManager{},
 				Begin{
@@ -1659,17 +1808,18 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, walFilesPath(tm.stateDirectory), "", testhelper.DirectoryState{
-						"/":                       {Mode: mode.Directory},
-						"/0000000000002":          {Mode: mode.Directory},
-						"/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
-						"/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/0000000000003":          {Mode: mode.Directory},
-						"/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
-						"/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/0000000000004":          {Mode: mode.Directory},
-						"/0000000000004/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID)),
-						"/0000000000004/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", testhelper.DirectoryState{
+						"/":                           {Mode: mode.Directory},
+						"/wal":                        {Mode: mode.Directory},
+						"/wal/0000000000002":          {Mode: mode.Directory},
+						"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
+						"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+						"/wal/0000000000003":          {Mode: mode.Directory},
+						"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
+						"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+						"/wal/0000000000004":          {Mode: mode.Directory},
+						"/wal/0000000000004/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID)),
+						"/wal/0000000000004/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 					})
 				}),
 				StartManager{},

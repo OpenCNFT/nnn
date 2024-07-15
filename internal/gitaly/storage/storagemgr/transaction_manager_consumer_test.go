@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -39,13 +40,15 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
-				Directory: testhelper.DirectoryState{
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
 					"/wal":                        {Mode: mode.Directory},
 					"/wal/0000000000001":          {Mode: mode.Directory},
 					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
 					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-				},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
@@ -192,13 +195,15 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
-				Directory: testhelper.DirectoryState{
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
 					"/wal":                        {Mode: mode.Directory},
 					"/wal/0000000000001":          {Mode: mode.Directory},
 					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
 					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-				},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
@@ -273,7 +278,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
-				Directory: testhelper.DirectoryState{
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
 					"/wal":                        {Mode: mode.Directory},
 					"/wal/0000000000002":          {Mode: mode.Directory},
@@ -282,7 +287,10 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 					"/wal/0000000000003":          {Mode: mode.Directory},
 					"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/third", setup.Commits.Third.OID)),
 					"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.Third.OID + "\n")},
-				},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					2: {{"refs/heads/other": git.ReferenceUpdate{NewOID: setup.Commits.Second.OID}}},
+					3: {{"refs/heads/third": git.ReferenceUpdate{NewOID: setup.Commits.Third.OID}}},
+				})),
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
@@ -325,13 +333,15 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
-				Directory: testhelper.DirectoryState{
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
 					"/wal":                        {Mode: mode.Directory},
 					"/wal/0000000000001":          {Mode: mode.Directory},
 					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
 					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-				},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
