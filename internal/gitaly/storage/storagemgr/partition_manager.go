@@ -340,9 +340,11 @@ type TransactionOptions struct {
 // TransactionManager is not already running, a new one is created and used. The partition tracks
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
 //
-// Specifying storageName and relativePath will begin a transaction targeting a
-// repository. Specifying storageName and partitionID will being a transaction
-// targeting an entire partition.
+// Specifying storageName and partitionID will begin a transaction targeting an
+// entire partition. If the partitionID is zero, then the partition is detected
+// from relativePath.
+//
+// relativePath specifies which repository in the partition will be the target.
 func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath string, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
 	storageMgr, ok := pm.storages[storageName]
 	if !ok {
@@ -351,13 +353,14 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 
 	var relativePaths []string
 
-	if partitionID == invalidPartitionID {
-		relativePath, err := storage.ValidateRelativePath(storageMgr.path, relativePath)
+	if relativePath != "" {
+		var err error
+		relativePath, err = storage.ValidateRelativePath(storageMgr.path, relativePath)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
 		}
 
-		partitionID, err = storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+		repoPartitionID, err := storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
 		if err != nil {
 			if errors.Is(err, badger.ErrDBClosed) {
 				// The database is closed when PartitionManager is closing. Return a more
@@ -368,7 +371,12 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 			return nil, fmt.Errorf("get partition: %w", err)
 		}
 
+		if partitionID != invalidPartitionID && repoPartitionID != partitionID {
+			return nil, errors.New("partition ID does not match repository partition")
+		}
+
 		relativePaths = []string{relativePath}
+		partitionID = repoPartitionID
 	}
 
 	relativeStateDir := deriveStateDirectory(partitionID)

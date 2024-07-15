@@ -817,6 +817,45 @@ func TestPartitionManager(t *testing.T) {
 				return setupData{}
 			},
 		},
+		{
+			desc: "transaction committed for partition with relative path filter",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo := setupRepository(t, cfg, cfg.Storages[0])
+
+				return setupData{
+					steps: steps{
+						begin{
+							storageName: cfg.Storages[0].Name,
+							partitionID: 2,
+							repo:        repo,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						commit{},
+					},
+				}
+			},
+		},
+		{
+			desc: "beginning transaction on partition with relative path filter on different partition fails",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo := setupRepository(t, cfg, cfg.Storages[0])
+
+				return setupData{
+					steps: steps{
+						begin{
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   100,
+							repo:          repo,
+							expectedError: fmt.Errorf("partition ID does not match repository partition"),
+						},
+					},
+				}
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
