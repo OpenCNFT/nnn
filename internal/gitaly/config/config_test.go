@@ -2645,17 +2645,19 @@ func TestRaftConfig_Validate(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name        string
-		cfg         Raft
-		expectedErr error
+		name            string
+		cfgRaft         Raft
+		cfgTransactions Transactions
+		expectedErr     error
 	}{
 		{
-			name: "disable",
-			cfg:  Raft{},
+			name:            "disable",
+			cfgRaft:         Raft{},
+			cfgTransactions: Transactions{Enabled: true},
 		},
 		{
 			name: "valid",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2669,10 +2671,11 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 		},
 		{
 			name: "empty cluster ID",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "",
 				NodeID:    1,
@@ -2686,6 +2689,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					cfgerror.ErrNotSet,
@@ -2695,7 +2699,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid cluster ID",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "1234",
 				NodeID:    1,
@@ -2709,6 +2713,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					fmt.Errorf("invalid UUID format for ClusterID: invalid UUID length: 4"),
@@ -2718,7 +2723,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid node ID",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    0,
@@ -2732,6 +2737,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					fmt.Errorf("%w: 0 is not greater than 0", cfgerror.ErrNotInRange),
@@ -2741,7 +2747,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid raft address",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2755,6 +2761,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					errors.New("invalid address format: address 1:2:3: too many colons in address"),
@@ -2764,7 +2771,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "empty initial members",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:         true,
 				ClusterID:       "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:          1,
@@ -2774,6 +2781,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					cfgerror.ErrNotSet,
@@ -2783,7 +2791,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "an initial member is empty",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2798,6 +2806,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					errors.New("invalid address format: missing port in address"),
@@ -2807,7 +2816,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "an initial member is invalid",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2822,6 +2831,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					errors.New("invalid address format: address 1:2:3: too many colons in address"),
@@ -2831,7 +2841,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid RTT",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2845,6 +2855,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					fmt.Errorf("%w: 0 is not greater than 0", cfgerror.ErrNotInRange),
@@ -2854,7 +2865,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid election RTT",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2868,6 +2879,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   0,
 				HeartbeatTicks:  2,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					fmt.Errorf("%w: 0 is not greater than 0", cfgerror.ErrNotInRange),
@@ -2877,7 +2889,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid heartbeat RTT",
-			cfg: Raft{
+			cfgRaft: Raft{
 				Enabled:   true,
 				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
 				NodeID:    1,
@@ -2891,6 +2903,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 				ElectionTicks:   20,
 				HeartbeatTicks:  0,
 			},
+			cfgTransactions: Transactions{Enabled: true},
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					fmt.Errorf("%w: 0 is not greater than 0", cfgerror.ErrNotInRange),
@@ -2898,9 +2911,33 @@ func TestRaftConfig_Validate(t *testing.T) {
 				),
 			},
 		},
+		{
+			name: "transactions not enabled",
+			cfgRaft: Raft{
+				Enabled:   true,
+				ClusterID: "4f04a0e2-0db8-4bfa-b846-01b5b4a093fb",
+				NodeID:    1,
+				RaftAddr:  "localhost:3001",
+				InitialMembers: map[string]string{
+					"1": "localhost:3001",
+					"2": "localhost:3002",
+					"3": "localhost:3003",
+				},
+				RTTMilliseconds: 200,
+				ElectionTicks:   20,
+				HeartbeatTicks:  2,
+			},
+			cfgTransactions: Transactions{Enabled: false},
+			expectedErr: cfgerror.ValidationErrors{
+				cfgerror.NewValidationError(
+					fmt.Errorf("transactions must be enabled to enable Raft"),
+					"enabled",
+				),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.cfg.Validate()
+			err := tc.cfgRaft.Validate(tc.cfgTransactions)
 			require.Equal(t, tc.expectedErr, err)
 		})
 	}

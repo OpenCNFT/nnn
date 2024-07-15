@@ -805,7 +805,9 @@ func (cfg *Cfg) ValidateV2() error {
 		{field: "pack_objects_cache", validate: cfg.PackObjectsCache.Validate},
 		{field: "pack_objects_limiting", validate: cfg.PackObjectsLimiting.Validate},
 		{field: "backup", validate: cfg.Backup.Validate},
-		{field: "raft", validate: cfg.Raft.Validate},
+		{field: "raft", validate: func() error {
+			return cfg.Raft.Validate(cfg.Transactions)
+		}},
 	} {
 		var fields []string
 		if check.field != "" {
@@ -1242,11 +1244,20 @@ func (r Raft) fulfillDefaults() Raft {
 }
 
 // Validate runs validation on all fields and compose all found errors.
-func (r Raft) Validate() error {
+func (r Raft) Validate(transactions Transactions) error {
 	if !r.Enabled {
 		return nil
 	}
-	cfgErr := cfgerror.New().
+	cfgErr := cfgerror.New()
+
+	if !transactions.Enabled {
+		cfgErr = cfgErr.Append(
+			fmt.Errorf("transactions must be enabled to enable Raft"),
+			"enabled",
+		)
+	}
+
+	cfgErr = cfgErr.
 		Append(cfgerror.NotEmptyMap(r.InitialMembers), "initial_members").
 		Append(cfgerror.NotEmpty(r.ClusterID), "cluster_id").
 		Append(cfgerror.Comparable(r.NodeID).GreaterThan(0), "node_id").
