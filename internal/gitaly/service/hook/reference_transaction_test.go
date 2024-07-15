@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -35,12 +34,12 @@ func (m mockTransactionRegistry) Get(id storage.TransactionID) (hook.Transaction
 
 type mockTransaction struct {
 	hook.Transaction
-	updateReferencesFunc         func(storagemgr.ReferenceUpdates)
+	updateReferencesFunc         func(git.ReferenceUpdates)
 	recordInitialReferenceValues func(context.Context, map[git.ReferenceName]git.Reference) error
 	markDefaultBranchUpdated     func()
 }
 
-func (m mockTransaction) UpdateReferences(updates storagemgr.ReferenceUpdates) {
+func (m mockTransaction) UpdateReferences(updates git.ReferenceUpdates) {
 	m.updateReferencesFunc(updates)
 }
 
@@ -99,7 +98,7 @@ func TestReferenceTransactionHook(t *testing.T) {
 		expectedErr                  error
 		expectedResponse             *gitalypb.ReferenceTransactionHookResponse
 		expectedReftxHash            []byte
-		expectedReferenceUpdates     storagemgr.ReferenceUpdates
+		expectedReferenceUpdates     git.ReferenceUpdates
 		expectedInitialValues        map[git.ReferenceName]git.Reference
 		expectedDefaultBranchUpdated bool
 	}{
@@ -167,7 +166,7 @@ func TestReferenceTransactionHook(t *testing.T) {
 				},
 			},
 			expectedReftxHash: stdin,
-			expectedReferenceUpdates: storagemgr.ReferenceUpdates{
+			expectedReferenceUpdates: git.ReferenceUpdates{
 				"refs/heads/branch-1": {
 					OldOID: gittest.DefaultObjectHash.ZeroOID,
 					NewOID: gittest.DefaultObjectHash.EmptyTreeOID,
@@ -268,13 +267,13 @@ func TestReferenceTransactionHook(t *testing.T) {
 				}, nil
 			}
 
-			var actualReferenceUpdates storagemgr.ReferenceUpdates
+			var actualReferenceUpdates git.ReferenceUpdates
 			var actualInitialValues map[git.ReferenceName]git.Reference
 			var defaultBranchUpdated bool
 			txRegistry := mockTransactionRegistry{
 				getFunc: func(storage.TransactionID) (hook.Transaction, error) {
 					return mockTransaction{
-						updateReferencesFunc: func(updates storagemgr.ReferenceUpdates) {
+						updateReferencesFunc: func(updates git.ReferenceUpdates) {
 							actualReferenceUpdates = updates
 						},
 						recordInitialReferenceValues: func(_ context.Context, initialValues map[git.ReferenceName]git.Reference) error {

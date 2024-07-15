@@ -397,7 +397,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID: 5,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -1133,7 +1133,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1210,7 +1210,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{setup.Commits.Second.Pack},

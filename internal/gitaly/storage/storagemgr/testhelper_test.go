@@ -718,7 +718,7 @@ type Commit struct {
 	// SkipVerificationFailures sets the verification failure handling for this commit.
 	SkipVerificationFailures bool
 	// ReferenceUpdates are the reference updates to commit.
-	ReferenceUpdates ReferenceUpdates
+	ReferenceUpdates git.ReferenceUpdates
 	// QuarantinedPacks are the packs to include in the quarantine directory of the transaction.
 	QuarantinedPacks [][]byte
 	// DefaultBranchUpdate is the default branch update to commit.
@@ -748,7 +748,7 @@ type UpdateReferences struct {
 	// TransactionID identifies the transaction to update references on.
 	TransactionID int
 	// ReferenceUpdates are the reference updates to make.
-	ReferenceUpdates ReferenceUpdates
+	ReferenceUpdates git.ReferenceUpdates
 }
 
 // SetKey calls SetKey on a transaction.
@@ -908,7 +908,7 @@ type transactionTestCase struct {
 	expectedState StateAssertion
 }
 
-func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo git.RepositoryExecutor, updates ReferenceUpdates) {
+func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo git.RepositoryExecutor, updates git.ReferenceUpdates) {
 	tx.UpdateReferences(updates)
 
 	updater, err := updateref.New(ctx, rewrittenRepo)
@@ -1453,7 +1453,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 	t.Helper()
 
 	testTransaction := &Transaction{
-		referenceUpdates: []ReferenceUpdates{{"sentinel": {}}},
+		referenceUpdates: []git.ReferenceUpdates{{"sentinel": {}}},
 		result:           make(chan error, 1),
 		finish:           func() error { return nil },
 	}

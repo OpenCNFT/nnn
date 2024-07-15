@@ -209,13 +209,13 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					ExpectedError: ReferenceVerificationError{
@@ -232,7 +232,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Third.OID},
 					},
 				},
@@ -263,7 +263,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -277,7 +277,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -312,13 +312,13 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					ExpectedError: ReferenceVerificationError{
@@ -337,7 +337,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -375,7 +375,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: ErrTransactionProcessingStopped,
@@ -391,7 +391,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -429,7 +429,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: ErrTransactionProcessingStopped,
@@ -445,7 +445,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -483,7 +483,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: ErrTransactionProcessingStopped,
@@ -504,13 +504,13 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Third.OID},
 					},
 					ExpectedError: ReferenceVerificationError{

@@ -9,6 +9,23 @@ import (
 	"strings"
 )
 
+// ReferenceUpdate describes the state of a reference's old and new tip in an update.
+type ReferenceUpdate struct {
+	// OldOID is the old OID the reference is expected to point to prior to updating it.
+	// If the reference does not point to the old value, the reference verification fails.
+	OldOID ObjectID
+	// NewOID is the new desired OID to point the reference to.
+	NewOID ObjectID
+	// OldTarget is the expected target for a symbolic reference.
+	OldTarget ReferenceName
+	// NewTarget stores the desired target for a symbolic reference.
+	NewTarget ReferenceName
+}
+
+// ReferenceUpdates contains references to update. Reference name is used as the key and the value
+// is the expected old tip and the desired new tip.
+type ReferenceUpdates map[ReferenceName]ReferenceUpdate
+
 // InternalReferenceType is the type of an internal reference.
 type InternalReferenceType int
 
