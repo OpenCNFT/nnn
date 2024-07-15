@@ -27,7 +27,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/non-\xE5-utf8-directory/non-\xE5-utf8-file": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -61,7 +61,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/non-\xE5-utf8-directory/non-\xE5-utf8-file": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -72,7 +72,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/non-\xE5-utf8-directory/non-\xE5-utf8-file": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -91,7 +91,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -120,7 +120,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"not-in-refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: InvalidReferenceFormatError{
@@ -143,13 +143,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent/child": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: updateref.FileDirectoryConflictError{
@@ -187,14 +187,14 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID:            1,
 					SkipVerificationFailures: true,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":         {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/parent/child": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -233,14 +233,14 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent/child": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					// This is a no-op and thus is dropped.
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -270,7 +270,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -281,13 +281,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				UpdateReferences{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent/child": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -315,7 +315,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/tags/v1.0.0": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.ObjectHash.EmptyTreeOID},
 					},
 				},
@@ -370,7 +370,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: localrepo.InvalidObjectError(setup.Commits.First.OID),
@@ -397,7 +397,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -413,14 +413,14 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID:            2,
 					SkipVerificationFailures: true,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
@@ -457,13 +457,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
@@ -505,13 +505,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: ReferenceVerificationError{
@@ -548,7 +548,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -559,7 +559,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -590,7 +590,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -607,14 +607,14 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID:            2,
 					SkipVerificationFailures: true,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Third.OID},
 					},
@@ -647,7 +647,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -664,13 +664,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Third.OID},
 					},
@@ -709,7 +709,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -725,13 +725,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 					ExpectedError: ReferenceVerificationError{
@@ -758,7 +758,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -769,7 +769,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -800,7 +800,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -811,7 +811,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -832,7 +832,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/branch-2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -860,13 +860,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-2": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -896,7 +896,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1":        {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/subdir/branch-2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -913,13 +913,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/subdir/branch-2": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -945,7 +945,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-packed":   {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/sentinel-packed": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -968,7 +968,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-loose":   {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/sentinel-loose": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -985,13 +985,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-packed": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				Commit{
 					TransactionID: 5,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-loose": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -1030,7 +1030,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/symbolic": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -1058,7 +1058,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1069,7 +1069,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/symbolic": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -1106,7 +1106,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1117,7 +1117,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/symbolic": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -1150,7 +1150,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -1167,14 +1167,14 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID:            2,
 					SkipVerificationFailures: true,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.ObjectHash.ZeroOID},
 						"refs/heads/non-conflicting": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
@@ -1206,7 +1206,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -1223,13 +1223,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.ObjectHash.ZeroOID},
 						"refs/heads/non-conflicting": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
@@ -1268,7 +1268,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1284,13 +1284,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 					ExpectedError: ReferenceVerificationError{
@@ -1315,7 +1315,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -1334,12 +1334,12 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				UpdateReferences{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				UpdateReferences{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -1374,19 +1374,19 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				UpdateReferences{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 				},
 				UpdateReferences{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						// The old oid should be ignored since there's already a recorded initial value for the
 						// reference.
 						"refs/heads/main": {NewOID: setup.Commits.Third.OID},
@@ -1451,7 +1451,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				UpdateReferences{
 					// The old oid is ignored as the references old value was already recorded.
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1482,7 +1482,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1500,7 +1500,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				UpdateReferences{
 					TransactionID: 2,
 					// The old oid is ignored as the references old value was already recorded.
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -1533,7 +1533,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1551,7 +1551,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				UpdateReferences{
 					TransactionID: 2,
 					// The old oid is ignored as the references old value was already recorded.
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -1584,7 +1584,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1602,7 +1602,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				UpdateReferences{
 					TransactionID: 2,
 					// The old oid is ignored as the references old value was already recorded.
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -1639,7 +1639,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePath: setup.RelativePath,
 				},
 				UpdateReferences{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1675,7 +1675,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1697,7 +1697,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1729,7 +1729,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1740,7 +1740,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1771,7 +1771,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/remotes/upstream/deleted-branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -1798,13 +1798,13 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					// Delete the branch in the same transaction as we create another one in the `refs/remotes`
 					// directory. The reference deletion creates the `refs/remotes` directory that was removed
 					// by the repacking task.
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/remotes/upstream/deleted-branch": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
 				UpdateReferences{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/remotes/upstream/created-branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},

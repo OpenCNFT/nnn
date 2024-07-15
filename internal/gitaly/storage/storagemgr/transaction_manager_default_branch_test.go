@@ -19,7 +19,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -63,7 +63,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -74,7 +74,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/main":    {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
@@ -108,7 +108,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 					RelativePath: setup.RelativePath,
 				},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					DefaultBranchUpdate: &DefaultBranchUpdate{
@@ -142,7 +142,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -154,7 +154,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch2": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 					DefaultBranchUpdate: &DefaultBranchUpdate{
@@ -188,7 +188,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -200,7 +200,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 					DefaultBranchUpdate: &DefaultBranchUpdate{
@@ -242,7 +242,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -262,7 +262,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
