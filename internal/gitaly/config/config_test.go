@@ -2671,7 +2671,7 @@ func TestRaftConfig_Validate(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid cluster ID",
+			name: "empty cluster ID",
 			cfg: Raft{
 				Enabled:   true,
 				ClusterID: "",
@@ -2689,6 +2689,29 @@ func TestRaftConfig_Validate(t *testing.T) {
 			expectedErr: cfgerror.ValidationErrors{
 				cfgerror.NewValidationError(
 					cfgerror.ErrNotSet,
+					"cluster_id",
+				),
+			},
+		},
+		{
+			name: "invalid cluster ID",
+			cfg: Raft{
+				Enabled:   true,
+				ClusterID: "1234",
+				NodeID:    1,
+				RaftAddr:  "localhost:3001",
+				InitialMembers: map[string]string{
+					"1": "localhost:3001",
+					"2": "localhost:3002",
+					"3": "localhost:3003",
+				},
+				RTTMilliseconds: 200,
+				ElectionTicks:   20,
+				HeartbeatTicks:  2,
+			},
+			expectedErr: cfgerror.ValidationErrors{
+				cfgerror.NewValidationError(
+					fmt.Errorf("invalid UUID format for ClusterID: invalid UUID length: 4"),
 					"cluster_id",
 				),
 			},
