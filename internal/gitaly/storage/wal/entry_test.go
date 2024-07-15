@@ -12,7 +12,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -86,7 +86,7 @@ func TestEntry(t *testing.T) {
 			}(),
 			expectedFiles: testhelper.DirectoryState{
 				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: storage.ModeFile, Content: []byte("root file")},
+				"/1": {Mode: mode.File, Content: []byte("root file")},
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestEntry(t *testing.T) {
 			}(),
 			expectedFiles: testhelper.DirectoryState{
 				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: storage.ModeFile, Content: []byte("root file")},
+				"/1": {Mode: mode.File, Content: []byte("root file")},
 			},
 		},
 		{
@@ -135,7 +135,7 @@ func TestEntry(t *testing.T) {
 			}(),
 			expectedFiles: testhelper.DirectoryState{
 				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: storage.ModeExecutable, Content: []byte("file-1")},
+				"/1": {Mode: mode.Executable, Content: []byte("file-1")},
 			},
 		},
 		{
@@ -156,9 +156,9 @@ func TestEntry(t *testing.T) {
 			}(),
 			expectedFiles: testhelper.DirectoryState{
 				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: storage.ModeExecutable, Content: []byte("file-1")},
-				"/2": {Mode: storage.ModeFile, Content: []byte("file-2")},
-				"/3": {Mode: storage.ModeFile, Content: []byte("file-3")},
+				"/1": {Mode: mode.Executable, Content: []byte("file-1")},
+				"/2": {Mode: mode.File, Content: []byte("file-2")},
+				"/3": {Mode: mode.File, Content: []byte("file-3")},
 			},
 		},
 		{
@@ -179,9 +179,9 @@ func TestEntry(t *testing.T) {
 			}(),
 			expectedFiles: testhelper.DirectoryState{
 				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: storage.ModeExecutable, Content: []byte("file-1")},
-				"/2": {Mode: storage.ModeFile, Content: []byte("file-2")},
-				"/3": {Mode: storage.ModeFile, Content: []byte("file-3")},
+				"/1": {Mode: mode.Executable, Content: []byte("file-1")},
+				"/2": {Mode: mode.File, Content: []byte("file-2")},
+				"/3": {Mode: mode.File, Content: []byte("file-3")},
 			},
 		},
 		{
@@ -432,11 +432,11 @@ func TestRecordReferenceUpdates(t *testing.T) {
 					}(),
 					expectedDirectory: testhelper.DirectoryState{
 						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
-						"/1": {Mode: storage.ModeFile, Content: []byte(oids[0] + "\n")},
-						"/2": {Mode: storage.ModeFile, Content: []byte(oids[1] + "\n")},
-						"/3": {Mode: storage.ModeFile, Content: []byte(oids[2] + "\n")},
-						"/4": {Mode: storage.ModeFile, Content: []byte(oids[3] + "\n")},
-						"/5": {Mode: storage.ModeFile, Content: []byte(oids[4] + "\n")},
+						"/1": {Mode: mode.File, Content: []byte(oids[0] + "\n")},
+						"/2": {Mode: mode.File, Content: []byte(oids[1] + "\n")},
+						"/3": {Mode: mode.File, Content: []byte(oids[2] + "\n")},
+						"/4": {Mode: mode.File, Content: []byte(oids[3] + "\n")},
+						"/5": {Mode: mode.File, Content: []byte(oids[4] + "\n")},
 					},
 				}
 			},
@@ -508,11 +508,11 @@ func TestRecordReferenceUpdates(t *testing.T) {
 					}(),
 					expectedDirectory: testhelper.DirectoryState{
 						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
-						"/1": {Mode: storage.ModeFile, Content: []byte(oids[1] + "\n")},
-						"/2": {Mode: storage.ModeFile, Content: []byte(oids[2] + "\n")},
-						"/3": {Mode: storage.ModeFile, Content: []byte(oids[1] + "\n")},
-						"/4": {Mode: storage.ModeFile, Content: []byte(oids[2] + "\n")},
-						"/5": {Mode: storage.ModeFile, Content: []byte(oids[3] + "\n")},
+						"/1": {Mode: mode.File, Content: []byte(oids[1] + "\n")},
+						"/2": {Mode: mode.File, Content: []byte(oids[2] + "\n")},
+						"/3": {Mode: mode.File, Content: []byte(oids[1] + "\n")},
+						"/4": {Mode: mode.File, Content: []byte(oids[2] + "\n")},
+						"/5": {Mode: mode.File, Content: []byte(oids[3] + "\n")},
 					},
 				}
 			},
@@ -582,9 +582,9 @@ func TestRecordReferenceUpdates(t *testing.T) {
 					}(),
 					expectedDirectory: testhelper.DirectoryState{
 						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
-						"/1": {Mode: storage.ModeFile, Content: []byte(oids[0] + "\n")},
-						"/2": {Mode: storage.ModeFile, Content: []byte(oids[1] + "\n")},
-						"/3": {Mode: storage.ModeFile, Content: []byte(oids[2] + "\n")},
+						"/1": {Mode: mode.File, Content: []byte(oids[0] + "\n")},
+						"/2": {Mode: mode.File, Content: []byte(oids[1] + "\n")},
+						"/3": {Mode: mode.File, Content: []byte(oids[2] + "\n")},
 					},
 				}
 			},
@@ -635,7 +635,7 @@ func TestRecordReferenceUpdates(t *testing.T) {
 					}(),
 					expectedDirectory: testhelper.DirectoryState{
 						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
-						"/1": {Mode: storage.ModeFile, Content: []byte(oids[0] + "\n")},
+						"/1": {Mode: mode.File, Content: []byte(oids[0] + "\n")},
 					},
 				}
 			},

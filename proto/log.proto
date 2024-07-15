@@ -110,8 +110,8 @@ message LogEntry {
     message CreateDirectory {
       // path is a relative path where to create the directory.
       bytes path = 1;
-      // permissions are the Unix permision bits to set on the created directory.
-      uint32 permissions = 2;
+      // mode is the file mode to set on the created directory.
+      uint32 mode = 2;
     }
 
     // SetKey sets a key with a value in the key-value store.

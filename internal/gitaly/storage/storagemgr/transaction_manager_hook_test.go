@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -122,13 +123,13 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						CustomHooks: testhelper.DirectoryState{
-							"/": {Mode: storage.ModeDirectory},
+							"/": {Mode: mode.Directory},
 							"/pre-receive": {
-								Mode:    storage.ModeExecutable,
+								Mode:    mode.Executable,
 								Content: []byte("hook content"),
 							},
-							"/private-dir":              {Mode: storage.ModeDirectory},
-							"/private-dir/private-file": {Mode: storage.ModeFile, Content: []byte("private content")},
+							"/private-dir":              {Mode: mode.Directory},
+							"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 						},
 					},
 				},

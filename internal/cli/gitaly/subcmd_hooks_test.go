@@ -15,6 +15,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/setup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -48,13 +49,13 @@ func TestSetHooksSubcommand(t *testing.T) {
 
 	expectedDirectoryMode := testhelper.WithOrWithoutWAL(
 		// TAR does not store the directory mode in the mode field. It's stored
-		// in the type field of the header. Remove the directory mode bit.
-		storage.ModeDirectory^fs.ModeDir,
+		// in the type field of the header. Only match against the permissions.
+		mode.Directory.Perm(),
 		umask.Mask(fs.ModePerm),
 	)
 
 	expectedExecutableMode := testhelper.WithOrWithoutWAL(
-		storage.ModeExecutable,
+		mode.Executable,
 		umask.Mask(perm.PrivateExecutable),
 	)
 

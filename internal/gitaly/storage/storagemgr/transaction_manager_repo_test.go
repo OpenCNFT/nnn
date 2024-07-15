@@ -5,6 +5,8 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -111,13 +113,13 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 							setup.Commits.Second.OID,
 						},
 						CustomHooks: testhelper.DirectoryState{
-							"/": {Mode: storage.ModeDirectory},
+							"/": {Mode: mode.Directory},
 							"/pre-receive": {
-								Mode:    storage.ModeExecutable,
+								Mode:    mode.Executable,
 								Content: []byte("hook content"),
 							},
-							"/private-dir":              {Mode: storage.ModeDirectory},
-							"/private-dir/private-file": {Mode: storage.ModeFile, Content: []byte("private content")},
+							"/private-dir":              {Mode: mode.Directory},
+							"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 						},
 					},
 				},
@@ -191,13 +193,13 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 								setup.Commits.First.OID,
 							},
 							CustomHooks: testhelper.DirectoryState{
-								"/": {Mode: storage.ModeReadOnlyDirectory},
+								"/": {Mode: snapshot.ModeReadOnlyDirectory},
 								"/pre-receive": {
-									Mode:    storage.ModeExecutable,
+									Mode:    mode.Executable,
 									Content: []byte("hook content"),
 								},
-								"/private-dir":              {Mode: storage.ModeReadOnlyDirectory},
-								"/private-dir/private-file": {Mode: storage.ModeFile, Content: []byte("private content")},
+								"/private-dir":              {Mode: snapshot.ModeReadOnlyDirectory},
+								"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 							},
 						},
 					},
@@ -347,13 +349,13 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 							},
 						},
 						CustomHooks: testhelper.DirectoryState{
-							"/": {Mode: storage.ModeDirectory},
+							"/": {Mode: mode.Directory},
 							"/pre-receive": {
-								Mode:    storage.ModeExecutable,
+								Mode:    mode.Executable,
 								Content: []byte("hook content"),
 							},
-							"/private-dir":              {Mode: storage.ModeDirectory},
-							"/private-dir/private-file": {Mode: storage.ModeFile, Content: []byte("private content")},
+							"/private-dir":              {Mode: mode.Directory},
+							"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 						},
 						Objects: []git.ObjectID{
 							setup.Commits.First.OID,
@@ -435,13 +437,13 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 							setup.Commits.First.OID,
 						},
 						CustomHooks: testhelper.DirectoryState{
-							"/": {Mode: storage.ModeDirectory},
+							"/": {Mode: mode.Directory},
 							"/pre-receive": {
-								Mode:    storage.ModeExecutable,
+								Mode:    mode.Executable,
 								Content: []byte("hook content"),
 							},
-							"/private-dir":              {Mode: storage.ModeDirectory},
-							"/private-dir/private-file": {Mode: storage.ModeFile, Content: []byte("private content")},
+							"/private-dir":              {Mode: mode.Directory},
+							"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 						},
 					},
 					"repository-2": {
@@ -890,13 +892,13 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 								setup.Commits.First.OID,
 							},
 							CustomHooks: testhelper.DirectoryState{
-								"/": {Mode: storage.ModeDirectory},
+								"/": {Mode: mode.Directory},
 								"/pre-receive": {
-									Mode:    storage.ModeExecutable,
+									Mode:    mode.Executable,
 									Content: []byte("hook content"),
 								},
-								"/private-dir":              {Mode: storage.ModeDirectory},
-								"/private-dir/private-file": {Mode: storage.ModeFile, Content: []byte("private content")},
+								"/private-dir":              {Mode: mode.Directory},
+								"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 							},
 						},
 					},

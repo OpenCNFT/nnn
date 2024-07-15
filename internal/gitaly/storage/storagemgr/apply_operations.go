@@ -49,7 +49,7 @@ func applyOperations(sync func(string) error, storageRoot, walEntryDirectory str
 			op := wrapper.CreateDirectory
 
 			path := string(op.Path)
-			if err := os.Mkdir(filepath.Join(storageRoot, path), fs.FileMode(op.Permissions)); err != nil && !errors.Is(err, fs.ErrExist) {
+			if err := os.Mkdir(filepath.Join(storageRoot, path), fs.FileMode(op.Mode)); err != nil && !errors.Is(err, fs.ErrExist) {
 				return fmt.Errorf("mkdir: %w", err)
 			}
 
