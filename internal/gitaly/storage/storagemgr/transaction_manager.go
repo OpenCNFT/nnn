@@ -28,6 +28,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
@@ -1449,7 +1450,7 @@ func (mgr *TransactionManager) setupStagingRepository(ctx context.Context, trans
 		if err := os.WriteFile(
 			stats.AlternatesFilePath(mgr.getAbsolutePath(transaction.stagingSnapshot.RelativePath(transaction.relativePath))),
 			[]byte(alternatesContent),
-			perm.PrivateFile,
+			mode.File,
 		); err != nil {
 			return fmt.Errorf("insert modified alternate file: %w", err)
 		}
@@ -3095,7 +3096,7 @@ func (mgr *TransactionManager) appendLogEntry(objectDependencies map[git.ObjectI
 
 	// Finalize the log entry by writing the MANIFEST file into the log entry's directory.
 	manifestPath := manifestPath(logEntryPath)
-	if err := os.WriteFile(manifestPath, manifestBytes, perm.PrivateFile); err != nil {
+	if err := os.WriteFile(manifestPath, manifestBytes, mode.File); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
