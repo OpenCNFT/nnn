@@ -18,6 +18,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -175,8 +177,9 @@ func TestPartitionManager(t *testing.T) {
 	}
 
 	type setupData struct {
-		steps                     steps
-		transactionManagerFactory transactionManagerFactory
+		steps                       steps
+		transactionManagerFactory   transactionManagerFactory
+		expectedInitializationError error
 	}
 
 	for _, tc := range []struct {
@@ -787,6 +790,32 @@ func TestPartitionManager(t *testing.T) {
 				}
 			},
 		},
+		{
+			desc: "clears read-only directory in staging directory",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				internalDir := internalDirectoryPath(cfg.Storages[0].Path)
+				stagingDir := stagingDirectoryPath(internalDir)
+
+				// Create a staging directory as it would exist if Gitaly terminated uncleanly.
+				require.NoError(t, os.MkdirAll(stagingDir, mode.Directory))
+
+				// Create a read-only directory that contains some other files to emulate a shared snapshot
+				// with read-only directories in it.
+				readOnlyDir := filepath.Join(stagingDir, "read-only-dir")
+				require.NoError(t, os.Mkdir(readOnlyDir, mode.Directory))
+				require.NoError(t, os.WriteFile(filepath.Join(readOnlyDir, "file-to-remove"), nil, mode.File))
+				require.NoError(t, storage.SetDirectoryMode(readOnlyDir, snapshot.ModeReadOnlyDirectory))
+				t.Cleanup(func() {
+					// Restore the permissions so our general testhelper deleting the test runs directory
+					// doesn't fail.
+					storage.SetDirectoryMode(readOnlyDir, mode.Directory)
+				})
+
+				return setupData{
+					expectedInitializationError: fs.ErrPermission,
+				}
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
@@ -816,8 +845,13 @@ func TestPartitionManager(t *testing.T) {
 
 			dbMgr, err := keyvalue.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 			require.NoError(t, err)
+			defer dbMgr.Close()
 
 			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+			if setup.expectedInitializationError != nil {
+				require.ErrorIs(t, err, setup.expectedInitializationError)
+				return
+			}
 			require.NoError(t, err)
 
 			if setup.transactionManagerFactory != nil {
