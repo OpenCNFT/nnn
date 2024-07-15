@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
-	"gitlab.com/gitlab-org/labkit/correlation"
 	"gitlab.com/gitlab-org/labkit/tracing"
 )
 
@@ -40,45 +37,22 @@ func main() {
 	ctx, finished := tracing.ExtractFromEnv(context.Background())
 	defer finished()
 
-	logger, closer, err := configureLogging(ctx, os.Environ())
+	logger, logCloser, err := command.NewSubprocessLogger(ctx, os.Getenv, "gitaly_lfs_smudge.log", "json")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error initializing log file for gitaly-lfs-smudge: %v", err)
+	} else {
+		defer func() {
+			if err := logCloser.Close(); err != nil {
+				fmt.Printf("close log: %q", err)
+				os.Exit(1)
+			}
+		}()
 	}
-	defer closer.Close()
 
 	if err := run(ctx, os.Environ(), os.Stdout, os.Stdin, logger); err != nil {
 		logger.WithError(err).Error("gitaly-lfs-smudge failed")
 		os.Exit(1)
 	}
-}
-
-type nopCloser struct{}
-
-func (nopCloser) Close() error {
-	return nil
-}
-
-func configureLogging(ctx context.Context, environment []string) (log.Logger, io.Closer, error) {
-	var closer io.Closer = nopCloser{}
-	writer := io.Discard
-
-	if logDir := env.ExtractValue(environment, log.GitalyLogDirEnvKey); logDir != "" {
-		logFile, err := os.OpenFile(filepath.Join(logDir, "gitaly_lfs_smudge.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, perm.SharedFile)
-		if err != nil {
-			// Ignore this error as we cannot do anything about it anyway. We cannot write anything to
-			// stdout or stderr as that might break hooks, and we have no other destination to log to.
-		} else {
-			writer = logFile
-		}
-	}
-
-	logger, err := log.Configure(writer, "json", "info")
-	if err != nil {
-		closer.Close()
-		return nil, nil, err
-	}
-
-	return logger.WithField(correlation.FieldName, correlation.ExtractFromContext(ctx)), closer, nil
 }
 
 func run(ctx context.Context, environment []string, out io.Writer, in io.Reader, logger log.Logger) error {
