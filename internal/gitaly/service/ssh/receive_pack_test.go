@@ -26,7 +26,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -438,7 +437,7 @@ func TestReceivePack_hookFailure(t *testing.T) {
 	remoteRepo, _ := gittest.CreateRepository(t, ctx, cfg)
 
 	hookContent := []byte("#!/bin/sh\nexit 1")
-	require.NoError(t, os.WriteFile(filepath.Join(gitCmdFactory.HooksPath(ctx), "pre-receive"), hookContent, perm.PrivateExecutable))
+	require.NoError(t, os.WriteFile(filepath.Join(gitCmdFactory.HooksPath(ctx), "pre-receive"), hookContent, mode.Executable))
 
 	_, _, err := setupRepoAndPush(t, ctx, cfg, &gitalypb.SSHReceivePackRequest{
 		Repository: remoteRepo,

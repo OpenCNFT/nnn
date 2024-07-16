@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
 func TestUnpackAuxiliaryBinaries_success(t *testing.T) {
@@ -23,7 +22,7 @@ func TestUnpackAuxiliaryBinaries_success(t *testing.T) {
 	for _, entry := range entries {
 		fileInfo, err := entry.Info()
 		require.NoError(t, err)
-		require.Equal(t, fileInfo.Mode(), perm.PrivateExecutable, "expected the owner to have rwx permissions on the unpacked binary")
+		require.Equal(t, fileInfo.Mode(), mode.Executable)
 
 		sourceBinary, err := os.ReadFile(filepath.Join(buildDir, fileInfo.Name()))
 		require.NoError(t, err)

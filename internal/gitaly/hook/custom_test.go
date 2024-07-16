@@ -15,7 +15,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -452,7 +451,7 @@ type customHookResults struct {
 
 func writeCustomHook(t *testing.T, hookName, dir string, content []byte) func() {
 	require.NoError(t, os.MkdirAll(dir, mode.Directory))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, hookName), content, perm.PrivateExecutable))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, hookName), content, mode.Executable))
 
 	return func() {
 		require.NoError(t, os.RemoveAll(dir))

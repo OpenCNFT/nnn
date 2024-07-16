@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
 // DirectoryEntry models an entry in a directory.
@@ -149,9 +148,9 @@ func MustCreateCustomHooksTar(tb testing.TB) io.Reader {
 	defer MustClose(tb, writer)
 
 	require.NoError(tb, writer.WriteHeader(&tar.Header{Name: "custom_hooks/", Mode: int64(mode.Directory)}))
-	writeFile(writer, "custom_hooks/pre-commit", perm.PrivateExecutable, "pre-commit content")
-	writeFile(writer, "custom_hooks/pre-push", perm.PrivateExecutable, "pre-push content")
-	writeFile(writer, "custom_hooks/pre-receive", perm.PrivateExecutable, "pre-receive content")
+	writeFile(writer, "custom_hooks/pre-commit", mode.Executable, "pre-commit content")
+	writeFile(writer, "custom_hooks/pre-push", mode.Executable, "pre-push content")
+	writeFile(writer, "custom_hooks/pre-receive", mode.Executable, "pre-receive content")
 
 	return &buffer
 }
