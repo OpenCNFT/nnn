@@ -136,7 +136,7 @@ func TestExtractHooks(t *testing.T) {
 			Name: "custom_hooks/subdirectory/",
 			Mode: int64(mode.Directory),
 		}))
-		writeFile(writer, "custom_hooks/subdirectory/supporting-file", perm.PrivateWriteOnceFile, "supporting-file content")
+		writeFile(writer, "custom_hooks/subdirectory/supporting-file", mode.File, "supporting-file content")
 		writeFile(writer, "ignored_file", fs.ModePerm, "ignored content")
 		writeFile(writer, "ignored_directory/ignored_file", fs.ModePerm, "ignored content")
 		defer testhelper.MustClose(t, writer)
@@ -194,7 +194,7 @@ func TestExtractHooks(t *testing.T) {
 				"/custom_hooks":              {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/custom_hooks/pre-receive":  {Mode: umask.Mask(fs.ModePerm), Content: []byte("pre-receive content")},
 				"/custom_hooks/subdirectory": {Mode: mode.Directory},
-				"/custom_hooks/subdirectory/supporting-file": {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte("supporting-file content")},
+				"/custom_hooks/subdirectory/supporting-file": {Mode: mode.File, Content: []byte("supporting-file content")},
 			},
 		},
 		{
@@ -205,7 +205,7 @@ func TestExtractHooks(t *testing.T) {
 				"/":                             {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/pre-receive":                  {Mode: umask.Mask(fs.ModePerm), Content: []byte("pre-receive content")},
 				"/subdirectory":                 {Mode: mode.Directory},
-				"/subdirectory/supporting-file": {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte("supporting-file content")},
+				"/subdirectory/supporting-file": {Mode: mode.File, Content: []byte("supporting-file content")},
 			},
 		},
 		{
@@ -349,7 +349,7 @@ func TestNewDirectoryVote(t *testing.T) {
 		{
 			desc: "generated hash matches with changed file mode",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateWriteOnceFile},
+				{name: "pre-commit.sample", content: "foo", mode: mode.File},
 				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
 			},
 			expectedHash: "ad20a4fea20e9049bb70e084e757fcc5d2cf2cc7",

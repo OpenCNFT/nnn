@@ -28,7 +28,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -41,7 +40,7 @@ var errSimulatedCrash = errors.New("simulated crash")
 
 func manifestDirectoryEntry(expected *gitalypb.LogEntry) testhelper.DirectoryEntry {
 	return testhelper.DirectoryEntry{
-		Mode:    perm.PrivateWriteOnceFile,
+		Mode:    mode.File,
 		Content: expected,
 		ParseContent: func(tb testing.TB, path string, content []byte) any {
 			var logEntry gitalypb.LogEntry
@@ -77,7 +76,7 @@ func validCustomHooks(tb testing.TB) []byte {
 	require.NoError(tb, writer.WriteHeader(&tar.Header{
 		Name: "custom_hooks/private-dir/private-file",
 		Size: int64(len("private content")),
-		Mode: int64(perm.PrivateWriteOnceFile),
+		Mode: int64(mode.File),
 	}))
 	_, err = writer.Write([]byte("private content"))
 	require.NoError(tb, err)

@@ -10,7 +10,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -115,7 +114,7 @@ func TestFromRepo_failures(t *testing.T) {
 
 			require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "objects", "info"), mode.Directory))
 			alternateFilePath := filepath.Join(repoPath, "objects", "info", "alternates")
-			require.NoError(t, os.WriteFile(alternateFilePath, tc.fileContent, perm.PrivateWriteOnceFile))
+			require.NoError(t, os.WriteFile(alternateFilePath, tc.fileContent, mode.File))
 			poolFromRepo, err := FromRepo(ctx, logger, locator, pool.gitCmdFactory, nil, nil, nil, repo)
 			require.Equal(t, tc.expectedErr, err)
 			require.Nil(t, poolFromRepo)

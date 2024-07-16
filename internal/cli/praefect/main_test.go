@@ -10,7 +10,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bootstrap/starter"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/praefect/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -159,6 +159,6 @@ func writeConfigToFile(tb testing.TB, conf config.Config) string {
 	require.NoError(tb, err)
 	tmpDir := testhelper.TempDir(tb)
 	confPath := filepath.Join(tmpDir, "config.toml")
-	require.NoError(tb, os.WriteFile(confPath, confData, perm.PrivateWriteOnceFile))
+	require.NoError(tb, os.WriteFile(confPath, confData, mode.File))
 	return confPath
 }

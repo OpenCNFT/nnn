@@ -19,7 +19,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -255,8 +254,6 @@ func TestLogEntryArchiver(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			umask := testhelper.Umask()
-
 			entryRootPath := testhelper.TempDir(t)
 
 			archivePath := testhelper.TempDir(t)
@@ -344,8 +341,8 @@ func TestLogEntryArchiver(t *testing.T) {
 					require.NoError(t, err)
 					testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
 						lsn.String() + "/":                          {Mode: mode.Directory.Perm()},
-						filepath.Join(lsn.String(), "LSN"):          {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(lsn.String())},
-						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+						filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
+						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 					})
 				}
 			}
@@ -366,8 +363,6 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(testhelper.Context(t))
 	defer cancel()
-
-	umask := testhelper.Umask()
 
 	const lsn = storage.LSN(1)
 	const workerCount = 1
@@ -452,8 +447,8 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 
 	testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
 		lsn.String() + "/":                          {Mode: mode.Directory.Perm()},
-		filepath.Join(lsn.String(), "LSN"):          {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(lsn.String())},
-		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+		filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
+		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 	})
 
 	require.NoError(t, testutil.CollectAndCompare(
@@ -474,8 +469,8 @@ func createEntryDir(t *testing.T, entryRootPath string, storageName string, part
 
 	testhelper.CreateFS(t, filepath.Join(partitionPath, lsn.String()), fstest.MapFS{
 		".":            {Mode: mode.Directory},
-		"LSN":          {Mode: perm.PrivateWriteOnceFile, Data: []byte(lsn.String())},
-		"PARTITION_ID": {Mode: perm.PrivateWriteOnceFile, Data: []byte(fmt.Sprintf("%d", partitionID))},
+		"LSN":          {Mode: mode.File, Data: []byte(lsn.String())},
+		"PARTITION_ID": {Mode: mode.File, Data: []byte(fmt.Sprintf("%d", partitionID))},
 	})
 }
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -89,7 +88,7 @@ func TestObjectDirsOutsideStorage(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			require.NoError(t, os.WriteFile(alternatesFile, []byte(tc.alternates), perm.PrivateWriteOnceFile))
+			require.NoError(t, os.WriteFile(alternatesFile, []byte(tc.alternates), mode.File))
 			out, err := ObjectDirectories(ctx, logger, storageRoot, repoPath)
 			require.Equal(t, expectedErr, err)
 			require.Nil(t, out)

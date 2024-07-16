@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
@@ -38,7 +39,7 @@ func TestUnpackAuxiliaryBinaries_alreadyExists(t *testing.T) {
 	destinationDir := t.TempDir()
 
 	existingFile := filepath.Join(destinationDir, "gitaly-hooks")
-	require.NoError(t, os.WriteFile(existingFile, []byte("existing file"), perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(existingFile, []byte("existing file"), mode.File))
 
 	err := UnpackAuxiliaryBinaries(destinationDir)
 	require.EqualError(t, err, fmt.Sprintf(`open %s: file exists`, existingFile), "expected unpacking to fail if destination binary already existed")

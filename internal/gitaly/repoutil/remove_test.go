@@ -9,8 +9,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -50,7 +50,7 @@ func TestRemove(t *testing.T) {
 
 				// Simulate a concurrent RPC holding the repository lock.
 				lockPath := repoPath + ".lock"
-				require.NoError(t, os.WriteFile(lockPath, []byte{}, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(lockPath, []byte{}, mode.File))
 				tb.Cleanup(func() {
 					require.NoError(t, os.RemoveAll(lockPath))
 				})

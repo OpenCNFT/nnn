@@ -14,7 +14,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
 func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPartitionID storage.PartitionID, relativePath string) []transactionTestCase {
@@ -126,12 +125,12 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						require.NoError(t, os.WriteFile(
 							filepath.Join(repoPath, "packed-refs.lock"),
 							[]byte{},
-							perm.PrivateWriteOnceFile,
+							mode.File,
 						))
 						require.NoError(t, os.WriteFile(
 							filepath.Join(repoPath, "packed-refs.new"),
 							[]byte{},
-							perm.PrivateWriteOnceFile,
+							mode.File,
 						))
 					},
 				},

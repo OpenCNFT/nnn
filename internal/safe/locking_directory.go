@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 type lockingDirectoryState int
@@ -52,7 +52,7 @@ func (ld *LockingDirectory) Lock() error {
 		return errors.New("locking directory not lockable")
 	}
 
-	lock, err := os.OpenFile(ld.lockPath(), os.O_CREATE|os.O_EXCL|os.O_RDONLY, perm.PrivateWriteOnceFile)
+	lock, err := os.OpenFile(ld.lockPath(), os.O_CREATE|os.O_EXCL|os.O_RDONLY, mode.File)
 	if err != nil {
 		if os.IsExist(err) {
 			return ErrFileAlreadyLocked

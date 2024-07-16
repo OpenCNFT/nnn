@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -156,7 +155,7 @@ func TestRandomWalk(t *testing.T) {
 			}
 
 			for _, file := range tc.files {
-				require.NoError(t, os.WriteFile(filepath.Join(root, file), []byte{}, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(filepath.Join(root, file), []byte{}, mode.File))
 			}
 
 			walker := newRandomWalker(root, rand.New(rand.NewSource(1)))

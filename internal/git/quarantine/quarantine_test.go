@@ -10,7 +10,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -34,7 +33,7 @@ func (e entry) create(t *testing.T, root string) {
 			child.create(t, filepath.Join(root, name))
 		}
 	} else {
-		require.NoError(t, os.WriteFile(root, []byte(e.contents), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(root, []byte(e.contents), mode.File))
 	}
 }
 
@@ -124,7 +123,7 @@ func TestQuarantine_Migrate(t *testing.T) {
 		quarantine, err := New(ctx, repo, logger, locator)
 		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(filepath.Join(quarantine.dir.Path(), "file"), []byte("foobar"), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(filepath.Join(quarantine.dir.Path(), "file"), []byte("foobar"), mode.File))
 		require.NoError(t, quarantine.Migrate(ctx))
 
 		newContents := listEntries(t, repoPath)
@@ -155,7 +154,7 @@ func TestQuarantine_Migrate(t *testing.T) {
 		recursiveQuarantine, err := New(ctx, quarantine.QuarantinedRepo(), logger, locator)
 		require.NoError(t, err)
 
-		require.NoError(t, os.WriteFile(filepath.Join(recursiveQuarantine.dir.Path(), "file"), []byte("foobar"), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(filepath.Join(recursiveQuarantine.dir.Path(), "file"), []byte("foobar"), mode.File))
 		require.NoError(t, recursiveQuarantine.Migrate(ctx))
 
 		// The main repo should be untouched and still not contain the object.
@@ -406,7 +405,7 @@ func TestFinalizeObjectFile(t *testing.T) {
 
 		source := filepath.Join(dir, "a")
 		target := filepath.Join(dir, "b")
-		require.NoError(t, os.WriteFile(source, []byte("a"), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(source, []byte("a"), mode.File))
 
 		require.NoError(t, finalizeObjectFile(source, target))
 		require.NoFileExists(t, source)
@@ -419,7 +418,7 @@ func TestFinalizeObjectFile(t *testing.T) {
 
 		source := filepath.Join(sourceDir, "a")
 		target := filepath.Join(targetDir, "a")
-		require.NoError(t, os.WriteFile(source, []byte("a"), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(source, []byte("a"), mode.File))
 
 		require.NoError(t, finalizeObjectFile(source, target))
 		require.NoFileExists(t, source)
@@ -430,10 +429,10 @@ func TestFinalizeObjectFile(t *testing.T) {
 		dir := testhelper.TempDir(t)
 
 		source := filepath.Join(dir, "a")
-		require.NoError(t, os.WriteFile(source, []byte("a"), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(source, []byte("a"), mode.File))
 
 		target := filepath.Join(dir, "b")
-		require.NoError(t, os.WriteFile(target, []byte("b"), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(target, []byte("b"), mode.File))
 
 		// We do not expect an error in case the target file exists: given that objects and
 		// packs are content addressable, a file with the same name should have the same
