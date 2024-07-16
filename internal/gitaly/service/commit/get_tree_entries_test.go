@@ -1078,107 +1078,6 @@ func TestGetTreeEntries(t *testing.T) {
 			},
 		},
 		{
-			desc: "pagination continues on same tree after concurrent commit",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
-				file3OID := gittest.WriteBlob(t, cfg, repoPath, []byte("file-3-content"))
-				dir2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Mode: "100644", Path: "file3", OID: file3OID},
-				})
-				// Initial commit
-				gittest.WriteCommit(t, cfg, repoPath,
-					gittest.WithTree(gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{
-							Path: "dir1",
-							Mode: "040000",
-							OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-								{Mode: "100644", Path: "file2", Content: "file2-content"},
-							}),
-						},
-						{
-							Path: "dir2",
-							Mode: "040000",
-							OID:  dir2OID,
-						},
-					})),
-					gittest.WithBranch("main"),
-				)
-
-				// First request to get initial page token
-				firstReq := &gitalypb.GetTreeEntriesRequest{
-					Repository: repo,
-					Revision:   []byte("main"),
-					Path:       []byte("."),
-					Recursive:  true,
-					PaginationParams: &gitalypb.PaginationParameter{
-						Limit: 2,
-					},
-				}
-				stream, err := client.GetTreeEntries(ctx, firstReq)
-				require.NoError(t, err)
-
-				var firstResp *gitalypb.GetTreeEntriesResponse
-				firstResp, err = stream.Recv()
-				require.NoError(t, err)
-				require.NotEmpty(t, firstResp.GetPaginationCursor().GetNextCursor())
-				initialPageToken := firstResp.PaginationCursor.NextCursor
-
-				// Verify first two entries
-				require.Len(t, firstResp.Entries, 2)
-				require.Equal(t, []byte("dir1"), firstResp.Entries[0].Path)
-				require.Equal(t, []byte("dir1/file2"), firstResp.Entries[1].Path)
-
-				// Write a new commit changing the tree
-				gittest.WriteCommit(t, cfg, repoPath,
-					gittest.WithTree(gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{
-							Path: "new_dir",
-							Mode: "040000",
-							OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-								{
-									Mode:    "100644",
-									Path:    "new_file2",
-									Content: "new_file2-content",
-								},
-							}),
-						},
-					})),
-					gittest.WithBranch("main"),
-				)
-
-				return setupData{
-					request: &gitalypb.GetTreeEntriesRequest{
-						Repository: repo,
-						Revision:   []byte("main"),
-						Path:       []byte("."),
-						Recursive:  true,
-						PaginationParams: &gitalypb.PaginationParameter{
-							PageToken: initialPageToken,
-							Limit:     2,
-						},
-					},
-					expectedTreeEntries: []*gitalypb.TreeEntry{
-						{
-							Oid:  dir2OID.String(),
-							Path: []byte("dir2"),
-							Type: gitalypb.TreeEntry_TREE,
-							Mode: 0o40000,
-							// CommitOid field is currently being evaluated as revision could be a branch name or a commitID,
-							// for more info refer to https://gitlab.com/gitlab-org/gitaly/-/issues/6205
-							CommitOid: "main",
-						},
-						{
-							Oid:       file3OID.String(),
-							Path:      []byte("dir2/file3"),
-							Type:      gitalypb.TreeEntry_BLOB,
-							Mode:      0o100644,
-							CommitOid: "main",
-						},
-					},
-				}
-			},
-		},
-		{
 			desc: "sorted by trees first and paginated",
 			setup: func(t *testing.T) setupData {
 				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
@@ -1202,11 +1101,10 @@ func TestGetTreeEntries(t *testing.T) {
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				rootTreeOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{OID: folder2OID, Mode: "040000", Path: "bar"},
-					{OID: folderOID, Mode: "040000", Path: "foo"},
-				})
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTree(rootTreeOID))
+				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
+					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
+				))
 
 				expectedTreeEntries := []*gitalypb.TreeEntry{
 					{
@@ -1232,7 +1130,7 @@ func TestGetTreeEntries(t *testing.T) {
 					},
 				}
 
-				cursor, err := encodePageToken(expectedTreeEntries[2], rootTreeOID)
+				cursor, err := encodePageToken(expectedTreeEntries[2])
 				require.NoError(t, err)
 
 				return setupData{
