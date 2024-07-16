@@ -1725,13 +1725,8 @@ func (mgr *TransactionManager) prepareHousekeeping(ctx context.Context, transact
 	return nil
 }
 
-// preparePackRefs runs git-pack-refs command against the snapshot repository. It collects the resulting packed-refs
-// file and the list of pruned references. Unfortunately, git-pack-refs doesn't output which refs are pruned. So, we
-// performed two ref walkings before and after running the command. The difference between the two walks is the list of
-// pruned refs. This workaround works but is not performant on large repositories with huge amount of loose references.
-// Smaller repositories or ones that run housekeeping frequent won't have this issue.
-// The work of adding pruned refs dump to `git-pack-refs` is tracked here:
-// https://gitlab.com/gitlab-org/git/-/issues/222
+// preparePackRefs runs pack refs on the repository after detecting
+// its reference backend type.
 func (mgr *TransactionManager) preparePackRefs(ctx context.Context, transaction *Transaction) error {
 	if transaction.runHousekeeping.packRefs == nil {
 		return nil
@@ -1743,6 +1738,17 @@ func (mgr *TransactionManager) preparePackRefs(ctx context.Context, transaction 
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "prepare")
 	defer finishTimer()
 
+	return mgr.preparePackRefsFiles(ctx, transaction)
+}
+
+// preparePackRefsFiles runs git-pack-refs command against the snapshot repository. It collects the resulting packed-refs
+// file and the list of pruned references. Unfortunately, git-pack-refs doesn't output which refs are pruned. So, we
+// performed two ref walkings before and after running the command. The difference between the two walks is the list of
+// pruned refs. This workaround works but is not performant on large repositories with huge amount of loose references.
+// Smaller repositories or ones that run housekeeping frequent won't have this issue.
+// The work of adding pruned refs dump to `git-pack-refs` is tracked here:
+// https://gitlab.com/gitlab-org/git/-/issues/222
+func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transaction *Transaction) error {
 	runPackRefs := transaction.runHousekeeping.packRefs
 	repoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
 
