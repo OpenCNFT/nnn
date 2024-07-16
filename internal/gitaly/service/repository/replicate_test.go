@@ -26,7 +26,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -714,7 +713,7 @@ func listenGitalySSHCalls(t *testing.T, conf config.Cfg) func() gitalySSHParams 
 		echo "$@" >%[1]q/arguments
 
 		exec %[2]q "$@"`, tmpDir, updatedPath)
-	require.NoError(t, os.WriteFile(initialPath, []byte(script), perm.PrivateExecutable))
+	require.NoError(t, os.WriteFile(initialPath, []byte(script), mode.Executable))
 
 	return func() gitalySSHParams {
 		arguments := testhelper.MustReadFile(t, filepath.Join(tmpDir, "arguments"))

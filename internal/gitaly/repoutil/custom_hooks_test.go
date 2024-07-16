@@ -21,7 +21,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
@@ -46,7 +45,7 @@ func TestGetCustomHooks_successful(t *testing.T) {
 	}
 	require.NoError(t, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), mode.Directory), "Could not create custom_hooks dir")
 	for _, fileName := range expectedTarResponse[1:] {
-		require.NoError(t, os.WriteFile(filepath.Join(repoPath, fileName), []byte("Some hooks"), perm.PrivateExecutable), fmt.Sprintf("Could not create %s", fileName))
+		require.NoError(t, os.WriteFile(filepath.Join(repoPath, fileName), []byte("Some hooks"), mode.Executable), fmt.Sprintf("Could not create %s", fileName))
 	}
 
 	var hooks bytes.Buffer
@@ -325,34 +324,34 @@ func TestNewDirectoryVote(t *testing.T) {
 		{
 			desc: "generated hash matches",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateExecutable},
-				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: mode.Executable},
+				{name: "pre-push.sample", content: "bar", mode: mode.Executable},
 			},
-			expectedHash: "3c0fd54e0428c5ee04c15ee5a52864694771fb20",
+			expectedHash: "edf456d64829c9519bd692d5f6a9695c4cca7d17",
 		},
 		{
 			desc: "generated hash matches with changed file name",
 			files: []testFile{
-				{name: "pre-commit.sample.diff", content: "foo", mode: perm.PrivateExecutable},
-				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample.diff", content: "foo", mode: mode.Executable},
+				{name: "pre-push.sample", content: "bar", mode: mode.Executable},
 			},
-			expectedHash: "2d5080ef5ed0a52254a794915c8fbbec8c694224",
+			expectedHash: "70c2821e79862399f6fe68c858ec3df20282530a",
 		},
 		{
 			desc: "generated hash matches with changed file content",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateExecutable},
-				{name: "pre-push.sample", content: "bar.diff", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: mode.Executable},
+				{name: "pre-push.sample", content: "bar.diff", mode: mode.Executable},
 			},
-			expectedHash: "18e2d3f9cc9990747b27cf8a7fad281539856194",
+			expectedHash: "be06b7a1f74928aa53c5751d8f9b066aa4b09222",
 		},
 		{
 			desc: "generated hash matches with changed file mode",
 			files: []testFile{
 				{name: "pre-commit.sample", content: "foo", mode: mode.File},
-				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
+				{name: "pre-push.sample", content: "bar", mode: mode.Executable},
 			},
-			expectedHash: "ad20a4fea20e9049bb70e084e757fcc5d2cf2cc7",
+			expectedHash: "88e59654d920c86ad17286e59fbce4b70eaaea67",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
