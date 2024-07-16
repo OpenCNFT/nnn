@@ -3,6 +3,7 @@
 package cgroups
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -123,6 +124,18 @@ func (cgm *CGroupManager) Setup() error {
 	if err := cgm.handler.setupParent(cgm.configParentResources()); err != nil {
 		return err
 	}
+
+	// cmd run to force creation of repository cgroups
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "echo", "Gitaly")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("run command to force repository cgroups setup: %w", err)
+	}
+	if _, err := cgm.AddCommand(cmd, WithCgroupKey("setup")); err != nil {
+		return err
+	}
+
 	cgm.enabled = true
 
 	return nil
