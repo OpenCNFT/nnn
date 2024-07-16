@@ -106,7 +106,7 @@ func TestReplicateRepository(t *testing.T) {
 				attrFilePath := filepath.Join(sourcePath, "info", "attributes")
 				require.NoError(t, os.MkdirAll(filepath.Dir(attrFilePath), mode.Directory))
 				attributesData := []byte("*.pbxproj binary\n")
-				require.NoError(t, os.WriteFile(attrFilePath, attributesData, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(attrFilePath, attributesData, mode.File))
 
 				return setupData{
 					source: source,
@@ -345,7 +345,7 @@ func TestReplicateRepository(t *testing.T) {
 				// Remove the HEAD first as the files are read-only with transactions.
 				headPath := filepath.Join(sourcePath, "HEAD")
 				require.NoError(t, os.Remove(headPath))
-				require.NoError(t, os.WriteFile(headPath, []byte("garbage"), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(headPath, []byte("garbage"), mode.File))
 
 				return setupData{
 					source:        source,

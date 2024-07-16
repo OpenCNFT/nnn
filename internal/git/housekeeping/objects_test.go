@@ -16,7 +16,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -394,7 +394,7 @@ func TestRepackObjects(t *testing.T) {
 				require.Len(t, packPath, 1)
 
 				keepPath := strings.TrimSuffix(packPath[0], ".pack") + ".keep"
-				require.NoError(t, os.WriteFile(keepPath, nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(keepPath, nil, mode.File))
 			},
 			repackCfg: config.RepackObjectsConfig{
 				Strategy: config.RepackObjectsStrategyGeometric,
@@ -771,7 +771,7 @@ func TestRepackObjects_incrementalWithUnreachable(t *testing.T) {
 				require.NoError(t, os.WriteFile(
 					filepath.Join(repoPath, "objects", "info", "alternates"),
 					[]byte(filepath.Join(alternateRepoPath, "objects")),
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 
 				return setupData{
@@ -807,7 +807,7 @@ func TestRepackObjects_incrementalWithUnreachable(t *testing.T) {
 				require.NoError(t, os.WriteFile(
 					filepath.Join(repoPath, "objects", "info", "alternates"),
 					[]byte(filepath.Join(alternateRepoPath, "objects")),
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 
 				return setupData{

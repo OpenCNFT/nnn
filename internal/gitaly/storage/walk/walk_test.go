@@ -10,7 +10,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -76,7 +75,7 @@ func TestWalkStorage(t *testing.T) {
 				err := os.MkdirAll(dir, mode.Directory)
 				require.NoError(t, err)
 
-				f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE, perm.PrivateWriteOnceFile)
+				f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE, mode.File)
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 			}

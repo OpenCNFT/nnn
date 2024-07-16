@@ -20,7 +20,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -305,7 +304,7 @@ func TestCreate(t *testing.T) {
 				seed: func(t *testing.T, repo *gitalypb.Repository, repoPath string) error {
 					// Objects should both be ignored. They may contain indeterministic data
 					// that's different across replicas and would thus cause us to not reach quorum.
-					require.NoError(t, os.WriteFile(filepath.Join(repoPath, "objects", "object"), []byte("object"), perm.PrivateWriteOnceFile))
+					require.NoError(t, os.WriteFile(filepath.Join(repoPath, "objects", "object"), []byte("object"), mode.File))
 
 					gittest.BackendSpecificRepoHash(t, ctx, cfg, hash, repoPath)
 

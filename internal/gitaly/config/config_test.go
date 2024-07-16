@@ -20,7 +20,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/sentry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -307,7 +306,7 @@ func TestLoadConfigCommand(t *testing.T) {
 			desc: "command points to non-executable file",
 			setup: func(t *testing.T) setupData {
 				cmd := filepath.Join(testhelper.TempDir(t), "script")
-				require.NoError(t, os.WriteFile(cmd, nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(cmd, nil, mode.File))
 
 				return setupData{
 					cfg: Cfg{
@@ -557,7 +556,7 @@ func TestValidateStorages(t *testing.T) {
 	require.NoError(t, os.MkdirAll(nestedRepositories, mode.Directory))
 
 	filePath := filepath.Join(testhelper.TempDir(t), "temporary-file")
-	require.NoError(t, os.WriteFile(filePath, []byte{}, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(filePath, []byte{}, mode.File))
 
 	invalidDir := filepath.Join(filepath.Dir(repositories), t.Name())
 
@@ -1754,7 +1753,7 @@ func TestSetupRuntimeDirectory(t *testing.T) {
 	t.Run("validation", func(t *testing.T) {
 		dirPath := testhelper.TempDir(t)
 		filePath := filepath.Join(dirPath, "file")
-		require.NoError(t, os.WriteFile(filePath, nil, perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(filePath, nil, mode.File))
 
 		for _, tc := range []struct {
 			desc        string
@@ -2099,7 +2098,7 @@ func TestStorage_Validate(t *testing.T) {
 
 	dirPath := testhelper.TempDir(t)
 	filePath := filepath.Join(dirPath, "file")
-	require.NoError(t, os.WriteFile(filePath, nil, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(filePath, nil, mode.File))
 	for _, tc := range []struct {
 		name        string
 		storage     Storage
@@ -2141,7 +2140,7 @@ func TestTLS_Validate(t *testing.T) {
 
 	tmpDir := testhelper.TempDir(t)
 	tmpFile := filepath.Join(tmpDir, "file")
-	require.NoError(t, os.WriteFile(tmpFile, []byte("I am not a certificate"), perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(tmpFile, []byte("I am not a certificate"), mode.File))
 
 	for _, tc := range []struct {
 		name        string
@@ -2242,7 +2241,7 @@ func TestGitlabShell_Validate(t *testing.T) {
 
 	tmpDir := testhelper.TempDir(t)
 	tmpFile := filepath.Join(tmpDir, "file")
-	require.NoError(t, os.WriteFile(tmpFile, nil, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(tmpFile, nil, mode.File))
 
 	for _, tc := range []struct {
 		name        string
@@ -2357,7 +2356,7 @@ func TestHTTPSettings_Validate(t *testing.T) {
 
 	tmpDir := testhelper.TempDir(t)
 	tmpFile := filepath.Join(tmpDir, "tmpfile")
-	require.NoError(t, os.WriteFile(tmpFile, []byte{}, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(tmpFile, []byte{}, mode.File))
 
 	for _, tc := range []struct {
 		name         string
@@ -2412,7 +2411,7 @@ func TestGitlab_Validate(t *testing.T) {
 
 	tmpDir := testhelper.TempDir(t)
 	tmpFile := filepath.Join(tmpDir, "tmpfile")
-	require.NoError(t, os.WriteFile(tmpFile, []byte{}, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(tmpFile, []byte{}, mode.File))
 
 	for _, tc := range []struct {
 		name        string

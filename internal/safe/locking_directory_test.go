@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -29,7 +29,7 @@ func TestLockingDirectory(t *testing.T) {
 		require.NoError(t, os.WriteFile(
 			filepath.Join(path, "somefile"),
 			[]byte("data"),
-			perm.PrivateWriteOnceFile),
+			mode.File),
 		)
 		assert.ErrorIs(t, secondLockingDir.Lock(), safe.ErrFileAlreadyLocked)
 		require.NoError(t, lockingDir.Unlock())

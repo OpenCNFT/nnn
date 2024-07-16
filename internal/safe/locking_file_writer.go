@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 type lockingFileWriterState int
@@ -138,7 +138,7 @@ func (fw *LockingFileWriter) Lock() error {
 		return err
 	}
 
-	lock, err := os.OpenFile(fw.lockPath(), os.O_CREATE|os.O_EXCL|os.O_RDONLY, perm.PrivateWriteOnceFile)
+	lock, err := os.OpenFile(fw.lockPath(), os.O_CREATE|os.O_EXCL|os.O_RDONLY, mode.File)
 	if err != nil {
 		if os.IsExist(err) {
 			return ErrFileAlreadyLocked

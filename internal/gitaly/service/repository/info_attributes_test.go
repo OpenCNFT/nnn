@@ -11,7 +11,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -31,7 +30,7 @@ func TestGetInfoAttributesExisting(t *testing.T) {
 	buffSize := streamio.WriteBufferSize + 1
 	data := bytes.Repeat([]byte("*.pbxproj binary\n"), buffSize)
 	attrsPath := filepath.Join(infoPath, "attributes")
-	err := os.WriteFile(attrsPath, data, perm.PrivateWriteOnceFile)
+	err := os.WriteFile(attrsPath, data, mode.File)
 	require.NoError(t, err)
 
 	gitattributesContent := "*.go diff=go text\n*.md text\n*.jpg -text"

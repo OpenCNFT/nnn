@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -90,5 +89,5 @@ func TestWriteTarball(t *testing.T) {
 func writeFile(tb testing.TB, path string, data []byte) {
 	tb.Helper()
 	require.NoError(tb, os.MkdirAll(filepath.Dir(path), mode.Directory))
-	require.NoError(tb, os.WriteFile(path, data, perm.PrivateWriteOnceFile))
+	require.NoError(tb, os.WriteFile(path, data, mode.File))
 }

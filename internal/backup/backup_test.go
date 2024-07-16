@@ -21,7 +21,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -123,7 +122,7 @@ func TestManager_Create(t *testing.T) {
 					repo, repoPath := gittest.CreateRepository(tb, ctx, cfg)
 					gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(git.DefaultBranch))
 					require.NoError(tb, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), mode.Directory))
-					require.NoError(tb, os.WriteFile(filepath.Join(repoPath, "custom_hooks/pre-commit.sample"), []byte("Some hooks"), perm.PrivateWriteOnceFile))
+					require.NoError(tb, os.WriteFile(filepath.Join(repoPath, "custom_hooks/pre-commit.sample"), []byte("Some hooks"), mode.File))
 
 					return setupData{
 						repo:     repo,

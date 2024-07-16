@@ -15,7 +15,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -68,11 +67,11 @@ func TestRepositorySize_normalRepository(t *testing.T) {
 	requireRepositorySize(t, ctx, client, repo, 16)
 
 	// Also, updating any other files should cause a size increase.
-	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "packed-refs"), incompressibleData(7*1024), perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "packed-refs"), incompressibleData(7*1024), mode.File))
 	requireRepositorySize(t, ctx, client, repo, 23)
 
 	// Even garbage should increase the size.
-	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "garbage"), incompressibleData(5*1024), perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "garbage"), incompressibleData(5*1024), mode.File))
 	requireRepositorySize(t, ctx, client, repo, 28)
 }
 

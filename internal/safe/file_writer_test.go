@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -49,7 +49,7 @@ func TestFileWriter_mode(t *testing.T) {
 	dir := testhelper.TempDir(t)
 
 	target := filepath.Join(dir, "file")
-	require.NoError(t, os.WriteFile(target, []byte("contents"), perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(target, []byte("contents"), mode.File))
 
 	writer, err := safe.NewFileWriter(target, safe.FileWriterConfig{
 		FileMode: 0o060,

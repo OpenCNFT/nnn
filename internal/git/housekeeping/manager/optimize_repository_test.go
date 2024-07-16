@@ -491,7 +491,7 @@ func TestOptimizeRepository(t *testing.T) {
 		require.NoError(t, os.WriteFile(
 			alternatesPath,
 			[]byte(alternatesContent),
-			perm.PrivateWriteOnceFile,
+			mode.File,
 		))
 		require.NoError(t, os.Chtimes(alternatesPath, date, date))
 	}
@@ -732,7 +732,7 @@ func TestOptimizeRepository(t *testing.T) {
 
 				for i := 0; i < housekeeping.LooseObjectLimit+1; i++ {
 					blobPath := filepath.Join(repoPath, "objects", "17", fmt.Sprintf("%d", i))
-					require.NoError(t, os.WriteFile(blobPath, nil, perm.PrivateWriteOnceFile))
+					require.NoError(t, os.WriteFile(blobPath, nil, mode.File))
 					require.NoError(t, os.Chtimes(blobPath, almostTwoWeeksAgo, almostTwoWeeksAgo))
 				}
 
@@ -767,7 +767,7 @@ func TestOptimizeRepository(t *testing.T) {
 
 				for i := 0; i < housekeeping.LooseObjectLimit+1; i++ {
 					blobPath := filepath.Join(repoPath, "objects", "17", fmt.Sprintf("%d", i))
-					require.NoError(t, os.WriteFile(blobPath, nil, perm.PrivateWriteOnceFile))
+					require.NoError(t, os.WriteFile(blobPath, nil, mode.File))
 					require.NoError(t, os.Chtimes(blobPath, moreThanTwoWeeksAgo, moreThanTwoWeeksAgo))
 				}
 
@@ -1734,7 +1734,7 @@ func TestRepositoryManager_CleanStaleData_reftable(t *testing.T) {
 
 			path := filepath.Join(repoPath, "reftable", "tables.list.lock")
 
-			require.NoError(t, os.WriteFile(path, []byte{}, perm.PrivateWriteOnceFile))
+			require.NoError(t, os.WriteFile(path, []byte{}, mode.File))
 			filetime := time.Now().Add(-tc.age)
 			require.NoError(t, os.Chtimes(path, filetime, filetime))
 
@@ -1844,7 +1844,7 @@ func TestRepositoryManager_CleanStaleData_references(t *testing.T) {
 				path := filepath.Join(repoPath, ref.name)
 
 				require.NoError(t, os.MkdirAll(filepath.Dir(path), mode.Directory))
-				require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte{0}, ref.size), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte{0}, ref.size), mode.File))
 				filetime := time.Now().Add(-ref.age)
 				require.NoError(t, os.Chtimes(path, filetime, filetime))
 			}
@@ -2493,7 +2493,7 @@ func TestRepositoryManager_CleanStaleData_unsetConfiguration(t *testing.T) {
 	else = untouched
 [totally]
 	unrelated = untouched
-`), perm.PrivateWriteOnceFile))
+`), mode.File))
 
 	mgr := New(cfg.Prometheus, testhelper.SharedLogger(t), nil, nil)
 
@@ -2589,7 +2589,7 @@ func TestRepositoryManager_CleanStaleData_pruneEmptyConfigSections(t *testing.T)
 [remote "tmp-03b5e8c765135b343214d471843a062a"]
 [remote "tmp-f57338181aca1d599669dbb71ce9ce57"]
 [remote "tmp-8c948ca94832c2725733e48cb2902287"]
-`), perm.PrivateWriteOnceFile))
+`), mode.File))
 
 	mgr := New(cfg.Prometheus, testhelper.SharedLogger(t), nil, nil)
 
@@ -2630,7 +2630,7 @@ func TestRepositoryManager_CleanStaleData_removeGitLabFullPathConfig(t *testing.
 [gitlab]
 	fullpath = foo/bar
 	other = config
-`), perm.PrivateWriteOnceFile))
+`), mode.File))
 
 	mgr := New(cfg.Prometheus, testhelper.SharedLogger(t), nil, nil)
 

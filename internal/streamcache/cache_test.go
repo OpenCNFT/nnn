@@ -19,7 +19,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -359,7 +358,7 @@ func TestCache_unWriteableFile(t *testing.T) {
 	c := newCache(t, tmp)
 
 	innerCache(c).createFile = func() (namedWriteCloser, error) {
-		return os.OpenFile(filepath.Join(tmp, "unwriteable"), os.O_RDONLY|os.O_CREATE|os.O_EXCL, perm.PrivateWriteOnceFile)
+		return os.OpenFile(filepath.Join(tmp, "unwriteable"), os.O_RDONLY|os.O_CREATE|os.O_EXCL, mode.File)
 	}
 
 	_, _, err := c.Fetch(ctx, "key", io.Discard, func(w io.Writer) error {
@@ -380,7 +379,7 @@ func TestCache_unCloseableFile(t *testing.T) {
 	c := newCache(t, tmp)
 
 	innerCache(c).createFile = func() (namedWriteCloser, error) {
-		f, err := os.OpenFile(filepath.Join(tmp, "uncloseable"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm.PrivateWriteOnceFile)
+		f, err := os.OpenFile(filepath.Join(tmp, "uncloseable"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode.File)
 		if err != nil {
 			return nil, err
 		}
@@ -402,7 +401,7 @@ func TestCache_cannotOpenFileForReading(t *testing.T) {
 	c := newCache(t, tmp)
 
 	innerCache(c).createFile = func() (namedWriteCloser, error) {
-		f, err := os.OpenFile(filepath.Join(tmp, "unopenable"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm.PrivateWriteOnceFile)
+		f, err := os.OpenFile(filepath.Join(tmp, "unopenable"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode.File)
 		if err != nil {
 			return nil, err
 		}

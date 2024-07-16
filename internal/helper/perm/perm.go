@@ -9,11 +9,6 @@ import (
 )
 
 const (
-	// PrivateWriteOnceFile is the most restrictive file permission. Given to
-	// files that are expected to be written only once and must be read only by
-	// gitaly.
-	PrivateWriteOnceFile fs.FileMode = 0o400
-
 	// SharedFile is the permission given for a file that may be read outside
 	// of gitaly.
 	SharedFile fs.FileMode = 0o644
