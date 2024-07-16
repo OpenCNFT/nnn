@@ -12,10 +12,6 @@ const (
 	// SharedFile is the permission given for a file that may be read outside
 	// of gitaly.
 	SharedFile fs.FileMode = 0o644
-
-	// PrivateExecutable is the permissions given for an executable that must
-	// only be used by gitaly.
-	PrivateExecutable fs.FileMode = 0o700
 )
 
 // Umask represents a umask that is used to mask mode bits.

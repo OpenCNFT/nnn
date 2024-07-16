@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -51,7 +51,7 @@ func UnpackAuxiliaryBinaries(destinationDir string) error {
 			}()
 
 			unpackedPath := filepath.Join(destinationDir, entry.Name())
-			unpackedFile, err := os.OpenFile(unpackedPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, perm.PrivateExecutable)
+			unpackedFile, err := os.OpenFile(unpackedPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode.Executable)
 			if err != nil {
 				return err
 			}
