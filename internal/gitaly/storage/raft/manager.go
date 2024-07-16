@@ -245,19 +245,23 @@ func (m *Manager) Start() (returnedErr error) {
 	// Register storage ID if not exist. Similarly, this operation is handled by the metadata group.
 	// It will be handled by the metadata authority in the future.
 	for storageName, storageMgr := range m.storageManagers {
-		if err := storageMgr.loadStorageID(m.ctx); err != nil {
-			return fmt.Errorf("loading storage ID: %w", err)
+		if err := storageMgr.loadStorageInfo(m.ctx); err != nil {
+			return fmt.Errorf("loading persisted storage info: %w", err)
 		}
-		if storageMgr.id == 0 {
-			id, err := m.metadataGroup.RegisterStorage(storageName)
+		if storageMgr.persistedInfo == nil || storageMgr.persistedInfo.GetStorageId() == 0 {
+			storageInfo, err := m.metadataGroup.RegisterStorage(storageName)
 			if err != nil {
-				return fmt.Errorf("registering storage ID: %w", err)
+				return fmt.Errorf("registering storage info: %w", err)
 			}
-			if err := storageMgr.saveStorageID(m.ctx, id); err != nil {
-				return fmt.Errorf("saving storage ID: %w", err)
+			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
+				return fmt.Errorf("saving storage info: %w", err)
 			}
 		}
-		m.logger.WithFields(log.Fields{"storage_name": storageName, "storage_id": storageMgr.id}).Info("storage joined the cluster")
+		m.logger.WithFields(log.Fields{
+			"storage_name":       storageName,
+			"storage_id":         storageMgr.persistedInfo.GetStorageId(),
+			"replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
+		}).Info("storage joined the cluster")
 	}
 
 	m.logger.Info("Raft cluster has started")
