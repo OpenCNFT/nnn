@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -166,7 +167,7 @@ func TestCache_deletedFile(t *testing.T) {
 	require.True(t, created)
 
 	require.NoError(t, os.RemoveAll(tmp), "wipe out underlying files of cache")
-	require.NoError(t, os.MkdirAll(tmp, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(tmp, mode.Directory))
 
 	// File is gone from filesystem but not from cache
 	requireCacheFiles(t, tmp, 0)

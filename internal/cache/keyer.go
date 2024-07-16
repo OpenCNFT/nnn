@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/version"
@@ -65,7 +65,7 @@ func (keyer leaseKeyer) updateLatest(ctx context.Context, repo *gitalypb.Reposit
 	}
 
 	lPath := latestPath(repoStatePath)
-	if err := os.MkdirAll(filepath.Dir(lPath), perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(lPath), mode.Directory); err != nil {
 		return "", err
 	}
 
@@ -182,7 +182,7 @@ func (keyer leaseKeyer) newPendingLease(ctx context.Context, repo *gitalypb.Repo
 	}
 
 	pDir := pendingDir(repoStatePath)
-	if err := os.MkdirAll(pDir, perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(pDir, mode.Directory); err != nil {
 		return "", err
 	}
 

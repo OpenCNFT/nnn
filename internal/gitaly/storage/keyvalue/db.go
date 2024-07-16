@@ -10,8 +10,8 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 )
@@ -62,7 +62,7 @@ func NewDBManager(
 		internalDir := internalDirectoryPath(configuredStorage.Path)
 
 		databaseDir := filepath.Join(internalDir, "database")
-		if err := os.MkdirAll(databaseDir, perm.PrivateDir); err != nil && !errors.Is(err, fs.ErrExist) {
+		if err := os.MkdirAll(databaseDir, mode.Directory); err != nil && !errors.Is(err, fs.ErrExist) {
 			return nil, fmt.Errorf("create storage's database directory: %w", err)
 		}
 

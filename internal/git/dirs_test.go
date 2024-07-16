@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -65,7 +66,7 @@ func TestObjectDirsOutsideStorage(t *testing.T) {
 	repoPath := filepath.Join(storageRoot, "repo")
 	alternatesFile := filepath.Join(repoPath, "objects", "info", "alternates")
 	altObjDir := filepath.Join(tmp, "outside-storage-sibling", "objects")
-	require.NoError(t, os.MkdirAll(filepath.Dir(alternatesFile), perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(filepath.Dir(alternatesFile), mode.Directory))
 	expectedErr := alternateOutsideStorageError(altObjDir)
 
 	for _, tc := range []struct {

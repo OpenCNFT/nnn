@@ -26,6 +26,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
@@ -34,7 +35,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/middleware/limithandler"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/limiter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	praefectconfig "gitlab.com/gitlab-org/gitaly/v16/internal/praefect/config"
@@ -205,7 +205,7 @@ func runGitaly(tb testing.TB, cfg config.Cfg, registrar func(srv *grpc.Server, d
 		registrar(internalServer, deps)
 		registerHealthServerIfNotRegistered(internalServer)
 
-		require.NoError(tb, os.MkdirAll(cfg.InternalSocketDir(), perm.PrivateDir))
+		require.NoError(tb, os.MkdirAll(cfg.InternalSocketDir(), mode.Directory))
 		tb.Cleanup(func() { require.NoError(tb, os.RemoveAll(cfg.InternalSocketDir())) })
 
 		internalListener, err := net.Listen("unix", cfg.InternalSocketPath())

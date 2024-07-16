@@ -20,13 +20,13 @@ import (
 )
 
 func setupTestDirectory(t *testing.T, path string) {
-	require.NoError(t, os.MkdirAll(path, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(path, mode.Directory))
 	require.NoError(t, os.WriteFile(filepath.Join(path, "file-1"), []byte("file-1"), perm.PrivateExecutable))
 	privateSubDir := filepath.Join(filepath.Join(path, "subdir-private"))
-	require.NoError(t, os.Mkdir(privateSubDir, perm.PrivateDir))
+	require.NoError(t, os.Mkdir(privateSubDir, mode.Directory))
 	require.NoError(t, os.WriteFile(filepath.Join(privateSubDir, "file-2"), []byte("file-2"), perm.PrivateWriteOnceFile))
 	sharedSubDir := filepath.Join(path, "subdir-shared")
-	require.NoError(t, os.Mkdir(sharedSubDir, perm.PrivateDir))
+	require.NoError(t, os.Mkdir(sharedSubDir, mode.Directory))
 	require.NoError(t, os.WriteFile(filepath.Join(sharedSubDir, "file-3"), []byte("file-3"), perm.PrivateWriteOnceFile))
 }
 
@@ -263,15 +263,15 @@ func TestRecordAlternateUnlink(t *testing.T) {
 
 	createSourceHierarchy := func(tb testing.TB, path string) {
 		testhelper.CreateFS(tb, path, fstest.MapFS{
-			".":                      {Mode: fs.ModeDir | perm.PrivateDir},
-			"objects":                {Mode: fs.ModeDir | perm.PrivateDir},
-			"objects/info":           {Mode: fs.ModeDir | perm.PrivateDir},
-			"objects/3f":             {Mode: fs.ModeDir | perm.PrivateDir},
+			".":                      {Mode: mode.Directory},
+			"objects":                {Mode: mode.Directory},
+			"objects/info":           {Mode: mode.Directory},
+			"objects/3f":             {Mode: mode.Directory},
 			"objects/3f/1":           {Mode: perm.PrivateWriteOnceFile},
 			"objects/3f/2":           {Mode: perm.PrivateWriteOnceFile},
-			"objects/4f":             {Mode: fs.ModeDir | perm.PrivateDir},
+			"objects/4f":             {Mode: mode.Directory},
 			"objects/4f/3":           {Mode: perm.PrivateWriteOnceFile},
-			"objects/pack":           {Mode: fs.ModeDir | perm.PrivateDir},
+			"objects/pack":           {Mode: mode.Directory},
 			"objects/pack/pack.pack": {Mode: perm.PrivateWriteOnceFile},
 			"objects/pack/pack.idx":  {Mode: perm.PrivateWriteOnceFile},
 		})
@@ -285,9 +285,9 @@ func TestRecordAlternateUnlink(t *testing.T) {
 		{
 			desc: "empty target",
 			createTarget: func(tb testing.TB, path string) {
-				require.NoError(tb, os.Mkdir(path, perm.PrivateDir))
-				require.NoError(tb, os.Mkdir(filepath.Join(path, "objects"), perm.PrivateDir))
-				require.NoError(tb, os.Mkdir(filepath.Join(path, "objects/pack"), perm.PrivateDir))
+				require.NoError(tb, os.Mkdir(path, mode.Directory))
+				require.NoError(tb, os.Mkdir(filepath.Join(path, "objects"), mode.Directory))
+				require.NoError(tb, os.Mkdir(filepath.Join(path, "objects/pack"), mode.Directory))
 			},
 			expectedOperations: func() operations {
 				var ops operations
@@ -306,13 +306,13 @@ func TestRecordAlternateUnlink(t *testing.T) {
 			desc: "target with some existing state",
 			createTarget: func(tb testing.TB, path string) {
 				testhelper.CreateFS(tb, path, fstest.MapFS{
-					".":                     {Mode: fs.ModeDir | perm.PrivateDir},
-					"objects":               {Mode: fs.ModeDir | perm.PrivateDir},
-					"objects/3f":            {Mode: fs.ModeDir | perm.PrivateDir},
+					".":                     {Mode: mode.Directory},
+					"objects":               {Mode: mode.Directory},
+					"objects/3f":            {Mode: mode.Directory},
 					"objects/3f/1":          {Mode: perm.PrivateWriteOnceFile},
-					"objects/4f":            {Mode: fs.ModeDir | perm.PrivateDir},
+					"objects/4f":            {Mode: mode.Directory},
 					"objects/4f/3":          {Mode: perm.PrivateWriteOnceFile},
-					"objects/pack":          {Mode: fs.ModeDir | perm.PrivateDir},
+					"objects/pack":          {Mode: mode.Directory},
 					"objects/pack/pack.idx": {Mode: perm.PrivateWriteOnceFile},
 				})
 			},
@@ -651,7 +651,7 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			storageRoot := cfg.Storages[0].Path
 			snapshotPrefix := "snapshot"
 			relativePath := "relative-path"
-			require.NoError(t, os.Mkdir(filepath.Join(storageRoot, snapshotPrefix), perm.PrivateDir))
+			require.NoError(t, os.Mkdir(filepath.Join(storageRoot, snapshotPrefix), mode.Directory))
 
 			_, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 				SkipCreationViaService: true,

@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -293,7 +294,7 @@ func TestCreateFork_targetExists(t *testing.T) {
 		{
 			desc: "empty target directory",
 			seed: func(t *testing.T, targetPath string) {
-				require.NoError(t, os.MkdirAll(targetPath, perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(targetPath, mode.Directory))
 			},
 			expectedErr: func() error {
 				if testhelper.IsWALEnabled() {
@@ -306,7 +307,7 @@ func TestCreateFork_targetExists(t *testing.T) {
 		{
 			desc: "non-empty target directory",
 			seed: func(t *testing.T, targetPath string) {
-				require.NoError(t, os.MkdirAll(targetPath, perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(targetPath, mode.Directory))
 				require.NoError(t, os.WriteFile(
 					filepath.Join(targetPath, "config"),
 					nil,
@@ -324,7 +325,7 @@ func TestCreateFork_targetExists(t *testing.T) {
 		{
 			desc: "target file",
 			seed: func(t *testing.T, targetPath string) {
-				require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), mode.Directory))
 				require.NoError(t, os.WriteFile(targetPath, nil, perm.PrivateWriteOnceFile))
 			},
 			expectedErr: func() error {

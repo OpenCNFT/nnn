@@ -21,6 +21,7 @@ import (
 	gitalyhook "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
@@ -103,7 +104,7 @@ func TestReplicateRepository(t *testing.T) {
 				// created in the target repository as expected.
 				// We should get rid of this with https://gitlab.com/groups/gitlab-org/-/epics/9006
 				attrFilePath := filepath.Join(sourcePath, "info", "attributes")
-				require.NoError(t, os.MkdirAll(filepath.Dir(attrFilePath), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Dir(attrFilePath), mode.Directory))
 				attributesData := []byte("*.pbxproj binary\n")
 				require.NoError(t, os.WriteFile(attrFilePath, attributesData, perm.PrivateWriteOnceFile))
 
@@ -534,7 +535,7 @@ func TestReplicateRepository_transactional(t *testing.T) {
 	// we use a temporary file here to figure out the expected permissions as they would in fact be subject
 	// to change depending on the current umask.
 	noHooksVoteData := [5]byte{'.', 0, 0, 0, 0}
-	binary.BigEndian.PutUint32(noHooksVoteData[1:], uint32(testhelper.Umask().Mask(perm.PrivateDir|fs.ModeDir)))
+	binary.BigEndian.PutUint32(noHooksVoteData[1:], uint32(mode.Directory))
 	noHooksVote := voting.VoteFromData(noHooksVoteData[:])
 
 	expectedVotes := []voting.Vote{

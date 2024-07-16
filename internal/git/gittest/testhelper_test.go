@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -34,17 +34,17 @@ func setup(tb testing.TB) (config.Cfg, *gitalypb.Repository, string) {
 			Path: filepath.Join(rootDir, "storage.d"),
 		},
 	}
-	require.NoError(tb, os.Mkdir(cfg.Storages[0].Path, perm.PrivateDir))
+	require.NoError(tb, os.Mkdir(cfg.Storages[0].Path, mode.Directory))
 
 	cfg.GitlabShell.Dir = filepath.Join(rootDir, "shell.d")
-	require.NoError(tb, os.Mkdir(cfg.GitlabShell.Dir, perm.PrivateDir))
+	require.NoError(tb, os.Mkdir(cfg.GitlabShell.Dir, mode.Directory))
 
 	cfg.BinDir = filepath.Join(rootDir, "bin.d")
-	require.NoError(tb, os.Mkdir(cfg.BinDir, perm.PrivateDir))
+	require.NoError(tb, os.Mkdir(cfg.BinDir, mode.Directory))
 
 	cfg.RuntimeDir = filepath.Join(rootDir, "run.d")
-	require.NoError(tb, os.Mkdir(cfg.RuntimeDir, perm.PrivateDir))
-	require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), perm.PrivateDir))
+	require.NoError(tb, os.Mkdir(cfg.RuntimeDir, mode.Directory))
+	require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), mode.Directory))
 
 	require.NoError(tb, cfg.Validate())
 

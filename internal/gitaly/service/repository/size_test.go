@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -229,7 +230,7 @@ func TestGetObjectDirectorySize_quarantine(t *testing.T) {
 		requireObjectDirectorySize(t, ctx, client, repo, 16)
 
 		quarantinePath := filepath.Join(cfg.Storages[0].Path, "tx-state", "quarantine")
-		require.NoError(t, os.MkdirAll(quarantinePath, perm.PrivateDir))
+		require.NoError(t, os.MkdirAll(quarantinePath, mode.Directory))
 
 		gitObjectDirectory, err := filepath.Rel(repoPath, quarantinePath)
 		require.NoError(t, err)

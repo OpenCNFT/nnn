@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -27,7 +28,7 @@ func (e entry) create(t *testing.T, root string) {
 	require.True(t, e.contents == "" || e.children == nil, "An entry cannot have both file contents and children")
 
 	if e.children != nil {
-		require.NoError(t, os.Mkdir(root, perm.PrivateDir))
+		require.NoError(t, os.Mkdir(root, mode.Directory))
 
 		for name, child := range e.children {
 			child.create(t, filepath.Join(root, name))

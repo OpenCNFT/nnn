@@ -16,6 +16,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
@@ -362,15 +363,15 @@ func (s *server) syncGitconfig(ctx context.Context, source, target *gitalypb.Rep
 	return nil
 }
 
-func (s *server) writeFile(ctx context.Context, path string, mode os.FileMode, reader io.Reader) (returnedErr error) {
+func (s *server) writeFile(ctx context.Context, path string, fileMode os.FileMode, reader io.Reader) (returnedErr error) {
 	parentDir := filepath.Dir(path)
-	if err := os.MkdirAll(parentDir, perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(parentDir, mode.Directory); err != nil {
 		return err
 	}
 
 	lockedFile, err := safe.NewLockingFileWriter(path, safe.LockingFileWriterConfig{
 		FileWriterConfig: safe.FileWriterConfig{
-			FileMode: mode,
+			FileMode: fileMode,
 		},
 	})
 	if err != nil {

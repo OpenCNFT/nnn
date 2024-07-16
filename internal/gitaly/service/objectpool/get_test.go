@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -54,7 +55,7 @@ func TestGetObjectPoolBadFile(t *testing.T) {
 	_, repo, repoPath, _, client := setup(t, ctx)
 
 	alternatesFilePath := filepath.Join(repoPath, "objects", "info", "alternates")
-	require.NoError(t, os.MkdirAll(filepath.Dir(alternatesFilePath), perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(filepath.Dir(alternatesFilePath), mode.Directory))
 	require.NoError(t, os.WriteFile(alternatesFilePath, []byte("not-a-directory"), perm.PrivateWriteOnceFile))
 
 	resp, err := client.GetObjectPool(ctx, &gitalypb.GetObjectPoolRequest{

@@ -18,6 +18,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/cgroups"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/sentry"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -553,7 +554,7 @@ func TestValidateStorages(t *testing.T) {
 	repositories := testhelper.TempDir(t)
 	repositories2 := testhelper.TempDir(t)
 	nestedRepositories := filepath.Join(repositories, "nested")
-	require.NoError(t, os.MkdirAll(nestedRepositories, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(nestedRepositories, mode.Directory))
 
 	filePath := filepath.Join(testhelper.TempDir(t), "temporary-file")
 	require.NoError(t, os.WriteFile(filePath, []byte{}, perm.PrivateWriteOnceFile))
@@ -1068,7 +1069,7 @@ func TestSetupRuntimeDirectory_validateInternalSocket(t *testing.T) {
 			desc: "symlinked runtime directory",
 			setup: func(t *testing.T) string {
 				runtimeDir := testhelper.TempDir(t)
-				require.NoError(t, os.Mkdir(filepath.Join(runtimeDir, "sock.d"), perm.PrivateDir))
+				require.NoError(t, os.Mkdir(filepath.Join(runtimeDir, "sock.d"), mode.Directory))
 
 				// Create a symlink which points to the real runtime directory.
 				symlinkDir := testhelper.TempDir(t)
@@ -1095,7 +1096,7 @@ func TestSetupRuntimeDirectory_validateInternalSocket(t *testing.T) {
 
 				runtimeDirTooLongForSockets := filepath.Join(tempDir, strings.Repeat("/nested_directory", 10))
 				socketDir := filepath.Join(runtimeDirTooLongForSockets, "sock.d")
-				require.NoError(t, os.MkdirAll(socketDir, perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(socketDir, mode.Directory))
 
 				return runtimeDirTooLongForSockets
 			},
