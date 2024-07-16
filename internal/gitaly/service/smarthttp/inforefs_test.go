@@ -20,7 +20,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -676,7 +676,7 @@ func withInfoRefCache(cache infoRefCache) ServerOpt {
 
 func replaceCachedResponse(tb testing.TB, ctx context.Context, cache *cache.DiskCache, req *gitalypb.InfoRefsRequest, newContents string) {
 	path := pathToCachedResponse(tb, ctx, cache, req)
-	require.NoError(tb, os.WriteFile(path, []byte(newContents), perm.PrivateWriteOnceFile))
+	require.NoError(tb, os.WriteFile(path, []byte(newContents), mode.File))
 }
 
 func setInfoRefsUploadPackMethod(ctx context.Context) context.Context {

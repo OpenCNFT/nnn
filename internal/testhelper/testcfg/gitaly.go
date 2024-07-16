@@ -11,7 +11,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -120,7 +119,7 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 	if cfg.Gitlab.SecretFile == "" {
 		cfg.Gitlab.SecretFile = filepath.Join(root, "gitlab", "http.secret")
 		require.NoError(tb, os.MkdirAll(filepath.Dir(cfg.Gitlab.SecretFile), mode.Directory))
-		require.NoError(tb, os.WriteFile(cfg.Gitlab.SecretFile, nil, perm.PrivateWriteOnceFile))
+		require.NoError(tb, os.WriteFile(cfg.Gitlab.SecretFile, nil, mode.File))
 	}
 
 	if len(cfg.Storages) == 0 {
@@ -172,7 +171,7 @@ func WriteTemporaryGitalyConfigFile(tb testing.TB, cfg config.Cfg) string {
 
 	contents, err := toml.Marshal(cfg)
 	require.NoError(tb, err)
-	require.NoError(tb, os.WriteFile(path, contents, perm.PrivateWriteOnceFile))
+	require.NoError(tb, os.WriteFile(path, contents, mode.File))
 
 	return path
 }

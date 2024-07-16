@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
 type tbRecorder struct {
@@ -75,7 +74,7 @@ func TestRequireDirectoryState(t *testing.T) {
 		os.WriteFile(
 			filepath.Join(rootDir, relativePath, "parsed-file"),
 			[]byte("raw content"),
-			perm.PrivateWriteOnceFile,
+			mode.File,
 		),
 	)
 
@@ -145,7 +144,7 @@ func TestRequireDirectoryState(t *testing.T) {
 			expectedState := DirectoryState{
 				"/assertion-root": {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/assertion-root/parsed-file": {
-					Mode:    umask.Mask(perm.PrivateWriteOnceFile),
+					Mode:    mode.File,
 					Content: "parsed content",
 					ParseContent: func(tb testing.TB, path string, content []byte) any {
 						require.Equal(t, filepath.Join(rootDir, "/assertion-root/parsed-file"), path)
@@ -191,22 +190,22 @@ func TestCreateFS(t *testing.T) {
 	CreateFS(t, rootPath, fstest.MapFS{
 		".":                              {Mode: mode.Directory},
 		"private-dir":                    {Mode: mode.Directory},
-		"private-dir/private-file":       {Mode: perm.PrivateWriteOnceFile, Data: []byte("private-file")},
+		"private-dir/private-file":       {Mode: mode.File, Data: []byte("private-file")},
 		"private-dir/subdir":             {Mode: mode.Directory},
 		"private-dir/subdir/subdir-file": {Mode: mode.File, Data: []byte("subdir-file")},
 		"shared-dir":                     {Mode: mode.Directory},
 		"shared-dir/shared-file":         {Mode: mode.File, Data: []byte("shared-file")},
-		"root-file":                      {Mode: perm.PrivateWriteOnceFile, Data: []byte("root-file")},
+		"root-file":                      {Mode: mode.File, Data: []byte("root-file")},
 	})
 
 	RequireDirectoryState(t, rootPath, "", DirectoryState{
 		"/":                               {Mode: mode.Directory},
 		"/private-dir":                    {Mode: mode.Directory},
-		"/private-dir/private-file":       {Mode: perm.PrivateWriteOnceFile, Content: []byte("private-file")},
+		"/private-dir/private-file":       {Mode: mode.File, Content: []byte("private-file")},
 		"/private-dir/subdir":             {Mode: mode.Directory},
 		"/private-dir/subdir/subdir-file": {Mode: mode.File, Content: []byte("subdir-file")},
 		"/shared-dir":                     {Mode: mode.Directory},
 		"/shared-dir/shared-file":         {Mode: mode.File, Content: []byte("shared-file")},
-		"/root-file":                      {Mode: perm.PrivateWriteOnceFile, Content: []byte("root-file")},
+		"/root-file":                      {Mode: mode.File, Content: []byte("root-file")},
 	})
 }

@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -29,7 +28,7 @@ func TestRepositoryInfo(t *testing.T) {
 		t.Helper()
 		path := filepath.Join(pathComponents...)
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), mode.Directory))
-		require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte{0}, byteCount), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte{0}, byteCount), mode.File))
 		return path
 	}
 

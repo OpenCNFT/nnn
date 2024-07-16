@@ -14,7 +14,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -311,7 +310,7 @@ func TestCreateFork_targetExists(t *testing.T) {
 				require.NoError(t, os.WriteFile(
 					filepath.Join(targetPath, "config"),
 					nil,
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 			},
 			expectedErr: func() error {
@@ -326,7 +325,7 @@ func TestCreateFork_targetExists(t *testing.T) {
 			desc: "target file",
 			seed: func(t *testing.T, targetPath string) {
 				require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), mode.Directory))
-				require.NoError(t, os.WriteFile(targetPath, nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(targetPath, nil, mode.File))
 			},
 			expectedErr: func() error {
 				if testhelper.IsWALEnabled() {

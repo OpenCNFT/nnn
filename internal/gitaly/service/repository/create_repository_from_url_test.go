@@ -15,7 +15,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -143,7 +142,7 @@ testing of this scenario should be left to the relevant package.
 				require.NoError(t, os.MkdirAll(importedRepoPath, mode.Directory))
 			} else {
 				require.NoError(t, os.MkdirAll(filepath.Dir(importedRepoPath), mode.Directory))
-				require.NoError(t, os.WriteFile(importedRepoPath, nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(importedRepoPath, nil, mode.File))
 			}
 			t.Cleanup(func() { require.NoError(t, os.RemoveAll(importedRepoPath)) })
 

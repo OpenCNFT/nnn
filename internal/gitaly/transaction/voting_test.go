@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
@@ -208,7 +208,7 @@ func TestCommitLockedFile(t *testing.T) {
 			VoteFn: func(context.Context, txinfo.Transaction, voting.Vote, voting.Phase) error {
 				// This shouldn't typically happen given that the file is locked,
 				// but we concurrently update the file after our first vote.
-				require.NoError(t, os.WriteFile(file, []byte("something"), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(file, []byte("something"), mode.File))
 				return nil
 			},
 		}, writer)

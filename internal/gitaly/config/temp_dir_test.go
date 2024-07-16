@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -62,7 +61,7 @@ func TestPruneOldGitalyProcessDirectories(t *testing.T) {
 
 		// Create an unexpected file in the runtime directory
 		unexpectedFilePath := filepath.Join(baseDir, "unexpected-file")
-		require.NoError(t, os.WriteFile(unexpectedFilePath, []byte(""), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(unexpectedFilePath, []byte(""), mode.File))
 		expectedLogs[unexpectedFilePath] = "ignoring file found in gitaly process directory"
 
 		nonPrunableDirs := []string{ownRuntimeDir}
