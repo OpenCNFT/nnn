@@ -13,10 +13,6 @@ const (
 	// used by gitaly.
 	PrivateDir fs.FileMode = 0o700
 
-	// GroupPrivateDir is the permissions given for a directory that must only
-	// be used by gitaly and the git group.
-	GroupPrivateDir fs.FileMode = 0o770
-
 	// PrivateWriteOnceFile is the most restrictive file permission. Given to
 	// files that are expected to be written only once and must be read only by
 	// gitaly.
