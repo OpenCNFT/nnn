@@ -9,6 +9,8 @@ import (
 	"github.com/lni/dragonboat/v4"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"google.golang.org/protobuf/proto"
 )
 
 type dbAccessor func(context.Context, bool, func(keyvalue.ReadWriter) error) error
@@ -17,10 +19,11 @@ type dbAccessor func(context.Context, bool, func(keyvalue.ReadWriter) error) err
 // keyvalue.Transactioner for each Raft group, allowing the Raft groups to store their data in the
 // underlying keyvalue store.
 type storageManager struct {
-	id       raftID
-	name     string
-	ptnMgr   *storagemgr.PartitionManager
-	nodeHost *dragonboat.NodeHost
+	id            raftID
+	name          string
+	ptnMgr        *storagemgr.PartitionManager
+	nodeHost      *dragonboat.NodeHost
+	persistedInfo *gitalypb.Storage
 }
 
 // newStorageManager returns an instance of storage manager.
@@ -35,10 +38,10 @@ func newStorageManager(name string, ptnMgr *storagemgr.PartitionManager, nodeHos
 // Close closes the storage manager.
 func (m *storageManager) Close() { m.nodeHost.Close() }
 
-func (m *storageManager) loadStorageID(ctx context.Context) error {
+func (m *storageManager) loadStorageInfo(ctx context.Context) error {
 	db := m.dbForStorage()
-	return db(ctx, true, func(txn keyvalue.ReadWriter) error {
-		item, err := txn.Get([]byte("storage_id"))
+	return db(ctx, false, func(txn keyvalue.ReadWriter) error {
+		item, err := txn.Get([]byte("storage"))
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
 				return nil
@@ -46,32 +49,45 @@ func (m *storageManager) loadStorageID(ctx context.Context) error {
 			return err
 		}
 		return item.Value(func(value []byte) error {
-			m.id.UnmarshalBinary(value)
+			var persistedInfo gitalypb.Storage
+			if err := proto.Unmarshal(value, &persistedInfo); err != nil {
+				return err
+			}
+			m.persistedInfo = &persistedInfo
+			m.id = raftID(m.persistedInfo.StorageId)
 			return nil
 		})
 	})
 }
 
-func (m *storageManager) saveStorageID(ctx context.Context, id raftID) error {
+func (m *storageManager) saveStorageInfo(ctx context.Context, storage *gitalypb.Storage) error {
 	db := m.dbForStorage()
 	return db(ctx, false, func(txn keyvalue.ReadWriter) error {
-		_, err := txn.Get([]byte("storage_id"))
+		_, err := txn.Get([]byte("storage"))
 		if err == nil {
-			return fmt.Errorf("storage ID already exists")
+			return fmt.Errorf("storage already exists")
 		} else if !errors.Is(err, badger.ErrKeyNotFound) {
 			return err
 		}
-		if err := txn.Set([]byte("storage_id"), id.MarshalBinary()); err != nil {
+		marshaled, err := proto.Marshal(storage)
+		if err != nil {
 			return err
 		}
-		m.id = id
+		if err := txn.Set([]byte("storage"), marshaled); err != nil {
+			return err
+		}
+		m.persistedInfo = storage
+		m.id = raftID(m.persistedInfo.StorageId)
 		return nil
 	})
 }
 
-// clearStorageID clears the storage ID inside the in-memory storage of the storage manager. It does
-// not clean the underlying storage ID.
-func (m *storageManager) clearStorageID() { m.id = 0 }
+// clearStorageInfo clears the storage info inside the in-memory storage of the storage manager. It
+// does not clean the persisted info the DB.
+func (m *storageManager) clearStorageInfo() {
+	m.id = 0
+	m.persistedInfo = nil
+}
 
 func (m *storageManager) dbForStorage() dbAccessor {
 	return func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
