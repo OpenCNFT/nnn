@@ -159,15 +159,16 @@ func (cgm *CGroupManager) SupportsCloneIntoCgroup() bool {
 func (cgm *CGroupManager) maybeCreateCgroup(cgroupPath string) error {
 	lock := cgm.status.getLock(cgroupPath)
 
-	lock.once.Do(func() {
-		if err := cgm.handler.createCgroup(cgm.repoRes, cgroupPath); err != nil {
-			lock.creationError = err
-			return
-		}
+	if lock != nil {
+		lock.once.Do(func() {
+			if err := cgm.handler.createCgroup(cgm.repoRes, cgroupPath); err != nil {
+				lock.creationError = err
+				return
+			}
 
-		lock.created.Store(true)
-	})
-
+			lock.created.Store(true)
+		})
+	}
 	return lock.creationError
 }
 
@@ -214,7 +215,10 @@ func (cgm *CGroupManager) cgroupPathForCommand(cmd *exec.Cmd, opts []AddCommandO
 
 func (cgm *CGroupManager) calcGroupID(rand randomizer, key string, count uint, allocationCount uint) uint {
 	checksum := crc32.ChecksumIEEE([]byte(key))
-
+	// Prevent divide by zero error
+	if count == 0 {
+		count++
+	}
 	// Pick a starting point
 	groupID := uint(checksum) % count
 	if allocationCount <= 1 {
