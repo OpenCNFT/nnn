@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 func TestGetInode(t *testing.T) {
@@ -17,8 +17,8 @@ func TestGetInode(t *testing.T) {
 	file1Path := filepath.Join(tempDir, "file-1")
 	file2Path := filepath.Join(tempDir, "file-2")
 	linkPath := filepath.Join(tempDir, "link-1")
-	require.NoError(t, os.WriteFile(file1Path, nil, perm.PrivateDir))
-	require.NoError(t, os.WriteFile(file2Path, nil, perm.PrivateDir))
+	require.NoError(t, os.WriteFile(file1Path, nil, mode.Directory))
+	require.NoError(t, os.WriteFile(file2Path, nil, mode.Directory))
 	require.NoError(t, os.Link(file1Path, linkPath))
 
 	file1Inode, err := getInode(file1Path)

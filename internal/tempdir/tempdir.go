@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -81,7 +81,7 @@ func newDirectory(ctx context.Context, storageName string, prefix string, logger
 		return Dir{}, fmt.Errorf("temp directory: %w", err)
 	}
 
-	if err := os.MkdirAll(root, perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(root, mode.Directory); err != nil {
 		return Dir{}, err
 	}
 

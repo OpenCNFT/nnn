@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
@@ -761,7 +762,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						// the all directories even if the reference deletion was already applied.
 						require.NoError(tb, os.MkdirAll(
 							filepath.Join(storagePath, setup.RelativePath, "refs", "heads", "empty-dir"),
-							perm.PrivateDir,
+							mode.Directory,
 						))
 					},
 				},

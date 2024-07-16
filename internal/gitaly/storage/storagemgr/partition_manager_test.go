@@ -3,7 +3,6 @@ package storagemgr
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -22,7 +21,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -73,7 +71,6 @@ func TestPartitionManager(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
-	umask := testhelper.Umask()
 
 	// steps defines execution steps in a test. Each test case can define multiple steps to exercise
 	// more complex behavior.
@@ -842,7 +839,7 @@ func TestPartitionManager(t *testing.T) {
 				require.NoError(t,
 					os.MkdirAll(
 						filepath.Join(stagingDirectoryPath(internalDirectoryPath(storage.Path)), "existing-content"),
-						perm.PrivateDir,
+						mode.Directory,
 					),
 				)
 			}
@@ -864,7 +861,7 @@ func TestPartitionManager(t *testing.T) {
 				for _, storage := range cfg.Storages {
 					// Assert all staging directories have been emptied at the end.
 					testhelper.RequireDirectoryState(t, internalDirectoryPath(storage.Path), "staging", testhelper.DirectoryState{
-						"/staging": {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
+						"/staging": {Mode: mode.Directory},
 					})
 				}
 			}()
@@ -872,7 +869,7 @@ func TestPartitionManager(t *testing.T) {
 			for _, storage := range cfg.Storages {
 				// Assert the existing content in the staging directory was removed.
 				testhelper.RequireDirectoryState(t, internalDirectoryPath(storage.Path), "staging", testhelper.DirectoryState{
-					"/staging": {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
+					"/staging": {Mode: mode.Directory},
 				})
 			}
 

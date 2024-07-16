@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
@@ -60,7 +61,7 @@ func TestRequireDirectoryState(t *testing.T) {
 	require.NoError(t,
 		os.MkdirAll(
 			filepath.Join(rootDir, relativePath, "dir-b"),
-			perm.PrivateDir,
+			mode.Directory,
 		),
 	)
 	require.NoError(t,
@@ -153,7 +154,7 @@ func TestRequireDirectoryState(t *testing.T) {
 				},
 				"/assertion-root/dir-a":               {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/assertion-root/dir-a/unparsed-file": {Mode: umask.Mask(fs.ModePerm), Content: []byte("raw content")},
-				"/assertion-root/dir-b":               {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
+				"/assertion-root/dir-b":               {Mode: mode.Directory},
 			}
 
 			tc.modifyAssertion(expectedState)
@@ -188,24 +189,24 @@ func TestCreateFS(t *testing.T) {
 	rootPath := filepath.Join(tmpDir, "root")
 
 	CreateFS(t, rootPath, fstest.MapFS{
-		".":                              {Mode: fs.ModeDir | perm.PrivateDir},
-		"private-dir":                    {Mode: fs.ModeDir | perm.PrivateDir},
+		".":                              {Mode: mode.Directory},
+		"private-dir":                    {Mode: mode.Directory},
 		"private-dir/private-file":       {Mode: perm.PrivateWriteOnceFile, Data: []byte("private-file")},
-		"private-dir/subdir":             {Mode: fs.ModeDir | perm.PrivateDir},
-		"private-dir/subdir/subdir-file": {Mode: perm.PrivateDir, Data: []byte("subdir-file")},
-		"shared-dir":                     {Mode: fs.ModeDir | perm.PrivateDir},
-		"shared-dir/shared-file":         {Mode: perm.PrivateDir, Data: []byte("shared-file")},
+		"private-dir/subdir":             {Mode: mode.Directory},
+		"private-dir/subdir/subdir-file": {Mode: mode.File, Data: []byte("subdir-file")},
+		"shared-dir":                     {Mode: mode.Directory},
+		"shared-dir/shared-file":         {Mode: mode.File, Data: []byte("shared-file")},
 		"root-file":                      {Mode: perm.PrivateWriteOnceFile, Data: []byte("root-file")},
 	})
 
 	RequireDirectoryState(t, rootPath, "", DirectoryState{
-		"/":                               {Mode: fs.ModeDir | perm.PrivateDir},
-		"/private-dir":                    {Mode: fs.ModeDir | perm.PrivateDir},
+		"/":                               {Mode: mode.Directory},
+		"/private-dir":                    {Mode: mode.Directory},
 		"/private-dir/private-file":       {Mode: perm.PrivateWriteOnceFile, Content: []byte("private-file")},
-		"/private-dir/subdir":             {Mode: fs.ModeDir | perm.PrivateDir},
-		"/private-dir/subdir/subdir-file": {Mode: perm.PrivateDir, Content: []byte("subdir-file")},
-		"/shared-dir":                     {Mode: fs.ModeDir | perm.PrivateDir},
-		"/shared-dir/shared-file":         {Mode: perm.PrivateDir, Content: []byte("shared-file")},
+		"/private-dir/subdir":             {Mode: mode.Directory},
+		"/private-dir/subdir/subdir-file": {Mode: mode.File, Content: []byte("subdir-file")},
+		"/shared-dir":                     {Mode: mode.Directory},
+		"/shared-dir/shared-file":         {Mode: mode.File, Content: []byte("shared-file")},
 		"/root-file":                      {Mode: perm.PrivateWriteOnceFile, Content: []byte("root-file")},
 	})
 }

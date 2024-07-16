@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -139,9 +140,9 @@ testing of this scenario should be left to the relevant package.
 			importedRepoPath := filepath.Join(cfg.Storages[0].Path, importedRepo.GetRelativePath())
 
 			if testCase.isDir {
-				require.NoError(t, os.MkdirAll(importedRepoPath, perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(importedRepoPath, mode.Directory))
 			} else {
-				require.NoError(t, os.MkdirAll(filepath.Dir(importedRepoPath), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Dir(importedRepoPath), mode.Directory))
 				require.NoError(t, os.WriteFile(importedRepoPath, nil, perm.PrivateWriteOnceFile))
 			}
 			t.Cleanup(func() { require.NoError(t, os.RemoveAll(importedRepoPath)) })

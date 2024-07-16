@@ -11,7 +11,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"golang.org/x/sync/errgroup"
 )
@@ -59,8 +59,8 @@ func TestManager(t *testing.T) {
 				testhelper.RequireDirectoryState(t, fs1.Root(), "", testhelper.DirectoryState{
 					// The snapshotting process does not use the existing permissions for
 					// directories in the hierarchy before the repository directories.
-					"/":                       {Mode: fs.ModeDir | umask.Mask(perm.PrivateDir)},
-					"/repositories":           {Mode: fs.ModeDir | umask.Mask(perm.PrivateDir)},
+					"/":                       {Mode: mode.Directory},
+					"/repositories":           {Mode: mode.Directory},
 					"/repositories/a":         {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 					"/repositories/a/refs":    {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 					"/repositories/a/objects": {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
@@ -69,8 +69,8 @@ func TestManager(t *testing.T) {
 				})
 
 				testhelper.RequireDirectoryState(t, fs2.Root(), "", testhelper.DirectoryState{
-					"/":                       {Mode: fs.ModeDir | umask.Mask(perm.PrivateDir)},
-					"/repositories":           {Mode: fs.ModeDir | umask.Mask(perm.PrivateDir)},
+					"/":                       {Mode: mode.Directory},
+					"/repositories":           {Mode: mode.Directory},
 					"/repositories/a":         {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 					"/repositories/a/refs":    {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 					"/repositories/a/objects": {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},

@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 // FixDirectoryPermissions does a recursive directory walk to look for
@@ -20,7 +22,7 @@ func fixDirectoryPermissions(ctx context.Context, path string, retriedPaths map[
 			return nil
 		}
 
-		const minimumDirPerm = PrivateDir
+		const minimumDirPerm = mode.Directory
 		if !info.IsDir() || info.Mode()&minimumDirPerm == minimumDirPerm {
 			return nil
 		}

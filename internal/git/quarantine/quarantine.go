@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -128,7 +128,7 @@ func migrate(sourcePath, targetPath string) error {
 		nestedSourcePath := filepath.Join(sourcePath, entry.Name())
 
 		if entry.IsDir() {
-			if err := os.Mkdir(nestedTargetPath, perm.PrivateDir); err != nil {
+			if err := os.Mkdir(nestedTargetPath, mode.Directory); err != nil {
 				if !errors.Is(err, os.ErrExist) {
 					return fmt.Errorf("creating target directory %q: %w", nestedTargetPath, err)
 				}

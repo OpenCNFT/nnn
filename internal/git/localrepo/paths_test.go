@@ -11,7 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -57,7 +57,7 @@ func TestRepo_Path(t *testing.T) {
 		// Recreate the repository as a simple empty directory to simulate
 		// that the repository is in a partially-created state.
 		require.NoError(t, os.RemoveAll(repoPath))
-		require.NoError(t, os.MkdirAll(repoPath, perm.PrivateDir))
+		require.NoError(t, os.MkdirAll(repoPath, mode.Directory))
 
 		_, err := repo.Path(ctx)
 		require.Equal(t, structerr.NewFailedPrecondition("%w: %q does not exist", storage.ErrRepositoryNotValid, "objects").WithMetadata("repository_path", repoPath), err)
@@ -83,7 +83,7 @@ func TestRepo_ObjectDirectoryPath(t *testing.T) {
 	transactionStateDir := filepath.Join(cfg.Storages[0].Path, "tx-tmp")
 	transactionQuarantineDir := filepath.Join(transactionStateDir, "quarantine")
 	transactionQuarantineDirWithGitPush := filepath.Join(transactionQuarantineDir, "tmp_objdir-incoming-Gbc29N")
-	require.NoError(t, os.MkdirAll(transactionQuarantineDirWithGitPush, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(transactionQuarantineDirWithGitPush, mode.Directory))
 	transactionQuarantineDirRelativePath, err := filepath.Rel(repoPath, transactionQuarantineDir)
 	require.NoError(t, err)
 	transactionQuarantineDirWithGitPushRelativePath, err := filepath.Rel(repoPath, transactionQuarantineDirWithGitPush)

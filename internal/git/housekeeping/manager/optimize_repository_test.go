@@ -25,6 +25,7 @@ import (
 	gitalycfg "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
@@ -722,7 +723,7 @@ func TestOptimizeRepository(t *testing.T) {
 
 				// The repack won't repack the following objects because they're
 				// broken, and thus we'll retry to prune them afterwards.
-				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "objects", "17"), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "objects", "17"), mode.Directory))
 
 				// We set the object's mtime to be almost two weeks ago. Given that
 				// our timeout is at exactly two weeks this shouldn't caused them to
@@ -760,7 +761,7 @@ func TestOptimizeRepository(t *testing.T) {
 
 				// The repack won't repack the following objects because they're
 				// broken, and thus we'll retry to prune them afterwards.
-				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "objects", "17"), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "objects", "17"), mode.Directory))
 
 				moreThanTwoWeeksAgo := time.Now().Add(stats.StaleObjectsGracePeriod).Add(-time.Minute)
 
@@ -1842,7 +1843,7 @@ func TestRepositoryManager_CleanStaleData_references(t *testing.T) {
 			for _, ref := range tc.refs {
 				path := filepath.Join(repoPath, ref.name)
 
-				require.NoError(t, os.MkdirAll(filepath.Dir(path), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), mode.Directory))
 				require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte{0}, ref.size), perm.PrivateWriteOnceFile))
 				filetime := time.Now().Add(-ref.age)
 				require.NoError(t, os.Chtimes(path, filetime, filetime))

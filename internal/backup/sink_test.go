@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 
@@ -150,7 +151,7 @@ func TestFileBlobSink(t *testing.T) {
 
 	info, err := os.Stat(tmpPath)
 	require.NoError(t, err)
-	require.Equal(t, perm.PrivateDir, info.Mode().Perm())
+	require.Equal(t, mode.Directory, info.Mode())
 }
 
 func TestStorageServiceSink(t *testing.T) {

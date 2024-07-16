@@ -132,7 +132,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: &bytes.Buffer{},
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/": {Mode: perm.PrivateDir},
+				"custom_hooks/": {Mode: mode.Directory.Perm()},
 			},
 		},
 		{
@@ -147,7 +147,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: perm.PrivateDir},
+				"custom_hooks/":            {Mode: mode.Directory.Perm()},
 				"custom_hooks/pre-commit":  {Mode: expectedExecutableMode, Content: []byte("pre-commit content")},
 				"custom_hooks/pre-push":    {Mode: expectedExecutableMode, Content: []byte("pre-push content")},
 				"custom_hooks/pre-receive": {Mode: expectedExecutableMode, Content: []byte("pre-receive content")},
@@ -171,7 +171,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: perm.PrivateDir},
+				"custom_hooks/":            {Mode: mode.Directory.Perm()},
 				"custom_hooks/pre-commit":  {Mode: expectedExecutableMode, Content: []byte("pre-commit content")},
 				"custom_hooks/pre-push":    {Mode: expectedExecutableMode, Content: []byte("pre-push content")},
 				"custom_hooks/pre-receive": {Mode: expectedExecutableMode, Content: []byte("pre-receive content")},

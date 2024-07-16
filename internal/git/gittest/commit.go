@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -220,7 +220,7 @@ func WriteCommit(tb testing.TB, cfg config.Cfg, repoPath string, opts ...WriteCo
 	if writeCommitConfig.alternateObjectDir != "" {
 		require.True(tb, filepath.IsAbs(writeCommitConfig.alternateObjectDir),
 			"alternate object directory must be an absolute path")
-		require.NoError(tb, os.MkdirAll(writeCommitConfig.alternateObjectDir, perm.PrivateDir))
+		require.NoError(tb, os.MkdirAll(writeCommitConfig.alternateObjectDir, mode.Directory))
 
 		env = append(env,
 			fmt.Sprintf("GIT_OBJECT_DIRECTORY=%s", writeCommitConfig.alternateObjectDir),

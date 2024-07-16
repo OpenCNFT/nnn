@@ -20,7 +20,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -239,7 +238,7 @@ func NewPartitionManager(
 			return nil, fmt.Errorf("failed clearing storage's staging directory: %w", err)
 		}
 
-		if err := os.MkdirAll(stagingDir, perm.PrivateDir); err != nil {
+		if err := os.MkdirAll(stagingDir, mode.Directory); err != nil {
 			return nil, fmt.Errorf("create storage's staging directory: %w", err)
 		}
 
@@ -370,7 +369,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 
 	relativeStateDir := deriveStateDirectory(partitionID)
 	absoluteStateDir := filepath.Join(storageMgr.path, relativeStateDir)
-	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
 	}
 
@@ -458,7 +457,7 @@ func (pm *PartitionManager) StorageKV(ctx context.Context, storageName string, r
 func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *storageManager, partitionID storage.PartitionID) (*partition, error) {
 	relativeStateDir := deriveStateDirectory(partitionID)
 	absoluteStateDir := filepath.Join(storageMgr.path, relativeStateDir)
-	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
 	}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -80,7 +81,7 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 
 	if cfg.BinDir == "" {
 		cfg.BinDir = filepath.Join(root, "bin.d")
-		require.NoError(tb, os.Mkdir(cfg.BinDir, perm.PrivateDir))
+		require.NoError(tb, os.Mkdir(cfg.BinDir, mode.Directory))
 	}
 
 	if cfg.Logging.Dir == "" {
@@ -89,19 +90,19 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 			cfg.Logging.Dir = logDir
 		} else {
 			cfg.Logging.Dir = filepath.Join(root, "log.d")
-			require.NoError(tb, os.Mkdir(cfg.Logging.Dir, perm.PrivateDir))
+			require.NoError(tb, os.Mkdir(cfg.Logging.Dir, mode.Directory))
 		}
 	}
 
 	if cfg.GitlabShell.Dir == "" {
 		cfg.GitlabShell.Dir = filepath.Join(root, "shell.d")
-		require.NoError(tb, os.Mkdir(cfg.GitlabShell.Dir, perm.PrivateDir))
+		require.NoError(tb, os.Mkdir(cfg.GitlabShell.Dir, mode.Directory))
 	}
 
 	if cfg.RuntimeDir == "" {
 		cfg.RuntimeDir = filepath.Join(root, "runtime.d")
-		require.NoError(tb, os.Mkdir(cfg.RuntimeDir, perm.PrivateDir))
-		require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), perm.PrivateDir))
+		require.NoError(tb, os.Mkdir(cfg.RuntimeDir, mode.Directory))
+		require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), mode.Directory))
 	}
 
 	if len(cfg.Storages) != 0 && len(gc.storages) != 0 {
@@ -118,13 +119,13 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 
 	if cfg.Gitlab.SecretFile == "" {
 		cfg.Gitlab.SecretFile = filepath.Join(root, "gitlab", "http.secret")
-		require.NoError(tb, os.MkdirAll(filepath.Dir(cfg.Gitlab.SecretFile), perm.PrivateDir))
+		require.NoError(tb, os.MkdirAll(filepath.Dir(cfg.Gitlab.SecretFile), mode.Directory))
 		require.NoError(tb, os.WriteFile(cfg.Gitlab.SecretFile, nil, perm.PrivateWriteOnceFile))
 	}
 
 	if len(cfg.Storages) == 0 {
 		storagesDir := filepath.Join(root, "storages.d")
-		require.NoError(tb, os.Mkdir(storagesDir, perm.PrivateDir))
+		require.NoError(tb, os.Mkdir(storagesDir, mode.Directory))
 
 		if len(gc.storages) == 0 {
 			gc.storages = []string{"default"}
@@ -134,7 +135,7 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 		cfg.Storages = make([]config.Storage, len(gc.storages))
 		for i, storageName := range gc.storages {
 			storagePath := filepath.Join(storagesDir, storageName)
-			require.NoError(tb, os.MkdirAll(storagePath, perm.PrivateDir))
+			require.NoError(tb, os.MkdirAll(storagePath, mode.Directory))
 			cfg.Storages[i].Name = storageName
 			cfg.Storages[i].Path = storagePath
 		}
