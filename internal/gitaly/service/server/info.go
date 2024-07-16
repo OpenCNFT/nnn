@@ -2,12 +2,12 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"os"
-	"path/filepath"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/fstype"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/version"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -21,7 +21,10 @@ func (s *server) ServerInfo(ctx context.Context, in *gitalypb.ServerInfoRequest)
 
 	var storageStatuses []*gitalypb.ServerInfoResponse_StorageStatus
 	for _, shard := range s.storages {
-		readable, writeable := shardCheck(shard.Path)
+		readable, writeable, err := shardCheck(shard.Path)
+		if err != nil {
+			return nil, fmt.Errorf("shard check: %w", err)
+		}
 		fsType := fstype.FileSystem(shard.Path)
 
 		gitalyMetadata, err := storage.ReadMetadataFile(shard.Path)
@@ -46,19 +49,14 @@ func (s *server) ServerInfo(ctx context.Context, in *gitalypb.ServerInfoRequest)
 	}, nil
 }
 
-func shardCheck(shardPath string) (readable bool, writeable bool) {
-	if _, err := os.Stat(shardPath); err == nil {
-		readable = true
+func shardCheck(shardPath string) (bool, bool, error) {
+	info, err := os.Stat(shardPath)
+	if err != nil {
+		return false, false, fmt.Errorf("stat: %w", err)
 	}
 
-	// the path uses a `+` to avoid naming collisions
-	testPath := filepath.Join(shardPath, "+testWrite")
+	readable := info.Mode()&(permission.OwnerRead|permission.OwnerExecute) == permission.OwnerRead|permission.OwnerExecute
+	writable := info.Mode()&permission.OwnerWrite == permission.OwnerWrite
 
-	content := []byte("testWrite")
-	if err := os.WriteFile(testPath, content, perm.SharedFile); err == nil {
-		writeable = true
-	}
-	_ = os.Remove(testPath)
-
-	return
+	return readable, writable, nil
 }
