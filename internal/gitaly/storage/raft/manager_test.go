@@ -46,7 +46,7 @@ func TestManager_Start(t *testing.T) {
 	resetManager := func(t *testing.T, m *Manager) {
 		m.metadataGroup = nil
 		for _, storageMgr := range m.storageManagers {
-			storageMgr.clearStorageID()
+			storageMgr.clearStorageInfo()
 			storageMgr.nodeHost.Close()
 			nodeHost, err := dragonboat.NewNodeHost(storageMgr.nodeHost.NodeHostConfig())
 			require.NoError(t, err)
@@ -99,6 +99,11 @@ func TestManager_Start(t *testing.T) {
 
 				fanOut(numNode, func(node raftID) {
 					require.NoError(t, cluster.nodes[node].manager.Start())
+
+					storage := cluster.nodes[node].manager.firstStorage
+					require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+					require.Equal(t, storage.name, storage.persistedInfo.Name)
+					require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 				})
 
 				var expectedIDs, allocatedIDs []raftID
@@ -117,9 +122,10 @@ func TestManager_Start(t *testing.T) {
 
 					require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 					require.Equal(t, uint64(numNode+1), clusterInfo.NextStorageId)
-					require.Equal(t, &gitalypb.Storage{
+					expectedInfo := &gitalypb.Storage{
 						StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
-					}, clusterInfo.Storages[storage.id.ToUint64()])
+					}
+					testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 				})
 			})
 		}(numNode)
@@ -137,6 +143,11 @@ func TestManager_Start(t *testing.T) {
 					fanOut(2, func(node raftID) {
 						require.NoError(t, cluster.nodes[node].manager.Start())
 						require.Equal(t, true, cluster.nodes[node].manager.Ready())
+
+						storage := cluster.nodes[node].manager.firstStorage
+						require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+						require.Equal(t, storage.name, storage.persistedInfo.Name)
+						require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 					})
 
 					// The quorum is reached
@@ -154,9 +165,10 @@ func TestManager_Start(t *testing.T) {
 
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(3), clusterInfo.NextStorageId)
-						require.Equal(t, &gitalypb.Storage{
+						expectedInfo := &gitalypb.Storage{
 							StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
-						}, clusterInfo.Storages[storage.id.ToUint64()])
+						}
+						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 					})
 
 					// Now the third node joins. It does not matter whether the third node bootstraps the cluster.
@@ -172,9 +184,10 @@ func TestManager_Start(t *testing.T) {
 
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(4), clusterInfo.NextStorageId)
-						require.Equal(t, &gitalypb.Storage{
+						expectedInfo := &gitalypb.Storage{
 							StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
-						}, clusterInfo.Storages[storage.id.ToUint64()])
+						}
+						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 					})
 				})
 			}(bootstrap)
@@ -226,6 +239,11 @@ func TestManager_Start(t *testing.T) {
 				require.EqualError(t, cluster.nodes[node].manager.Start(), "registering storage ID: storage \"storage-2\" already registered")
 			} else {
 				require.NoError(t, cluster.nodes[node].manager.Start())
+
+				storage := cluster.nodes[node].manager.firstStorage
+				require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+				require.Equal(t, storage.name, storage.persistedInfo.Name)
+				require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 			}
 
 			if node != duplicatedNode {
@@ -253,9 +271,10 @@ func TestManager_Start(t *testing.T) {
 				require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 				require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 
-				require.Equal(t, &gitalypb.Storage{
+				expectedInfo := &gitalypb.Storage{
 					StorageId: storage.id.ToUint64(), Name: storage.name, ReplicationFactor: 3,
-				}, clusterInfo.Storages[storage.id.ToUint64()])
+				}
+				testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
 			}
 		})
 	})
@@ -268,6 +287,11 @@ func TestManager_Start(t *testing.T) {
 
 		fanOut(3, func(node raftID) {
 			require.NoError(t, cluster.nodes[node].manager.Start())
+
+			storage := cluster.nodes[node].manager.firstStorage
+			require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+			require.Equal(t, storage.name, storage.persistedInfo.Name)
+			require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 		})
 
 		for _, node := range cluster.nodes {
@@ -286,9 +310,10 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
-			require.Equal(t, &gitalypb.Storage{
+			expectedInfo := &gitalypb.Storage{
 				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name, ReplicationFactor: 3,
-			}, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
+			}
+			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
 		})
 	})
 
@@ -300,6 +325,11 @@ func TestManager_Start(t *testing.T) {
 
 		fanOut(3, func(node raftID) {
 			require.NoError(t, cluster.nodes[node].manager.Start())
+
+			storage := cluster.nodes[node].manager.firstStorage
+			require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+			require.Equal(t, storage.name, storage.persistedInfo.Name)
+			require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 		})
 
 		for _, node := range cluster.nodes {
@@ -319,9 +349,10 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
-			require.Equal(t, &gitalypb.Storage{
+			expectedInfo := &gitalypb.Storage{
 				StorageId: mgr.firstStorage.id.ToUint64(), Name: mgr.firstStorage.name, ReplicationFactor: 3,
-			}, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
+			}
+			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
 		})
 	})
 

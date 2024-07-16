@@ -280,9 +280,13 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 		groups := bootstrapCluster(t, cluster, ptnMgr)
 
 		for i := raftID(1); i <= 3; i++ {
-			id, err := groups[i].RegisterStorage(fmt.Sprintf("storage-%d", 2*i))
+			info, err := groups[i].RegisterStorage(fmt.Sprintf("storage-%d", 2*i))
 			require.NoError(t, err)
-			require.Equal(t, i, id)
+			require.Equal(t, &gitalypb.Storage{
+				StorageId:         uint64(i),
+				Name:              fmt.Sprintf("storage-%d", 2*i),
+				ReplicationFactor: 3,
+			}, info)
 		}
 
 		for i := raftID(1); i <= 3; i++ {
@@ -310,9 +314,13 @@ func TestMetadataGroup_RegisterStorage(t *testing.T) {
 		ptnMgr := setupTestPartitionManager(t, cfg)
 		groups := bootstrapCluster(t, cluster, ptnMgr)
 
-		id, err := groups[1].RegisterStorage("storage-1")
+		info, err := groups[1].RegisterStorage("storage-1")
 		require.NoError(t, err)
-		require.Equal(t, raftID(1), id)
+		require.Equal(t, &gitalypb.Storage{
+			StorageId:         1,
+			Name:              "storage-1",
+			ReplicationFactor: 3,
+		}, info)
 
 		_, err = groups[2].RegisterStorage("storage-1")
 		require.EqualError(t, err, "storage \"storage-1\" already registered")

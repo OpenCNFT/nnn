@@ -157,35 +157,35 @@ func (g *metadataRaftGroup) tryBootstrap() (*gitalypb.Cluster, error) {
 // RegisterStorage requests the metadata group to allocate a unique ID for a new storage. The caller
 // is expected to persist the newly allocated ID. This ID is used for future interactions with the
 // Raft cluster. The storage name must be unique cluster-wide.
-func (g *metadataRaftGroup) RegisterStorage(storageName string) (raftID, error) {
+func (g *metadataRaftGroup) RegisterStorage(storageName string) (*gitalypb.Storage, error) {
 	storageName = strings.TrimSpace(storageName)
 	cluster, err := g.ClusterInfo()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	for _, storage := range cluster.Storages {
 		if storage.GetName() == storageName {
-			return 0, fmt.Errorf("storage %q already registered", storageName)
+			return nil, fmt.Errorf("storage %q already registered", storageName)
 		}
 	}
 	result, response, err := g.requestRegisterStorage(storageName, g.clusterConfig.ReplicationFactor)
 	if err != nil {
-		return 0, fmt.Errorf("registering storage: %w", err)
+		return nil, fmt.Errorf("registering storage: %w", err)
 	}
 
 	switch result {
 	case resultRegisterStorageSuccessful:
-		return raftID(response.GetStorage().GetStorageId()), nil
+		return response.GetStorage(), nil
 	case resultStorageAlreadyRegistered:
 		// There's a chance that storage is registered by another node while firing this request. We
 		// have no choice but reject this request.
-		return 0, fmt.Errorf("storage %q already registered", storageName)
+		return nil, fmt.Errorf("storage %q already registered", storageName)
 	case resultRegisterStorageClusterNotBootstrappedYet:
 		// Extremely rare occasion. This case occurs when the cluster information is wiped out of
 		// the metadata group when the register storage request is in-flight.
-		return 0, fmt.Errorf("cluster has not been bootstrapped")
+		return nil, fmt.Errorf("cluster has not been bootstrapped")
 	default:
-		return 0, fmt.Errorf("unsupported update result: %d", result)
+		return nil, fmt.Errorf("unsupported update result: %d", result)
 	}
 }
 
