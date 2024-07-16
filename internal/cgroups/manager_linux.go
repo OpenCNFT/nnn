@@ -123,6 +123,12 @@ func (cgm *CGroupManager) Setup() error {
 	if err := cgm.handler.setupParent(cgm.configParentResources()); err != nil {
 		return err
 	}
+
+	cgroupPath := cgm.handler.repoPath(0)
+	if err := cgm.maybeCreateCgroup(cgroupPath); err != nil {
+		return fmt.Errorf("setup repository-scoped cgroup: %w", err)
+	}
+
 	cgm.enabled = true
 
 	return nil
@@ -133,7 +139,7 @@ func (cgm *CGroupManager) Ready() bool {
 	return cgm.enabled
 }
 
-// AddCommand adds a Cmd to a cgroup
+// AddCommand adds a Cmd that has already started to a cgroup
 func (cgm *CGroupManager) AddCommand(cmd *exec.Cmd, opts ...AddCommandOption) (string, error) {
 	if cmd.Process == nil {
 		return "", errors.New("cannot add command that has not yet been started")
