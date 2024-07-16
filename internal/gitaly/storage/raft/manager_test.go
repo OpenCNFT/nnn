@@ -29,10 +29,9 @@ func TestManager_Start(t *testing.T) {
 			cfg := testcfg.Build(t, testcfg.WithStorages(fmt.Sprintf("storage-%d", node)))
 			logger := testhelper.NewLogger(t)
 
-			dbMgr := setupTestDB(t, cfg)
-			t.Cleanup(dbMgr.Close)
+			ptnMgr := setupTestPartitionManager(t, cfg)
 
-			mgr, err := NewManager(ctx, cfg.Storages, cluster.createRaftConfig(node), managerTestConfig(true), dbMgr, logger)
+			mgr, err := NewManager(ctx, cfg.Storages, cluster.createRaftConfig(node), managerTestConfig(true), ptnMgr, logger)
 			if err != nil {
 				return nil, err
 			}
@@ -201,15 +200,14 @@ func TestManager_Start(t *testing.T) {
 			cfg := testcfg.Build(t, testcfg.WithStorages(storageName))
 			logger := testhelper.NewLogger(t)
 
-			dbMgr := setupTestDB(t, cfg)
-			t.Cleanup(dbMgr.Close)
+			ptnMgr := setupTestPartitionManager(t, cfg)
 
 			mgrCfg := managerTestConfig(true)
 			mgrCfg.testBeforeRegister = func() {
 				<-waits[node]
 			}
 
-			mgr, err := NewManager(ctx, cfg.Storages, cluster.createRaftConfig(node), mgrCfg, dbMgr, logger)
+			mgr, err := NewManager(ctx, cfg.Storages, cluster.createRaftConfig(node), mgrCfg, ptnMgr, logger)
 			if err != nil {
 				return nil, err
 			}
@@ -353,10 +351,9 @@ func TestManager_Start(t *testing.T) {
 		cfg := testcfg.Build(t, testcfg.WithStorages("storage-1", "storage-2"))
 		logger := testhelper.NewLogger(t)
 
-		dbMgr := setupTestDB(t, cfg)
-		t.Cleanup(dbMgr.Close)
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
-		_, err := NewManager(ctx, cfg.Storages, config.Raft{}, managerTestConfig(true), dbMgr, logger)
+		_, err := NewManager(ctx, cfg.Storages, config.Raft{}, managerTestConfig(true), ptnMgr, logger)
 		require.EqualError(t, err, "the support for multiple storages is temporarily disabled")
 	})
 }

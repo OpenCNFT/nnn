@@ -25,10 +25,8 @@ func TestMetadataStatemachine_Open(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
-
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(testhelper.Context(t), 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 
 		lastApplied, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
@@ -39,10 +37,9 @@ func TestMetadataStatemachine_Open(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(testhelper.Context(t), 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -71,15 +68,15 @@ func TestMetadataStatemachine_Open(t *testing.T) {
 	t.Run("multiple statemachines co-exist", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		cfg := testcfg.Build(t, testcfg.WithStorages("storage-1", "storage-2"))
+		ctx := testhelper.Context(t)
+		ptnMgr := setupTestPartitionManager(t, cfg)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
-		sm2 := newMetadataStatemachine(1, 2, dbForGroup(db, 1, 2))
+		sm2 := newMetadataStatemachine(ctx, 1, 2, dbForMetadataGroup(ptnMgr, cfg.Storages[1].Name))
 		_, err = sm2.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -111,10 +108,10 @@ func TestMetadataStatemachine_Open(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 
 		stopC := make(chan struct{}, 1)
 		stopC <- struct{}{}
@@ -127,11 +124,13 @@ func TestMetadataStatemachine_Open(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		close()
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ctx := testhelper.Context(t)
+
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		ptnMgr.Close()
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
-		require.Contains(t, err.Error(), "DB::Get key")
+		require.Contains(t, err.Error(), "reading last index from DB")
 	})
 }
 
@@ -171,10 +170,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -190,10 +189,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -217,11 +216,11 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 	t.Run("register a new storage", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		cfg := testcfg.Build(t, testcfg.WithStorages("storage-1", "storage-2"))
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -229,8 +228,8 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		requireLastApplied(t, sm, 1)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-1"})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-2"})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -239,7 +238,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
 						StorageId: 1,
-						Name:      "storage-1",
+						Name:      cfg.Storages[0].Name,
 					},
 				}),
 			}},
@@ -248,7 +247,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
 						StorageId: 2,
-						Name:      "storage-2",
+						Name:      cfg.Storages[1].Name,
 					},
 				}),
 			}},
@@ -261,11 +260,11 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 			Storages: map[uint64]*gitalypb.Storage{
 				1: {
 					StorageId: 1,
-					Name:      "storage-1",
+					Name:      cfg.Storages[0].Name,
 				},
 				2: {
 					StorageId: 2,
-					Name:      "storage-2",
+					Name:      cfg.Storages[1].Name,
 				},
 			},
 		})
@@ -275,10 +274,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -286,8 +285,8 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		requireLastApplied(t, sm, 1)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-1"})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-1"})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -296,7 +295,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
 						StorageId: 1,
-						Name:      "storage-1",
+						Name:      cfg.Storages[0].Name,
 					},
 				}),
 			}},
@@ -312,7 +311,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 			Storages: map[uint64]*gitalypb.Storage{
 				1: {
 					StorageId: 1,
-					Name:      "storage-1",
+					Name:      cfg.Storages[0].Name,
 				},
 			},
 		})
@@ -322,15 +321,15 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 1, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-1"})},
+			{Index: 1, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -345,10 +344,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -368,10 +367,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -412,10 +411,10 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -429,10 +428,10 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
@@ -450,18 +449,18 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 	t.Run("get an established cluster", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		cfg := testcfg.Build(t, testcfg.WithStorages("storage-1", "storage-2"))
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 
 		bootstrapCluster(t, sm)
 		_, err = sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-1"})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: "storage-2"})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name})},
 		})
 		require.NoError(t, err)
 
@@ -472,8 +471,8 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 			ClusterId:     "1234",
 			NextStorageId: 3,
 			Storages: map[uint64]*gitalypb.Storage{
-				1: {StorageId: 1, Name: "storage-1"},
-				2: {StorageId: 2, Name: "storage-2"},
+				1: {StorageId: 1, Name: cfg.Storages[0].Name},
+				2: {StorageId: 2, Name: cfg.Storages[1].Name},
 			},
 		}}, response)
 	})
@@ -482,10 +481,10 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		db, close := setupStorageDB(t, cfg)
-		defer close()
+		ctx := testhelper.Context(t)
 
-		sm := newMetadataStatemachine(1, 1, dbForGroup(db, 1, 1))
+		ptnMgr := setupTestPartitionManager(t, cfg)
+		sm := newMetadataStatemachine(ctx, 1, 1, dbForMetadataGroup(ptnMgr, cfg.Storages[0].Name))
 		_, err := sm.Open(make(<-chan struct{}))
 		require.NoError(t, err)
 

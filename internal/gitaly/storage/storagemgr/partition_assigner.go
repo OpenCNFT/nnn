@@ -30,6 +30,14 @@ var (
 )
 
 const prefixPartitionAssignment = "partition_assignment/"
+const (
+	// invalidPartitionID is an invalid partition ID.
+	invalidPartitionID = 0
+	// metadataPartitionID is ID of the storage's metadata partition.
+	metadataPartitionID = 1
+	// initialPartitionID is the starting ID of normal partitions.
+	initialPartitionID = 2
+)
 
 // relativePathNotFoundError is raised when attempting to assign a relative path that does not exist into
 // a partition.
@@ -133,11 +141,8 @@ func (pa *partitionAssigner) Close() error {
 }
 
 func (pa *partitionAssigner) allocatePartitionID() (storage.PartitionID, error) {
-	// Start allocating partition IDs from 2:
-	// - The default value, 0, refers to an invalid partition.
-	// - Partition ID 1 is reserved for the storage's metadata partition.
 	var id uint64
-	for id < 2 {
+	for id < initialPartitionID {
 		var err error
 		id, err = pa.idSequence.Next()
 		if err != nil {
@@ -297,7 +302,7 @@ func (pa *partitionAssigner) assignPartitionID(ctx context.Context, relativePath
 		}
 
 		ptnID = partitionHint
-		if ptnID == 0 {
+		if ptnID == invalidPartitionID {
 			// The repository has no alternate. Unpooled repositories go into their own partitions.
 			// Allocate a new partition ID for this repository.
 			ptnID, err = pa.allocatePartitionID()

@@ -14,8 +14,12 @@ import (
 	dragonboatConfig "github.com/lni/dragonboat/v4/config"
 	"github.com/lni/dragonboat/v4/statemachine"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"google.golang.org/protobuf/proto"
@@ -327,23 +331,24 @@ func reserveEphemeralAddrs(t *testing.T, count int) []string {
 	return addrs
 }
 
-func setupTestDB(t *testing.T, cfg config.Cfg) *keyvalue.DBManager {
+func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.PartitionManager {
 	logger := testhelper.NewLogger(t)
 
 	dbMgr, err := keyvalue.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
+	t.Cleanup(dbMgr.Close)
 
-	return dbMgr
-}
+	cmdFactory := gittest.NewCommandFactory(t, cfg)
+	catfileCache := catfile.NewCache(cfg)
+	t.Cleanup(catfileCache.Stop)
 
-func setupStorageDB(t *testing.T, cfg config.Cfg) (keyvalue.Transactioner, func()) {
-	dbMgr := setupTestDB(t, cfg)
+	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	storage := cfg.Storages[0]
-	db, err := dbMgr.GetDB(storage.Name)
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
 	require.NoError(t, err)
+	t.Cleanup(partitionManager.Close)
 
-	return dbForStorage(db), dbMgr.Close
+	return partitionManager
 }
 
 // fanOut executes f concurrently num times. The supplied raftID begins from 1.
