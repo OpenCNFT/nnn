@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -70,7 +71,7 @@ func TestRepo_WriteBlob(t *testing.T) {
 			// Apply the gitattributes
 			// We should get rid of this with https://gitlab.com/groups/gitlab-org/-/epics/9006
 			attributesPath := filepath.Join(repoPath, "info", "attributes")
-			require.NoError(t, os.MkdirAll(filepath.Dir(attributesPath), perm.PrivateDir))
+			require.NoError(t, os.MkdirAll(filepath.Dir(attributesPath), mode.Directory))
 
 			if err := os.Remove(attributesPath); !errors.Is(err, fs.ErrNotExist) {
 				require.NoError(t, err)

@@ -17,6 +17,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -142,7 +143,7 @@ func TestGetSnapshot(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(repoPath, "shallow"), nil, perm.PrivateWriteOnceFile))
 
 				// Custom Git hooks are not included in snapshots.
-				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "hooks"), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "hooks"), mode.Directory))
 
 				// Create a file in the objects directory that does not match the regex.
 				require.NoError(t, os.WriteFile(

@@ -19,6 +19,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -43,7 +44,7 @@ func TestGetCustomHooks_successful(t *testing.T) {
 		"custom_hooks/prepare-commit-msg.sample",
 		"custom_hooks/pre-push.sample",
 	}
-	require.NoError(t, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), perm.PrivateDir), "Could not create custom_hooks dir")
+	require.NoError(t, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), mode.Directory), "Could not create custom_hooks dir")
 	for _, fileName := range expectedTarResponse[1:] {
 		require.NoError(t, os.WriteFile(filepath.Join(repoPath, fileName), []byte("Some hooks"), perm.PrivateExecutable), fmt.Sprintf("Could not create %s", fileName))
 	}
@@ -133,7 +134,7 @@ func TestExtractHooks(t *testing.T) {
 		writeFile(writer, "custom_hooks/pre-receive", fs.ModePerm, "pre-receive content")
 		require.NoError(t, writer.WriteHeader(&tar.Header{
 			Name: "custom_hooks/subdirectory/",
-			Mode: int64(perm.PrivateDir),
+			Mode: int64(mode.Directory),
 		}))
 		writeFile(writer, "custom_hooks/subdirectory/supporting-file", perm.PrivateWriteOnceFile, "supporting-file content")
 		writeFile(writer, "ignored_file", fs.ModePerm, "ignored content")
@@ -192,7 +193,7 @@ func TestExtractHooks(t *testing.T) {
 				"/":                          {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/custom_hooks":              {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/custom_hooks/pre-receive":  {Mode: umask.Mask(fs.ModePerm), Content: []byte("pre-receive content")},
-				"/custom_hooks/subdirectory": {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
+				"/custom_hooks/subdirectory": {Mode: mode.Directory},
 				"/custom_hooks/subdirectory/supporting-file": {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte("supporting-file content")},
 			},
 		},
@@ -203,7 +204,7 @@ func TestExtractHooks(t *testing.T) {
 			expectedState: testhelper.DirectoryState{
 				"/":                             {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/pre-receive":                  {Mode: umask.Mask(fs.ModePerm), Content: []byte("pre-receive content")},
-				"/subdirectory":                 {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
+				"/subdirectory":                 {Mode: mode.Directory},
 				"/subdirectory/supporting-file": {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte("supporting-file content")},
 			},
 		},
@@ -375,7 +376,7 @@ func mustWriteCustomHookDirectory(t *testing.T, files []testFile, dirName string
 	tmpDir := testhelper.TempDir(t)
 	hooksPath := filepath.Join(tmpDir, dirName)
 
-	err := os.Mkdir(hooksPath, perm.PrivateDir)
+	err := os.Mkdir(hooksPath, mode.Directory)
 	require.NoError(t, err)
 
 	for _, f := range files {

@@ -15,8 +15,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -154,7 +154,7 @@ func SetCustomHooks(
 	// it means the repository should be set with an empty `custom_hooks`
 	// directory. Create `custom_hooks` in the temporary directory so that any
 	// existing repository hooks will be replaced with this empty directory.
-	if err := os.Mkdir(tempHooksPath, perm.PrivateDir); err != nil && !errors.Is(err, fs.ErrExist) {
+	if err := os.Mkdir(tempHooksPath, mode.Directory); err != nil && !errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("making temp hooks directory: %w", err)
 	}
 

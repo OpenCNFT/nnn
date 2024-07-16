@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -206,7 +206,7 @@ func configureTestDirectory(logger log.Logger) (_ func(), returnedErr error) {
 	// around after our tests. To avoid this, we thus set the TMPDIR environment variable to
 	// point into a directory inside of out test directory.
 	globalTempDir := filepath.Join(testDirectory, "tmp")
-	if err := os.Mkdir(globalTempDir, perm.PrivateDir); err != nil {
+	if err := os.Mkdir(globalTempDir, mode.Directory); err != nil {
 		return nil, fmt.Errorf("creating global temporary directory: %w", err)
 	}
 	if err := os.Setenv("TMPDIR", globalTempDir); err != nil {
