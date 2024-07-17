@@ -664,7 +664,8 @@ func (scc StreamCacheConfig) Validate() error {
 func defaultLoggingConfig() Logging {
 	return Logging{
 		Config: log.Config{
-			Level: "info",
+			Format: "text",
+			Level:  "info",
 		},
 	}
 }

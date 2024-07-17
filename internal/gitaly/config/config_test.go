@@ -215,7 +215,8 @@ sentry_dsn = "abc123"`)
 
 	require.Equal(t, Logging{
 		Config: log.Config{
-			Level: "info",
+			Format: "text",
+			Level:  "info",
 		},
 		Sentry: Sentry(sentry.Config{
 			Environment: "production",

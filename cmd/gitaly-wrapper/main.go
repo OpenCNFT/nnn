@@ -23,7 +23,7 @@ const (
 )
 
 func main() {
-	var logFormat string
+	logFormat := "text"
 	if jsonLogging() {
 		logFormat = "json"
 	}

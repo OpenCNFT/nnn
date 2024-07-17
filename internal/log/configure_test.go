@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func TestConfigure(t *testing.T) {
 		level          string
 		hooks          []logrus.Hook
 		expectedLogger *logrus.Logger
+		expectedError  error
 	}{
 		{
 			desc:   "json format with info level",
@@ -47,14 +49,8 @@ func TestConfigure(t *testing.T) {
 			}(),
 		},
 		{
-			desc: "empty format with info level",
-			expectedLogger: func() *logrus.Logger {
-				logger := newLogger()
-				logger.Out = &out
-				logger.Formatter = UTCTextFormatter()
-				logger.Level = logrus.InfoLevel
-				return logger
-			}(),
+			desc:          "empty format with info level",
+			expectedError: fmt.Errorf("invalid logger format %q", ""),
 		},
 		{
 			desc:   "text format with debug level",
@@ -101,7 +97,13 @@ func TestConfigure(t *testing.T) {
 			out.Reset()
 
 			logger := newLogger()
-			require.NoError(t, configure(logger, &out, tc.format, tc.level, tc.hooks...))
+			err := configure(logger, &out, tc.format, tc.level, tc.hooks...)
+			if tc.expectedError != nil {
+				require.Equal(t, tc.expectedError, err)
+				return
+			}
+
+			require.NoError(t, err)
 
 			// We cannot directly compare the loggers with each other because they contain function
 			// pointers, so we have to check the relevant fields one by one.
