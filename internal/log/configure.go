@@ -101,7 +101,7 @@ func configure(logger *logrus.Logger, out io.Writer, format, level string, hooks
 
 	logrusLevel, err := logrus.ParseLevel(level)
 	if err != nil {
-		logrusLevel = logrus.InfoLevel
+		return fmt.Errorf("parse level: %w", err)
 	}
 
 	logger.Out = out

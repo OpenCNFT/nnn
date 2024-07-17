@@ -28,6 +28,7 @@ func TestConfigure(t *testing.T) {
 	}{
 		{
 			desc:   "json format with info level",
+			level:  "info",
 			format: "json",
 			expectedLogger: func() *logrus.Logger {
 				logger := newLogger()
@@ -39,6 +40,7 @@ func TestConfigure(t *testing.T) {
 		},
 		{
 			desc:   "text format with info level",
+			level:  "info",
 			format: "text",
 			expectedLogger: func() *logrus.Logger {
 				logger := newLogger()
@@ -65,16 +67,10 @@ func TestConfigure(t *testing.T) {
 			}(),
 		},
 		{
-			desc:   "text format with invalid level",
-			format: "text",
-			level:  "invalid-level",
-			expectedLogger: func() *logrus.Logger {
-				logger := newLogger()
-				logger.Out = &out
-				logger.Formatter = UTCTextFormatter()
-				logger.Level = logrus.InfoLevel
-				return logger
-			}(),
+			desc:          "text format with invalid level",
+			format:        "text",
+			level:         "invalid-level",
+			expectedError: fmt.Errorf("parse level: %w", fmt.Errorf("not a valid logrus Level: %q", "invalid-level")),
 		},
 		{
 			desc:   "with hook",
@@ -126,10 +122,10 @@ func TestConfigure(t *testing.T) {
 				entry.Warn(message)
 			case "error":
 				entry.Error(message)
-			case "", "info":
+			case "info":
 				entry.Info(message)
 			default:
-				entry.Info(message)
+				t.Fatalf("invalid level: %q", tc.level)
 			}
 
 			if tc.format != "" {
