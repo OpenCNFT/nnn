@@ -93,7 +93,7 @@ func configure(logger *logrus.Logger, out io.Writer, format, level string, hooks
 	switch format {
 	case "json":
 		formatter = UTCJsonFormatter()
-	case "", "text":
+	case "text":
 		formatter = UTCTextFormatter()
 	default:
 		return fmt.Errorf("invalid logger format %q", format)
