@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
@@ -536,22 +538,22 @@ func TestGetArchive_environment(t *testing.T) {
 	for _, tc := range []struct {
 		desc            string
 		includeLFSBlobs bool
-		expectedEnv     []string
+		expectedEnv     map[string]struct{}
 	}{
 		{
 			desc:            "without LFS blobs",
 			includeLFSBlobs: false,
-			expectedEnv: []string{
-				"CORRELATION_ID=" + correlationID,
+			expectedEnv: map[string]struct{}{
+				"CORRELATION_ID=" + correlationID: {},
 			},
 		},
 		{
 			desc:            "with LFS blobs",
 			includeLFSBlobs: true,
-			expectedEnv: []string{
-				"CORRELATION_ID=" + correlationID,
-				smudgeEnv,
-				"GITALY_LOG_DIR=" + cfg.Logging.Dir,
+			expectedEnv: map[string]struct{}{
+				"CORRELATION_ID=" + correlationID:   {},
+				smudgeEnv:                           {},
+				"GITALY_LOG_DIR=" + cfg.Logging.Dir: {},
 			},
 		},
 	} {
@@ -565,7 +567,27 @@ func TestGetArchive_environment(t *testing.T) {
 
 			data, err := consumeArchive(stream)
 			require.NoError(t, err)
-			require.ElementsMatch(t, tc.expectedEnv, strings.Split(text.ChompBytes(data), "\n"))
+
+			actualEnv := map[string]struct{}{}
+			for _, env := range strings.Split(text.ChompBytes(data), "\n") {
+				actualEnv[env] = struct{}{}
+			}
+
+			// Check that EnvLogConfiguration is present but don't assert its
+			// contents as part of this test.
+			if featureflag.SubprocessLogger.IsEnabled(ctx) {
+				found := false
+				for env := range actualEnv {
+					if strings.HasPrefix(env, command.EnvLogConfiguration+"=") {
+						found = true
+						delete(actualEnv, env)
+					}
+				}
+
+				require.True(t, found)
+			}
+
+			require.Equal(t, tc.expectedEnv, actualEnv)
 		})
 	}
 }

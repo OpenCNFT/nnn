@@ -542,6 +542,11 @@ func (cf *ExecCommandFactory) newCommand(ctx context.Context, repo storage.Repos
 		command.WithCgroup(cf.cgroupsManager, cgroupsAddCommandOpts...),
 		command.WithCommandGitVersion(cmdGitVersion.String()),
 	)
+
+	if featureflag.SubprocessLogger.IsEnabled(ctx) {
+		commandOpts = append(commandOpts, command.WithSubprocessLogger(cf.cfg.Logging.Config))
+	}
+
 	command, err := command.New(ctx, cf.logger, append([]string{execEnv.BinaryPath}, args...), commandOpts...)
 	if err != nil {
 		return nil, err

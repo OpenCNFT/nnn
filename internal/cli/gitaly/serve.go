@@ -150,7 +150,7 @@ func configure(configPath string) (config.Cfg, log.Logger, error) {
 		"UpdateRemoteMirror",
 	)
 
-	logger, err := log.Configure(os.Stdout, cfg.Logging.Format, cfg.Logging.Level, urlSanitizer)
+	logger, err := log.Configure(log.NewSyncWriter(os.Stdout), cfg.Logging.Format, cfg.Logging.Level, urlSanitizer)
 	if err != nil {
 		return config.Cfg{}, nil, fmt.Errorf("configuring logger failed: %w", err)
 	}
