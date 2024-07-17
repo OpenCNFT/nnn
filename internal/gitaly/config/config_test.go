@@ -56,7 +56,6 @@ func TestLoadEmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedCfg := Cfg{
-		Logging:             defaultLoggingConfig(),
 		Prometheus:          prometheus.DefaultConfig(),
 		PackObjectsCache:    defaultPackObjectsCacheConfig(),
 		PackObjectsLimiting: defaultPackObjectsLimiting(),
@@ -265,7 +264,6 @@ func TestLoadConfigCommand(t *testing.T) {
 
 	modifyDefaultConfig := func(modify func(cfg *Cfg)) Cfg {
 		cfg := &Cfg{
-			Logging:             defaultLoggingConfig(),
 			Prometheus:          prometheus.DefaultConfig(),
 			PackObjectsCache:    defaultPackObjectsCacheConfig(),
 			PackObjectsLimiting: defaultPackObjectsLimiting(),
