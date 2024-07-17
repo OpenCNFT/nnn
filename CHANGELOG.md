@@ -1,5 +1,16 @@
 # Gitaly changelog
 
+## 17.2.0 (2024-07-17)
+
+### Added (1 change)
+
+- [Extend UserMergeBranch with squash option](gitlab-org/gitaly@3029deed6e825d4bc77642bcc5ba1cde12e3ec0e) ([merge request](gitlab-org/gitaly!7060))
+
+### Fixed (2 changes)
+
+- [Ensure page token is for the same tree](gitlab-org/gitaly@1ab723e39f5b7921e2ec7343fb2c0e55a7b45954) ([merge request](gitlab-org/gitaly!7068))
+- [git: Allow reading the attributes for 'git-merge-tree(1)'](gitlab-org/gitaly@2635c20f5a062507aee3282f87df797193e1c1aa) ([merge request](gitlab-org/gitaly!7066))
+
 ## 17.1.2 (2024-07-09)
 
 No changes.
