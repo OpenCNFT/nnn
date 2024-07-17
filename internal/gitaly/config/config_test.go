@@ -61,10 +61,10 @@ func TestLoadEmptyConfig(t *testing.T) {
 		PackObjectsCache:    defaultPackObjectsCacheConfig(),
 		PackObjectsLimiting: defaultPackObjectsLimiting(),
 	}
-	require.NoError(t, expectedCfg.SetDefaults())
+	require.NoError(t, expectedCfg.Sanitize())
 
 	// The runtime directory is a temporary path, so we need to take the value from the loaded
-	// config. Furthermore, because `SetDefaults()` would append the PID, we can't do so before
+	// config. Furthermore, because `Sanitize()` would append the PID, we can't do so before
 	// calling that function.
 	expectedCfg.RuntimeDir = cfg.RuntimeDir
 
@@ -125,7 +125,7 @@ upload_archive_negotiation = -10`,
 			cfg, err := Load(strings.NewReader(tc.InputTOML))
 			if tc.ExpectedLoadErr == nil {
 				require.NoError(t, err)
-				require.NoError(t, tc.ExpectedConfig.SetDefaults())
+				require.NoError(t, tc.ExpectedConfig.Sanitize())
 				require.Equal(t, tc.ExpectedConfig.Timeout, cfg.Timeout)
 			} else {
 				require.EqualError(t, err, tc.ExpectedLoadErr.Error())
@@ -149,7 +149,7 @@ relative_url_root = "/gitlab"`)
 			RelativeURLRoot: "/gitlab",
 		},
 	}
-	require.NoError(t, expectedCfg.SetDefaults())
+	require.NoError(t, expectedCfg.Sanitize())
 	require.Equal(t, expectedCfg.Gitlab, cfg.Gitlab)
 }
 
@@ -166,7 +166,7 @@ path = "/tmp/"`)
 			{Name: "default", Path: "/tmp"},
 		},
 	}
-	require.NoError(t, expectedCfg.SetDefaults())
+	require.NoError(t, expectedCfg.Sanitize())
 	require.Equal(t, expectedCfg.Storages, cfg.Storages)
 }
 
@@ -269,7 +269,7 @@ func TestLoadConfigCommand(t *testing.T) {
 			PackObjectsCache:    defaultPackObjectsCacheConfig(),
 			PackObjectsLimiting: defaultPackObjectsLimiting(),
 		}
-		require.NoError(t, cfg.SetDefaults())
+		require.NoError(t, cfg.Sanitize())
 		modify(cfg)
 		return *cfg
 	}
@@ -2910,6 +2910,6 @@ initial_members = {1 = "localhost:4001", 2 = "localhost:4002", 3 = "localhost:40
 			HeartbeatTicks:  0,
 		},
 	}
-	require.NoError(t, expectedCfg.SetDefaults())
+	require.NoError(t, expectedCfg.Sanitize())
 	require.Equal(t, expectedCfg.Raft, cfg.Raft)
 }
