@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
+	"gitlab.com/gitlab-org/labkit/correlation"
 )
 
 const (
@@ -169,9 +170,10 @@ func (c *GitlabNetClient) DoRequest(ctx context.Context, method, path string, da
 	response, err := c.httpClient.Do(request)
 
 	logger := c.logger.WithFields(log.Fields{
-		"method":      method,
-		"url":         request.URL.String(),
-		"duration_ms": time.Since(start) / time.Millisecond,
+		"method":              method,
+		"url":                 request.URL.String(),
+		"duration_ms":         time.Since(start) / time.Millisecond,
+		correlation.FieldName: correlation.ExtractFromContextOrGenerate(ctx),
 	})
 
 	if err != nil {
