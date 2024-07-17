@@ -6,9 +6,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	grpcmetadata "google.golang.org/grpc/metadata"
@@ -57,10 +59,16 @@ func TestWithRefHook(t *testing.T) {
 				}
 			}
 
-			require.EqualValues(t, []string{
+			expectedEnv := []string{
 				"GITALY_HOOKS_PAYLOAD",
 				"GITALY_LOG_DIR",
-			}, actualEnvVars)
+			}
+
+			if featureflag.LogServer.IsEnabled(ctx) {
+				expectedEnv = append(expectedEnv, log.EnvLogConfiguration)
+			}
+
+			require.EqualValues(t, expectedEnv, actualEnvVars)
 		})
 	}
 }

@@ -218,6 +218,21 @@ func runGitaly(tb testing.TB, cfg config.Cfg, registrar func(srv *grpc.Server, d
 		waitHealthy(tb, ctx, "unix://"+internalListener.Addr().String(), cfg.Auth.Token)
 	}
 
+	logger := testhelper.NewLogger(tb, testhelper.WithLoggerName("subprocess-logger"))
+	logServer, err := log.NewServer(logger, cfg.RuntimeDir, logger)
+	require.NoError(tb, err)
+
+	logServerFinished := make(chan struct{})
+	tb.Cleanup(func() {
+		defer func() { <-logServerFinished }()
+		require.NoError(tb, logServer.Close())
+	})
+
+	go func() {
+		defer close(logServerFinished)
+		assert.NoError(tb, logServer.Run())
+	}()
+
 	secure := cfg.TLS.CertPath != "" && cfg.TLS.KeyPath != ""
 
 	externalServer, err := serverFactory.CreateExternal(secure, serverOpts...)
