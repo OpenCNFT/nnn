@@ -380,6 +380,7 @@ func TestConfigParsing(t *testing.T) {
 				},
 				BackgroundVerification: DefaultBackgroundVerificationConfig(),
 				Yamux:                  DefaultYamuxConfig(),
+				Logging:                DefaultLoggingConfig(),
 			},
 		},
 		{
@@ -403,6 +404,7 @@ func TestConfigParsing(t *testing.T) {
 				},
 				BackgroundVerification: DefaultBackgroundVerificationConfig(),
 				Yamux:                  DefaultYamuxConfig(),
+				Logging:                DefaultLoggingConfig(),
 			},
 		},
 		{
