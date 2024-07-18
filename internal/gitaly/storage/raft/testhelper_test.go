@@ -42,6 +42,9 @@ func (m *testStateMachine) Open(stopc <-chan struct{}) (uint64, error) {
 }
 
 func (m *testStateMachine) Update(entries []statemachine.Entry) ([]statemachine.Entry, error) {
+	m.Lock()
+	defer m.Unlock()
+
 	var returnedEntries []statemachine.Entry
 	for _, entry := range entries {
 		req, err := anyProtoUnmarshal(entry.Cmd)
@@ -62,9 +65,7 @@ func (m *testStateMachine) Update(entries []statemachine.Entry) ([]statemachine.
 			},
 		})
 		m.index = raftID(entry.Index)
-		m.Lock()
 		m.entries = append(m.entries, req)
-		m.Unlock()
 	}
 	return returnedEntries, nil
 }
