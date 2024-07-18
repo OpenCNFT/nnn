@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/receivepack"
@@ -121,7 +120,7 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 	}()
 
 	transactionID := storage.ExtractTransactionID(ctx)
-	transactionsEnabled := transactionID > 0 && featureflag.TransactionProcReceive.IsEnabled(ctx)
+	transactionsEnabled := transactionID > 0
 	if transactionsEnabled {
 		repo := s.localrepo(req.GetRepository())
 		procReceiveCleanup, err := receivepack.RegisterProcReceiveHook(

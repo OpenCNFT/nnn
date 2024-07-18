@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/receivepack"
@@ -88,7 +87,7 @@ func (s *server) postReceivePack(
 	}
 
 	transactionID := storage.ExtractTransactionID(ctx)
-	transactionsEnabled := transactionID > 0 && featureflag.TransactionProcReceive.IsEnabled(ctx)
+	transactionsEnabled := transactionID > 0
 	if transactionsEnabled {
 		repo := s.localrepo(req.GetRepository())
 		procReceiveCleanup, err := receivepack.RegisterProcReceiveHook(

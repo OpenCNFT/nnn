@@ -309,12 +309,8 @@ func TestReceivePack_invalidGitconfig(t *testing.T) {
 
 func TestReceivePack_client(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.TransactionProcReceive).Run(t, testReceivePackClient)
-}
 
-func testReceivePackClient(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
+	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 	cfg.SocketPath = runSSHServer(t, cfg)
 
@@ -491,12 +487,8 @@ func TestReceivePack_customHookFailure(t *testing.T) {
 
 func TestReceivePack_hooks(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.TransactionProcReceive).Run(t, testReceivePackHooks)
-}
 
-func testReceivePackHooks(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
+	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 	cfg.SocketPath = runSSHServer(t, cfg)
 
@@ -535,12 +527,8 @@ func testReceivePackHooks(t *testing.T, ctx context.Context) {
 
 func TestReceivePack_hidesObjectPoolReferences(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.TransactionProcReceive).Run(t, testReceivePackHidesObjectPoolReferences)
-}
 
-func testReceivePackHidesObjectPoolReferences(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
+	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 	cfg.SocketPath = runSSHServer(t, cfg)
 
@@ -576,12 +564,8 @@ func testReceivePackHidesObjectPoolReferences(t *testing.T, ctx context.Context)
 
 func TestReceivePack_transactional(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.TransactionProcReceive).Run(t, testReceivePackTransactional)
-}
 
-func testReceivePackTransactional(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
+	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 
 	txManager := transaction.NewTrackingManager()
