@@ -13,9 +13,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -268,7 +268,7 @@ func mustWriteCustomHookDirectory(t *testing.T, files []testFile, dirName string
 	tmpDir := testhelper.TempDir(t)
 	hooksPath := filepath.Join(tmpDir, dirName)
 
-	err := os.Mkdir(hooksPath, perm.PrivateDir)
+	err := os.Mkdir(hooksPath, mode.Directory)
 	require.NoError(t, err)
 
 	for _, f := range files {

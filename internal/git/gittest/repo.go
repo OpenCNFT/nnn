@@ -14,8 +14,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -38,7 +38,7 @@ const (
 // InitRepoDir creates a temporary directory for a repo, without initializing it
 func InitRepoDir(tb testing.TB, storagePath, relativePath string) *gitalypb.Repository {
 	repoPath := filepath.Join(storagePath, relativePath, "..")
-	require.NoError(tb, os.MkdirAll(repoPath, perm.PrivateDir), "making repo parent dir")
+	require.NoError(tb, os.MkdirAll(repoPath, mode.Directory), "making repo parent dir")
 	return &gitalypb.Repository{
 		StorageName:   "default",
 		RelativePath:  relativePath,

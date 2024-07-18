@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/cgroups"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"golang.org/x/exp/slices"
 )
@@ -665,8 +665,8 @@ func TestPruneOldCgroups(t *testing.T) {
 					tc.cfg.HierarchyRoot,
 				)
 
-				require.NoError(t, os.MkdirAll(cpuRoot, perm.PrivateDir))
-				require.NoError(t, os.MkdirAll(memoryRoot, perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(cpuRoot, mode.Directory))
+				require.NoError(t, os.MkdirAll(memoryRoot, mode.Directory))
 
 				pid := tc.setup(t, tc.cfg, mock)
 
@@ -703,7 +703,7 @@ func TestPruneOldCgroups(t *testing.T) {
 					tc.cfg.Mountpoint,
 					tc.cfg.HierarchyRoot,
 				)
-				require.NoError(t, os.MkdirAll(root, perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(root, mode.Directory))
 
 				pid := tc.setup(t, tc.cfg, mock)
 
@@ -892,7 +892,7 @@ func readCgroupFile(t *testing.T, path string) []byte {
 	// The cgroups package defaults to permission 0 as it expects the file to be existing (the kernel creates the file)
 	// and its testing override the permission private variable to something sensible, hence we have to chmod ourselves
 	// so we can read the file.
-	require.NoError(t, os.Chmod(path, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.Chmod(path, mode.File))
 
 	return testhelper.MustReadFile(t, path)
 }

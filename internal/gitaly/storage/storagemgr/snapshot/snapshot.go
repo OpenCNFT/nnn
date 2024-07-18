@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 )
 
 // ModeReadOnlyDirectory is the mode given to directories in read-only snapshots.
@@ -109,7 +108,7 @@ func newSnapshot(ctx context.Context, rootPath, destinationPath string, relative
 // and their alternates.
 func createRepositorySnapshots(ctx context.Context, storagePath, snapshotPrefix string, relativePaths []string) error {
 	// Create the root directory always to as the storage would also exist always.
-	if err := os.Mkdir(filepath.Join(storagePath, snapshotPrefix), perm.PrivateDir); err != nil {
+	if err := os.Mkdir(filepath.Join(storagePath, snapshotPrefix), mode.Directory); err != nil {
 		return fmt.Errorf("mkdir snapshot root: %w", err)
 	}
 
@@ -181,7 +180,7 @@ func createRepositorySnapshot(ctx context.Context, repositoryPath, snapshotPath 
 	//
 	// The repository's directory itself is not yet created as whether it should be created depends on whether the
 	// repository exists or not.
-	if err := os.MkdirAll(filepath.Dir(snapshotPath), perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(snapshotPath), mode.Directory); err != nil {
 		return fmt.Errorf("create parent directory hierarchy: %w", err)
 	}
 

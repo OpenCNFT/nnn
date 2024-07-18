@@ -13,7 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPartitionID storage.PartitionID, relativePath string) []transactionTestCase {
@@ -125,12 +125,12 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						require.NoError(t, os.WriteFile(
 							filepath.Join(repoPath, "packed-refs.lock"),
 							[]byte{},
-							perm.PrivateWriteOnceFile,
+							mode.File,
 						))
 						require.NoError(t, os.WriteFile(
 							filepath.Join(repoPath, "packed-refs.new"),
 							[]byte{},
-							perm.PrivateWriteOnceFile,
+							mode.File,
 						))
 					},
 				},
@@ -761,7 +761,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						// the all directories even if the reference deletion was already applied.
 						require.NoError(tb, os.MkdirAll(
 							filepath.Join(storagePath, setup.RelativePath, "refs", "heads", "empty-dir"),
-							perm.PrivateDir,
+							mode.Directory,
 						))
 					},
 				},

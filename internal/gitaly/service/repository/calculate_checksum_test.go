@@ -13,7 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -199,7 +199,7 @@ func TestCalculateChecksum(t *testing.T) {
 					require.NoError(t, os.WriteFile(
 						filepath.Join(repoPath, "packed-refs"),
 						[]byte(fmt.Sprintf("# pack-refs with: peeled fully-peeled sorted\n%s refs/heads/broken:reference\n", commitID)),
-						perm.PrivateWriteOnceFile,
+						mode.File,
 					))
 				}
 

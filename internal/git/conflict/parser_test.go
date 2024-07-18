@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 func TestFile_Resolve(t *testing.T) {
@@ -112,7 +112,7 @@ we can both agree on this line though
 		t.Run(tt.name, func(t *testing.T) {
 			entry := Entry{
 				Path:     tt.path,
-				Mode:     uint(perm.SharedFile),
+				Mode:     uint(mode.File),
 				Contents: []byte("something-with-trailing-newline\n"),
 			}
 

@@ -22,6 +22,7 @@ package cgroups
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,7 +31,7 @@ import (
 	"github.com/containerd/cgroups/v3/cgroup1"
 	"github.com/stretchr/testify/require"
 	cgroupscfg "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/cgroups"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -78,7 +79,7 @@ func newMockV1(t *testing.T) *mockCgroupV1 {
 	require.NoError(t, err)
 
 	for _, s := range subsystems {
-		require.NoError(t, os.MkdirAll(filepath.Join(root, string(s.Name())), perm.PrivateDir))
+		require.NoError(t, os.MkdirAll(filepath.Join(root, string(s.Name())), mode.Directory))
 	}
 
 	return &mockCgroupV1{
@@ -130,7 +131,7 @@ func (m *mockCgroupV1) setupMockCgroupFiles(
 ) {
 	for _, s := range m.subsystems {
 		cgroupPath := filepath.Join(m.root, string(s.Name()), manager.currentProcessCgroup())
-		require.NoError(t, os.MkdirAll(cgroupPath, perm.PrivateDir))
+		require.NoError(t, os.MkdirAll(cgroupPath, mode.Directory))
 
 		content := map[string]string{}
 		for _, ic := range inputContent {
@@ -156,16 +157,16 @@ func (m *mockCgroupV1) setupMockCgroupFiles(
 
 		for filename, content := range content {
 			controlFilePath := filepath.Join(cgroupPath, filename)
-			require.NoError(t, os.WriteFile(controlFilePath, []byte(content), perm.SharedFile))
+			require.NoError(t, os.WriteFile(controlFilePath, []byte(content), fs.ModePerm))
 		}
 
 		for _, shard := range shards {
 			shardPath := filepath.Join(cgroupPath, fmt.Sprintf("repos-%d", shard))
-			require.NoError(t, os.MkdirAll(shardPath, perm.PrivateDir))
+			require.NoError(t, os.MkdirAll(shardPath, mode.Directory))
 
 			for filename, content := range content {
 				shardControlFilePath := filepath.Join(shardPath, filename)
-				require.NoError(t, os.WriteFile(shardControlFilePath, []byte(content), perm.SharedFile))
+				require.NoError(t, os.WriteFile(shardControlFilePath, []byte(content), fs.ModePerm))
 			}
 		}
 	}
@@ -240,25 +241,25 @@ func (m *mockCgroupV2) setupMockCgroupFiles(
 	}
 
 	cgroupPath := filepath.Join(m.root, manager.currentProcessCgroup())
-	require.NoError(t, os.MkdirAll(cgroupPath, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(cgroupPath, mode.Directory))
 
 	for filename, content := range content {
 		controlFilePath := filepath.Join(m.root, manager.cfg.HierarchyRoot, filename)
-		require.NoError(t, os.WriteFile(controlFilePath, []byte(content), perm.SharedFile))
+		require.NoError(t, os.WriteFile(controlFilePath, []byte(content), fs.ModePerm))
 	}
 
 	for filename, content := range content {
 		controlFilePath := filepath.Join(cgroupPath, filename)
-		require.NoError(t, os.WriteFile(controlFilePath, []byte(content), perm.SharedFile))
+		require.NoError(t, os.WriteFile(controlFilePath, []byte(content), fs.ModePerm))
 	}
 
 	for _, shard := range shards {
 		shardPath := filepath.Join(cgroupPath, fmt.Sprintf("repos-%d", shard))
-		require.NoError(t, os.MkdirAll(shardPath, perm.PrivateDir))
+		require.NoError(t, os.MkdirAll(shardPath, mode.Directory))
 
 		for filename, content := range content {
 			shardControlFilePath := filepath.Join(shardPath, filename)
-			require.NoError(t, os.WriteFile(shardControlFilePath, []byte(content), perm.SharedFile))
+			require.NoError(t, os.WriteFile(shardControlFilePath, []byte(content), fs.ModePerm))
 		}
 	}
 }

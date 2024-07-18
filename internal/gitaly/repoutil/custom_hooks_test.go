@@ -19,8 +19,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
@@ -43,9 +43,9 @@ func TestGetCustomHooks_successful(t *testing.T) {
 		"custom_hooks/prepare-commit-msg.sample",
 		"custom_hooks/pre-push.sample",
 	}
-	require.NoError(t, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), perm.PrivateDir), "Could not create custom_hooks dir")
+	require.NoError(t, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), mode.Directory), "Could not create custom_hooks dir")
 	for _, fileName := range expectedTarResponse[1:] {
-		require.NoError(t, os.WriteFile(filepath.Join(repoPath, fileName), []byte("Some hooks"), perm.PrivateExecutable), fmt.Sprintf("Could not create %s", fileName))
+		require.NoError(t, os.WriteFile(filepath.Join(repoPath, fileName), []byte("Some hooks"), mode.Executable), fmt.Sprintf("Could not create %s", fileName))
 	}
 
 	var hooks bytes.Buffer
@@ -133,9 +133,9 @@ func TestExtractHooks(t *testing.T) {
 		writeFile(writer, "custom_hooks/pre-receive", fs.ModePerm, "pre-receive content")
 		require.NoError(t, writer.WriteHeader(&tar.Header{
 			Name: "custom_hooks/subdirectory/",
-			Mode: int64(perm.PrivateDir),
+			Mode: int64(mode.Directory),
 		}))
-		writeFile(writer, "custom_hooks/subdirectory/supporting-file", perm.PrivateWriteOnceFile, "supporting-file content")
+		writeFile(writer, "custom_hooks/subdirectory/supporting-file", mode.File, "supporting-file content")
 		writeFile(writer, "ignored_file", fs.ModePerm, "ignored content")
 		writeFile(writer, "ignored_directory/ignored_file", fs.ModePerm, "ignored content")
 		defer testhelper.MustClose(t, writer)
@@ -192,8 +192,8 @@ func TestExtractHooks(t *testing.T) {
 				"/":                          {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/custom_hooks":              {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/custom_hooks/pre-receive":  {Mode: umask.Mask(fs.ModePerm), Content: []byte("pre-receive content")},
-				"/custom_hooks/subdirectory": {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
-				"/custom_hooks/subdirectory/supporting-file": {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte("supporting-file content")},
+				"/custom_hooks/subdirectory": {Mode: mode.Directory},
+				"/custom_hooks/subdirectory/supporting-file": {Mode: mode.File, Content: []byte("supporting-file content")},
 			},
 		},
 		{
@@ -203,8 +203,8 @@ func TestExtractHooks(t *testing.T) {
 			expectedState: testhelper.DirectoryState{
 				"/":                             {Mode: umask.Mask(fs.ModeDir | fs.ModePerm)},
 				"/pre-receive":                  {Mode: umask.Mask(fs.ModePerm), Content: []byte("pre-receive content")},
-				"/subdirectory":                 {Mode: umask.Mask(fs.ModeDir | perm.PrivateDir)},
-				"/subdirectory/supporting-file": {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte("supporting-file content")},
+				"/subdirectory":                 {Mode: mode.Directory},
+				"/subdirectory/supporting-file": {Mode: mode.File, Content: []byte("supporting-file content")},
 			},
 		},
 		{
@@ -324,34 +324,34 @@ func TestNewDirectoryVote(t *testing.T) {
 		{
 			desc: "generated hash matches",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateExecutable},
-				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: mode.Executable},
+				{name: "pre-push.sample", content: "bar", mode: mode.Executable},
 			},
-			expectedHash: "3c0fd54e0428c5ee04c15ee5a52864694771fb20",
+			expectedHash: "edf456d64829c9519bd692d5f6a9695c4cca7d17",
 		},
 		{
 			desc: "generated hash matches with changed file name",
 			files: []testFile{
-				{name: "pre-commit.sample.diff", content: "foo", mode: perm.PrivateExecutable},
-				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample.diff", content: "foo", mode: mode.Executable},
+				{name: "pre-push.sample", content: "bar", mode: mode.Executable},
 			},
-			expectedHash: "2d5080ef5ed0a52254a794915c8fbbec8c694224",
+			expectedHash: "70c2821e79862399f6fe68c858ec3df20282530a",
 		},
 		{
 			desc: "generated hash matches with changed file content",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.PrivateExecutable},
-				{name: "pre-push.sample", content: "bar.diff", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: mode.Executable},
+				{name: "pre-push.sample", content: "bar.diff", mode: mode.Executable},
 			},
-			expectedHash: "18e2d3f9cc9990747b27cf8a7fad281539856194",
+			expectedHash: "be06b7a1f74928aa53c5751d8f9b066aa4b09222",
 		},
 		{
 			desc: "generated hash matches with changed file mode",
 			files: []testFile{
-				{name: "pre-commit.sample", content: "foo", mode: perm.SharedFile},
-				{name: "pre-push.sample", content: "bar", mode: perm.PrivateExecutable},
+				{name: "pre-commit.sample", content: "foo", mode: mode.File},
+				{name: "pre-push.sample", content: "bar", mode: mode.Executable},
 			},
-			expectedHash: "c81ab4e8cca863a4e8d24c080d3daefcf5f0f8aa",
+			expectedHash: "88e59654d920c86ad17286e59fbce4b70eaaea67",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -375,7 +375,7 @@ func mustWriteCustomHookDirectory(t *testing.T, files []testFile, dirName string
 	tmpDir := testhelper.TempDir(t)
 	hooksPath := filepath.Join(tmpDir, dirName)
 
-	err := os.Mkdir(hooksPath, perm.PrivateDir)
+	err := os.Mkdir(hooksPath, mode.Directory)
 	require.NoError(t, err)
 
 	for _, f := range files {

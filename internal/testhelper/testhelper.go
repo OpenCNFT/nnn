@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"golang.org/x/exp/slices"
@@ -117,7 +118,7 @@ func WriteFiles(tb testing.TB, root string, files map[string]any) {
 	for name, value := range files {
 		path := filepath.Join(root, name)
 
-		require.NoError(tb, os.MkdirAll(filepath.Dir(path), perm.PrivateDir))
+		require.NoError(tb, os.MkdirAll(filepath.Dir(path), mode.Directory))
 
 		switch content := value.(type) {
 		case string:
@@ -312,7 +313,7 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 func CreateGlobalDirectory(tb testing.TB, name string) string {
 	require.NotEmpty(tb, testDirectory, "global temporary directory does not exist")
 	path := filepath.Join(testDirectory, name)
-	require.NoError(tb, os.Mkdir(path, perm.PrivateDir))
+	require.NoError(tb, os.Mkdir(path, mode.Directory))
 	return path
 }
 
@@ -340,7 +341,7 @@ type Cleanup func()
 // executable.
 func WriteExecutable(tb testing.TB, path string, content []byte) string {
 	dir := filepath.Dir(path)
-	require.NoError(tb, os.MkdirAll(dir, perm.PrivateDir))
+	require.NoError(tb, os.MkdirAll(dir, mode.Directory))
 	tb.Cleanup(func() {
 		assert.NoError(tb, os.RemoveAll(dir))
 	})
@@ -354,7 +355,7 @@ func WriteExecutable(tb testing.TB, path string, content []byte) string {
 	//
 	// We thus need to perform file locking to ensure that all writeable references to this
 	// file have been closed before returning.
-	executable, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, perm.PrivateExecutable)
+	executable, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode.Executable)
 	require.NoError(tb, err)
 	_, err = io.Copy(executable, bytes.NewReader(content))
 	require.NoError(tb, err)

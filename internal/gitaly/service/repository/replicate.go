@@ -16,11 +16,11 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tempdir"
@@ -352,7 +352,7 @@ func (s *server) syncGitconfig(ctx context.Context, source, target *gitalypb.Rep
 	}
 
 	configPath := filepath.Join(repoPath, "config")
-	if err := s.writeFile(ctx, configPath, perm.SharedFile, streamio.NewReader(func() ([]byte, error) {
+	if err := s.writeFile(ctx, configPath, streamio.NewReader(func() ([]byte, error) {
 		resp, err := stream.Recv()
 		return resp.GetData(), err
 	})); err != nil {
@@ -362,15 +362,15 @@ func (s *server) syncGitconfig(ctx context.Context, source, target *gitalypb.Rep
 	return nil
 }
 
-func (s *server) writeFile(ctx context.Context, path string, mode os.FileMode, reader io.Reader) (returnedErr error) {
+func (s *server) writeFile(ctx context.Context, path string, reader io.Reader) (returnedErr error) {
 	parentDir := filepath.Dir(path)
-	if err := os.MkdirAll(parentDir, perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(parentDir, mode.Directory); err != nil {
 		return err
 	}
 
 	lockedFile, err := safe.NewLockingFileWriter(path, safe.LockingFileWriterConfig{
 		FileWriterConfig: safe.FileWriterConfig{
-			FileMode: mode,
+			FileMode: mode.File,
 		},
 	})
 	if err != nil {

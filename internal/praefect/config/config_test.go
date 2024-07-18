@@ -16,8 +16,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/sentry"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -930,7 +930,7 @@ func TestConfig_ValidateV2(t *testing.T) {
 	t.Run("invalid", func(t *testing.T) {
 		tmpDir := testhelper.TempDir(t)
 		tmpFile := filepath.Join(tmpDir, "file")
-		require.NoError(t, os.WriteFile(tmpFile, nil, perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(tmpFile, nil, mode.File))
 		cfg := Config{
 			BackgroundVerification: BackgroundVerification{
 				VerificationInterval: duration.Duration(-1),
@@ -1026,7 +1026,7 @@ func TestConfig_ConfigCommand(t *testing.T) {
 			desc: "command points to non-executable file",
 			setup: func(t *testing.T) setupData {
 				cmd := filepath.Join(testhelper.TempDir(t), "script")
-				require.NoError(t, os.WriteFile(cmd, nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(cmd, nil, mode.File))
 
 				return setupData{
 					cfg: Config{

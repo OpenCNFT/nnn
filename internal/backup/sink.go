@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gocloud.dev/blob"
 	"gocloud.dev/blob/azureblob"
 	"gocloud.dev/blob/fileblob"
@@ -72,7 +72,7 @@ func newFileblobSink(path string) (*StorageServiceSink, error) {
 		if !os.IsNotExist(err) {
 			return nil, fmt.Errorf("stat sink path: %w", err)
 		}
-		if err := os.MkdirAll(path, perm.PrivateDir); err != nil {
+		if err := os.MkdirAll(path, mode.Directory); err != nil {
 			return nil, fmt.Errorf("creating sink directory: %w", err)
 		}
 	}

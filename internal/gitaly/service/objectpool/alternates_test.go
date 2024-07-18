@@ -8,7 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -93,7 +93,7 @@ func TestDisconnectGitAlternatesUnexpectedAlternates(t *testing.T) {
 
 			altPath, err := repo.InfoAlternatesPath(ctx)
 			require.NoError(t, err)
-			require.NoError(t, os.WriteFile(altPath, []byte(tc.altContent), perm.SharedFile))
+			require.NoError(t, os.WriteFile(altPath, []byte(tc.altContent), mode.File))
 
 			_, err = client.DisconnectGitAlternates(ctx, &gitalypb.DisconnectGitAlternatesRequest{Repository: repoProto})
 			require.Error(t, err)

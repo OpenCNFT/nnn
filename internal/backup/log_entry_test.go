@@ -3,7 +3,6 @@ package backup
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,9 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -255,8 +254,6 @@ func TestLogEntryArchiver(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			umask := testhelper.Umask()
-
 			entryRootPath := testhelper.TempDir(t)
 
 			archivePath := testhelper.TempDir(t)
@@ -329,23 +326,23 @@ func TestLogEntryArchiver(t *testing.T) {
 			wg.Wait()
 
 			cmpDir := testhelper.TempDir(t)
-			require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), perm.PrivateDir))
+			require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), mode.Directory))
 
 			for info, manager := range accessor.managers {
 				lastAck := manager.acknowledged[len(manager.acknowledged)-1]
 				require.Equal(t, tc.finalLSN, lastAck)
 
 				partitionDir := partitionPath(cmpDir, info.storageName, info.partitionID)
-				require.NoError(t, os.Mkdir(partitionDir, perm.PrivateDir))
+				require.NoError(t, os.Mkdir(partitionDir, mode.Directory))
 
 				for _, lsn := range manager.acknowledged {
 					tarPath := filepath.Join(partitionPath(archivePath, info.storageName, info.partitionID), lsn.String()+".tar")
 					archive, err := os.Open(tarPath)
 					require.NoError(t, err)
 					testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
-						lsn.String() + "/":                          {Mode: umask.Mask(perm.PrivateDir)},
-						filepath.Join(lsn.String(), "LSN"):          {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(lsn.String())},
-						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+						lsn.String() + "/":                          {Mode: mode.Directory.Perm()},
+						filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
+						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 					})
 				}
 			}
@@ -366,8 +363,6 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(testhelper.Context(t))
 	defer cancel()
-
-	umask := testhelper.Umask()
 
 	const lsn = storage.LSN(1)
 	const workerCount = 1
@@ -444,16 +439,16 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 
 	cmpDir := testhelper.TempDir(t)
 	partitionDir := partitionPath(cmpDir, info.storageName, info.partitionID)
-	require.NoError(t, os.MkdirAll(partitionDir, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(partitionDir, mode.Directory))
 
 	tarPath := filepath.Join(partitionPath(archivePath, info.storageName, info.partitionID), lsn.String()) + ".tar"
 	archive, err := os.Open(tarPath)
 	require.NoError(t, err)
 
 	testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
-		lsn.String() + "/":                          {Mode: umask.Mask(perm.PrivateDir)},
-		filepath.Join(lsn.String(), "LSN"):          {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(lsn.String())},
-		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: umask.Mask(perm.PrivateWriteOnceFile), Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+		lsn.String() + "/":                          {Mode: mode.Directory.Perm()},
+		filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
+		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 	})
 
 	require.NoError(t, testutil.CollectAndCompare(
@@ -470,12 +465,12 @@ func createEntryDir(t *testing.T, entryRootPath string, storageName string, part
 	t.Helper()
 
 	partitionPath := partitionPath(entryRootPath, storageName, partitionID)
-	require.NoError(t, os.MkdirAll(partitionPath, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(partitionPath, mode.Directory))
 
 	testhelper.CreateFS(t, filepath.Join(partitionPath, lsn.String()), fstest.MapFS{
-		".":            {Mode: fs.ModeDir | perm.PrivateDir},
-		"LSN":          {Mode: perm.PrivateWriteOnceFile, Data: []byte(lsn.String())},
-		"PARTITION_ID": {Mode: perm.PrivateWriteOnceFile, Data: []byte(fmt.Sprintf("%d", partitionID))},
+		".":            {Mode: mode.Directory},
+		"LSN":          {Mode: mode.File, Data: []byte(lsn.String())},
+		"PARTITION_ID": {Mode: mode.File, Data: []byte(fmt.Sprintf("%d", partitionID))},
 	})
 }
 

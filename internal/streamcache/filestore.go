@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/dontpanic"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
@@ -106,11 +107,11 @@ func (fs *filestore) Create() (namedWriteCloser, error) {
 	)
 
 	path := filepath.Join(fs.dir, fmt.Sprintf("%02x", uint8(fileID)), name)
-	if err := os.MkdirAll(filepath.Dir(path), perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), mode.Directory); err != nil {
 		return nil, fmt.Errorf("Create: mkdir: %w", err)
 	}
 
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm.SharedFile)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode.File)
 	if err != nil {
 		return nil, fmt.Errorf("Create: %w", err)
 	}

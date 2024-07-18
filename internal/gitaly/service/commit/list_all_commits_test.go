@@ -13,8 +13,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -120,7 +120,7 @@ func TestListAllCommits(t *testing.T) {
 				gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("unquarantined"))
 
 				quarantineDir := filepath.Join("objects", "incoming-123456")
-				require.NoError(t, os.Mkdir(filepath.Join(repoPath, quarantineDir), perm.PrivateDir))
+				require.NoError(t, os.Mkdir(filepath.Join(repoPath, quarantineDir), mode.Directory))
 
 				repo.GitObjectDirectory = quarantineDir
 				repo.GitAlternateObjectDirectories = nil
@@ -139,7 +139,7 @@ func TestListAllCommits(t *testing.T) {
 				gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("unquarantined"))
 
 				quarantineDir := filepath.Join("objects", "incoming-123456")
-				require.NoError(t, os.Mkdir(filepath.Join(repoPath, quarantineDir), perm.PrivateDir))
+				require.NoError(t, os.Mkdir(filepath.Join(repoPath, quarantineDir), mode.Directory))
 
 				repo.GitObjectDirectory = quarantineDir
 				repo.GitAlternateObjectDirectories = nil
