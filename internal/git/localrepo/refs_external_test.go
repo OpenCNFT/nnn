@@ -20,8 +20,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/hook"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -179,7 +179,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 			require.NoError(t, updater.Prepare())
 			t.Cleanup(func() { require.NoError(t, updater.Close()) })
 		} else {
-			require.NoError(t, os.WriteFile(filepath.Join(repoPath, "HEAD.lock"), []byte(""), perm.SharedFile))
+			require.NoError(t, os.WriteFile(filepath.Join(repoPath, "HEAD.lock"), []byte(""), mode.File))
 		}
 
 		err = repo.SetDefaultBranch(ctx, &transaction.MockManager{}, "refs/heads/branch")

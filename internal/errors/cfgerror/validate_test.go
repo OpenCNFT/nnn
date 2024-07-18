@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -122,7 +122,7 @@ func TestDirExists(t *testing.T) {
 	t.Parallel()
 
 	filePath := filepath.Join(testhelper.TempDir(t), "tmp-file")
-	require.NoError(t, os.WriteFile(filePath, []byte{}, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(filePath, []byte{}, mode.File))
 	existing := testhelper.TempDir(t)
 	notExisting := filepath.Join(existing, "bad")
 
@@ -140,7 +140,7 @@ func TestFileExists(t *testing.T) {
 
 	dir := testhelper.TempDir(t)
 	existing := filepath.Join(dir, "tmp-file")
-	require.NoError(t, os.WriteFile(existing, []byte{}, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(existing, []byte{}, mode.File))
 	notExisting := filepath.Join(dir, "bad")
 
 	require.NoError(t, FileExists(existing))

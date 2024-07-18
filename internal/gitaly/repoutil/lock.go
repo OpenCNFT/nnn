@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -26,7 +26,7 @@ func Lock(ctx context.Context, logger log.Logger, locator storage.Locator, repos
 	}
 
 	// Create the parent directory in case it doesn't exist yet.
-	if err := os.MkdirAll(filepath.Dir(path), perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), mode.Directory); err != nil {
 		return nil, structerr.NewInternal("create directories: %w", err)
 	}
 

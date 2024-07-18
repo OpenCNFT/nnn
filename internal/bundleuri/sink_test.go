@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -98,8 +98,8 @@ func TestSink_SignedURL(t *testing.T) {
 			desc: "signs bundle successfully",
 			setup: func(t *testing.T, sinkDir string, sink *Sink) {
 				path := filepath.Join(sinkDir, sink.relativePath(repo, "default"))
-				require.NoError(t, os.MkdirAll(filepath.Dir(path), perm.PrivateDir))
-				require.NoError(t, os.WriteFile(path, []byte("hello"), perm.SharedFile))
+				require.NoError(t, os.MkdirAll(filepath.Dir(path), mode.Directory))
+				require.NoError(t, os.WriteFile(path, []byte("hello"), mode.File))
 			},
 		},
 		{

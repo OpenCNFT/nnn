@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -255,7 +255,7 @@ func TestPruneEmptyConfigSections(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			require.NoError(t, os.WriteFile(configPath, []byte(tc.configData), perm.SharedFile))
+			require.NoError(t, os.WriteFile(configPath, []byte(tc.configData), mode.File))
 
 			skippedSections, err := PruneEmptyConfigSections(ctx, repo)
 			require.NoError(t, err)
@@ -364,7 +364,7 @@ func TestRemoveGitLabFullPathConfig(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			require.NoError(t, os.WriteFile(configPath, []byte(tc.configData), perm.SharedFile))
+			require.NoError(t, os.WriteFile(configPath, []byte(tc.configData), mode.File))
 
 			cleanupCount, err := removeGitLabFullPathConfig(ctx, repo, &transaction.MockManager{})
 			require.NoError(t, err)

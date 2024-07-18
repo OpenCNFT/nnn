@@ -30,7 +30,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -923,7 +923,6 @@ func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction,
 
 func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCase, setup testTransactionSetup) {
 	logger := testhelper.NewLogger(t)
-	umask := testhelper.Umask()
 
 	storageName := setup.Config.Storages[0].Name
 	storageScopedFactory, err := setup.RepositoryFactory.ScopeByStorage(ctx, storageName)
@@ -943,7 +942,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	stateDir := filepath.Join(storagePath, "state")
 
 	stagingDir := filepath.Join(storagePath, "staging")
-	require.NoError(t, os.Mkdir(stagingDir, perm.PrivateDir))
+	require.NoError(t, os.Mkdir(stagingDir, mode.Directory))
 
 	newMetrics := func() transactionManagerMetrics {
 		m := newMetrics(setup.Config.Prometheus)
@@ -1002,7 +1001,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			// to clean up any stale state leftover by crashes. Do that here as well so the tests don't fail if we don't
 			// finish transactions after crash simulations.
 			require.NoError(t, os.RemoveAll(stagingDir))
-			require.NoError(t, os.Mkdir(stagingDir, perm.PrivateDir))
+			require.NoError(t, os.Mkdir(stagingDir, mode.Directory))
 
 			transactionManager = NewTransactionManager(setup.PartitionID, logger, database, setup.Config.Storages[0].Name, storagePath, stateDir, stagingDir, setup.CommandFactory, storageScopedFactory, newMetrics(), setup.Consumer)
 			installHooks(transactionManager, &inflightTransactions, step.Hooks)
@@ -1101,11 +1100,10 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						transaction.stagingDirectory,
 						transaction.quarantineDirectory,
 					} {
-						const expectedPerm = perm.PrivateDir
 						stat, err := os.Stat(dir)
 						require.NoError(t, err)
-						require.Equal(t, stat.Mode().Perm(), umask.Mask(expectedPerm),
-							"%q had %q permission but expected %q", dir, stat.Mode().Perm().String(), expectedPerm,
+						require.Equal(t, stat.Mode(), mode.Directory,
+							"%q had %q mode but expected %q", dir, stat.Mode(), mode.Directory,
 						)
 					}
 
@@ -1425,8 +1423,8 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		// Set the base state as the default so we don't have to repeat it in every test case but it
 		// gets asserted.
 		expectedDirectory = testhelper.DirectoryState{
-			"/":    {Mode: fs.ModeDir | perm.PrivateDir},
-			"/wal": {Mode: fs.ModeDir | perm.PrivateDir},
+			"/":    {Mode: mode.Directory},
+			"/wal": {Mode: mode.Directory},
 		}
 	}
 
@@ -1435,13 +1433,13 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	testhelper.RequireDirectoryState(t, stateDir, "", expectedDirectory)
 
 	expectedStagingDirState := testhelper.DirectoryState{
-		"/": {Mode: fs.ModeDir | perm.PrivateDir},
+		"/": {Mode: mode.Directory},
 	}
 
 	// Snapshots directory may not exist if the manager failed to initialize. Check if it exists, and if so,
 	// ensure that it is empty.
 	if _, err := os.Stat(transactionManager.snapshotsDir()); err == nil {
-		expectedStagingDirState["/snapshots"] = testhelper.DirectoryEntry{Mode: fs.ModeDir | perm.PrivateDir}
+		expectedStagingDirState["/snapshots"] = testhelper.DirectoryEntry{Mode: mode.Directory}
 	} else {
 		require.ErrorIs(t, err, fs.ErrNotExist)
 	}

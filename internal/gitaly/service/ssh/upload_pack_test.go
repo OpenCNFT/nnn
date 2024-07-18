@@ -21,9 +21,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -835,7 +835,7 @@ func testUploadPackGitFailure(t *testing.T, ctx context.Context) {
 	// Remove the config file first as files are read-only with transactions.
 	configPath := filepath.Join(repoPath, "config")
 	require.NoError(t, os.Remove(configPath))
-	require.NoError(t, os.WriteFile(configPath, []byte("Not a valid gitconfig"), perm.SharedFile))
+	require.NoError(t, os.WriteFile(configPath, []byte("Not a valid gitconfig"), mode.File))
 
 	stream, err := client.SSHUploadPack(ctx)
 	require.NoError(t, err)

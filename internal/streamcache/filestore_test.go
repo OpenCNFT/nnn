@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -107,9 +107,9 @@ func TestFilestoreCleanwalk(t *testing.T) {
 	dir1 := filepath.Join(tmp, "dir1")
 	dir2 := filepath.Join(tmp, "dir2")
 	file := filepath.Join(dir2, "file")
-	require.NoError(t, os.Mkdir(dir1, perm.PrivateDir))
-	require.NoError(t, os.Mkdir(dir2, perm.PrivateDir))
-	require.NoError(t, os.WriteFile(file, nil, perm.SharedFile))
+	require.NoError(t, os.Mkdir(dir1, mode.Directory))
+	require.NoError(t, os.Mkdir(dir2, mode.Directory))
+	require.NoError(t, os.WriteFile(file, nil, mode.File))
 	require.NoError(t, os.Chmod(dir2, 0), "create dir with pathological permissions")
 
 	require.NoError(t, fs.cleanWalk(time.Now().Add(time.Hour)))
@@ -118,7 +118,7 @@ func TestFilestoreCleanwalk(t *testing.T) {
 		fi, err := os.Stat(d)
 		require.NoError(t, err, "directories do not get deleted")
 
-		const mask = perm.PrivateDir
+		const mask = mode.Directory
 		require.True(t, fi.Mode()&mask >= mask, "unexpected file mode %o", fi.Mode())
 	}
 

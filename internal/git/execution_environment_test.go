@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -74,7 +74,7 @@ func TestBundledGitEnvironmentConstructor(t *testing.T) {
 	seedDirWithExecutables := func(t *testing.T, executableNames ...string) string {
 		dir := testhelper.TempDir(t)
 		for _, executableName := range executableNames {
-			require.NoError(t, os.WriteFile(filepath.Join(dir, executableName), nil, perm.PrivateExecutable))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, executableName), nil, mode.Executable))
 		}
 		return dir
 	}
@@ -242,7 +242,7 @@ func TestFallbackGitEnvironmentConstructor(t *testing.T) {
 	t.Run("successfully resolved executable", func(t *testing.T) {
 		tempDir := testhelper.TempDir(t)
 		gitPath := filepath.Join(tempDir, "git")
-		require.NoError(t, os.WriteFile(gitPath, nil, perm.PrivateExecutable))
+		require.NoError(t, os.WriteFile(gitPath, nil, mode.Executable))
 
 		t.Setenv("PATH", "/does/not/exist:"+tempDir)
 

@@ -15,7 +15,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/dontpanic"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
 func (c *DiskCache) logWalkErr(err error, path, msg string) {
@@ -154,7 +154,7 @@ func (c *DiskCache) moveAndClear(storage config.Storage) error {
 		return fmt.Errorf("temp dir: %w", err)
 	}
 
-	if err := os.MkdirAll(tempPath, perm.PrivateDir); err != nil {
+	if err := os.MkdirAll(tempPath, mode.Directory); err != nil {
 		return err
 	}
 

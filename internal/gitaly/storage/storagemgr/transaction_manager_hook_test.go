@@ -1,14 +1,12 @@
 package storagemgr
 
 import (
-	"io/fs"
 	"sync"
 	"testing"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -80,8 +78,8 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					string(keyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
-					"/":    {Mode: fs.ModeDir | perm.PrivateDir},
-					"/wal": {Mode: fs.ModeDir | perm.PrivateDir},
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
 				},
 			},
 		},
@@ -117,8 +115,8 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
-					"/":    {Mode: fs.ModeDir | perm.PrivateDir},
-					"/wal": {Mode: fs.ModeDir | perm.PrivateDir},
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -191,8 +189,8 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					string(keyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
-					"/":    {Mode: fs.ModeDir | perm.PrivateDir},
-					"/wal": {Mode: fs.ModeDir | perm.PrivateDir},
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
 				},
 			},
 		},

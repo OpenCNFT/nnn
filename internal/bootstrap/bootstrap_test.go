@@ -12,8 +12,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -78,7 +78,7 @@ func TestBootstrap_unixListener(t *testing.T) {
 			require.NoError(t, err)
 
 			if tc.preexistingSocket {
-				require.NoError(t, os.WriteFile(socketPath, nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(socketPath, nil, mode.File))
 			}
 
 			listener, err := b.listen("unix", socketPath)
