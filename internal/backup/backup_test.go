@@ -426,11 +426,11 @@ func TestManager_Restore_latest(t *testing.T) {
 
 	for _, managerTC := range []struct {
 		desc  string
-		setup func(t testing.TB, sink backup.Sink, locator backup.Locator, logger log.LogrusLogger) *backup.Manager
+		setup func(t testing.TB, sink backup.Sink, locator backup.Locator, logger log.Logger) *backup.Manager
 	}{
 		{
 			desc: "RPC manager",
-			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.LogrusLogger) *backup.Manager {
+			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.Logger) *backup.Manager {
 				pool := client.NewPool()
 				tb.Cleanup(func() {
 					testhelper.MustClose(tb, pool)
@@ -441,7 +441,7 @@ func TestManager_Restore_latest(t *testing.T) {
 		},
 		{
 			desc: "Local manager",
-			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.LogrusLogger) *backup.Manager {
+			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.Logger) *backup.Manager {
 				if testhelper.IsPraefectEnabled() {
 					tb.Skip("local backup manager expects to operate on the local filesystem so cannot operate through praefect")
 				}
@@ -819,11 +819,11 @@ func TestManager_Restore_specific(t *testing.T) {
 
 	for _, managerTC := range []struct {
 		desc  string
-		setup func(t testing.TB, sink backup.Sink, locator backup.Locator, logger log.LogrusLogger) *backup.Manager
+		setup func(t testing.TB, sink backup.Sink, locator backup.Locator, logger log.Logger) *backup.Manager
 	}{
 		{
 			desc: "RPC manager",
-			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.LogrusLogger) *backup.Manager {
+			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.Logger) *backup.Manager {
 				pool := client.NewPool()
 				tb.Cleanup(func() {
 					testhelper.MustClose(tb, pool)
@@ -834,7 +834,7 @@ func TestManager_Restore_specific(t *testing.T) {
 		},
 		{
 			desc: "Local manager",
-			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.LogrusLogger) *backup.Manager {
+			setup: func(tb testing.TB, sink backup.Sink, locator backup.Locator, logger log.Logger) *backup.Manager {
 				if testhelper.IsPraefectEnabled() {
 					tb.Skip("local backup manager expects to operate on the local filesystem so cannot operate through praefect")
 				}
