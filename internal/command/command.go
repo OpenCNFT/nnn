@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -147,10 +148,13 @@ type Command struct {
 	context      context.Context
 	startTime    time.Time
 
-	waitError       error
-	waitOnce        sync.Once
-	teardownOnce    sync.Once
-	processExitedCh chan struct{}
+	waitError    error
+	waitOnce     sync.Once
+	teardownOnce sync.Once
+	// subprocessLoggerDone is closed once the subprocess log consuming
+	// goroutine has finished.
+	subprocessLoggerDone chan struct{}
+	processExitedCh      chan struct{}
 
 	finalizers []func(context.Context, *Command)
 
@@ -165,7 +169,7 @@ type Command struct {
 // New creates a Command from the given executable name and arguments On success, the Command
 // contains a running subprocess. When ctx is canceled the embedded process will be terminated and
 // reaped automatically.
-func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...Option) (*Command, error) {
+func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...Option) (_ *Command, returnedErr error) {
 	if ctx.Done() == nil {
 		panic("command spawned with context without Done() channel")
 	}
@@ -235,16 +239,17 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	cmd := exec.Command(nameAndArgs[0], nameAndArgs[1:]...)
 
 	command := &Command{
-		logger:          logger,
-		cmd:             cmd,
-		startTime:       time.Now(),
-		context:         ctx,
-		span:            span,
-		finalizers:      cfg.finalizers,
-		metricsCmd:      cfg.commandName,
-		metricsSubCmd:   cfg.subcommandName,
-		cmdGitVersion:   cfg.gitVersion,
-		processExitedCh: make(chan struct{}),
+		logger:               logger,
+		cmd:                  cmd,
+		startTime:            time.Now(),
+		context:              ctx,
+		span:                 span,
+		finalizers:           cfg.finalizers,
+		metricsCmd:           cfg.commandName,
+		metricsSubCmd:        cfg.subcommandName,
+		cmdGitVersion:        cfg.gitVersion,
+		subprocessLoggerDone: make(chan struct{}),
+		processExitedCh:      make(chan struct{}),
 	}
 
 	cmd.Dir = cfg.dir
@@ -255,6 +260,65 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	cmd.Env = append(cmd.Env, cfg.environment...)
 	// And finally inject environment variables required for tracing into the command.
 	cmd.Env = envInjector(ctx, cmd.Env)
+
+	if (cfg.logConfiguration != log.Config{}) {
+		// Create a pipe the process will send its logs over.
+		logReader, logWriter, err := os.Pipe()
+		if err != nil {
+			return nil, fmt.Errorf("create log pipe: %w", err)
+		}
+		defer func() {
+			// Close the file descriptor after spawning the command as we're not
+			// the ones writing into it.
+			if err := logWriter.Close(); err != nil {
+				returnedErr = errors.Join(returnedErr, fmt.Errorf("close log writer: %w", err))
+			}
+
+			// If the command failed to be setup, it won't be waited on. Ensure
+			// the logger has stopped before returning to clean up.
+			if returnedErr != nil {
+				// Close the reader to ensure the log consuming goroutine returns if the setup
+				// fails after spawning the command. This shouldn't actually be needed as we close
+				// our file descriptor for the write end of the pipe. If the child isn't started
+				// or is terminated, there would be no open writers on the pipe and we'd receive
+				// an EOF. However, New() is leaking child processes if the cgroup setup fails after
+				// the child process was started. Once we no longer leave child processes running
+				// when returning from New() with an error, we can remove this.
+				//
+				// Issue: https://gitlab.com/gitlab-org/gitaly/-/issues/6228
+				if err := logReader.Close(); err != nil {
+					returnedErr = errors.Join(returnedErr, fmt.Errorf("close log reader: %w", err))
+				}
+
+				<-command.subprocessLoggerDone
+			}
+		}()
+
+		// Pass the log writer to the command so it can write logs to it.
+		cmd.ExtraFiles = append(cmd.ExtraFiles, logWriter)
+		loggerEnv, err := envSubprocessLoggerConfiguration(subprocessConfiguration{
+			// The first three file descriptors, indexed from zero, are
+			// stdin, stdout and stderr. The log file descriptor is the
+			// last one in the extra files.
+			FileDescriptor: uintptr(2 + len(cmd.ExtraFiles)),
+			Config:         cfg.logConfiguration,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("subprocess logger env: %w", err)
+		}
+		cmd.Env = append(cmd.Env, loggerEnv)
+
+		go func() {
+			defer close(command.subprocessLoggerDone)
+			if err := command.handleSubprocessLogs(logReader); err != nil {
+				logger.WithError(err).Error("failed handling subprocess logs")
+			}
+		}()
+	} else {
+		// If subprocess logger wasn't enabled, close the channel immediately as
+		// we don't have a log consuming goroutine to wait for.
+		close(command.subprocessLoggerDone)
+	}
 
 	// Start the command in its own process group (nice for signalling)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -369,6 +433,41 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	return command, nil
 }
 
+// handleSubprocessLogs consumes logs from the command. The command is passed a pipe which
+// is connected to logReader. It sends fully formatted logs over the pipe to Gitaly. Here
+// we read those logs and output them to the general log output.
+func (c *Command) handleSubprocessLogs(logReader io.ReadCloser) (returnedErr error) {
+	defer func() {
+		if err := logReader.Close(); err != nil {
+			returnedErr = errors.Join(returnedErr, fmt.Errorf("close log reader: %w", err))
+		}
+	}()
+
+	r := bufio.NewReader(logReader)
+	for {
+		line, err := r.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if len(line) != 0 {
+					// Partial lines without a line ending must not be logged. They
+					// would only occur if the subprocess is killed before outputting
+					// the proper log line and would lead to possibly printing invalid
+					// JSON in the logs.
+					return fmt.Errorf("incomplete log line: %q", line)
+				}
+
+				return nil
+			}
+
+			return fmt.Errorf("read line: %w", err)
+		}
+
+		if _, err := c.logger.Output().Write(line); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+	}
+}
+
 // Read calls Read() on the stdout pipe of the command.
 func (c *Command) Read(p []byte) (int, error) {
 	if c.reader == nil {
@@ -403,6 +502,7 @@ func (c *Command) Wait() error {
 // This function should never be called directly, use Wait().
 func (c *Command) wait() {
 	defer close(c.processExitedCh)
+	defer func() { <-c.subprocessLoggerDone }()
 
 	c.teardownStandardStreams()
 	c.waitError = c.cmd.Wait()

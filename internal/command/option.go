@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
 type config struct {
@@ -23,6 +24,9 @@ type config struct {
 	cgroupsManager        cgroups.Manager
 	cgroupsAddCommandOpts []cgroups.AddCommandOption
 	spawnTokenManager     *SpawnTokenManager
+	// logConfiguration contains the logging configuration to pass to the
+	// command if subprocess logging is in use.
+	logConfiguration log.Config
 }
 
 // Option is an option that can be passed to `New()` for controlling how the command is being
@@ -119,5 +123,13 @@ func WithSpawnTokenManager(spawnTokenManager *SpawnTokenManager) Option {
 func WithFinalizer(finalizer func(context.Context, *Command)) Option {
 	return func(cfg *config) {
 		cfg.finalizers = append(cfg.finalizers, finalizer)
+	}
+}
+
+// WithSubprocessLogger sets up a goroutine that consumes logs from the subprocess through a pipe
+// and outputs them in Logger's output.
+func WithSubprocessLogger(logConfig log.Config) Option {
+	return func(cfg *config) {
+		cfg.logConfiguration = logConfig
 	}
 }
