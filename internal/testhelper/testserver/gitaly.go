@@ -332,6 +332,10 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		gsd.procReceiveRegistry = hook.NewProcReceiveRegistry()
 	}
 
+	if gsd.inProgressTracker == nil {
+		gsd.inProgressTracker = service.NewInProgressTracker()
+	}
+
 	var partitionManager *storagemgr.PartitionManager
 	if testhelper.IsWALEnabled() {
 		dbMgr, err := keyvalue.NewDBManager(
@@ -439,6 +443,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		BackupLocator:       gsd.backupLocator,
 		BundleURISink:       gsd.bundleURISink,
 		ProcReceiveRegistry: gsd.procReceiveRegistry,
+		InProgressTracker:   gsd.inProgressTracker,
 	}
 }
 
