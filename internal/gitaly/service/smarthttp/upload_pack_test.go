@@ -21,12 +21,15 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/limiter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -277,6 +280,7 @@ func testServerPostUploadPackWithSidechannelUsesPackObjectsHook(t *testing.T, ct
 
 func testServerPostUploadPackUsesPackObjectsHook(t *testing.T, ctx context.Context, makeRequest requestMaker, opts ...testcfg.Option) {
 	cfg := testcfg.Build(t, append(opts, testcfg.WithPackObjectsCacheEnabled())...)
+	cfg.BinDir = testhelper.TempDir(t)
 
 	outputPath := filepath.Join(cfg.BinDir, "output")
 	//nolint:gitaly-linters
@@ -379,6 +383,7 @@ func TestServer_PostUploadPackWithBundleURI(t *testing.T) {
 
 	ctx := testhelper.Context(t)
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.BundleURI, true)
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.AutogenerateBundlesForBundleURI, false)
 
 	tempDir := testhelper.TempDir(t)
 	keyFile, err := os.Create(filepath.Join(tempDir, "secret.key"))
@@ -494,6 +499,208 @@ func TestServer_PostUploadPackWithBundleURI(t *testing.T) {
 			} else {
 				require.False(t, ok)
 				require.NotContains(t, responseBuffer.String(), "bundle.default.uri")
+			}
+		})
+	}
+}
+
+type testInProgressTracker struct {
+	thresholdReached bool
+}
+
+func (t *testInProgressTracker) GetInProgress(key string) uint {
+	if t.thresholdReached {
+		return concurrentUploadPackThreshold + 1
+	}
+
+	return 0
+}
+
+func (t *testInProgressTracker) IncrementInProgress(key string) {}
+
+func (t *testInProgressTracker) DecrementInProgress(key string) {}
+
+type blockingLimiter struct {
+	ch                      chan struct{}
+	lastBundleGeneratedPath string
+}
+
+func (l *blockingLimiter) Limit(ctx context.Context, lockKey string, f limiter.LimitedFunc) (interface{}, error) {
+	res, err := f()
+	l.lastBundleGeneratedPath = res.(string)
+	l.ch <- struct{}{}
+	return res, err
+}
+
+func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.AutogenerateBundlesForBundleURI, true)
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.BundleURI, true)
+
+	testCases := []struct {
+		desc    string
+		sinkDir string
+		setup   func(
+			t *testing.T,
+			ctx context.Context,
+			cfg config.Cfg,
+			sink *bundleuri.Sink,
+			tracker *testInProgressTracker,
+			repoProto *gitalypb.Repository,
+			repoPath string,
+		)
+		expectBundleGenerated bool
+		verifyBundle          func(*testing.T, config.Cfg, string, git.ObjectID)
+	}{
+		{
+			desc: "autogeneration successful",
+			setup: func(
+				t *testing.T,
+				ctx context.Context,
+				cfg config.Cfg,
+				sink *bundleuri.Sink,
+				tracker *testInProgressTracker,
+				repoProto *gitalypb.Repository,
+				repoPath string,
+			) {
+				gittest.WriteCommit(t, cfg, repoPath,
+					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
+					gittest.WithBranch("main"))
+
+				tracker.thresholdReached = true
+			},
+			expectBundleGenerated: true,
+			verifyBundle: func(t *testing.T, cfg config.Cfg, bundlePath string, commit git.ObjectID) {
+				tempDir := t.TempDir()
+				objectFormat := gittest.DefaultObjectHash.Format
+				gittest.Exec(t, cfg, "init", "--object-format="+objectFormat, tempDir)
+				gittest.Exec(t, cfg, "-C", tempDir, "bundle", "unbundle", bundlePath)
+				// A new bundle is expected to be created containing the new commit
+				gittest.RequireObjectExists(t, cfg, tempDir, commit)
+			},
+		},
+		{
+			desc: "bundle already exists",
+			setup: func(
+				t *testing.T,
+				ctx context.Context,
+				cfg config.Cfg,
+				sink *bundleuri.Sink,
+				tracker *testInProgressTracker,
+				repoProto *gitalypb.Repository,
+				repoPath string,
+			) {
+				gittest.WriteCommit(t, cfg, repoPath,
+					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
+					gittest.WithBranch("main"))
+				tracker.thresholdReached = true
+
+				repo := localrepo.NewTestRepo(t, cfg, repoProto)
+				require.NoError(t, sink.Generate(ctx, repo))
+			},
+			expectBundleGenerated: false,
+			verifyBundle: func(t *testing.T, cfg config.Cfg, bundlePath string, commit git.ObjectID) {
+				tempDir := t.TempDir()
+				objectFormat := gittest.DefaultObjectHash.Format
+				gittest.Exec(t, cfg, "init", "--object-format="+objectFormat, tempDir)
+				gittest.Exec(t, cfg, "-C", tempDir, "bundle", "unbundle", bundlePath)
+				// No new bundle is expected to be created since one already existed.
+				gittest.RequireObjectNotExists(t, cfg, tempDir, commit)
+			},
+		},
+		{
+			desc: "no concurrent upload packs in flight",
+			setup: func(
+				t *testing.T,
+				ctx context.Context,
+				cfg config.Cfg,
+				sink *bundleuri.Sink,
+				tracker *testInProgressTracker,
+				repoProto *gitalypb.Repository,
+				repoPath string,
+			) {
+				tracker.thresholdReached = false
+				gittest.WriteCommit(t, cfg, repoPath,
+					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
+					gittest.WithBranch("main"))
+			},
+			expectBundleGenerated: false,
+			verifyBundle: func(t *testing.T, cfg config.Cfg, bundlePath string, commit git.ObjectID) {
+				tempDir := t.TempDir()
+				gittest.Exec(t, cfg, "init", tempDir)
+				gittest.Exec(t, cfg, "-C", tempDir, "bundle", "unbundle", bundlePath)
+				// No new bundle is expected to have been created because there are no
+				// inflight upload pack calls.
+				gittest.RequireObjectNotExists(t, cfg, tempDir, commit)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			tracker := &testInProgressTracker{}
+
+			sinkDir := t.TempDir()
+			sink, err := bundleuri.NewSink(ctx, "file://"+sinkDir)
+			require.NoError(t, err)
+
+			cfg := testcfg.Build(t)
+			logger := testhelper.NewLogger(t)
+
+			cfg.BundleURI.AutoGeneration.Enabled = true
+
+			gitCmdFactory := gittest.NewCommandFactory(t, cfg)
+			catfileCache := catfile.NewCache(cfg)
+			t.Cleanup(catfileCache.Stop)
+
+			blockingCh := make(chan struct{})
+			limiter := &blockingLimiter{ch: blockingCh}
+
+			server := startSmartHTTPServerWithOptions(t, cfg, nil, []testserver.GitalyServerOpt{
+				testserver.WithBundleGenerationManager(bundleuri.NewBundleGenerationManager(sink, limiter)),
+				testserver.WithBundleURISink(sink),
+				testserver.WithLogger(logger),
+				testserver.WithInProgressTracker(tracker),
+				testserver.WithTransactionRegistry(storagemgr.NewTransactionRegistry()),
+				testserver.WithGitCommandFactory(gitCmdFactory),
+			})
+
+			cfg.SocketPath = server.Address()
+
+			repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			oldCommit := gittest.WriteCommit(t, cfg, repoPath)
+			newCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("master"), gittest.WithParents(oldCommit))
+
+			if tc.setup != nil {
+				tc.setup(t, ctx, cfg, sink, tracker, repoProto, repoPath)
+			}
+
+			commitInUpdatedBundle := gittest.WriteCommit(t, cfg, repoPath,
+				gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "CHANGELOG", Content: "nothing changed"}),
+				gittest.WithBranch("main"))
+
+			// UploadPack request is a "want" packet line followed by a packet flush, then many "have" packets followed by a packet flush.
+			// This is explained a bit in https://git-scm.com/book/en/v2/Git-Internals-Transfer-Protocols#_downloading_data
+			requestBuffer := &bytes.Buffer{}
+			gittest.WritePktlineString(t, requestBuffer, fmt.Sprintf("want %s %s\n", newCommit, clientCapabilities))
+			gittest.WritePktlineFlush(t, requestBuffer)
+			gittest.WritePktlineString(t, requestBuffer, fmt.Sprintf("have %s\n", oldCommit))
+			gittest.WritePktlineFlush(t, requestBuffer)
+
+			req := &gitalypb.PostUploadPackWithSidechannelRequest{Repository: repoProto}
+			responseBuffer, err := makePostUploadPackWithSidechannelRequest(t, ctx, cfg.SocketPath, cfg.Auth.Token, req, requestBuffer)
+			require.NoError(t, err)
+
+			pack, _, _ := extractPackDataFromResponse(t, responseBuffer)
+			require.NotEmpty(t, pack, "Expected to find a pack file in response, found none")
+
+			if tc.expectBundleGenerated {
+				<-blockingCh
+				tc.verifyBundle(t, cfg, filepath.Join(sinkDir, limiter.lastBundleGeneratedPath), commitInUpdatedBundle)
+			} else {
+				require.Empty(t, limiter.lastBundleGeneratedPath)
 			}
 		})
 	}

@@ -552,17 +552,17 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			return fmt.Errorf("create bundle-URI sink: %w", err)
 		}
 
-		if cfg.BundleURI.Autogeneration {
+		if cfg.BundleURI.AutoGeneration.Enabled {
 			var bundleGenerationLimit *limiter.AdaptiveLimit
-			if cfg.BundleURI.Concurrency.Adaptive {
+			if cfg.BundleURI.AutoGeneration.Concurrency.Adaptive {
 				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{
-					Initial:       cfg.BundleURI.Concurrency.InitialLimit,
-					Max:           cfg.BundleURI.Concurrency.MaxLimit,
-					Min:           cfg.BundleURI.Concurrency.MinLimit,
+					Initial:       cfg.BundleURI.AutoGeneration.Concurrency.InitialLimit,
+					Max:           cfg.BundleURI.AutoGeneration.Concurrency.MaxLimit,
+					Min:           cfg.BundleURI.AutoGeneration.Concurrency.MinLimit,
 					BackoffFactor: limiter.DefaultBackoffFactor,
 				})
 			} else {
-				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{Initial: cfg.BundleURI.Concurrency.MaxConcurrency})
+				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{Initial: cfg.BundleURI.AutoGeneration.Concurrency.MaxConcurrency})
 			}
 
 			bundleGenerationMonitor := limiter.NewPackObjectsConcurrencyMonitor(
@@ -570,8 +570,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			)
 			bundleGenerationLimiter := limiter.NewConcurrencyLimiter(
 				bundleGenerationLimit,
-				cfg.BundleURI.Concurrency.MaxQueueSize,
-				cfg.BundleURI.Concurrency.MaxQueueWait.Duration(),
+				cfg.BundleURI.AutoGeneration.Concurrency.MaxQueueSize,
+				cfg.BundleURI.AutoGeneration.Concurrency.MaxQueueWait.Duration(),
 				bundleGenerationMonitor,
 			)
 			prometheus.MustRegister(bundleGenerationMonitor)
@@ -627,6 +627,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			BackupLocator:       backupLocator,
 			BundleURISink:       bundleURISink,
 			BundleGenerationMgr: bundleGenerationMgr,
+			InProgressTracker:   service.NewInProgressTracker(),
 		})
 		b.RegisterStarter(starter.New(c, srv, logger))
 	}

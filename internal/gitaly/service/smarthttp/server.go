@@ -35,6 +35,9 @@ type server struct {
 	backupSink                 backup.Sink
 	bundleURISink              *bundleuri.Sink
 	bundleGenerationMgr        *bundleuri.BundleGenerationManager
+	inProgressTracker          service.InProgressTracker
+	generateBundles            bool
+	partitionMgr               *storagemgr.PartitionManager
 }
 
 // NewServer creates a new instance of a grpc SmartHTTPServer
@@ -58,6 +61,9 @@ func NewServer(deps *service.Dependencies, serverOpts ...ServerOpt) gitalypb.Sma
 		backupSink:          deps.GetBackupSink(),
 		bundleURISink:       deps.GetBundleURISink(),
 		bundleGenerationMgr: deps.GetBundleGenerationManager(),
+		inProgressTracker:   deps.GetInProgressTracker(),
+		generateBundles:     deps.GetCfg().BundleURI.AutoGeneration.Enabled,
+		partitionMgr:        deps.GetPartitionManager(),
 	}
 
 	for _, serverOpt := range serverOpts {
