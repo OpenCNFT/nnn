@@ -19,7 +19,7 @@ var (
 	sharedLoggersMutex sync.Mutex
 	// sharedLogger contains test case specific loggers keyed by the test name.
 	// sharedLoggersMutex should be acquired before accessing the map.
-	sharedLoggers = map[string]log.LogrusLogger{}
+	sharedLoggers = map[string]Logger{}
 )
 
 // SharedLogger returns a logger that is global to the running test case.
@@ -34,7 +34,7 @@ var (
 // mechanism serves as a workaround to use the same logger everywhere in
 // the same test case. Using the same logger ensures the log messages
 // are properly ordered.
-func SharedLogger(tb testing.TB) log.LogrusLogger {
+func SharedLogger(tb testing.TB) Logger {
 	sharedLoggersMutex.Lock()
 	defer sharedLoggersMutex.Unlock()
 
@@ -103,9 +103,21 @@ func WithLoggerName(name string) LoggerOption {
 	}
 }
 
+// Logger wraps a LogrusLogger and implements Writer on it that can be used
+// to write into the test's log output.
+type Logger struct {
+	log.LogrusLogger
+	output *syncBuffer
+}
+
+// Write writes into the log's output.
+func (l Logger) Write(data []byte) (int, error) {
+	return l.output.Write(data)
+}
+
 // NewLogger returns a logger that records the log output and
 // prints it out only if the test fails.
-func NewLogger(tb testing.TB, options ...LoggerOption) log.LogrusLogger {
+func NewLogger(tb testing.TB, options ...LoggerOption) Logger {
 	logger, logOutput := NewCapturedLogger()
 
 	var opts loggerOptions
@@ -125,7 +137,10 @@ func NewLogger(tb testing.TB, options ...LoggerOption) log.LogrusLogger {
 		}
 	})
 
-	return logger
+	return Logger{
+		LogrusLogger: logger,
+		output:       logOutput,
+	}
 }
 
 // NewCapturedLogger returns a logger that records the log outputs in a buffer. The caller
@@ -144,8 +159,8 @@ type LoggerHook struct {
 }
 
 // AddLoggerHook installs a hook on the logger.
-func AddLoggerHook(logger log.LogrusLogger) LoggerHook {
-	return LoggerHook{hook: test.NewLocal(logger.LogrusEntry().Logger)} //nolint:staticcheck
+func AddLoggerHook(logger Logger) LoggerHook {
+	return LoggerHook{hook: test.NewLocal(logger.LogrusLogger.LogrusEntry().Logger)} //nolint:staticcheck
 }
 
 // AllEntries returns all log entries that have been intercepted by the hook.

@@ -538,6 +538,15 @@ func (cf *ExecCommandFactory) newCommand(ctx context.Context, repo storage.Repos
 		commandOpts = append(commandOpts, command.WithFinalizer(cf.trace2Finalizer(trace2Manager)))
 	}
 
+	if featureflag.LogServer.IsEnabled(ctx) {
+		configEnvVar, err := log.SubprocessConfiguration(cf.cfg.RuntimeDir, cf.cfg.Logging.Config)
+		if err != nil {
+			return nil, fmt.Errorf("subprocess configuration: %w", err)
+		}
+
+		env = append(env, configEnvVar)
+	}
+
 	commandOpts = append(
 		commandOpts,
 		command.WithEnvironment(env),

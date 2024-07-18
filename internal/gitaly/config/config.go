@@ -659,14 +659,6 @@ func (scc StreamCacheConfig) Validate() error {
 		AsError()
 }
 
-func defaultLoggingConfig() Logging {
-	return Logging{
-		Config: log.Config{
-			Level: "info",
-		},
-	}
-}
-
 func defaultPackObjectsCacheConfig() StreamCacheConfig {
 	return StreamCacheConfig{
 		// The Pack-Objects cache is effective at deduplicating concurrent
@@ -699,7 +691,6 @@ func defaultPackObjectsLimiting() PackObjectsLimiting {
 func Load(file io.Reader) (Cfg, error) {
 	cfg := Cfg{
 		Prometheus:          prometheus.DefaultConfig(),
-		Logging:             defaultLoggingConfig(),
 		PackObjectsCache:    defaultPackObjectsCacheConfig(),
 		PackObjectsLimiting: defaultPackObjectsLimiting(),
 	}
@@ -900,6 +891,14 @@ func (cfg *Cfg) Sanitize() error {
 
 	if cfg.Raft.Enabled {
 		cfg.Raft = cfg.Raft.fulfillDefaults()
+	}
+
+	if cfg.Logging.Config.Format == "" {
+		cfg.Logging.Config.Format = "text"
+	}
+
+	if cfg.Logging.Config.Level == "" {
+		cfg.Logging.Config.Level = "info"
 	}
 
 	return nil

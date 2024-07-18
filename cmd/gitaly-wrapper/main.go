@@ -23,12 +23,12 @@ const (
 )
 
 func main() {
-	var logFormat string
+	logFormat := "text"
 	if jsonLogging() {
 		logFormat = "json"
 	}
 
-	logger, err := log.Configure(os.Stdout, logFormat, "")
+	logger, err := log.Configure(os.Stdout, logFormat, "info")
 	if err != nil {
 		fmt.Printf("configuring logger failed: %v", err)
 		os.Exit(1)

@@ -269,6 +269,14 @@ func DefaultYamuxConfig() Yamux {
 	}
 }
 
+// DefaultLoggingConfig returns the default logging configuration.
+func DefaultLoggingConfig() log.Config {
+	return log.Config{
+		Format: "text",
+		Level:  "info",
+	}
+}
+
 // VirtualStorage represents a set of nodes for a storage
 type VirtualStorage struct {
 	Name  string  `toml:"name,omitempty" json:"name"`
@@ -315,6 +323,7 @@ func FromReader(reader io.Reader) (Config, error) {
 		Failover:            Failover{Enabled: true, ElectionStrategy: ElectionStrategyPerRepository},
 		RepositoriesCleanup: DefaultRepositoriesCleanup(),
 		Yamux:               DefaultYamuxConfig(),
+		Logging:             DefaultLoggingConfig(),
 	}
 	if err := toml.NewDecoder(reader).Decode(conf); err != nil {
 		return Config{}, err

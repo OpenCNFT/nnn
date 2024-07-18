@@ -3,6 +3,7 @@ package gitaly
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"time"
@@ -116,7 +117,7 @@ func serveAction(ctx *cli.Context) error {
 		cli.ShowSubcommandHelpAndExit(ctx, 2)
 	}
 
-	cfg, logger, err := configure(ctx.Args().First())
+	cfg, logger, logOutput, err := configure(ctx.Args().First())
 	if err != nil {
 		return cli.Exit(err, 1)
 	}
@@ -128,7 +129,7 @@ func serveAction(ctx *cli.Context) error {
 	logger.WithField("version", version.GetVersion()).Info("Starting Gitaly")
 	fips.Check()
 
-	if err := run(ctx, cfg, logger); err != nil {
+	if err := run(ctx, cfg, logger, logOutput); err != nil {
 		return cli.Exit(fmt.Errorf("unclean Gitaly shutdown: %w", err), 1)
 	}
 
@@ -137,10 +138,10 @@ func serveAction(ctx *cli.Context) error {
 	return nil
 }
 
-func configure(configPath string) (config.Cfg, log.Logger, error) {
+func configure(configPath string) (config.Cfg, log.Logger, io.Writer, error) {
 	cfg, err := loadConfig(configPath)
 	if err != nil {
-		return config.Cfg{}, nil, fmt.Errorf("load config: config_path %q: %w", configPath, err)
+		return config.Cfg{}, nil, nil, fmt.Errorf("load config: config_path %q: %w", configPath, err)
 	}
 
 	urlSanitizer := log.NewURLSanitizerHook()
@@ -150,9 +151,11 @@ func configure(configPath string) (config.Cfg, log.Logger, error) {
 		"UpdateRemoteMirror",
 	)
 
-	logger, err := log.Configure(os.Stdout, cfg.Logging.Format, cfg.Logging.Level, urlSanitizer)
+	logOutput := log.NewSyncWriter(os.Stdout)
+
+	logger, err := log.Configure(logOutput, cfg.Logging.Format, cfg.Logging.Level, urlSanitizer)
 	if err != nil {
-		return config.Cfg{}, nil, fmt.Errorf("configuring logger failed: %w", err)
+		return config.Cfg{}, nil, nil, fmt.Errorf("configuring logger failed: %w", err)
 	}
 
 	if undo, err := maxprocs.Set(maxprocs.Logger(func(s string, i ...interface{}) {
@@ -167,7 +170,7 @@ func configure(configPath string) (config.Cfg, log.Logger, error) {
 	labkittracing.Initialize(labkittracing.WithServiceName("gitaly"))
 	preloadLicenseDatabase(logger)
 
-	return cfg, logger, nil
+	return cfg, logger, logOutput, nil
 }
 
 func preloadLicenseDatabase(logger log.Logger) {
@@ -183,7 +186,7 @@ func preloadLicenseDatabase(logger log.Logger) {
 	}()
 }
 
-func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
+func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger, logOutput io.Writer) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -201,6 +204,31 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		return fmt.Errorf("setup runtime directory: %w", err)
 	}
 	cfg.RuntimeDir = runtimeDir
+
+	logServer, err := log.NewServer(logger, cfg.RuntimeDir, logOutput)
+	if err != nil {
+		return fmt.Errorf("new log server: %w", err)
+	}
+
+	defer func() {
+		if err := logServer.Close(); err != nil {
+			logger.WithError(err).Error("failed closing log server")
+		}
+	}()
+
+	go func() {
+		// We do not wait for this goroutine to return before exiting.
+		//
+		// All of the connections to the log server come from goroutines that should
+		// already have finished. By the time graceful shutdown of the gRPC server
+		// has completed, there should no longer be subprocesses connected to the
+		// log server. If the graceful shutdown timed out, there may still be open
+		// connections. In such case we don't want to block the shutdown anyway
+		// as the graceful shutdown timeout has already been reached.
+		if err := logServer.Run(); err != nil {
+			logger.WithError(err).Error("log server failed")
+		}
+	}()
 
 	cgroupMgr := cgroups.NewManager(cfg.Cgroups, logger, os.Getpid())
 

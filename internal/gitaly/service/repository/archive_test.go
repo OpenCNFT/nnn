@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
@@ -20,6 +21,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -562,6 +564,12 @@ func TestGetArchive_environment(t *testing.T) {
 				IncludeLfsBlobs: tc.includeLFSBlobs,
 			})
 			require.NoError(t, err)
+
+			if featureflag.LogServer.IsEnabled(ctx) {
+				logConfigurationEnv, err := log.SubprocessConfiguration(cfg.RuntimeDir, cfg.Logging.Config)
+				require.NoError(t, err)
+				tc.expectedEnv = append(tc.expectedEnv, logConfigurationEnv)
+			}
 
 			data, err := consumeArchive(stream)
 			require.NoError(t, err)
