@@ -32,7 +32,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -75,7 +75,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -118,7 +118,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -129,7 +129,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -172,7 +172,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -228,7 +228,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -242,7 +242,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/other": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -261,7 +261,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/third": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
 					},
 				},
@@ -314,7 +314,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},

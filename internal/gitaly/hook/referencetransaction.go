@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
 )
 
@@ -124,11 +123,11 @@ func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state 
 // parseChanges parses the changes from the reader. All updates to references lacking a 'refs/' prefix are ignored. These
 // are the various pseudo reference like ORIG_HEAD but also HEAD. See the documentation of the reference-transaction hook
 // for details on the format: https://git-scm.com/docs/githooks#_reference_transaction
-func parseChanges(ctx context.Context, objectHash git.ObjectHash, changes io.Reader) (storagemgr.ReferenceUpdates, bool, error) {
+func parseChanges(ctx context.Context, objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUpdates, bool, error) {
 	scanner := bufio.NewScanner(changes)
 	defaultBranchUpdated := false
 
-	updates := storagemgr.ReferenceUpdates{}
+	updates := git.ReferenceUpdates{}
 	for scanner.Scan() {
 		line := scanner.Text()
 		components := strings.Split(line, " ")
@@ -144,7 +143,7 @@ func parseChanges(ctx context.Context, objectHash git.ObjectHash, changes io.Rea
 			continue
 		}
 
-		update := storagemgr.ReferenceUpdate{}
+		update := git.ReferenceUpdate{}
 
 		var err error
 		update.OldOID, err = objectHash.FromHex(components[0])

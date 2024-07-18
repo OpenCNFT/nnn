@@ -510,7 +510,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					DeleteRepository: true,
@@ -611,7 +611,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					ExpectedError: ErrRepositoryNotFound,
@@ -762,7 +762,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					DefaultBranchUpdate: &DefaultBranchUpdate{
 						Reference: "refs/heads/branch",
 					},
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					CustomHooksUpdate: &CustomHooksUpdate{
@@ -853,7 +853,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					DefaultBranchUpdate: &DefaultBranchUpdate{
 						Reference: "refs/heads/new-head",
 					},
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					QuarantinedPacks: [][]byte{setup.Commits.First.Pack},
@@ -948,7 +948,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					QuarantinedPacks: [][]byte{setup.Commits.First.Pack},

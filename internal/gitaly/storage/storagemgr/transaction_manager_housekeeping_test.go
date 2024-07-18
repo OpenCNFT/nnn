@@ -78,7 +78,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -140,7 +140,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/branch-3": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Diverging.OID},
 					},
@@ -191,7 +191,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/keep-around/1":        {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/merge-requests/1":     {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/very/deep/nested/ref": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
@@ -252,7 +252,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-3": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Diverging.OID},
 						"refs/keep-around/1":  {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -310,7 +310,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-3": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Diverging.OID},
 						"refs/keep-around/1":  {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -361,7 +361,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
@@ -421,7 +421,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
@@ -474,7 +474,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
 						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
 					},
@@ -530,7 +530,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -611,7 +611,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -630,7 +630,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.Commits.First.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
 					},
 				},
@@ -690,7 +690,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
 						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
 					},
@@ -726,7 +726,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/empty-dir/parent/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -820,7 +820,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				RunPackRefs{},
 				Commit{
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 					ExpectedError: errHousekeepingConflictOtherUpdates,
@@ -1700,7 +1700,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Second.OID},
 					},
 					ExpectedError: errHousekeepingConflictOtherUpdates,
@@ -1787,7 +1787,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -1854,7 +1854,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -1885,7 +1885,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -1942,7 +1942,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -1970,7 +1970,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2029,7 +2029,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2057,7 +2057,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -2106,7 +2106,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2131,7 +2131,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2145,7 +2145,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2159,7 +2159,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 5,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2231,7 +2231,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":   {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
@@ -2247,7 +2247,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.Commits.Second.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -2269,7 +2269,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -2318,7 +2318,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":   {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
@@ -2334,7 +2334,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.Commits.Second.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -2356,7 +2356,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -2404,7 +2404,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main":   {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
@@ -2420,7 +2420,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.Commits.Second.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
 				},
@@ -2442,7 +2442,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -2496,7 +2496,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					IncludeObjects: []git.ObjectID{setup.Commits.Diverging.OID},
@@ -2517,13 +2517,13 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				UpdateReferences{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Diverging.OID},
 					},
 				},
 				UpdateReferences{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-2": {OldOID: setup.Commits.Diverging.OID, NewOID: setup.Commits.First.OID},
 					},
 				},
@@ -2602,7 +2602,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 2,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2776,7 +2776,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2791,7 +2791,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -2934,7 +2934,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -2949,7 +2949,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Second.OID},
 					},
 				},
@@ -3060,7 +3060,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -3074,7 +3074,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -3223,7 +3223,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Commit{
 					TransactionID: 3,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/branch-2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
 					},
@@ -3496,7 +3496,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -3653,7 +3653,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Commit{
 					TransactionID: 1,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
 					QuarantinedPacks: [][]byte{
@@ -3700,7 +3700,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Commit{
 					TransactionID: 4,
-					ReferenceUpdates: ReferenceUpdates{
+					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
 					},
 					QuarantinedPacks: [][]byte{

@@ -135,19 +135,6 @@ func (err ReferenceVerificationError) Error() string {
 	return fmt.Sprintf("expected %q to point to %q but it pointed to %q", err.ReferenceName, err.ExpectedOldOID, err.ActualOldOID)
 }
 
-// ReferenceUpdate describes the state of a reference's old and new tip in an update.
-type ReferenceUpdate struct {
-	// OldOID is the old OID the reference is expected to point to prior to updating it.
-	// If the reference does not point to the old value, the reference verification fails.
-	OldOID git.ObjectID
-	// NewOID is the new desired OID to point the reference to.
-	NewOID git.ObjectID
-	// OldTarget is the expected target for a symbolic reference.
-	OldTarget git.ReferenceName
-	// NewTarget stores the desired target for a symbolic reference.
-	NewTarget git.ReferenceName
-}
-
 // repositoryCreation models a repository creation in a transaction.
 type repositoryCreation struct {
 	// objectHash defines the object format the repository is created with.
@@ -192,10 +179,6 @@ type writeCommitGraphs struct {
 	// config includes the configs for writing commit graph.
 	config housekeepingcfg.WriteCommitGraphConfig
 }
-
-// ReferenceUpdates contains references to update. Reference name is used as the key and the value
-// is the expected old tip and the desired new tip.
-type ReferenceUpdates map[git.ReferenceName]ReferenceUpdate
 
 type transactionState int
 
@@ -291,7 +274,7 @@ type Transaction struct {
 	walEntry                 *wal.Entry
 	skipVerificationFailures bool
 	initialReferenceValues   map[git.ReferenceName]git.Reference
-	referenceUpdates         []ReferenceUpdates
+	referenceUpdates         []git.ReferenceUpdates
 	defaultBranchUpdated     bool
 	customHooksUpdated       bool
 	repositoryCreation       *repositoryCreation
@@ -677,8 +660,8 @@ func (txn *Transaction) RecordInitialReferenceValues(ctx context.Context, initia
 // committed as 'oid-1 -> oid-3'. The old OIDs of the intermediate states are not verified when
 // committing the write to the actual repository and are discarded from the final committed log
 // entry.
-func (txn *Transaction) UpdateReferences(updates ReferenceUpdates) {
-	u := ReferenceUpdates{}
+func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) {
+	u := git.ReferenceUpdates{}
 
 	for reference, update := range updates {
 		oldOID := update.OldOID
@@ -704,7 +687,7 @@ func (txn *Transaction) UpdateReferences(updates ReferenceUpdates) {
 			}
 		}
 
-		u[reference] = ReferenceUpdate{
+		u[reference] = git.ReferenceUpdate{
 			OldOID:    oldOID,
 			NewOID:    update.NewOID,
 			OldTarget: oldTarget,
@@ -717,14 +700,14 @@ func (txn *Transaction) UpdateReferences(updates ReferenceUpdates) {
 }
 
 // flattenReferenceTransactions flattens the recorded reference transactions by dropping
-// all intermediate states. The returned ReferenceUpdates contains the reference changes
+// all intermediate states. The returned git.ReferenceUpdates contains the reference changes
 // with the OldOID set to the reference's value at the beginning of the transaction, and the
 // NewOID set to the reference's final value after all of the changes.
-func (txn *Transaction) flattenReferenceTransactions() ReferenceUpdates {
-	flattenedUpdates := ReferenceUpdates{}
+func (txn *Transaction) flattenReferenceTransactions() git.ReferenceUpdates {
+	flattenedUpdates := git.ReferenceUpdates{}
 	for _, updates := range txn.referenceUpdates {
 		for reference, update := range updates {
-			u := ReferenceUpdate{
+			u := git.ReferenceUpdate{
 				OldOID:    update.OldOID,
 				NewOID:    update.NewOID,
 				OldTarget: update.OldTarget,
@@ -1367,19 +1350,19 @@ func (mgr *TransactionManager) stageRepositoryCreation(ctx context.Context, tran
 		return fmt.Errorf("get references: %w", err)
 	}
 
-	referenceUpdates := make(ReferenceUpdates, len(references))
+	referenceUpdates := make(git.ReferenceUpdates, len(references))
 	for _, ref := range references {
 		if ref.IsSymbolic {
 			return fmt.Errorf("unexpected symbolic ref: %v", ref)
 		}
 
-		referenceUpdates[ref.Name] = ReferenceUpdate{
+		referenceUpdates[ref.Name] = git.ReferenceUpdate{
 			OldOID: objectHash.ZeroOID,
 			NewOID: git.ObjectID(ref.Target),
 		}
 	}
 
-	transaction.referenceUpdates = []ReferenceUpdates{referenceUpdates}
+	transaction.referenceUpdates = []git.ReferenceUpdates{referenceUpdates}
 
 	var customHooks bytes.Buffer
 	if err := repoutil.GetCustomHooks(ctx, mgr.logger,
