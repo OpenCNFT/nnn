@@ -23,8 +23,10 @@ message Storage {
   uint64 storage_id = 1;
   // name is the human-readable name of the storage.
   string name = 2;
+  // replication_factor defines the number of nodes where data of this storage are replicated.
+  uint64 replication_factor = 3;
   // replica_groups is a list of identifiers for the replica groups associated with this storage.
-  repeated uint64 replica_groups = 3;
+  repeated uint64 replica_groups = 4;
 }
 
 // LeaderState represents the current leader state of a Raft group.
