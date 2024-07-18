@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/errors/cfgerror"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/auth"
@@ -809,7 +810,9 @@ func (cfg *Cfg) ValidateV2() error {
 		{field: "pack_objects_cache", validate: cfg.PackObjectsCache.Validate},
 		{field: "pack_objects_limiting", validate: cfg.PackObjectsLimiting.Validate},
 		{field: "backup", validate: cfg.Backup.Validate},
-		{field: "raft", validate: cfg.Raft.Validate},
+		{field: "raft", validate: func() error {
+			return cfg.Raft.Validate(cfg.Transactions)
+		}},
 	} {
 		var fields []string
 		if check.field != "" {
@@ -1259,11 +1262,20 @@ func (r Raft) fulfillDefaults() Raft {
 }
 
 // Validate runs validation on all fields and compose all found errors.
-func (r Raft) Validate() error {
+func (r Raft) Validate(transactions Transactions) error {
 	if !r.Enabled {
 		return nil
 	}
-	cfgErr := cfgerror.New().
+	cfgErr := cfgerror.New()
+
+	if !transactions.Enabled {
+		cfgErr = cfgErr.Append(
+			fmt.Errorf("transactions must be enabled to enable Raft"),
+			"enabled",
+		)
+	}
+
+	cfgErr = cfgErr.
 		Append(cfgerror.NotEmptyMap(r.InitialMembers), "initial_members").
 		Append(cfgerror.NotEmpty(r.ClusterID), "cluster_id").
 		Append(cfgerror.Comparable(r.NodeID).GreaterThan(0), "node_id").
@@ -1275,6 +1287,13 @@ func (r Raft) Validate() error {
 	// Validate RaftAddr to have hosts:port format
 	if _, _, err := net.SplitHostPort(r.RaftAddr); err != nil {
 		cfgErr = cfgErr.Append(fmt.Errorf("invalid address format: %s", err.Error()), "raft_addr")
+	}
+
+	// Validate UUID format of ClusterID
+	if r.ClusterID != "" {
+		if _, err := uuid.Parse(r.ClusterID); err != nil {
+			cfgErr = cfgErr.Append(fmt.Errorf("invalid UUID format for ClusterID: %s", err.Error()), "cluster_id")
+		}
 	}
 
 	// Validate InitialMembers to have node_id:raft_addr format
