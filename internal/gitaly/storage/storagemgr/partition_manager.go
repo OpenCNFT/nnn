@@ -159,6 +159,8 @@ func (sm *storageManager) newFinalizableTransaction(ptn *partition, tx *Transact
 type partition struct {
 	// closing is closed when the partition has no longer any active transactions.
 	closing chan struct{}
+	// closed is closed when the partitions goroutine has finished.
+	closed chan struct{}
 	// transactionManagerClosed is closed to signal when the partition's TransactionManager.Run has returned.
 	// Clients stumbling on the partition when it is closing wait on this channel to know when the previous
 	// TransactionManager has closed and it is safe to start another one.
@@ -487,6 +489,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 		if !ok {
 			ptn = &partition{
 				closing:                  make(chan struct{}),
+				closed:                   make(chan struct{}),
 				transactionManagerClosed: make(chan struct{}),
 			}
 
@@ -532,6 +535,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 					logger.WithError(err).Error("failed removing partition's staging directory")
 				}
 
+				close(ptn.closed)
 				storageMgr.activePartitions.Done()
 			}()
 		}
