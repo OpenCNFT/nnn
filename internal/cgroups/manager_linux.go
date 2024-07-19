@@ -133,7 +133,7 @@ func (cgm *CGroupManager) Setup() error {
 		return fmt.Errorf("run command to force repository cgroups setup: %w", err)
 	}
 	if _, err := cgm.AddCommand(cmd, WithCgroupKey("setup")); err != nil {
-		return err
+		return fmt.Errorf("could not add command in cgroups setup: %w", err)
 	}
 
 	cgm.enabled = true
@@ -146,7 +146,7 @@ func (cgm *CGroupManager) Ready() bool {
 	return cgm.enabled
 }
 
-// AddCommand adds a Cmd to a cgroup
+// AddCommand adds a Cmd that has already started to a cgroup
 func (cgm *CGroupManager) AddCommand(cmd *exec.Cmd, opts ...AddCommandOption) (string, error) {
 	if cmd.Process == nil {
 		return "", errors.New("cannot add command that has not yet been started")
@@ -181,8 +181,9 @@ func (cgm *CGroupManager) maybeCreateCgroup(cgroupPath string) error {
 
 			lock.created.Store(true)
 		})
+		return lock.creationError
 	}
-	return lock.creationError
+	return errors.New("could not get lock to create cgroup")
 }
 
 // CloneIntoCgroup configures the cgroup parameters UseCgroupFD and CgroupFD in SysProcAttr

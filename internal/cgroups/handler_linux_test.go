@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -314,7 +313,9 @@ func TestAddCommand(t *testing.T) {
 				_, err := manager.AddCommand(cmd)
 				require.NoError(t, err)
 				requireShards(t, version, mock, manager, pid, groupID...)
-				pidExistsInCgroupProcs(t, mock, pid, cmd.Process.Pid, groupID)
+				for _, shard := range groupID {
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, shard, uint(0))
+				}
 			})
 
 			t.Run("with overridden key", func(t *testing.T) {
@@ -331,7 +332,9 @@ func TestAddCommand(t *testing.T) {
 				_, err := manager.AddCommand(cmd, WithCgroupKey("foobar"))
 				require.NoError(t, err)
 				requireShards(t, version, mock, manager, pid, groupID...)
-				pidExistsInCgroupProcs(t, mock, pid, cmd.Process.Pid, groupID)
+				for _, shard := range groupID {
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, shard, uint(0))
+				}
 			})
 
 			t.Run("when AllocationSet is set", func(t *testing.T) {
@@ -346,42 +349,32 @@ func TestAddCommand(t *testing.T) {
 				rand := newMockRand(t, 3)
 				manager.rand = rand
 
-				// find a directory with /repos-\d in it's path from the parent cgroup path
+				// Find a directory with /repos-\d in it's path from the parent cgroup path
 				cgroupPath := mock.repoPaths(pid, 0)[0]
-				re := regexp.MustCompile(`repos-\d$`)
-				filesFound, err := findDirMatchingRegex(re, filepath.Dir(cgroupPath))
+				filesFound, err := filepath.Glob(filepath.Dir(cgroupPath) + "/repos-[0-9]*")
 				require.NoError(t, err)
 
-				// extract groupID that was created
+				// Extract setupGroupID that was created
+				var setupGroupID uint64
 				for _, f := range filesFound {
-					repoNumber, err := getRepoNumber(f)
+					repoNumber := getRepoNumber(t, f)
+					setupGroupID, err = strconv.ParseUint(repoNumber, 10, 64)
 					require.NoError(t, err)
-
-					gFinal, err := strconv.Atoi(repoNumber)
-					require.NoError(t, err)
-					if !Contains(groupIDs, uint(gFinal)) {
-						groupIDs = append(groupIDs, uint(gFinal))
-					}
 				}
 
-				for i := 0; i < 3; i++ {
+				// Assert that the invoked command pid matches the shard's cgroup.proc
+				for i := 0; i < len(groupIDs); i++ {
 					cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 					require.NoError(t, cmd.Run())
 					_, err := manager.AddCommand(cmd)
 
 					require.NoError(t, err)
-
-					for _, path := range mock.repoPaths(pid, groupIDs[i]) {
-						procsPath := filepath.Join(path, "cgroup.procs")
-						content := readCgroupFile(t, procsPath)
-
-						cmdPid, err := strconv.Atoi(string(content))
-						require.NoError(t, err)
-
-						require.Equal(t, cmd.Process.Pid, cmdPid)
-					}
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, groupIDs[i], uint(setupGroupID))
 				}
-
+				// Add the pid that got created from manager.Setup()
+				if !slices.Contains(groupIDs, uint(setupGroupID)) {
+					groupIDs = append(groupIDs, uint(setupGroupID))
+				}
 				requireShards(t, version, mock, manager, pid, groupIDs...)
 			})
 		})
@@ -931,8 +924,8 @@ func requireShards(t *testing.T, version int, mock mockCgroup, mgr *CGroupManage
 		cgroupPath := filepath.Join("gitaly",
 			fmt.Sprintf("gitaly-%d", pid), fmt.Sprintf("repos-%d", shard))
 		cgLock := mgr.status.getLock(cgroupPath)
-		require.Equal(t, shouldExist, cgLock.isCreated(),
-			fmt.Sprintf("shard %d should exist (%t) but got %t", shard, shouldExist, cgLock.isCreated()))
+		require.Equalf(t, shouldExist, cgLock.isCreated(),
+			"shard %d should exist (%t) but got %t", shard, shouldExist, cgLock.isCreated())
 
 		for _, diskPath := range mock.repoPaths(pid, shard) {
 			if shouldExist {
