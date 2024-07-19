@@ -28,7 +28,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -41,7 +40,7 @@ var errSimulatedCrash = errors.New("simulated crash")
 
 func manifestDirectoryEntry(expected *gitalypb.LogEntry) testhelper.DirectoryEntry {
 	return testhelper.DirectoryEntry{
-		Mode:    perm.PrivateWriteOnceFile,
+		Mode:    mode.File,
 		Content: expected,
 		ParseContent: func(tb testing.TB, path string, content []byte) any {
 			var logEntry gitalypb.LogEntry
@@ -58,7 +57,7 @@ func validCustomHooks(tb testing.TB) []byte {
 	writer := tar.NewWriter(&hooks)
 	require.NoError(tb, writer.WriteHeader(&tar.Header{
 		Name: "custom_hooks/",
-		Mode: int64(perm.PrivateDir),
+		Mode: int64(mode.Directory),
 	}))
 
 	require.NoError(tb, writer.WriteHeader(&tar.Header{
@@ -71,13 +70,13 @@ func validCustomHooks(tb testing.TB) []byte {
 
 	require.NoError(tb, writer.WriteHeader(&tar.Header{
 		Name: "custom_hooks/private-dir/",
-		Mode: int64(perm.PrivateDir),
+		Mode: int64(mode.Directory),
 	}))
 
 	require.NoError(tb, writer.WriteHeader(&tar.Header{
 		Name: "custom_hooks/private-dir/private-file",
 		Size: int64(len("private content")),
-		Mode: int64(perm.PrivateWriteOnceFile),
+		Mode: int64(mode.File),
 	}))
 	_, err = writer.Write([]byte("private content"))
 	require.NoError(tb, err)
@@ -378,9 +377,9 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Directory: testhelper.DirectoryState{
-					"/":                  {Mode: fs.ModeDir | perm.PrivateDir},
-					"/wal":               {Mode: fs.ModeDir | perm.PrivateDir},
-					"/wal/0000000000001": {Mode: fs.ModeDir | perm.PrivateDir},
+					"/":                  {Mode: mode.Directory},
+					"/wal":               {Mode: mode.Directory},
+					"/wal/0000000000001": {Mode: mode.Directory},
 					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(&gitalypb.LogEntry{
 						RelativePath: setup.RelativePath,
 						ReferenceTransactions: []*gitalypb.LogEntry_ReferenceTransaction{
@@ -505,7 +504,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 									Mode:    mode.Executable,
 									Content: []byte("hook content"),
 								},
-								"/private-dir":              {Mode: fs.ModeDir | perm.PrivateDir},
+								"/private-dir":              {Mode: mode.Directory},
 								"/private-dir/private-file": {Mode: mode.File, Content: []byte("private content")},
 							},
 						},
@@ -1027,11 +1026,11 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
 						packFilePath := packFilePath(walFilesPathForLSN(filepath.Join(storagePath, setup.RelativePath), 1))
-						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), perm.PrivateDir))
+						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,
 							[]byte("invalid pack"),
-							perm.PrivateDir,
+							mode.Directory,
 						))
 					},
 				},
@@ -1562,11 +1561,11 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					})
 					// Transaction 2 and 3 are left-over.
 					testhelper.RequireDirectoryState(t, walFilesPath(tm.stateDirectory), "", testhelper.DirectoryState{
-						"/":                       {Mode: fs.ModeDir | perm.PrivateDir},
-						"/0000000000002":          {Mode: fs.ModeDir | perm.PrivateDir},
+						"/":                       {Mode: mode.Directory},
+						"/0000000000002":          {Mode: mode.Directory},
 						"/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
 						"/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/0000000000003":          {Mode: fs.ModeDir | perm.PrivateDir},
+						"/0000000000003":          {Mode: mode.Directory},
 						"/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
 						"/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 					})
@@ -1652,7 +1651,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					// setup. It's a bit tricky to simulate committed log entries and un-processed
 					// appended log entries at the same time.
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
-					require.NoError(t, os.Mkdir(logEntryPath, perm.PrivateDir))
+					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
 					require.NoError(t, tm.appendLogEntry(map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
 
@@ -1661,14 +1660,14 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					})
 					// Transaction 2 and 3 are left-over.
 					testhelper.RequireDirectoryState(t, walFilesPath(tm.stateDirectory), "", testhelper.DirectoryState{
-						"/":                       {Mode: fs.ModeDir | perm.PrivateDir},
-						"/0000000000002":          {Mode: fs.ModeDir | perm.PrivateDir},
+						"/":                       {Mode: mode.Directory},
+						"/0000000000002":          {Mode: mode.Directory},
 						"/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
 						"/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/0000000000003":          {Mode: fs.ModeDir | perm.PrivateDir},
+						"/0000000000003":          {Mode: mode.Directory},
 						"/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
 						"/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/0000000000004":          {Mode: fs.ModeDir | perm.PrivateDir},
+						"/0000000000004":          {Mode: mode.Directory},
 						"/0000000000004/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID)),
 						"/0000000000004/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 					})
@@ -1816,10 +1815,10 @@ func BenchmarkTransactionManager(b *testing.B) {
 				storagePath := cfg.Storages[0].Path
 
 				stateDir := filepath.Join(storagePath, "state", strconv.Itoa(i))
-				require.NoError(b, os.MkdirAll(stateDir, perm.PrivateDir))
+				require.NoError(b, os.MkdirAll(stateDir, mode.Directory))
 
 				stagingDir := filepath.Join(storagePath, "staging", strconv.Itoa(i))
-				require.NoError(b, os.MkdirAll(stagingDir, perm.PrivateDir))
+				require.NoError(b, os.MkdirAll(stagingDir, mode.Directory))
 
 				m := newMetrics(cfg.Prometheus)
 

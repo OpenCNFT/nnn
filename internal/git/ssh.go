@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -33,7 +33,7 @@ func BuildSSHInvocation(ctx context.Context, logger log.Logger, sshKey, knownHos
 	args := []string{sshCommand}
 	if sshKey != "" {
 		sshKeyFile := filepath.Join(tmpDir, "ssh-key")
-		if err := os.WriteFile(sshKeyFile, []byte(sshKey), perm.PrivateWriteOnceFile); err != nil {
+		if err := os.WriteFile(sshKeyFile, []byte(sshKey), mode.File); err != nil {
 			cleanup()
 			return "", nil, fmt.Errorf("create ssh key file: %w", err)
 		}
@@ -43,7 +43,7 @@ func BuildSSHInvocation(ctx context.Context, logger log.Logger, sshKey, knownHos
 
 	if knownHosts != "" {
 		knownHostsFile := filepath.Join(tmpDir, "known-hosts")
-		if err := os.WriteFile(knownHostsFile, []byte(knownHosts), perm.PrivateWriteOnceFile); err != nil {
+		if err := os.WriteFile(knownHostsFile, []byte(knownHosts), mode.File); err != nil {
 			cleanup()
 			return "", nil, fmt.Errorf("create known hosts file: %w", err)
 		}

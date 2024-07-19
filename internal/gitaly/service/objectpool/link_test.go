@@ -10,7 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -186,7 +186,7 @@ func TestLink_noClobber(t *testing.T) {
 	require.NoFileExists(t, alternatesFile)
 
 	contentBefore := "mock/objects\n"
-	require.NoError(t, os.WriteFile(alternatesFile, []byte(contentBefore), perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(alternatesFile, []byte(contentBefore), mode.File))
 
 	request := &gitalypb.LinkRepositoryToObjectPoolRequest{
 		Repository: repoProto,

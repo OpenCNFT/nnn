@@ -10,7 +10,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -31,15 +30,15 @@ func TestApplyOperations(t *testing.T) {
 
 	snapshotRoot := filepath.Join(t.TempDir(), "snapshot")
 	testhelper.CreateFS(t, snapshotRoot, fstest.MapFS{
-		".":                                          {Mode: fs.ModeDir | perm.PrivateDir},
-		"parent":                                     {Mode: fs.ModeDir | perm.PrivateDir},
-		"parent/relative-path":                       {Mode: fs.ModeDir | perm.PrivateDir},
-		"parent/relative-path/private-file":          {Mode: perm.PrivateWriteOnceFile, Data: []byte("private")},
-		"parent/relative-path/shared-file":           {Mode: perm.PrivateWriteOnceFile, Data: []byte("shared")},
-		"parent/relative-path/empty-dir":             {Mode: fs.ModeDir | perm.PrivateDir},
-		"parent/relative-path/removed-dir":           {Mode: fs.ModeDir | perm.PrivateDir},
-		"parent/relative-path/dir-with-removed-file": {Mode: fs.ModeDir | perm.PrivateDir},
-		"parent/relative-path/dir-with-removed-file/removed-file": {Mode: perm.PrivateWriteOnceFile, Data: []byte("removed")},
+		".":                                          {Mode: mode.Directory},
+		"parent":                                     {Mode: mode.Directory},
+		"parent/relative-path":                       {Mode: mode.Directory},
+		"parent/relative-path/private-file":          {Mode: mode.File, Data: []byte("private")},
+		"parent/relative-path/shared-file":           {Mode: mode.File, Data: []byte("shared")},
+		"parent/relative-path/empty-dir":             {Mode: mode.Directory},
+		"parent/relative-path/removed-dir":           {Mode: mode.Directory},
+		"parent/relative-path/dir-with-removed-file": {Mode: mode.Directory},
+		"parent/relative-path/dir-with-removed-file/removed-file": {Mode: mode.File, Data: []byte("removed")},
 	})
 	umask := testhelper.Umask()
 

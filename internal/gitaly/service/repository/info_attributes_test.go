@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -25,12 +25,12 @@ func TestGetInfoAttributesExisting(t *testing.T) {
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
 
 	infoPath := filepath.Join(repoPath, "info")
-	require.NoError(t, os.MkdirAll(infoPath, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(infoPath, mode.Directory))
 
 	buffSize := streamio.WriteBufferSize + 1
 	data := bytes.Repeat([]byte("*.pbxproj binary\n"), buffSize)
 	attrsPath := filepath.Join(infoPath, "attributes")
-	err := os.WriteFile(attrsPath, data, perm.PrivateWriteOnceFile)
+	err := os.WriteFile(attrsPath, data, mode.File)
 	require.NoError(t, err)
 
 	gitattributesContent := "*.go diff=go text\n*.md text\n*.jpg -text"

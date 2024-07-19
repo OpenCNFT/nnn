@@ -14,9 +14,9 @@ import (
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -84,7 +84,7 @@ func TestCreate(t *testing.T) {
 
 		// We currently allow creating object pools when the target path is an empty
 		// directory. This can be considered a bug, but for now we abide.
-		require.NoError(t, os.MkdirAll(fullPath, perm.PrivateDir))
+		require.NoError(t, os.MkdirAll(fullPath, mode.Directory))
 
 		_, _, err := createPool(t, &gitalypb.ObjectPool{
 			Repository: &gitalypb.Repository{

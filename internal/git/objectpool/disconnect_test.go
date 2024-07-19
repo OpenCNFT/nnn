@@ -20,9 +20,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
@@ -92,7 +92,7 @@ func TestDisconnect(t *testing.T) {
 
 		altPath, err := repo.InfoAlternatesPath(ctx)
 		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(altPath, []byte(altContent), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(altPath, []byte(altContent), mode.File))
 
 		return repo
 	}
@@ -188,7 +188,7 @@ func TestDisconnect(t *testing.T) {
 
 				altPath, err := repo.InfoAlternatesPath(ctx)
 				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(altPath, []byte(altObjectDir), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(altPath, []byte(altObjectDir), mode.File))
 
 				return setupData{
 					repository: repo,
@@ -382,7 +382,7 @@ func TestRemoveAlternatesIfOk(t *testing.T) {
 		altPath, err := repo.InfoAlternatesPath(ctx)
 		require.NoError(t, err)
 		altContent := testhelper.TempDir(t) + "\n"
-		require.NoError(t, os.WriteFile(altPath, []byte(altContent), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(altPath, []byte(altContent), mode.File))
 
 		// Intentionally break the repository so that the consistency check will cause an
 		// error.
@@ -412,7 +412,7 @@ func TestRemoveAlternatesIfOk(t *testing.T) {
 		altPath, err := repo.InfoAlternatesPath(ctx)
 		require.NoError(t, err)
 		altContent := testhelper.TempDir(t) + "\n"
-		require.NoError(t, os.WriteFile(altPath, []byte(altContent), perm.PrivateWriteOnceFile))
+		require.NoError(t, os.WriteFile(altPath, []byte(altContent), mode.File))
 
 		// In order to test the scenario where a commit is in a commit graph but not in the
 		// object database, we will first write a new commit, write the commit graph, then

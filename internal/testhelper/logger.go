@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -177,7 +177,7 @@ func CreateTestLogDir(tb testing.TB) string {
 
 	logDir := filepath.Join(testLogDir, tb.Name())
 
-	require.NoError(tb, os.MkdirAll(logDir, perm.PrivateDir))
+	require.NoError(tb, os.MkdirAll(logDir, mode.Directory))
 
 	return logDir
 }

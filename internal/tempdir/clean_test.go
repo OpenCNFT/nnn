@@ -10,7 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -22,7 +22,7 @@ func TestCleanSuccess(t *testing.T) {
 	cleanRoot, err := locator.TempDir(cfg.Storages[0].Name)
 	require.NoError(t, err)
 
-	require.NoError(t, os.MkdirAll(cleanRoot, perm.PrivateDir), "create clean root before setup")
+	require.NoError(t, os.MkdirAll(cleanRoot, mode.Directory), "create clean root before setup")
 	testhelper.MustRunCommand(t, nil, "chmod", "-R", "0700", cleanRoot)
 	require.NoError(t, os.RemoveAll(cleanRoot), "clean up test clean root")
 
@@ -159,7 +159,7 @@ func makeFile(t *testing.T, locator storage.Locator, storage config.Storage, fil
 	require.NoError(t, err)
 
 	fullPath := filepath.Join(root, filePath)
-	require.NoError(t, os.WriteFile(fullPath, nil, perm.PrivateWriteOnceFile))
+	require.NoError(t, os.WriteFile(fullPath, nil, mode.File))
 	require.NoError(t, os.Chtimes(fullPath, mtime, mtime))
 }
 
@@ -168,6 +168,6 @@ func makeDir(t *testing.T, locator storage.Locator, storage config.Storage, dirP
 	require.NoError(t, err)
 
 	fullPath := filepath.Join(root, dirPath)
-	require.NoError(t, os.MkdirAll(fullPath, perm.PrivateDir))
+	require.NoError(t, os.MkdirAll(fullPath, mode.Directory))
 	require.NoError(t, os.Chtimes(fullPath, mtime, mtime))
 }

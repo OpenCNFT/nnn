@@ -31,7 +31,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -451,7 +450,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 			if !txn.readOnly {
 				if txn.repositoryExists {
 					txn.quarantineDirectory = filepath.Join(txn.stagingDirectory, "quarantine")
-					if err := os.MkdirAll(filepath.Join(txn.quarantineDirectory, "pack"), perm.PrivateDir); err != nil {
+					if err := os.MkdirAll(filepath.Join(txn.quarantineDirectory, "pack"), mode.Directory); err != nil {
 						return nil, fmt.Errorf("create quarantine directory: %w", err)
 					}
 
@@ -1135,7 +1134,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	}
 
 	// Create a directory to store all staging files.
-	if err := os.Mkdir(transaction.walFilesPath(), perm.PrivateDir); err != nil {
+	if err := os.Mkdir(transaction.walFilesPath(), mode.Directory); err != nil {
 		return fmt.Errorf("create wal files directory: %w", err)
 	}
 
@@ -1940,7 +1939,7 @@ func (mgr *TransactionManager) prepareCommitGraphs(ctx context.Context, transact
 		}
 	} else if len(graphEntries) > 0 {
 		walGraphsDir := filepath.Join(transaction.walFilesPath(), "commit-graphs")
-		if err := os.Mkdir(walGraphsDir, perm.PrivateDir); err != nil {
+		if err := os.Mkdir(walGraphsDir, mode.Directory); err != nil {
 			return fmt.Errorf("creating commit-graphs dir in WAL dir: %w", err)
 		}
 		for _, entry := range graphEntries {
@@ -2345,7 +2344,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("create state directory: %w", err)
 	}
 
-	if err := os.Mkdir(mgr.snapshotsDir(), perm.PrivateDir); err != nil {
+	if err := os.Mkdir(mgr.snapshotsDir(), mode.Directory); err != nil {
 		return fmt.Errorf("create snapshot manager directory: %w", err)
 	}
 
@@ -2429,7 +2428,7 @@ func (mgr *TransactionManager) createStateDirectory() error {
 		mgr.stateDirectory,
 		filepath.Join(mgr.stateDirectory, "wal"),
 	} {
-		if err := os.Mkdir(path, perm.PrivateDir); err != nil {
+		if err := os.Mkdir(path, mode.Directory); err != nil {
 			if !errors.Is(err, fs.ErrExist) {
 				return fmt.Errorf("mkdir: %w", err)
 			}
@@ -3474,7 +3473,7 @@ func (mgr *TransactionManager) replaceCommitGraphs(repoPath string, walPath stri
 		if err := os.RemoveAll(commitGraphsDir); err != nil {
 			return fmt.Errorf("resetting commit-graphs dir: %w", err)
 		}
-		if err := os.Mkdir(commitGraphsDir, perm.PrivateDir); err != nil {
+		if err := os.Mkdir(commitGraphsDir, mode.Directory); err != nil {
 			return fmt.Errorf("creating commit-graphs dir: %w", err)
 		}
 		for _, entry := range graphEntries {

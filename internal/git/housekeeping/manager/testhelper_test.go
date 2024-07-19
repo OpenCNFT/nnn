@@ -17,9 +17,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -238,7 +238,7 @@ func (d *dirEntry) create(t *testing.T, parent string) {
 
 	dirname := filepath.Join(parent, d.name)
 
-	if err := os.Mkdir(dirname, perm.PrivateDir); err != nil {
+	if err := os.Mkdir(dirname, mode.Directory); err != nil {
 		require.True(t, os.IsExist(err), "mkdir failed: %v", dirname)
 	}
 
@@ -303,7 +303,7 @@ func f(name string, opts ...entryOption) *fileEntry {
 }
 
 func d(name string, entries []entry, opts ...entryOption) *dirEntry {
-	opts = append([]entryOption{withMode(perm.PrivateDir)}, opts...)
+	opts = append([]entryOption{withMode(mode.Directory)}, opts...)
 
 	return &dirEntry{
 		fileEntry: *f(name, opts...),

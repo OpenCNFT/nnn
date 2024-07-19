@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/archive"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -95,16 +95,16 @@ doesn't seem to test a realistic scenario.`)
 				)
 
 				// The shallow file, used if the repository is a shallow clone, is also included in snapshots.
-				require.NoError(t, os.WriteFile(filepath.Join(repoPath, "shallow"), nil, perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(filepath.Join(repoPath, "shallow"), nil, mode.File))
 
 				// Custom Git hooks are not included in snapshots.
-				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "hooks"), perm.PrivateDir))
+				require.NoError(t, os.MkdirAll(filepath.Join(repoPath, "hooks"), mode.Directory))
 
 				// Create a file in the objects directory that does not match the regex.
 				require.NoError(t, os.WriteFile(
 					filepath.Join(repoPath, "objects/this-should-not-be-included"),
 					nil,
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 
 				return setupData{
@@ -136,7 +136,7 @@ doesn't seem to test a realistic scenario.`)
 				require.NoError(t, os.WriteFile(
 					altFile,
 					[]byte(fmt.Sprintf("%s\n", altObjectDir)),
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 
 				refs := gittest.FilesOrReftables(
@@ -198,7 +198,7 @@ doesn't seem to test a realistic scenario.`)
 				require.NoError(t, os.WriteFile(
 					altFile,
 					[]byte(fmt.Sprintf("%s\n", altObjectDir)),
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 				gittest.RequireObjectExists(t, cfg, repoPath, commitID)
 
@@ -245,7 +245,7 @@ doesn't seem to test a realistic scenario.`)
 				require.NoError(t, os.WriteFile(
 					altFile,
 					[]byte(fmt.Sprintf("%s\n", relAltObjectDir)),
-					perm.PrivateWriteOnceFile,
+					mode.File,
 				))
 				gittest.RequireObjectExists(t, cfg, repoPath, commitID)
 

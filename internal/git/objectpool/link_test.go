@@ -13,9 +13,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
@@ -112,7 +112,7 @@ func TestLink(t *testing.T) {
 				// Link the repository to object pool using the absolute path of the object pool.
 				// The alternates file should be rewritten to use the relative path.
 				poolObjectsPath := gittest.RepositoryPath(t, ctx, pool, "objects")
-				require.NoError(t, os.WriteFile(altPath, []byte(poolObjectsPath), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(altPath, []byte(poolObjectsPath), mode.File))
 
 				return setupData{
 					cfg:  cfg,
@@ -130,7 +130,7 @@ func TestLink(t *testing.T) {
 				// nothing and completes normally.
 				altPath, err := repo.InfoAlternatesPath(ctx)
 				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(altPath, []byte(getRelAltPath(t, repo, pool.Repo)), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(altPath, []byte(getRelAltPath(t, repo, pool.Repo)), mode.File))
 
 				return setupData{
 					cfg:  cfg,
@@ -148,7 +148,7 @@ func TestLink(t *testing.T) {
 				// linking operation fails.
 				altPath, err := repo.InfoAlternatesPath(ctx)
 				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(altPath, []byte("../different/object/pool"), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(altPath, []byte("../different/object/pool"), mode.File))
 
 				return setupData{
 					cfg:           cfg,
@@ -195,7 +195,7 @@ func TestLink(t *testing.T) {
 				// to the same object pool.
 				altPath, err := repo.InfoAlternatesPath(ctx)
 				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(altPath, []byte(getRelAltPath(t, repo, pool.Repo)), perm.PrivateWriteOnceFile))
+				require.NoError(t, os.WriteFile(altPath, []byte(getRelAltPath(t, repo, pool.Repo)), mode.File))
 
 				return setupData{
 					cfg:       cfg,

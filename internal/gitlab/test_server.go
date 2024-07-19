@@ -16,7 +16,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -26,9 +26,9 @@ var changeLineRegex = regexp.MustCompile("^[a-f0-9]{40} [a-f0-9]{40} refs/[^ ]+$
 func WriteShellSecretFile(tb testing.TB, dir, secretToken string) string {
 	tb.Helper()
 
-	require.NoError(tb, os.MkdirAll(dir, perm.PrivateDir))
+	require.NoError(tb, os.MkdirAll(dir, mode.Directory))
 	filePath := filepath.Join(dir, ".gitlab_shell_secret")
-	require.NoError(tb, os.WriteFile(filePath, []byte(secretToken), perm.PrivateWriteOnceFile))
+	require.NoError(tb, os.WriteFile(filePath, []byte(secretToken), mode.File))
 	return filePath
 }
 
