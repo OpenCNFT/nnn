@@ -476,10 +476,7 @@ func (cf *ExecCommandFactory) newCommand(ctx context.Context, repo storage.Repos
 	//
 	// This Git configuration has been reverted in versions 2.45.2, 2.44.2, 2.43.5, and 2.42.3. Once
 	// these versions are no longer supported by Gitaly, these options can be removed.
-	if (cmdGitVersion.GreaterOrEqual(NewVersion(2, 45, 1, 0))) && cmdGitVersion.LessThan(NewVersion(2, 45, 2, 0)) ||
-		(cmdGitVersion.GreaterOrEqual(NewVersion(2, 44, 1, 0)) && cmdGitVersion.LessThan(NewVersion(2, 44, 2, 0))) ||
-		(cmdGitVersion.GreaterOrEqual(NewVersion(2, 43, 4, 0)) && cmdGitVersion.LessThan(NewVersion(2, 43, 5, 0))) ||
-		(cmdGitVersion.GreaterOrEqual(NewVersion(2, 42, 2, 0)) && cmdGitVersion.LessThan(NewVersion(2, 42, 3, 0))) {
+	if (cmdGitVersion.GreaterOrEqual(NewVersion(2, 45, 1, 0))) && cmdGitVersion.LessThan(NewVersion(2, 45, 2, 0)) {
 		config.globals = append(config.globals,
 			ConfigPair{Key: "fsck.symlinkPointsToGitDir", Value: "ignore"},
 			ConfigPair{Key: "fetch.fsck.symlinkPointsToGitDir", Value: "ignore"},

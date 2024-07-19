@@ -130,8 +130,6 @@ func TestWalkObjects(t *testing.T) {
 
 	cfg, repo, repoPath := setupRepo(t)
 
-	gittest.SkipIfGitVersionLessThan(t, ctx, cfg, git.NewVersion(2, 44, 0, 1), "WalkObjects requires fixes to rev-list --missing that will be releasd in Git v2.45.")
-
 	// This blob is not expected to be encountered during walk as the tree referencing it is missing.
 	unexpectedBlob := gittest.WriteBlob(t, cfg, repoPath, []byte("we should not see this blob during the walk"))
 	// Create a commit which has a tree missing from the object database. We expect the commit to be reported with the tree reported as missing.

@@ -214,8 +214,6 @@ func TestTransactionManager(t *testing.T) {
 	relativePath := gittest.NewRepositoryName(t)
 	setup := setupTest(t, ctx, testPartitionID, relativePath)
 
-	gittest.SkipIfGitVersionLessThan(t, ctx, setup.Config, git.NewVersion(2, 44, 0, 1), "WalkObjects requires fixes to rev-list --missing that will be releasd in Git v2.45.")
-
 	var testCases []transactionTestCase
 	subTests := [][]transactionTestCase{
 		generateCommonTests(t, ctx, setup),
