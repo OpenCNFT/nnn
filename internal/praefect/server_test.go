@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -487,6 +489,145 @@ func TestWarnDuplicateAddrs(t *testing.T) {
 	for _, entry := range hook.AllEntries() {
 		require.NotContains(t, entry.Message, "more than one backend node")
 	}
+}
+
+func TestGitalyServerSignature(t *testing.T) {
+	t.Parallel()
+	ctx := testhelper.Context(t)
+
+	expectedPublicKey, err := os.ReadFile(filepath.Join(testhelper.TestdataAbsolutePath(t), "signing_ssh_key_ed25519.pub"))
+	require.NoError(t, err)
+	pathToPrivateKey := filepath.Join(testhelper.TestdataAbsolutePath(t), "signing_ssh_key_ed25519")
+
+	t.Run("gitaly responds with ok", func(t *testing.T) {
+		firstCfg := testcfg.Build(t, testcfg.WithStorages("praefect-internal-1"))
+		firstCfg.Git.SigningKey = pathToPrivateKey
+		firstCfg.SocketPath = testserver.RunGitalyServer(t, firstCfg, setup.RegisterAll, testserver.WithDisablePraefect())
+
+		secondCfg := testcfg.Build(t, testcfg.WithStorages("praefect-internal-2"))
+		secondCfg.Git.SigningKey = pathToPrivateKey
+		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
+
+		require.NoError(t, storage.WriteMetadataFile(firstCfg.Storages[0].Path))
+		_, err := storage.ReadMetadataFile(firstCfg.Storages[0].Path)
+		require.NoError(t, err)
+
+		conf := config.Config{
+			VirtualStorages: []*config.VirtualStorage{
+				{
+					Name: "virtual-storage",
+					Nodes: []*config.Node{
+						{
+							Storage: firstCfg.Storages[0].Name,
+							Address: firstCfg.SocketPath,
+						},
+						{
+							Storage: secondCfg.Storages[0].Name,
+							Address: secondCfg.SocketPath,
+						},
+					},
+				},
+			},
+		}
+
+		nodeSet, err := DialNodes(ctx, conf.VirtualStorages, nil, nil, nil, nil, testhelper.SharedLogger(t))
+		require.NoError(t, err)
+		t.Cleanup(nodeSet.Close)
+
+		cc, _, cleanup := RunPraefectServer(t, ctx, conf, BuildOptions{
+			WithConnections: nodeSet.Connections(),
+		})
+		t.Cleanup(cleanup)
+
+		expected := &gitalypb.ServerSignatureResponse{
+			PublicKey: expectedPublicKey,
+		}
+
+		client := gitalypb.NewServerServiceClient(cc)
+		actual, err := client.ServerSignature(ctx, &gitalypb.ServerSignatureRequest{})
+		require.NoError(t, err)
+
+		require.Equal(t, expected.PublicKey, actual.PublicKey)
+	})
+
+	t.Run("gitaly signature mismatch between nodes", func(t *testing.T) {
+		firstCfg := testcfg.Build(t, testcfg.WithStorages("praefect-internal-1"))
+		firstCfg.Git.SigningKey = "wrong_key"
+		firstCfg.SocketPath = testserver.RunGitalyServer(t, firstCfg, setup.RegisterAll, testserver.WithDisablePraefect())
+
+		secondCfg := testcfg.Build(t, testcfg.WithStorages("praefect-internal-2"))
+		secondCfg.Git.SigningKey = pathToPrivateKey
+		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
+
+		require.NoError(t, storage.WriteMetadataFile(firstCfg.Storages[0].Path))
+		_, err := storage.ReadMetadataFile(firstCfg.Storages[0].Path)
+		require.NoError(t, err)
+
+		conf := config.Config{
+			VirtualStorages: []*config.VirtualStorage{
+				{
+					Name: "virtual-storage",
+					Nodes: []*config.Node{
+						{
+							Storage: firstCfg.Storages[0].Name,
+							Address: firstCfg.SocketPath,
+						},
+						{
+							Storage: secondCfg.Storages[0].Name,
+							Address: secondCfg.SocketPath,
+						},
+					},
+				},
+			},
+		}
+
+		nodeSet, err := DialNodes(ctx, conf.VirtualStorages, nil, nil, nil, nil, testhelper.SharedLogger(t))
+		require.NoError(t, err)
+		t.Cleanup(nodeSet.Close)
+
+		cc, _, cleanup := RunPraefectServer(t, ctx, conf, BuildOptions{
+			WithConnections: nodeSet.Connections(),
+		})
+		t.Cleanup(cleanup)
+
+		client := gitalypb.NewServerServiceClient(cc)
+		actual, err := client.ServerSignature(ctx, &gitalypb.ServerSignatureRequest{})
+		require.Nil(t, actual)
+		require.ErrorContains(t, err, "failed to parse signing key")
+	})
+
+	t.Run("gitaly responds with error", func(t *testing.T) {
+		cfg := testcfg.Build(t)
+
+		conf := config.Config{
+			VirtualStorages: []*config.VirtualStorage{
+				{
+					Name: "virtual-storage",
+					Nodes: []*config.Node{
+						{
+							Storage: cfg.Storages[0].Name,
+							Token:   cfg.Auth.Token,
+							Address: "unix:///invalid.addr",
+						},
+					},
+				},
+			},
+		}
+
+		nodeSet, err := DialNodes(ctx, conf.VirtualStorages, nil, nil, nil, nil, testhelper.SharedLogger(t))
+		require.NoError(t, err)
+		t.Cleanup(nodeSet.Close)
+
+		cc, _, cleanup := RunPraefectServer(t, ctx, conf, BuildOptions{
+			WithConnections: nodeSet.Connections(),
+		})
+		t.Cleanup(cleanup)
+
+		client := gitalypb.NewServerServiceClient(cc)
+		actual, err := client.ServerSignature(ctx, &gitalypb.ServerSignatureRequest{})
+		require.Nil(t, actual)
+		require.ErrorContains(t, err, "Unavailable desc = request signature from Praefect storage \"default\"")
+	})
 }
 
 func TestRemoveRepository(t *testing.T) {

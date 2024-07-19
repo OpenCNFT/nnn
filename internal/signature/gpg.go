@@ -43,6 +43,11 @@ func (sk *GpgSigningKey) CreateSignature(contentToSign []byte, date time.Time) (
 	return []byte(sigBuf.String()), nil
 }
 
+// PublicKey returns a public key for GPG key
+func (sk *GpgSigningKey) PublicKey() ([]byte, error) {
+	return nil, fmt.Errorf("gpg public key not implemented")
+}
+
 // Verify method verifies whether a signature has been created by this signing key
 func (sk *GpgSigningKey) Verify(signature, signedText []byte) error {
 	_, err := openpgp.CheckArmoredDetachedSignature(

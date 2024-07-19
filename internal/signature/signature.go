@@ -11,6 +11,7 @@ import (
 type SigningKey interface {
 	CreateSignature([]byte, time.Time) ([]byte, error)
 	Verify([]byte, []byte) error
+	PublicKey() ([]byte, error)
 }
 
 // SigningKeys represents all signing keys configured in the system.
@@ -64,6 +65,11 @@ func parseSigningKey(path string) (SigningKey, error) {
 // CreateSignature uses the primary key to create a signature
 func (s *SigningKeys) CreateSignature(contentToSign []byte, date time.Time) ([]byte, error) {
 	return s.primaryKey.CreateSignature(contentToSign, date)
+}
+
+// PublicKey returns a public key for key
+func (s *SigningKeys) PublicKey() ([]byte, error) {
+	return s.primaryKey.PublicKey()
 }
 
 // Verify iterates over all signing keys and returns nil if any

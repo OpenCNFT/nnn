@@ -28,6 +28,9 @@ func TestParseSigningKeys(t *testing.T) {
 	expectedGPGSignature, err := os.ReadFile("testdata/signing_key.gpg.sig")
 	require.NoError(t, err)
 
+	expectedPublicKey, err := os.ReadFile("testdata/signing_key.ssh.pub")
+	require.NoError(t, err)
+
 	signingKeys, err := ParseSigningKeys(primaryPath, secondaryPaths...)
 	require.NoError(t, err)
 	require.NotNil(t, signingKeys.primaryKey)
@@ -36,6 +39,10 @@ func TestParseSigningKeys(t *testing.T) {
 	signature, err := signingKeys.CreateSignature(commit, time.Now())
 	require.NoError(t, err)
 	require.Equal(t, expectedSSHSignature, signature)
+
+	publicKey, err := signingKeys.PublicKey()
+	require.NoError(t, err)
+	require.Equal(t, expectedPublicKey, publicKey)
 
 	require.NoError(t, signingKeys.Verify(expectedSSHSignature, commit))
 	require.NoError(t, signingKeys.Verify(expectedGPGSignature, commit))
@@ -49,6 +56,10 @@ func TestGPGSignatureDeterministic(t *testing.T) {
 
 	expectedGPGSignature, err := os.ReadFile("testdata/signing_key.gpg.sig")
 	require.NoError(t, err)
+
+	publicKey, err := signingKeys.PublicKey()
+	require.Error(t, err)
+	require.Empty(t, publicKey)
 
 	signature, err := signingKeys.CreateSignature(commit, time.Unix(1691162414, 0))
 	require.NoError(t, err)

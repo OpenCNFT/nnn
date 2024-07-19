@@ -42,10 +42,11 @@ var NonTransactionalRPCs = map[string]struct{}{
 
 	// These are missing annotations. We don't have a suitable scope for them
 	// so mark these as non-transactional here.
-	gitalypb.ServerService_DiskStatistics_FullMethodName: {},
-	gitalypb.ServerService_ServerInfo_FullMethodName:     {},
-	gitalypb.ServerService_ClockSynced_FullMethodName:    {},
-	gitalypb.ServerService_ReadinessCheck_FullMethodName: {},
+	gitalypb.ServerService_DiskStatistics_FullMethodName:  {},
+	gitalypb.ServerService_ServerInfo_FullMethodName:      {},
+	gitalypb.ServerService_ClockSynced_FullMethodName:     {},
+	gitalypb.ServerService_ReadinessCheck_FullMethodName:  {},
+	gitalypb.ServerService_ServerSignature_FullMethodName: {},
 }
 
 // repositoryCreatingRPCs are all of the RPCs that may create a repository.
