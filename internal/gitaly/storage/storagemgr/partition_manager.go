@@ -62,6 +62,11 @@ type PartitionManager struct {
 	metrics *metrics
 }
 
+type storageManagerMetrics struct {
+	partitionsStarted prometheus.Counter
+	partitionsStopped prometheus.Counter
+}
+
 // storageManager represents a single storage.
 type storageManager struct {
 	// mu synchronizes access to the fields of storageManager.
@@ -88,6 +93,9 @@ type storageManager struct {
 	partitions map[storage.PartitionID]*partition
 	// activePartitions keeps track of active partitions.
 	activePartitions sync.WaitGroup
+
+	// metrics are the metrics gathered from the storage manager.
+	metrics storageManagerMetrics
 }
 
 func (sm *storageManager) close() {
@@ -225,6 +233,8 @@ func NewPartitionManager(
 	promCfg gitalycfgprom.Config,
 	consumerFactory LogConsumerFactory,
 ) (*PartitionManager, error) {
+	metrics := newMetrics(promCfg)
+
 	storages := make(map[string]*storageManager, len(configuredStorages))
 	for _, configuredStorage := range configuredStorages {
 		repoFactory, err := localRepoFactory.ScopeByStorage(ctx, configuredStorage.Name)
@@ -264,10 +274,9 @@ func NewPartitionManager(
 			database:          db,
 			partitionAssigner: pa,
 			partitions:        map[storage.PartitionID]*partition{},
+			metrics:           metrics.storageManagerMetrics(configuredStorage.Name),
 		}
 	}
-
-	metrics := newMetrics(promCfg)
 
 	pm := &PartitionManager{
 		storages:       storages,
@@ -507,6 +516,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 
 			storageMgr.partitions[partitionID] = ptn
 
+			storageMgr.metrics.partitionsStarted.Inc()
 			storageMgr.activePartitions.Add(1)
 			go func() {
 				if err := mgr.Run(); err != nil {
@@ -535,6 +545,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 					logger.WithError(err).Error("failed removing partition's staging directory")
 				}
 
+				storageMgr.metrics.partitionsStopped.Inc()
 				close(ptn.closed)
 				storageMgr.activePartitions.Done()
 			}()

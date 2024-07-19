@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
@@ -148,6 +150,17 @@ func TestPartitionManager(t *testing.T) {
 	// closeManager closes the partition manager. This is done to simulate errors for transactions
 	// being processed without a running partition manager.
 	type closeManager struct{}
+
+	type metricValues struct {
+		partitionsStartedTotal uint64
+		partitionsStoppedTotal uint64
+	}
+
+	// assertMetrics is a step used to assert the current state of metrics.
+	type assertMetrics struct {
+		defaultStorage metricValues
+		otherStorage   metricValues
+	}
 
 	// checkExpectedState validates that the partition manager contains the correct partitions and
 	// associated transaction count at the point of execution.
@@ -864,6 +877,106 @@ func TestPartitionManager(t *testing.T) {
 				}
 			},
 		},
+		{
+			desc: "records metrics correctly",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				return setupData{
+					steps: steps{
+						begin{
+							transactionID: 1,
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 1,
+							},
+						},
+						begin{
+							transactionID: 2,
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 2,
+								},
+							},
+						},
+						commit{
+							transactionID: 1,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 1,
+							},
+						},
+						commit{transactionID: 2},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 1,
+								partitionsStoppedTotal: 1,
+							},
+						},
+						begin{
+							transactionID: 3,
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						begin{
+							transactionID: 4,
+							storageName:   cfg.Storages[1].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+								"other-storage": {
+									2: 1,
+								},
+							},
+						},
+						commit{
+							transactionID: 3,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"other-storage": {
+									2: 1,
+								},
+							},
+						},
+						commit{transactionID: 4},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 2,
+								partitionsStoppedTotal: 2,
+							},
+							otherStorage: metricValues{
+								partitionsStartedTotal: 1,
+								partitionsStoppedTotal: 1,
+							},
+						},
+					},
+				}
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
@@ -1018,6 +1131,25 @@ func TestPartitionManager(t *testing.T) {
 					partitionManagerStopped = true
 
 					partitionManager.Close()
+				case assertMetrics:
+					require.NoError(t, testutil.CollectAndCompare(partitionManager, strings.NewReader(fmt.Sprintf(`
+# HELP gitaly_partitions_started_total Number of partitions started.
+# TYPE gitaly_partitions_started_total counter
+gitaly_partitions_started_total{storage="default"} %d
+gitaly_partitions_started_total{storage="other-storage"} %d
+# HELP gitaly_partitions_stopped_total Number of partitions stopped.
+# TYPE gitaly_partitions_stopped_total counter
+gitaly_partitions_stopped_total{storage="default"} %d
+gitaly_partitions_stopped_total{storage="other-storage"} %d
+					`,
+						step.defaultStorage.partitionsStartedTotal,
+						step.otherStorage.partitionsStartedTotal,
+						step.defaultStorage.partitionsStoppedTotal,
+						step.otherStorage.partitionsStoppedTotal,
+					)),
+						"gitaly_partitions_started_total",
+						"gitaly_partitions_stopped_total",
+					))
 				}
 			}
 		})
