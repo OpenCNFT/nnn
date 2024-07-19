@@ -63,7 +63,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
@@ -73,7 +73,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -136,7 +136,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -147,7 +147,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunPackRefs{
@@ -187,7 +187,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -199,7 +199,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunPackRefs{
@@ -241,14 +241,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -296,14 +296,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -350,14 +350,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -407,14 +407,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -463,14 +463,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -519,11 +519,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
@@ -536,7 +536,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -579,7 +579,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "pool",
+					RelativePaths: []string{"pool"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -592,10 +592,9 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 				},
 				Begin{
-					TransactionID:            2,
-					RelativePath:             "member",
-					SnapshottedRelativePaths: []string{"pool"},
-					ExpectedSnapshotLSN:      1,
+					TransactionID:       2,
+					RelativePaths:       []string{"member", "pool"},
+					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
 					TransactionID: 2,
@@ -606,7 +605,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -617,12 +616,12 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 3,
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 3,
 				},
 				RunPackRefs{
@@ -676,14 +675,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -722,7 +721,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -741,7 +740,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunPackRefs{
@@ -790,8 +789,8 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
-					ReadOnly:     true,
+					RelativePaths: []string{setup.RelativePath},
+					ReadOnly:      true,
 				},
 				RunPackRefs{},
 				Commit{
@@ -816,7 +815,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{},
 				Commit{
@@ -845,14 +844,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 2,
@@ -895,7 +894,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "pool",
+					RelativePaths: []string{"pool"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -908,10 +907,9 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 				},
 				Begin{
-					TransactionID:            2,
-					RelativePath:             "member",
-					SnapshottedRelativePaths: []string{"pool"},
-					ExpectedSnapshotLSN:      1,
+					TransactionID:       2,
+					RelativePaths:       []string{"member", "pool"},
+					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
 					TransactionID: 2,
@@ -922,12 +920,12 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 2,
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 2,
 				},
 				RunPackRefs{
@@ -988,7 +986,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
@@ -998,7 +996,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunPackRefs{
@@ -1038,14 +1036,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunPackRefs{
 					TransactionID: 1,
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    2,
@@ -1053,7 +1051,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
@@ -1142,7 +1140,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1196,7 +1194,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1246,7 +1244,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1295,7 +1293,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1348,7 +1346,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1405,7 +1403,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1456,7 +1454,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1508,7 +1506,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1558,7 +1556,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1616,7 +1614,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1631,7 +1629,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunRepack{
@@ -1688,7 +1686,7 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1745,7 +1743,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -1783,7 +1781,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -1799,7 +1797,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunRepack{
@@ -1850,7 +1848,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -1866,7 +1864,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunRepack{
@@ -1880,7 +1878,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -1938,7 +1936,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -1954,12 +1952,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunRepack{
@@ -2025,7 +2023,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -2041,12 +2039,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunRepack{
@@ -2102,7 +2100,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -2115,7 +2113,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RunRepack{
@@ -2126,7 +2124,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -2140,7 +2138,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -2154,7 +2152,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 3,
 				},
 				Commit{
@@ -2227,7 +2225,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -2242,7 +2240,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -2253,12 +2251,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				RunRepack{
@@ -2314,7 +2312,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -2329,7 +2327,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -2340,12 +2338,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				RunRepack{
@@ -2400,7 +2398,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -2415,7 +2413,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -2426,12 +2424,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				RunRepack{
@@ -2492,7 +2490,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -2507,12 +2505,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				UpdateReferences{
@@ -2583,7 +2581,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -2592,12 +2590,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -2667,7 +2665,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -2676,12 +2674,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -2744,7 +2742,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "pool",
+					RelativePaths: []string{"pool"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -2757,10 +2755,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					TransactionID: 1,
 				},
 				Begin{
-					TransactionID:            2,
-					RelativePath:             "member",
-					SnapshottedRelativePaths: []string{"pool"},
-					ExpectedSnapshotLSN:      1,
+					TransactionID:       2,
+					RelativePaths:       []string{"member", "pool"},
+					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
 					TransactionID: 2,
@@ -2771,7 +2768,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -2786,7 +2783,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 3,
 				},
 				Commit{
@@ -2797,7 +2794,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 4,
 				},
 				Commit{
@@ -2809,7 +2806,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       6,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 5,
 				},
 				RunRepack{
@@ -2902,7 +2899,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "pool",
+					RelativePaths: []string{"pool"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -2915,10 +2912,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					TransactionID: 1,
 				},
 				Begin{
-					TransactionID:            2,
-					RelativePath:             "member",
-					SnapshottedRelativePaths: []string{"pool"},
-					ExpectedSnapshotLSN:      1,
+					TransactionID:       2,
+					RelativePaths:       []string{"member", "pool"},
+					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
 					TransactionID: 2,
@@ -2929,7 +2925,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -2944,7 +2940,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 3,
 				},
 				Commit{
@@ -2955,7 +2951,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 4,
 				},
 				RunRepack{
@@ -3028,7 +3024,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "pool",
+					RelativePaths: []string{"pool"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -3041,10 +3037,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					TransactionID: 1,
 				},
 				Begin{
-					TransactionID:            2,
-					RelativePath:             "member",
-					SnapshottedRelativePaths: []string{"pool"},
-					ExpectedSnapshotLSN:      1,
+					TransactionID:       2,
+					RelativePaths:       []string{"member", "pool"},
+					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
 					TransactionID: 2,
@@ -3055,7 +3050,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -3069,7 +3064,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 3,
 				},
 				Commit{
@@ -3085,7 +3080,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 4,
 				},
 				Commit{
@@ -3097,7 +3092,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       6,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 5,
 				},
 				RunRepack{
@@ -3191,7 +3186,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "pool",
+					RelativePaths: []string{"pool"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -3204,10 +3199,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					TransactionID: 1,
 				},
 				Begin{
-					TransactionID:            2,
-					RelativePath:             "member",
-					SnapshottedRelativePaths: []string{"pool"},
-					ExpectedSnapshotLSN:      1,
+					TransactionID:       2,
+					RelativePaths:       []string{"member", "pool"},
+					ExpectedSnapshotLSN: 1,
 				},
 				CreateRepository{
 					TransactionID: 2,
@@ -3218,7 +3212,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -3236,7 +3230,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        "pool",
+					RelativePaths:       []string{"pool"},
 					ExpectedSnapshotLSN: 3,
 				},
 				Commit{
@@ -3248,7 +3242,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        "member",
+					RelativePaths:       []string{"member"},
 					ExpectedSnapshotLSN: 4,
 				},
 				RunRepack{
@@ -3339,11 +3333,11 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -3411,11 +3405,11 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RunRepack{
 					TransactionID: 1,
@@ -3492,7 +3486,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -3506,7 +3500,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				WriteCommitGraphs{
@@ -3561,7 +3555,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				WriteCommitGraphs{
 					TransactionID: 1,
@@ -3608,7 +3602,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				WriteCommitGraphs{
 					TransactionID: 1,
@@ -3649,7 +3643,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -3667,7 +3661,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				WriteCommitGraphs{
@@ -3681,7 +3675,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				RunRepack{
@@ -3695,7 +3689,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 3,
 				},
 				Commit{
@@ -3709,7 +3703,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 4,
 				},
 				WriteCommitGraphs{
@@ -3787,7 +3781,7 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				WriteCommitGraphs{
 					TransactionID: 1,

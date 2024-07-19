@@ -26,7 +26,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -69,7 +69,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -112,7 +112,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -122,7 +122,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -166,7 +166,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -176,7 +176,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				ConsumerAcknowledge{
@@ -222,7 +222,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -235,7 +235,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -246,12 +246,12 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				ConsumerAcknowledge{
@@ -308,7 +308,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,

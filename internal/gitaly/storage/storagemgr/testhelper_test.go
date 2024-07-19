@@ -630,11 +630,8 @@ type Begin struct {
 	// TransactionID is the identifier given to the transaction created. This is used to identify
 	// the transaction in later steps.
 	TransactionID int
-	// RelativePath is the relative path of the repository this transaction is operating on.
-	RelativePath string
-	// SnapshottedRelativePaths are the relative paths of the repositories to include in the snapshot
-	// in addition to the target repository.
-	SnapshottedRelativePaths []string
+	// RelativePath are the relative paths of the repositories this transaction is operating on.
+	RelativePaths []string
 	// ReadOnly indicates whether this is a read-only transaction.
 	ReadOnly bool
 	// Context is the context to use for the Begin call.
@@ -1035,15 +1032,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				beginCtx = step.Context
 			}
 
-			var relativePaths []string
-			if step.RelativePath != "" {
-				relativePaths = append(relativePaths, step.RelativePath)
-			}
-			if len(step.SnapshottedRelativePaths) > 0 {
-				relativePaths = append(relativePaths, step.SnapshottedRelativePaths...)
-			}
-
-			transaction, err := transactionManager.Begin(beginCtx, relativePaths, step.ReadOnly)
+			transaction, err := transactionManager.Begin(beginCtx, step.RelativePaths, step.ReadOnly)
 			require.ErrorIs(t, err, step.ExpectedError)
 			if err == nil {
 				require.Equalf(t, step.ExpectedSnapshotLSN, transaction.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")

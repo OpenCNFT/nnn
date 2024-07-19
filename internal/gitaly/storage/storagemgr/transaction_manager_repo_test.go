@@ -18,7 +18,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				RemoveRepository{},
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{},
 				Commit{},
@@ -42,11 +42,11 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -80,7 +80,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				RemoveRepository{},
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{
 					DefaultBranch: "refs/heads/branch",
@@ -132,7 +132,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -147,13 +147,13 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ReadOnly:            true,
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -162,7 +162,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				CreateRepository{
@@ -206,7 +206,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ReadOnly:            true,
 					ExpectedSnapshotLSN: 3,
 				},
@@ -271,7 +271,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -286,7 +286,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -315,7 +315,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -371,7 +371,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				RemoveRepository{},
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{},
 			},
@@ -386,11 +386,11 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  "repository-1",
+					RelativePaths: []string{"repository-1"},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  "repository-2",
+					RelativePaths: []string{"repository-2"},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -474,7 +474,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -482,7 +482,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RepositoryAssertion{
@@ -506,7 +506,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -517,7 +517,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RepositoryAssertion{
@@ -541,11 +541,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -570,11 +570,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -599,11 +599,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -630,11 +630,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -668,7 +668,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -681,7 +681,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RepositoryAssertion{
@@ -712,7 +712,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -725,7 +725,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				RepositoryAssertion{
@@ -751,11 +751,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -787,11 +787,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -830,8 +830,8 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
-					ReadOnly:     true,
+					RelativePaths: []string{setup.RelativePath},
+					ReadOnly:      true,
 				},
 				Commit{
 					DeleteRepository: true,
@@ -846,7 +846,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -863,12 +863,12 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -908,7 +908,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				RepositoryAssertion{
@@ -933,7 +933,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CreateRepository{
 					TransactionID: 1,
@@ -943,7 +943,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -958,7 +958,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -967,7 +967,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 3,
 				},
 				CreateRepository{
