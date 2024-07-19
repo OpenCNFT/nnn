@@ -241,7 +241,7 @@ to invoke the gRPC endpoints of Gitaly locally:
 
    ```shell
    $ grpcurl -plaintext -unix <socket address> list
-   
+
    gitaly.BlobService
    gitaly.CleanupService
    gitaly.CommitService
@@ -274,3 +274,10 @@ To use your custom Gitaly when running Rails tests in GDK, go to the
 [gitaly]: https://gitlab.com/gitlab-org/gitaly
 [gitaly-proto]: https://gitlab.com/gitlab-org/gitaly/tree/master/proto
 [proto-docs]: https://developers.google.com/protocol-buffers/docs/overview
+
+## Kubernetes
+
+The [Gitaly on GKE](https://gitlab.com/gitlab-com/infra-standards/project-templates/gitaly-on-gke-template)
+HackyStack template provides an easy path to deploying Gitaly alongside a full GitLab installation onto Google
+Kubernetes Engine. Consult the [README](https://gitlab.com/gitlab-com/infra-standards/project-templates/gitaly-on-gke-template/-/blob/main/README.md)
+for information on getting started.
