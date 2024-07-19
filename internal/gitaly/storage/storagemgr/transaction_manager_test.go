@@ -1838,7 +1838,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 				require.NoError(b, err)
 
 				for j := 0; j < tc.concurrentUpdaters; j++ {
-					transaction, err := manager.Begin(ctx, repo.RelativePath, nil, false)
+					transaction, err := manager.Begin(ctx, []string{repo.RelativePath}, false)
 					require.NoError(b, err)
 					transaction.UpdateReferences(getReferenceUpdates(j, objectHash.ZeroOID, commit1))
 					require.NoError(b, transaction.Commit(ctx))
@@ -1858,7 +1858,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 					currentReferences := getReferenceUpdates(i, commit1, commit2)
 					nextReferences := getReferenceUpdates(i, commit2, commit1)
 
-					transaction, err := manager.Begin(ctx, relativePath, nil, false)
+					transaction, err := manager.Begin(ctx, []string{relativePath}, false)
 					require.NoError(b, err)
 					transaction.UpdateReferences(currentReferences)
 
@@ -1870,7 +1870,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 						defer transactionWG.Done()
 
 						for range transactionChan {
-							transaction, err := manager.Begin(ctx, relativePath, nil, false)
+							transaction, err := manager.Begin(ctx, []string{relativePath}, false)
 							require.NoError(b, err)
 							transaction.UpdateReferences(nextReferences)
 							assert.NoError(b, transaction.Commit(ctx))

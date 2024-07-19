@@ -303,14 +303,12 @@ type BeginOptions struct {
 // The returned Transaction's read snapshot includes all writes that were committed prior to the
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
 //
-// relativePath is the relative path of the target repository the transaction is operating on.
-//
-// snapshottedRelativePaths are the relative paths to snapshot in addition to target repository.
-// These are read-only as the transaction can only perform changes against the target repository.
+// relativePaths are the repositories that will be part of the snapshot. Only
+// the first repository will be checked for writes.
 //
 // readOnly indicates whether this is a read-only transaction. Read-only transactions are not
 // configured with a quarantine directory and do not commit a log entry.
-func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, snapshottedRelativePaths []string, readOnly bool, possibleOpts ...BeginOptions) (_ *Transaction, returnedErr error) {
+func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string, readOnly bool, possibleOpts ...BeginOptions) (_ *Transaction, returnedErr error) {
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
 	select {
@@ -329,18 +327,16 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.Begin", nil)
 	span.SetTag("readonly", readOnly)
-	span.SetTag("relativePath", relativePath)
 	defer span.Finish()
 
 	mgr.mutex.Lock()
 
 	txn := &Transaction{
-		readOnly:     readOnly,
-		commit:       mgr.commit,
-		snapshotLSN:  mgr.appendedLSN,
-		finished:     make(chan struct{}),
-		relativePath: relativePath,
-		metrics:      transactionMetrics{housekeeping: mgr.metrics.housekeeping},
+		readOnly:    readOnly,
+		commit:      mgr.commit,
+		snapshotLSN: mgr.appendedLSN,
+		finished:    make(chan struct{}),
+		metrics:     transactionMetrics{housekeeping: mgr.metrics.housekeeping},
 	}
 
 	mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Add(1)
@@ -423,18 +419,20 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 	case <-mgr.ctx.Done():
 		return nil, ErrTransactionProcessingStopped
 	case <-readReady:
+		if len(relativePaths) > 0 {
+			// Set the first repository as the tracked repository
+			txn.relativePath = relativePaths[0]
+			span.SetTag("relativePath", txn.relativePath)
+		}
+
 		var err error
 		txn.stagingDirectory, err = os.MkdirTemp(mgr.stagingDirectory, "")
 		if err != nil {
 			return nil, fmt.Errorf("mkdir temp: %w", err)
 		}
 
-		if txn.repositoryTarget() {
-			snapshottedRelativePaths = append(snapshottedRelativePaths, txn.relativePath)
-		}
-
 		if txn.snapshot, err = mgr.snapshotManager.GetSnapshot(ctx,
-			snapshottedRelativePaths,
+			relativePaths,
 			!txn.readOnly || opts.ForceExclusiveSnapshot,
 		); err != nil {
 			return nil, fmt.Errorf("get snapshot: %w", err)

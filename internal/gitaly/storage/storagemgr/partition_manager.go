@@ -31,7 +31,7 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 // transactionManager is the interface of TransactionManager as used by PartitionManager. See the
 // TransactionManager's documentation for more details.
 type transactionManager interface {
-	Begin(context.Context, string, []string, bool, ...BeginOptions) (*Transaction, error)
+	Begin(context.Context, []string, bool, ...BeginOptions) (*Transaction, error)
 	Run() error
 	Close()
 	isClosing() bool
@@ -349,6 +349,8 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
 	}
 
+	var relativePaths []string
+
 	if partitionID == invalidPartitionID {
 		relativePath, err := storage.ValidateRelativePath(storageMgr.path, relativePath)
 		if err != nil {
@@ -365,6 +367,8 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 
 			return nil, fmt.Errorf("get partition: %w", err)
 		}
+
+		relativePaths = []string{relativePath}
 	}
 
 	relativeStateDir := deriveStateDirectory(partitionID)
@@ -382,12 +386,11 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 		return nil, err
 	}
 
-	var snapshottedRelativePaths []string
 	if opts.AlternateRelativePath != "" {
-		snapshottedRelativePaths = []string{opts.AlternateRelativePath}
+		relativePaths = append(relativePaths, opts.AlternateRelativePath)
 	}
 
-	transaction, err := ptn.transactionManager.Begin(ctx, relativePath, snapshottedRelativePaths, opts.ReadOnly, BeginOptions{
+	transaction, err := ptn.transactionManager.Begin(ctx, relativePaths, opts.ReadOnly, BeginOptions{
 		ForceExclusiveSnapshot: opts.ForceExclusiveSnapshot,
 	})
 	if err != nil {
@@ -442,7 +445,7 @@ func (pm *PartitionManager) StorageKV(ctx context.Context, storageName string, r
 	}
 	defer storageMgr.finalizeTransaction(ptn)
 
-	transaction, err := ptn.transactionManager.Begin(ctx, "", nil, readOnly)
+	transaction, err := ptn.transactionManager.Begin(ctx, []string{}, readOnly)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
