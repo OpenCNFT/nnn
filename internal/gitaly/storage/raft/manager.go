@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
-	"google.golang.org/protobuf/proto"
 )
 
 // Group is an abstract data structure that stores information of a Raft group.
@@ -87,10 +86,6 @@ type Statemachine interface {
 
 	// LastApplied returns the last applied index of the state machine.
 	LastApplied() (raftID, error)
-	// SupportRead returns if the statemachine supports input read operation.
-	SupportRead(proto.Message) bool
-	// SupportWrite returns if the statemachine supports input write operation.
-	SupportWrite(proto.Message) bool
 }
 
 // ManagerConfig contains the configuration options for the Raft manager.

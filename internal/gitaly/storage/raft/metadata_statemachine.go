@@ -139,27 +139,6 @@ func (s *metadataStateMachine) update(txn keyvalue.ReadWriter, entries []statema
 	return returnedEntries, nil
 }
 
-// SupportRead returns whether s supports the requested read operation.
-func (s *metadataStateMachine) SupportRead(req proto.Message) bool {
-	switch req.(type) {
-	case *gitalypb.GetClusterRequest:
-		return true
-	}
-
-	return false
-}
-
-// SupportWrite returns whether s supports the requested write operation.
-func (s *metadataStateMachine) SupportWrite(req proto.Message) bool {
-	switch req.(type) {
-	case *gitalypb.BootstrapClusterRequest,
-		*gitalypb.RegisterStorageRequest:
-		return true
-	}
-
-	return false
-}
-
 func (s *metadataStateMachine) updateEntry(cluster *gitalypb.Cluster, entry *statemachine.Entry) (*statemachine.Result, error) {
 	msg, err := anyProtoUnmarshal(entry.Cmd)
 	if err != nil {
