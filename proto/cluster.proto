@@ -82,3 +82,21 @@ message RegisterStorageResponse {
   // storage contains the details of the newly registered storage.
   Storage storage = 1;
 }
+
+// UpdateStorageRequest is the request message for updating info of an existing storage. The
+// metadata Raft group restricts which info could be updated. Any of those changes might shuffle the
+// replica groups of storages.
+message UpdateStorageRequest {
+  // storage_id is the ID of storage needed to update.
+  uint64 storage_id = 1;
+  // node_id is the new node that the storage resides.
+  uint64 node_id = 2;
+  // replication_factor is the new replication factor.
+  uint64 replication_factor = 3;
+}
+
+// UpdateStorageResponse is the response message of newly updated storage.
+message UpdateStorageResponse {
+  // storage contains the details of the newly updated storage.
+  Storage storage = 1;
+}

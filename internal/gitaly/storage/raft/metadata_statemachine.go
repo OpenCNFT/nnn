@@ -27,6 +27,8 @@ const (
 	resultRegisterStorageSuccessful
 	resultStorageAlreadyRegistered
 	resultRegisterStorageClusterNotBootstrappedYet
+	resultUpdateStorageSuccessful
+	resultUpdateStorageNotFound
 )
 
 var (
@@ -78,6 +80,7 @@ func (s *metadataStateMachine) Cluster() (cluster *gitalypb.Cluster, err error) 
 // following operations:
 //   - gitalypb.BootstrapClusterRequest to bootstrap a cluster for the first time.
 //   - gitalypb.RegisterStorageRequest to register a new storage.
+//   - gitalypb.UpdateStorageRequest to update info of a storage.
 func (s *metadataStateMachine) Update(entries []statemachine.Entry) ([]statemachine.Entry, error) {
 	var returnedEntries []statemachine.Entry
 
@@ -168,6 +171,8 @@ func (s *metadataStateMachine) updateEntry(cluster *gitalypb.Cluster, entry *sta
 		return s.handleBootstrapClusterRequest(req, cluster)
 	case *gitalypb.RegisterStorageRequest:
 		return s.handleRegisterStorageRequest(req, cluster)
+	case *gitalypb.UpdateStorageRequest:
+		return s.handleUpdateStorageRequest(req, cluster)
 	}
 
 	return nil, fmt.Errorf("request not supported: %s", msg.ProtoReflect().Descriptor().Name())
@@ -226,6 +231,38 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 	}
 
 	result.Value = uint64(resultRegisterStorageSuccessful)
+	result.Data = response
+	return &result, nil
+}
+
+func (s *metadataStateMachine) handleUpdateStorageRequest(req *gitalypb.UpdateStorageRequest, cluster *gitalypb.Cluster) (*statemachine.Result, error) {
+	var result statemachine.Result
+
+	if cluster.ClusterId == "" || cluster.NextStorageId == 0 {
+		result.Value = uint64(resultUpdateStorageNotFound)
+		return &result, nil
+	}
+
+	if cluster.Storages == nil {
+		cluster.Storages = map[uint64]*gitalypb.Storage{}
+	}
+
+	storage := cluster.Storages[req.GetStorageId()]
+	if storage == nil {
+		result.Value = uint64(resultUpdateStorageNotFound)
+		return &result, nil
+	}
+
+	storage.ReplicationFactor = req.GetReplicationFactor()
+	storage.NodeId = req.GetNodeId()
+	s.replicaPlacement.apply(cluster.Storages)
+
+	response, err := anyProtoMarshal(&gitalypb.UpdateStorageResponse{Storage: storage})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling register response: %w", err)
+	}
+
+	result.Value = uint64(resultUpdateStorageSuccessful)
 	result.Data = response
 	return &result, nil
 }
