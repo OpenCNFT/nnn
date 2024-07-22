@@ -238,30 +238,8 @@ func (m *Manager) Start() (returnedErr error) {
 		return fmt.Errorf("joining the wrong cluster, expected to join %q but joined %q", m.clusterConfig.ClusterID, cluster.ClusterId)
 	}
 
-	if m.managerConfig.testBeforeRegister != nil {
-		m.managerConfig.testBeforeRegister()
-	}
-
-	// Register storage ID if not exist. Similarly, this operation is handled by the metadata group.
-	// It will be handled by the metadata authority in the future.
-	for storageName, storageMgr := range m.storageManagers {
-		if err := storageMgr.loadStorageInfo(m.ctx); err != nil {
-			return fmt.Errorf("loading persisted storage info: %w", err)
-		}
-		if storageMgr.persistedInfo == nil || storageMgr.persistedInfo.GetStorageId() == 0 {
-			storageInfo, err := m.metadataGroup.RegisterStorage(storageName)
-			if err != nil {
-				return fmt.Errorf("registering storage info: %w", err)
-			}
-			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
-				return fmt.Errorf("saving storage info: %w", err)
-			}
-		}
-		m.logger.WithFields(log.Fields{
-			"storage_name":       storageName,
-			"storage_id":         storageMgr.persistedInfo.GetStorageId(),
-			"replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
-		}).Info("storage joined the cluster")
+	if err := m.registerStorages(); err != nil {
+		return err
 	}
 
 	m.logger.Info("Raft cluster has started")
@@ -282,6 +260,47 @@ func (m *Manager) initMetadataGroup(storageMgr *storageManager) error {
 	m.metadataGroup = metadataGroup
 
 	return m.metadataGroup.WaitReady()
+}
+
+func (m *Manager) registerStorages() error {
+	if m.managerConfig.testBeforeRegister != nil {
+		m.managerConfig.testBeforeRegister()
+	}
+
+	// Register storage ID if not exist. Similarly, this operation is handled by the metadata group.
+	// It will be handled by the metadata authority in the future.
+	for storageName, storageMgr := range m.storageManagers {
+		if err := storageMgr.loadStorageInfo(m.ctx); err != nil {
+			return fmt.Errorf("loading persisted storage info: %w", err)
+		}
+		if storageMgr.persistedInfo == nil || storageMgr.persistedInfo.GetStorageId() == 0 {
+			storageInfo, err := m.metadataGroup.RegisterStorage(storageName)
+			if err != nil {
+				return fmt.Errorf("registering storage info: %w", err)
+			}
+			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
+				return fmt.Errorf("saving storage info: %w", err)
+			}
+		} else if storageMgr.persistedInfo.NodeId != m.clusterConfig.NodeID || storageMgr.persistedInfo.ReplicationFactor != m.clusterConfig.ReplicationFactor {
+			// Changes that gonna affect replication. Gitaly needs to sync up those changes to metadata
+			// Raft group to shuffle the replication groups. We don't persit new info intentionally. The
+			// replication of this node will be applied by the replicators later.
+			if _, err := m.metadataGroup.UpdateStorage(
+				raftID(storageMgr.persistedInfo.StorageId),
+				raftID(m.clusterConfig.NodeID),
+				m.clusterConfig.ReplicationFactor,
+			); err != nil {
+				return fmt.Errorf("updating storage info: %w", err)
+			}
+		}
+		m.logger.WithFields(log.Fields{
+			"storage_name":       storageName,
+			"storage_id":         storageMgr.persistedInfo.GetStorageId(),
+			"replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
+		}).Info("storage joined the cluster")
+	}
+
+	return nil
 }
 
 // Ready returns if the Raft manager is ready.

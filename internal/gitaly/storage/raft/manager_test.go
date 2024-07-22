@@ -434,4 +434,53 @@ func TestManager_Start(t *testing.T) {
 		_, err := NewManager(ctx, cfg.Storages, config.Raft{}, managerTestConfig(true), ptnMgr, logger)
 		require.EqualError(t, err, "the support for multiple storages is temporarily disabled")
 	})
+
+	t.Run("change replication factors of storages after restart", func(t *testing.T) {
+		t.Parallel()
+
+		cluster := newTestRaftCluster(t, 3, withNodeStarter(startManager(t)), withRaftClusterConfig(func(cfg config.Raft) config.Raft {
+			cfg.ReplicationFactor = 1
+			return cfg
+		}))
+		defer cluster.closeAll()
+
+		fanOut(3, func(node raftID) {
+			require.NoError(t, cluster.nodes[node].manager.Start())
+
+			storage := cluster.nodes[node].manager.firstStorage
+			require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+			require.Equal(t, storage.name, storage.persistedInfo.Name)
+			require.Equal(t, uint64(1), storage.persistedInfo.ReplicationFactor)
+			require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
+			require.Equal(t, []uint64(nil), storage.persistedInfo.ReplicaGroups) // Because replication factor = 1
+		})
+
+		for _, node := range cluster.nodes {
+			resetManager(t, node.manager)
+			node.manager.managerConfig.BootstrapCluster = false
+			node.manager.clusterConfig.ReplicationFactor = 3
+		}
+
+		fanOut(3, func(node raftID) {
+			mgr := cluster.nodes[node].manager
+
+			require.NoError(t, mgr.Start())
+
+			require.NoError(t, mgr.metadataGroup.WaitReady())
+			clusterInfo, err := mgr.ClusterInfo()
+			require.NoError(t, err)
+
+			require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
+			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
+
+			expectedInfo := &gitalypb.Storage{
+				StorageId:         mgr.firstStorage.id.ToUint64(),
+				Name:              mgr.firstStorage.name,
+				ReplicationFactor: 3, // New replication factor
+				NodeId:            node.ToUint64(),
+				ReplicaGroups:     replicaGroups(mgr.firstStorage.id, 3), // New replica groups
+			}
+			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
+		})
+	})
 }
