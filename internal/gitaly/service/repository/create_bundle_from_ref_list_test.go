@@ -44,8 +44,15 @@ func TestCreateBundleFromRefList_success(t *testing.T) {
 	c, err := client.CreateBundleFromRefList(ctx)
 	require.NoError(t, err)
 
+	// Send only the repo first and get the acknowledgement
 	require.NoError(t, c.Send(&gitalypb.CreateBundleFromRefListRequest{
 		Repository: repo,
+	}))
+	response, err := c.Recv()
+	require.NoError(t, err)
+	require.Empty(t, response.Data) // First response is only an acknowledgement without any data
+
+	require.NoError(t, c.Send(&gitalypb.CreateBundleFromRefListRequest{
 		Patterns: [][]byte{
 			[]byte("master"),
 			[]byte("^master~1"),
@@ -83,8 +90,15 @@ func TestCreateBundleFromRefList_missing_ref(t *testing.T) {
 	c, err := client.CreateBundleFromRefList(ctx)
 	require.NoError(t, err)
 
+	// Send only the repo first and get the acknowledgement
 	require.NoError(t, c.Send(&gitalypb.CreateBundleFromRefListRequest{
 		Repository: repo,
+	}))
+	response, err := c.Recv()
+	require.NoError(t, err)
+	require.Empty(t, response.Data) // First response is only an acknowledgement without any data
+
+	require.NoError(t, c.Send(&gitalypb.CreateBundleFromRefListRequest{
 		Patterns: [][]byte{
 			[]byte("refs/heads/master"),
 			[]byte("refs/heads/totally_missing"),
@@ -110,45 +124,64 @@ func TestCreateBundleFromRefList_missing_ref(t *testing.T) {
 	require.Contains(t, string(output), fmt.Sprintf("The bundle contains this ref:\n%s refs/heads/master", commitOID))
 }
 
-func TestCreateBundleFromRefList_validations(t *testing.T) {
+func TestCreateBundleFromRefList_PatternsValidation(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
 	cfg, client := setupRepositoryService(t)
 	repo, _ := gittest.CreateRepository(t, ctx, cfg)
 
-	testCases := []struct {
-		desc        string
-		request     *gitalypb.CreateBundleFromRefListRequest
-		expectedErr error
-	}{
-		{
-			desc: "empty repository",
-			request: &gitalypb.CreateBundleFromRefListRequest{
-				Patterns: [][]byte{[]byte("master")},
-			},
-			expectedErr: structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet),
-		},
-		{
-			desc: "empty bundle",
-			request: &gitalypb.CreateBundleFromRefListRequest{
-				Repository: repo,
-				Patterns:   [][]byte{[]byte("master"), []byte("^master")},
-			},
-			expectedErr: status.Error(codes.FailedPrecondition, "create bundle: refusing to create empty bundle"),
-		},
-	}
+	stream, err := client.CreateBundleFromRefList(ctx)
+	require.NoError(t, err)
 
-	for _, testCase := range testCases {
-		t.Run(testCase.desc, func(t *testing.T) {
-			stream, err := client.CreateBundleFromRefList(ctx)
-			require.NoError(t, err)
+	require.NoError(t, stream.Send(&gitalypb.CreateBundleFromRefListRequest{
+		Repository: repo,
+		Patterns:   [][]byte{[]byte("master")},
+	}))
+	require.NoError(t, stream.CloseSend())
+	_, err = stream.Recv()
+	testhelper.RequireGrpcError(t, structerr.NewInvalidArgument("patterns should not be set for the first request in the stream"), err)
+}
 
-			require.NoError(t, stream.Send(testCase.request))
-			require.NoError(t, stream.CloseSend())
-			for _, err = stream.Recv(); err == nil; _, err = stream.Recv() {
-			}
-			testhelper.RequireGrpcError(t, testCase.expectedErr, err)
-		})
+func TestCreateBundleFromRefList_RepositoryValidation(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+	_, client := setupRepositoryService(t)
+
+	stream, err := client.CreateBundleFromRefList(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, stream.Send(&gitalypb.CreateBundleFromRefListRequest{}))
+	require.NoError(t, stream.CloseSend())
+	_, err = stream.Recv()
+	testhelper.RequireGrpcError(t, structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet), err)
+}
+
+func TestCreateBundleFromRefList_BundleValidation(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+	cfg, client := setupRepositoryService(t)
+	repo, _ := gittest.CreateRepository(t, ctx, cfg)
+
+	stream, err := client.CreateBundleFromRefList(ctx)
+	require.NoError(t, err)
+
+	// Send only the repo first and get the acknowledgement
+	require.NoError(t, stream.Send(&gitalypb.CreateBundleFromRefListRequest{
+		Repository: repo,
+	}))
+	response, err := stream.Recv()
+	require.NoError(t, err)
+	require.Empty(t, response.Data) // First response is only an acknowledgement without any data
+
+	require.NoError(t, stream.Send(&gitalypb.CreateBundleFromRefListRequest{
+		Patterns: [][]byte{[]byte("master"), []byte("^master")},
+	}))
+
+	require.NoError(t, stream.CloseSend())
+	for _, err = stream.Recv(); err == nil; _, err = stream.Recv() {
 	}
+	testhelper.RequireGrpcError(t, status.Error(codes.FailedPrecondition, "create bundle: refusing to create empty bundle"), err)
 }

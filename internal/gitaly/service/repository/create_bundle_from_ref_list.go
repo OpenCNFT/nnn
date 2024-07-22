@@ -18,10 +18,18 @@ func (s *server) CreateBundleFromRefList(stream gitalypb.RepositoryService_Creat
 	if err != nil {
 		return err
 	}
+	if firstRequest.GetPatterns() != nil {
+		return structerr.NewInvalidArgument("patterns should not be set for the first request in the stream")
+	}
 
 	repository := firstRequest.GetRepository()
 	if err := s.locator.ValidateRepository(ctx, repository); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
+	}
+
+	// Acknowledge the stream header for client to start the data stream.
+	if err := stream.Send(&gitalypb.CreateBundleFromRefListResponse{}); err != nil {
+		return err
 	}
 
 	repo := s.localrepo(repository)
@@ -30,18 +38,10 @@ func (s *server) CreateBundleFromRefList(stream gitalypb.RepositoryService_Creat
 		return structerr.NewInternal("cleaning up worktrees: %w", err)
 	}
 
-	firstRead := true
 	patterns := streamio.NewReader(func() ([]byte, error) {
-		var request *gitalypb.CreateBundleFromRefListRequest
-		if firstRead {
-			firstRead = false
-			request = firstRequest
-		} else {
-			var err error
-			request, err = stream.Recv()
-			if err != nil {
-				return nil, err
-			}
+		request, err := stream.Recv()
+		if err != nil {
+			return nil, err
 		}
 		return append(bytes.Join(request.GetPatterns(), []byte("\n")), '\n'), nil
 	})
