@@ -3034,7 +3034,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 	}, nil
 }
 
-// verifyPackRefs verifies if the pack-refs housekeeping task can be logged. Ideally, we can just apply the packed-refs
+// verifyPackRefsFiles verifies if the pack-refs housekeeping task can be logged. Ideally, we can just apply the packed-refs
 // file and prune the loose references. Unfortunately, there could be a ref modification between the time the pack-refs
 // command runs and the time this transaction is logged. Thus, we need to verify if the transaction conflicts with the
 // current state of the repository.
@@ -3051,17 +3051,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 //
 // In theory, if there is any reference deletion, it can be removed from the packed-refs file. However, it requires
 // parsing and regenerating the packed-refs file. So, let's settle down with a conflict error at this point.
-func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
-	if transaction.runHousekeeping.packRefs == nil {
-		return nil, nil
-	}
-
-	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.verifyPackRefs", nil)
-	defer span.Finish()
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "verify")
-	defer finishTimer()
-
+func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
 	objectHash, err := transaction.stagingRepository.ObjectHash(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("object hash: %w", err)
@@ -3099,6 +3089,22 @@ func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *
 	return &gitalypb.LogEntry_Housekeeping_PackRefs{
 		PrunedRefs: prunedRefs,
 	}, nil
+}
+
+// verifyPackRefs verifies if the git-pack-refs(1) can be applied without any conflicts.
+// It calls the reference backend specific function to handle the core logic.
+func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
+	if transaction.runHousekeeping.packRefs == nil {
+		return nil, nil
+	}
+
+	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.verifyPackRefs", nil)
+	defer span.Finish()
+
+	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "verify")
+	defer finishTimer()
+
+	return mgr.verifyPackRefsFiles(ctx, transaction)
 }
 
 // verifyRepacking checks the object repacking operations for conflicts.
