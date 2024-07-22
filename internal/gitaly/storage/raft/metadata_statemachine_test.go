@@ -216,7 +216,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 	t.Run("register a new storage", func(t *testing.T) {
 		t.Parallel()
 
-		cfg := testcfg.Build(t, testcfg.WithStorages("storage-1", "storage-2"))
+		cfg := testcfg.Build(t, testcfg.WithStorages("storage-1", "storage-2", "storage-3", "storage-4", "storage-5"))
 		ctx := testhelper.Context(t)
 
 		ptnMgr := setupTestPartitionManager(t, cfg)
@@ -228,17 +228,26 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		requireLastApplied(t, sm, 1)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name, ReplicationFactor: 5, NodeId: 2})},
+			{Index: 4, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[2].Name, ReplicationFactor: 3, NodeId: 3})},
+			{Index: 5, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[3].Name, ReplicationFactor: 3, NodeId: 4})},
+			{Index: 6, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[4].Name, ReplicationFactor: 3, NodeId: 5})},
 		})
 		require.NoError(t, err)
-		require.Equal(t, []statemachine.Entry{
+
+		// Remember, storage registration is supposed to be distributed and async. At the time first
+		// update finishes, the second might not have arrived. So, an update's returned data
+		// consists of the changes of the time that update is processed only.
+		testhelper.ProtoEqual(t, []statemachine.Entry{
 			{Index: 2, Result: statemachine.Result{
 				Value: uint64(resultRegisterStorageSuccessful),
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
-						StorageId: 1,
-						Name:      cfg.Storages[0].Name,
+						StorageId:         1,
+						Name:              cfg.Storages[0].Name,
+						ReplicationFactor: 3,
+						NodeId:            1,
 					},
 				}),
 			}},
@@ -246,25 +255,92 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Value: uint64(resultRegisterStorageSuccessful),
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
-						StorageId: 2,
-						Name:      cfg.Storages[1].Name,
+						StorageId:         2,
+						Name:              cfg.Storages[1].Name,
+						ReplicationFactor: 5,
+						NodeId:            2,
+						ReplicaGroups:     []uint64{1},
+					},
+				}),
+			}},
+			{Index: 4, Result: statemachine.Result{
+				Value: uint64(resultRegisterStorageSuccessful),
+				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
+					Storage: &gitalypb.Storage{
+						StorageId:         3,
+						Name:              cfg.Storages[2].Name,
+						ReplicationFactor: 3,
+						NodeId:            3,
+						ReplicaGroups:     []uint64{1, 2},
+					},
+				}),
+			}},
+			{Index: 5, Result: statemachine.Result{
+				Value: uint64(resultRegisterStorageSuccessful),
+				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
+					Storage: &gitalypb.Storage{
+						StorageId:         4,
+						Name:              cfg.Storages[3].Name,
+						ReplicationFactor: 3,
+						NodeId:            4,
+						ReplicaGroups:     []uint64{1, 2},
+					},
+				}),
+			}},
+			{Index: 6, Result: statemachine.Result{
+				Value: uint64(resultRegisterStorageSuccessful),
+				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
+					Storage: &gitalypb.Storage{
+						StorageId:         5,
+						Name:              cfg.Storages[4].Name,
+						ReplicationFactor: 3,
+						NodeId:            5,
+						ReplicaGroups:     []uint64{1, 2},
 					},
 				}),
 			}},
 		}, result)
 
-		requireLastApplied(t, sm, 3)
+		requireLastApplied(t, sm, 6)
+		// The final state of the statemachine does have latest replica groups.
 		requireClusterState(t, sm, &gitalypb.Cluster{
 			ClusterId:     "1234",
-			NextStorageId: 3,
+			NextStorageId: 6,
 			Storages: map[uint64]*gitalypb.Storage{
 				1: {
-					StorageId: 1,
-					Name:      cfg.Storages[0].Name,
+					StorageId:         1,
+					Name:              cfg.Storages[0].Name,
+					ReplicationFactor: 3,
+					NodeId:            1,
+					ReplicaGroups:     []uint64{2, 3},
 				},
 				2: {
-					StorageId: 2,
-					Name:      cfg.Storages[1].Name,
+					StorageId:         2,
+					Name:              cfg.Storages[1].Name,
+					ReplicationFactor: 5,
+					NodeId:            2,
+					ReplicaGroups:     []uint64{3, 4, 5, 1},
+				},
+				3: {
+					StorageId:         3,
+					Name:              cfg.Storages[2].Name,
+					ReplicationFactor: 3,
+					NodeId:            3,
+					ReplicaGroups:     []uint64{4, 5},
+				},
+				4: {
+					StorageId:         4,
+					Name:              cfg.Storages[3].Name,
+					ReplicationFactor: 3,
+					NodeId:            4,
+					ReplicaGroups:     []uint64{5, 1},
+				},
+				5: {
+					StorageId:         5,
+					Name:              cfg.Storages[4].Name,
+					ReplicationFactor: 3,
+					NodeId:            5,
+					ReplicaGroups:     []uint64{1, 2},
 				},
 			},
 		})
@@ -285,8 +361,8 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		requireLastApplied(t, sm, 1)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 5, NodeId: 2})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -294,8 +370,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 				Value: uint64(resultRegisterStorageSuccessful),
 				Data: wrapSMMessage(t, &gitalypb.RegisterStorageResponse{
 					Storage: &gitalypb.Storage{
-						StorageId: 1,
-						Name:      cfg.Storages[0].Name,
+						StorageId:         1,
+						Name:              cfg.Storages[0].Name,
+						ReplicationFactor: 3,
+						NodeId:            1,
 					},
 				}),
 			}},
@@ -310,8 +388,10 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 			NextStorageId: 2,
 			Storages: map[uint64]*gitalypb.Storage{
 				1: {
-					StorageId: 1,
-					Name:      cfg.Storages[0].Name,
+					StorageId:         1,
+					Name:              cfg.Storages[0].Name,
+					ReplicationFactor: 3,
+					NodeId:            1,
 				},
 			},
 		})
@@ -329,7 +409,7 @@ func TestMetadataStateMachine_Update(t *testing.T) {
 		require.NoError(t, err)
 
 		result, err := sm.Update([]statemachine.Entry{
-			{Index: 1, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
+			{Index: 1, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
 		})
 		require.NoError(t, err)
 		require.Equal(t, []statemachine.Entry{
@@ -459,8 +539,8 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 
 		bootstrapCluster(t, sm)
 		_, err = sm.Update([]statemachine.Entry{
-			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name})},
-			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name})},
+			{Index: 2, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1})},
+			{Index: 3, Cmd: wrapSMMessage(t, &gitalypb.RegisterStorageRequest{StorageName: cfg.Storages[1].Name, ReplicationFactor: 5, NodeId: 2})},
 		})
 		require.NoError(t, err)
 
@@ -471,8 +551,8 @@ func TestMetadataStateMachine_Lookup(t *testing.T) {
 			ClusterId:     "1234",
 			NextStorageId: 3,
 			Storages: map[uint64]*gitalypb.Storage{
-				1: {StorageId: 1, Name: cfg.Storages[0].Name},
-				2: {StorageId: 2, Name: cfg.Storages[1].Name},
+				1: {StorageId: 1, Name: cfg.Storages[0].Name, ReplicationFactor: 3, NodeId: 1, ReplicaGroups: []uint64{2}},
+				2: {StorageId: 2, Name: cfg.Storages[1].Name, ReplicationFactor: 5, NodeId: 2, ReplicaGroups: []uint64{1}},
 			},
 		}}, response)
 	})
