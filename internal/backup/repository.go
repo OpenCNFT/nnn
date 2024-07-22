@@ -129,6 +129,22 @@ func (rr *remoteRepository) createBundlePatterns(ctx context.Context, out io.Wri
 	if err != nil {
 		return fmt.Errorf("remote repository: create bundle patterns: %w", err)
 	}
+
+	if err := stream.Send(&gitalypb.CreateBundleFromRefListRequest{
+		Repository: rr.repo,
+	}); err != nil {
+		return fmt.Errorf("remote repository: create bundle patterns: %w", err)
+	}
+
+	// If we immediately start streaming the data without waiting for acknowledgement, it can cause:
+	// - Hard to debug errors when an RPC is rejected due to an error such as repository not existing.
+	// - The client not being able to retry the request on another node if it already started streaming
+	// the data to the other node without buffering the data.
+	// Therefore, here we are waiting for the acknowledgement from the server before starting the data stream.
+	if _, err = stream.Recv(); err != nil {
+		return fmt.Errorf("remote repository: create bundle patterns stream header is not acknowledged: %w", err)
+	}
+
 	c := chunk.New(&createBundleFromRefListSender{
 		stream: stream,
 	})
@@ -145,8 +161,7 @@ func (rr *remoteRepository) createBundlePatterns(ctx context.Context, out io.Wri
 		line = bytes.TrimSuffix(line, []byte("\n"))
 
 		if err := c.Send(&gitalypb.CreateBundleFromRefListRequest{
-			Repository: rr.repo,
-			Patterns:   [][]byte{line},
+			Patterns: [][]byte{line},
 		}); err != nil {
 			return fmt.Errorf("remote repository: create bundle patterns: %w", err)
 		}
