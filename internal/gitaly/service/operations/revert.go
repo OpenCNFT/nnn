@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -66,29 +65,12 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 		// Use the first parent as `theirs` to implement mainline = 1.
 		theirs = git.ObjectID(revertCommit.ParentIds[0])
 	} else {
-		gitVersion, err := quarantineRepo.GitVersion(ctx)
+		// It is a root commit, use empty tree oid as `theirs`.
+		hash, err := quarantineRepo.ObjectHash(ctx)
 		if err != nil {
-			return nil, structerr.NewInternal("detecting Git version: %w", err)
+			return nil, structerr.NewInternal("detecting object hash: %w", err)
 		}
-
-		// Both "ours" and "theirs" must exist for git-merge-tree. When the commit
-		// to be reverted has no parents, it is safe to assume that "theirs" is an
-		// empty tree.
-		if gitVersion.GreaterOrEqual(git.NewVersion(2, 45, 0, 0)) {
-			// Since Git v2.45.0, git-merge-tree allows passing tree-ish objects if
-			// "ours," "theirs," and "base" are all provided. Therefore, we no longer
-			// need the overhead of generating a temporary commit.
-			hash, err := quarantineRepo.ObjectHash(ctx)
-			if err != nil {
-				return nil, structerr.NewInternal("detecting object hash: %w", err)
-			}
-			theirs = hash.EmptyTreeOID
-		} else {
-			theirs, err = s.writeCommitWithEmptyTree(ctx, quarantineRepo)
-			if err != nil {
-				return nil, structerr.NewInternal("write temporary commit: %w", err)
-			}
-		}
+		theirs = hash.EmptyTreeOID
 	}
 
 	// We "merge" in the "changes" from parent to child, which would apply the "opposite"
@@ -224,34 +206,6 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 			RepoCreated:   !repoHadBranches,
 		},
 	}, nil
-}
-
-// writeCommitWithEmptyTree creates a dangling commit with an empty tree. This commit
-// is used by UserRevert to handle special scenarios, such as reverting commits with
-// no parents. The dangling commit will not be used anywhere permanently and will be
-// cleaned up by housekeeping.
-// This helper will be removed once the minimum required Git version is updated to
-// v2.45.0 or later, due to the direct tree-ish objects support added in
-// https://github.com/git/git/commit/ae46d5fb98.
-func (s *Server) writeCommitWithEmptyTree(ctx context.Context, quarantineRepo *localrepo.Repo) (git.ObjectID, error) {
-	const fakeName = "GitLab Bot"
-	const fakeEmail = "gitlab-bot@gitlab.com"
-	fakeDate := time.Unix(694540800, 0).UTC()
-
-	hash, err := quarantineRepo.ObjectHash(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	return quarantineRepo.WriteCommit(ctx, localrepo.WriteCommitConfig{
-		AuthorName:     fakeName,
-		AuthorEmail:    fakeEmail,
-		AuthorDate:     fakeDate,
-		CommitterName:  fakeName,
-		CommitterEmail: fakeEmail,
-		CommitterDate:  fakeDate,
-		TreeID:         hash.EmptyTreeOID,
-	})
 }
 
 type requestFetchingStartRevision interface {
