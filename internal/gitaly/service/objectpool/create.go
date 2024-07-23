@@ -8,7 +8,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
-	"google.golang.org/grpc/codes"
 )
 
 // errMissingOriginRepository is returned when the request is missing the
@@ -58,17 +57,7 @@ func (s *server) CreateObjectPool(ctx context.Context, in *gitalypb.CreateObject
 
 		return nil
 	}, repoutil.WithSkipInit()); err != nil {
-		err := structerr.New("creating object pool: %w", err)
-
-		// This is really ugly: Rails expects a FailedPrecondition error code in its
-		// rspecs, but `repoutil.Create()` returns `AlreadyExists` instead. So in
-		// case we see that error code we override it. We should eventually fix this
-		// and instead use something like structured errors.
-		if err.Code() == codes.AlreadyExists {
-			err = err.WithGRPCCode(codes.FailedPrecondition)
-		}
-
-		return nil, err
+		return nil, structerr.New("creating object pool: %w", err)
 	}
 
 	return &gitalypb.CreateObjectPoolResponse{}, nil

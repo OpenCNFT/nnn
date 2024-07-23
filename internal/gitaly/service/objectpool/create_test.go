@@ -264,7 +264,7 @@ func TestCreate_unsuccessful(t *testing.T) {
 				Origin:     repo,
 				ObjectPool: preexistingPool,
 			},
-			expectedErr: structerr.NewFailedPrecondition("creating object pool: repository exists already"),
+			expectedErr: structerr.NewAlreadyExists("creating object pool: repository exists already"),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
