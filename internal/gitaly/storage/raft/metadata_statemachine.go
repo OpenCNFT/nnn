@@ -33,7 +33,6 @@ const (
 
 var (
 	initialStorageID = raftID(1)
-	keyLastApplied   = []byte("applied_lsn")
 	keyClusterInfo   = []byte("cluster")
 )
 

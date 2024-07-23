@@ -13,8 +13,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type dbAccessor func(context.Context, bool, func(keyvalue.ReadWriter) error) error
-
 // storageManager is responsible for managing the Raft storage for a single storage. It provides a
 // keyvalue.Transactioner for each Raft group, allowing the Raft groups to store their data in the
 // underlying keyvalue store.
@@ -90,24 +88,9 @@ func (m *storageManager) clearStorageInfo() {
 }
 
 func (m *storageManager) dbForStorage() dbAccessor {
-	return func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
-		return m.ptnMgr.StorageKV(ctx, m.name, readOnly, func(rw keyvalue.ReadWriter) error {
-			return fn(keyvalue.NewPrefixedReadWriter(rw, []byte("raft")))
-		})
-	}
+	return dbForStorage(m.ptnMgr, m.name)
 }
 
 func (m *storageManager) dbForMetadataGroup() dbAccessor {
 	return dbForMetadataGroup(m.ptnMgr, m.name)
-}
-
-func dbForMetadataGroup(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
-		return ptnMgr.StorageKV(ctx, storageName, readOnly, func(rw keyvalue.ReadWriter) error {
-			return fn(keyvalue.NewPrefixedReadWriter(
-				rw,
-				[]byte(fmt.Sprintf("raft/%s", MetadataGroupID.MarshalBinary())),
-			))
-		})
-	}
 }
