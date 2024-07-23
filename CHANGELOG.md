@@ -702,6 +702,10 @@ No changes.
 
 - [Use SSH for signing commits](gitlab-org/gitaly@2a1007bee30206a282312d73186ff82c379f6aa9) ([merge request](gitlab-org/gitaly!5408))
 
+## 16.0.9 (2024-07-23)
+
+No changes.
+
 ## 16.0.8 (2023-08-01)
 
 No changes.
