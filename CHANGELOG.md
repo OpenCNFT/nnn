@@ -372,6 +372,10 @@ No changes.
 
 - [backup: Use --all when creating an incremental backup bundle](gitlab-org/gitaly@d874d8c3eb0d0c9b9362b583ba8ccc42221140cd) ([merge request](gitlab-org/gitaly!6421))
 
+## 16.5.9 (2024-07-23)
+
+No changes.
+
 ## 16.5.8 (2024-01-24)
 
 No changes.
