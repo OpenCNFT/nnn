@@ -11,7 +11,9 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 			desc: "set keys with values",
 			steps: steps{
 				StartManager{},
-				Begin{},
+				Begin{
+					RelativePaths: []string{},
+				},
 				SetKey{Key: "key-1", Value: "value-1"},
 				SetKey{Key: "key-2", Value: "value-2"},
 				Commit{},
@@ -30,12 +32,14 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				SetKey{TransactionID: 2, Key: "key-2", Value: "value-3"},
@@ -53,7 +57,9 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 			desc: "override key within a transaction",
 			steps: steps{
 				StartManager{},
-				Begin{},
+				Begin{
+					RelativePaths: []string{},
+				},
 				SetKey{Key: "key-1", Value: "value-1"},
 				SetKey{Key: "key-2", Value: "value-2"},
 				SetKey{Key: "key-2", Value: "value-3"},
@@ -73,12 +79,14 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				DeleteKey{TransactionID: 2, Key: "key-2"},
@@ -95,7 +103,9 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 			desc: "delete a key within a transaction",
 			steps: steps{
 				StartManager{},
-				Begin{},
+				Begin{
+					RelativePaths: []string{},
+				},
 				SetKey{Key: "key-1", Value: "value-1"},
 				SetKey{Key: "key-2", Value: "value-2"},
 				DeleteKey{Key: "key-2"},
@@ -112,7 +122,9 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 			desc: "delete a non-existent key",
 			steps: steps{
 				StartManager{},
-				Begin{},
+				Begin{
+					RelativePaths: []string{},
+				},
 				DeleteKey{Key: "key-1"},
 				Commit{},
 			},
@@ -128,9 +140,11 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				Begin{
 					TransactionID: 2,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 2, Key: "key-1", Value: "value-2"},
@@ -150,15 +164,18 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				DeleteKey{TransactionID: 2, Key: "key-1"},
@@ -178,15 +195,18 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				DeleteKey{TransactionID: 2, Key: "key-1"},
@@ -207,15 +227,18 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				DeleteKey{TransactionID: 2, Key: "key-1"},
@@ -235,9 +258,11 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				Begin{
 					TransactionID: 2,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				ReadKey{TransactionID: 2, Key: "key-1", ExpectedError: badger.ErrKeyNotFound},
@@ -260,9 +285,11 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				Begin{
 					TransactionID: 2,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				ReadKey{TransactionID: 2, Key: "key-1", ExpectedError: badger.ErrKeyNotFound},
@@ -285,15 +312,18 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				DeleteKey{TransactionID: 2, Key: "key-1"},
@@ -316,15 +346,18 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				Commit{TransactionID: 1},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				ReadKey{TransactionID: 2, Key: "key-1", ExpectedValue: "value-1"},
@@ -347,14 +380,17 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				// the lock information around.
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				Begin{
 					TransactionID: 2,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 2, Key: "key-1", Value: "value-1"},
 				Commit{TransactionID: 2},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				ReadKey{TransactionID: 3, Key: "key-1", ExpectedValue: "value-1"},
@@ -374,6 +410,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
@@ -383,10 +420,12 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				SetKey{TransactionID: 2, Key: "key-2", Value: "value-2-modified"},
@@ -416,6 +455,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
@@ -425,10 +465,12 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				DeleteKey{TransactionID: 2, Key: "key-2"},
@@ -457,6 +499,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-3", Value: "value-3"},
@@ -465,10 +508,12 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				SetKey{TransactionID: 2, Key: "key-2", Value: "value-2"},
@@ -497,6 +542,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "prefix-1/key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "prefix-1/key-3", Value: "value-3"},
@@ -505,10 +551,12 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				SetKey{TransactionID: 2, Key: "prefix-2/key-2", Value: "value-2"},
@@ -534,6 +582,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
@@ -542,6 +591,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				},
 				Begin{
 					TransactionID:       2,
+					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
 				ReadKey{TransactionID: 2, Key: string(keyAppliedLSN), ExpectedError: badger.ErrKeyNotFound},
@@ -573,6 +623,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 1, Key: "key-1", Value: "value-1"},
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
@@ -599,10 +650,12 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 					ReadOnly:      true,
 				},
 				Begin{
 					TransactionID: 2,
+					RelativePaths: []string{},
 				},
 				SetKey{TransactionID: 2, Key: "key-1", Value: "value-1"},
 				DeleteKey{TransactionID: 2, Key: "key-2"},
@@ -624,6 +677,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				StartManager{},
 				Begin{
 					TransactionID: 1,
+					RelativePaths: []string{},
 					ReadOnly:      true,
 				},
 				SetKey{TransactionID: 1, Key: "key-1", ExpectedError: badger.ErrReadOnlyTxn},
@@ -635,7 +689,9 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 			desc: "rollbacked key-value operations are discarded",
 			steps: steps{
 				StartManager{},
-				Begin{},
+				Begin{
+					RelativePaths: []string{},
+				},
 				SetKey{Key: "key-1", Value: "value-1"},
 				SetKey{Key: "key-2", Value: "value-2"},
 				Rollback{},
