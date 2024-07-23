@@ -326,6 +326,8 @@ type TransactionOptions struct {
 	// ReadOnly indicates whether this is a read-only transaction. Read-only transactions are not
 	// configured with a quarantine directory and do not commit a log entry.
 	ReadOnly bool
+	// RelativePath specifies which repository in the partition will be the target.
+	RelativePath string
 	// AlternateRelativePath specifies a repository to include in the transaction's snapshot as well.
 	AlternateRelativePath string
 	// AllowPartitionAssignmentWithoutRepository determines whether a partition assignment should be
@@ -342,10 +344,8 @@ type TransactionOptions struct {
 //
 // Specifying storageName and partitionID will begin a transaction targeting an
 // entire partition. If the partitionID is zero, then the partition is detected
-// from relativePath.
-//
-// relativePath specifies which repository in the partition will be the target.
-func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath string, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
+// from opts.RelativePath.
+func (pm *PartitionManager) Begin(ctx context.Context, storageName string, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
 	storageMgr, ok := pm.storages[storageName]
 	if !ok {
 		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
@@ -353,14 +353,14 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 
 	var relativePaths []string
 
-	if relativePath != "" {
+	if opts.RelativePath != "" {
 		var err error
-		relativePath, err = storage.ValidateRelativePath(storageMgr.path, relativePath)
+		opts.RelativePath, err = storage.ValidateRelativePath(storageMgr.path, opts.RelativePath)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
 		}
 
-		repoPartitionID, err := storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+		repoPartitionID, err := storageMgr.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
 		if err != nil {
 			if errors.Is(err, badger.ErrDBClosed) {
 				// The database is closed when PartitionManager is closing. Return a more
@@ -375,7 +375,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 			return nil, errors.New("partition ID does not match repository partition")
 		}
 
-		relativePaths = []string{relativePath}
+		relativePaths = []string{opts.RelativePath}
 		partitionID = repoPartitionID
 	}
 

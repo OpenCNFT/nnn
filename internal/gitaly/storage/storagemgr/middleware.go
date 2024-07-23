@@ -358,8 +358,9 @@ func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry 
 	// See issue: https://gitlab.com/gitlab-org/gitaly/-/issues/5957
 	_, isRepositoryCreation := repositoryCreatingRPCs[methodInfo.FullMethodName()]
 
-	tx, err := mgr.Begin(ctx, targetRepo.StorageName, targetRepo.RelativePath, 0, TransactionOptions{
+	tx, err := mgr.Begin(ctx, targetRepo.StorageName, 0, TransactionOptions{
 		ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
+		RelativePath:          targetRepo.RelativePath,
 		AlternateRelativePath: alternateRelativePath,
 		AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,
 		ForceExclusiveSnapshot:                    forceExclusiveSnapshot[methodInfo.FullMethodName()],

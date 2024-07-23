@@ -935,7 +935,8 @@ func TestPartitionManager(t *testing.T) {
 						storageName = step.repo.GetStorageName()
 						relativePath = step.repo.GetRelativePath()
 					}
-					txn, err := partitionManager.Begin(beginCtx, storageName, relativePath, step.partitionID, TransactionOptions{
+					txn, err := partitionManager.Begin(beginCtx, storageName, step.partitionID, TransactionOptions{
+						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
 					})
 					require.Equal(t, step.expectedError, err)
@@ -1036,7 +1037,8 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer partitionManager.Close()
 
-	tx, err := partitionManager.Begin(ctx, cfg.Storages[0].Name, "relative-path", 0, TransactionOptions{
+	tx, err := partitionManager.Begin(ctx, cfg.Storages[0].Name, 0, TransactionOptions{
+		RelativePath: "relative-path",
 		AllowPartitionAssignmentWithoutRepository: true,
 	})
 	require.NoError(t, err)
