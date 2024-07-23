@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"path"
 
@@ -108,6 +109,10 @@ func (s *testLogger) WithField(key string, value any) Logger {
 
 // WithFields implements Logger.
 func (s *testLogger) WithFields(fields logrus.Fields) Logger {
+	panic("unimplemented")
+}
+
+func (s *testLogger) Output() io.Writer {
 	panic("unimplemented")
 }
 

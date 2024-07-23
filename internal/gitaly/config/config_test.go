@@ -56,7 +56,6 @@ func TestLoadEmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedCfg := Cfg{
-		Logging:             defaultLoggingConfig(),
 		Prometheus:          prometheus.DefaultConfig(),
 		PackObjectsCache:    defaultPackObjectsCacheConfig(),
 		PackObjectsLimiting: defaultPackObjectsLimiting(),
@@ -215,7 +214,8 @@ sentry_dsn = "abc123"`)
 
 	require.Equal(t, Logging{
 		Config: log.Config{
-			Level: "info",
+			Format: "text",
+			Level:  "info",
 		},
 		Sentry: Sentry(sentry.Config{
 			Environment: "production",
@@ -264,7 +264,6 @@ func TestLoadConfigCommand(t *testing.T) {
 
 	modifyDefaultConfig := func(modify func(cfg *Cfg)) Cfg {
 		cfg := &Cfg{
-			Logging:             defaultLoggingConfig(),
 			Prometheus:          prometheus.DefaultConfig(),
 			PackObjectsCache:    defaultPackObjectsCacheConfig(),
 			PackObjectsLimiting: defaultPackObjectsLimiting(),

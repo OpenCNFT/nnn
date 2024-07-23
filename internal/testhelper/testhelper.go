@@ -300,6 +300,8 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	// Enable SymrefUpdates
 	symrefUpdateEnabled, _ := env.GetBool("GITALY_TEST_ENABLE_SYMREF_UPDATE", false)
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.SymrefUpdate, symrefUpdateEnabled)
+	// LogServer is checked when launching a Git command. Enable it randomly as it's checked in many places.
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.SubprocessLogger, rnd.Int()%2 == 0)
 
 	for _, opt := range opts {
 		ctx = opt(ctx)

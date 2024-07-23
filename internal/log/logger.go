@@ -2,6 +2,7 @@ package log
 
 import (
 	"context"
+	"io"
 
 	grpcmwlogrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus/ctxlogrus"
@@ -31,6 +32,9 @@ type Logger interface {
 
 	StreamServerInterceptor(...grpcmwlogrus.Option) grpc.StreamServerInterceptor
 	UnaryServerInterceptor(...grpcmwlogrus.Option) grpc.UnaryServerInterceptor
+
+	// Output returns the loggers output where fully formatted log entries can be written.
+	Output() io.Writer
 }
 
 // LogrusLogger is an implementation of the Logger interface that is implemented via a `logrus.FieldLogger`.
@@ -130,6 +134,11 @@ func (l LogrusLogger) ErrorContext(ctx context.Context, msg string) {
 // Data returns the data stored inside the logger entry.
 func (l LogrusLogger) Data() Fields {
 	return l.entry.Data
+}
+
+// Output returns the loggers output where fully formatted log entries can be written.
+func (l LogrusLogger) Output() io.Writer {
+	return l.entry.Logger.Out
 }
 
 // FromContext extracts the logger from the context. If no logger has been injected then this will

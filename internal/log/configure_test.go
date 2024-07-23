@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,9 +24,11 @@ func TestConfigure(t *testing.T) {
 		level          string
 		hooks          []logrus.Hook
 		expectedLogger *logrus.Logger
+		expectedError  error
 	}{
 		{
 			desc:   "json format with info level",
+			level:  "info",
 			format: "json",
 			expectedLogger: func() *logrus.Logger {
 				logger := newLogger()
@@ -37,6 +40,7 @@ func TestConfigure(t *testing.T) {
 		},
 		{
 			desc:   "text format with info level",
+			level:  "info",
 			format: "text",
 			expectedLogger: func() *logrus.Logger {
 				logger := newLogger()
@@ -47,14 +51,8 @@ func TestConfigure(t *testing.T) {
 			}(),
 		},
 		{
-			desc: "empty format with info level",
-			expectedLogger: func() *logrus.Logger {
-				logger := newLogger()
-				logger.Out = &out
-				logger.Formatter = UTCTextFormatter()
-				logger.Level = logrus.InfoLevel
-				return logger
-			}(),
+			desc:          "empty format with info level",
+			expectedError: fmt.Errorf("invalid logger format %q", ""),
 		},
 		{
 			desc:   "text format with debug level",
@@ -69,16 +67,10 @@ func TestConfigure(t *testing.T) {
 			}(),
 		},
 		{
-			desc:   "text format with invalid level",
-			format: "text",
-			level:  "invalid-level",
-			expectedLogger: func() *logrus.Logger {
-				logger := newLogger()
-				logger.Out = &out
-				logger.Formatter = UTCTextFormatter()
-				logger.Level = logrus.InfoLevel
-				return logger
-			}(),
+			desc:          "text format with invalid level",
+			format:        "text",
+			level:         "invalid-level",
+			expectedError: fmt.Errorf("parse level: %w", fmt.Errorf("not a valid logrus Level: %q", "invalid-level")),
 		},
 		{
 			desc:   "with hook",
@@ -101,7 +93,13 @@ func TestConfigure(t *testing.T) {
 			out.Reset()
 
 			logger := newLogger()
-			require.NoError(t, configure(logger, &out, tc.format, tc.level, tc.hooks...))
+			err := configure(logger, &out, tc.format, tc.level, tc.hooks...)
+			if tc.expectedError != nil {
+				require.Equal(t, tc.expectedError, err)
+				return
+			}
+
+			require.NoError(t, err)
 
 			// We cannot directly compare the loggers with each other because they contain function
 			// pointers, so we have to check the relevant fields one by one.
@@ -124,10 +122,10 @@ func TestConfigure(t *testing.T) {
 				entry.Warn(message)
 			case "error":
 				entry.Error(message)
-			case "", "info":
+			case "info":
 				entry.Info(message)
 			default:
-				entry.Info(message)
+				t.Fatalf("invalid level: %q", tc.level)
 			}
 
 			if tc.format != "" {

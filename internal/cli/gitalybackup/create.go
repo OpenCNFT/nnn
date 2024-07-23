@@ -93,7 +93,7 @@ func newCreateCommand() *cli.Command {
 }
 
 func createAction(cctx *cli.Context) error {
-	logger, err := log.Configure(cctx.App.Writer, "json", "")
+	logger, err := log.Configure(cctx.App.Writer, "json", "info")
 	if err != nil {
 		fmt.Printf("configuring logger failed: %v", err)
 		return err
