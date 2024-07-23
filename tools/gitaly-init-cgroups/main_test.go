@@ -26,16 +26,33 @@ func TestFindPodCgroup(t *testing.T) {
 			expectedCgroupPath: "kubepods-besteffort.slice/kubepods-besteffort-pod123456.slice",
 		},
 		{
+			name:               "matching cgroup path exists guaranteed QoS",
+			uid:                "123456",
+			expectedCgroupPath: "kubepods-pod123456.slice",
+		},
+		{
 			name:               "multiple cgroup paths",
 			uid:                "123456",
 			expectedCgroupPath: "kubepods-besteffort.slice/kubepods-besteffort-pod123456.slice",
 			additionalCgroups:  []string{"kubepods-besteffort.slice/kubepods-besteffort-pod789012.slice"},
 		},
 		{
+			name:               "multiple cgroup paths mixed QoS",
+			uid:                "123456",
+			expectedCgroupPath: "kubepods-besteffort.slice/kubepods-besteffort-pod123456.slice",
+			additionalCgroups:  []string{"kubepods-pod654321.slice", "kubepods-besteffort.slice/kubepods-besteffort-pod789012.slice"},
+		},
+		{
 			name:               "multiple matching cgroup paths",
 			uid:                "123456",
 			expectedCgroupPath: "kubepods-besteffort.slice/kubepods-besteffort-pod123456.slice",
 			additionalCgroups:  []string{"kubepods-besteffort.slice/kubepods-besteffort-pod123456.slice/cri-containerd-a69be83419aceb5000a9925552d67dc949e150c251b101357c242292579ed5d7.scope"},
+		},
+		{
+			name:               "multiple matching cgroup paths mixed QoS",
+			uid:                "123456",
+			expectedCgroupPath: "kubepods-pod123456.slice",
+			additionalCgroups:  []string{"kubepods-pod123456.slice", "kubepods-besteffort.slice/kubepods-besteffort-pod123456.slice"},
 		},
 	}
 
