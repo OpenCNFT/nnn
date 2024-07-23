@@ -32,7 +32,7 @@ var packedBinariesFS embed.FS
 // binaries in the main gitaly binary and unpacking them on start to a temporary directory we can call them from. This
 // way updating the gitaly binaries on the disk is atomic and a running gitaly can't call auxiliary binaries from a
 // different version.
-func UnpackAuxiliaryBinaries(destinationDir string) error {
+func UnpackAuxiliaryBinaries(destinationDir string, shouldInclude func(binaryName string) bool) error {
 	entries, err := packedBinariesFS.ReadDir(buildDir)
 	if err != nil {
 		return fmt.Errorf("list packed binaries: %w", err)
@@ -41,6 +41,9 @@ func UnpackAuxiliaryBinaries(destinationDir string) error {
 	g := &errgroup.Group{}
 	for _, entry := range entries {
 		entry := entry
+		if !shouldInclude(entry.Name()) {
+			continue
+		}
 		g.Go(func() error {
 			packedPath := filepath.Join(buildDir, entry.Name())
 			packedFile, err := packedBinariesFS.Open(packedPath)

@@ -12,7 +12,7 @@ import (
 
 func TestUnpackAuxiliaryBinaries_success(t *testing.T) {
 	destinationDir := t.TempDir()
-	require.NoError(t, UnpackAuxiliaryBinaries(destinationDir))
+	require.NoError(t, UnpackAuxiliaryBinaries(destinationDir, func(string) bool { return true }))
 
 	entries, err := os.ReadDir(destinationDir)
 	require.NoError(t, err)
@@ -36,10 +36,9 @@ func TestUnpackAuxiliaryBinaries_success(t *testing.T) {
 
 func TestUnpackAuxiliaryBinaries_alreadyExists(t *testing.T) {
 	destinationDir := t.TempDir()
-
 	existingFile := filepath.Join(destinationDir, "gitaly-hooks")
 	require.NoError(t, os.WriteFile(existingFile, []byte("existing file"), mode.File))
 
-	err := UnpackAuxiliaryBinaries(destinationDir)
+	err := UnpackAuxiliaryBinaries(destinationDir, func(_ string) bool { return true })
 	require.EqualError(t, err, fmt.Sprintf(`open %s: file exists`, existingFile), "expected unpacking to fail if destination binary already existed")
 }

@@ -52,12 +52,7 @@ To remove custom Git hooks for a specified repository, run the set subcommand wi
 						Usage:    "repository to set hooks for",
 						Required: true,
 					},
-					&cli.StringFlag{
-						Name:     flagConfig,
-						Usage:    "path to Gitaly configuration",
-						Aliases:  []string{"c"},
-						Required: true,
-					},
+					gitalyConfigFlag(),
 				},
 			},
 		},

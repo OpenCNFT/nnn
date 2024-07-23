@@ -221,7 +221,9 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	}()
 
 	began = time.Now()
-	if err := gitaly.UnpackAuxiliaryBinaries(cfg.RuntimeDir); err != nil {
+	if err := gitaly.UnpackAuxiliaryBinaries(cfg.RuntimeDir, func(string) bool {
+		return true
+	}); err != nil {
 		return fmt.Errorf("unpack auxiliary binaries: %w", err)
 	}
 	logger.WithField("duration_ms", time.Since(began).Milliseconds()).Info("finished unpacking auxiliary binaries")

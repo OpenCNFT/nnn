@@ -28,12 +28,7 @@ Example: gitaly bundle-uri --storage=default --repository=ab/cd/ef01234567890123
 				Usage:    "repository to generate bundle-URI for",
 				Required: true,
 			},
-			&cli.StringFlag{
-				Name:     flagConfig,
-				Usage:    "path to Gitaly configuration",
-				Aliases:  []string{"c"},
-				Required: true,
-			},
+			gitalyConfigFlag(),
 		},
 	}
 }

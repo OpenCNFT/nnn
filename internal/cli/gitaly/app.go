@@ -33,6 +33,7 @@ func NewApp() *cli.App {
 			newConfigurationCommand(),
 			newHooksCommand(),
 			newBundleURICommand(),
+			newGitCommand(),
 		},
 	}
 }
