@@ -90,6 +90,84 @@ func (x *Cluster) GetStorages() map[uint64]*Storage {
 	return nil
 }
 
+// Partition represents a partition in a Raft cluster.
+type Partition struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// authority_name is the name of storage that creates this partition.
+	AuthorityName string `protobuf:"bytes,1,opt,name=authority_name,json=authorityName,proto3" json:"authority_name,omitempty"`
+	// authority_id is the unique ID of storage that creates this partition. The ID was allocated by
+	// the metadata Raft group.
+	AuthorityId uint64 `protobuf:"varint,2,opt,name=authority_id,json=authorityId,proto3" json:"authority_id,omitempty"`
+	// partition_id is the partition ID of a partition *within the authority storage*. All
+	// repositories sharing a same origin have the same partition ID.
+	PartitionId uint64 `protobuf:"varint,3,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
+	// relative_path is the unique relative path of that partition.
+	RelativePath string `protobuf:"bytes,4,opt,name=relative_path,json=relativePath,proto3" json:"relative_path,omitempty"`
+}
+
+func (x *Partition) Reset() {
+	*x = Partition{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_cluster_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Partition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Partition) ProtoMessage() {}
+
+func (x *Partition) ProtoReflect() protoreflect.Message {
+	mi := &file_cluster_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Partition.ProtoReflect.Descriptor instead.
+func (*Partition) Descriptor() ([]byte, []int) {
+	return file_cluster_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Partition) GetAuthorityName() string {
+	if x != nil {
+		return x.AuthorityName
+	}
+	return ""
+}
+
+func (x *Partition) GetAuthorityId() uint64 {
+	if x != nil {
+		return x.AuthorityId
+	}
+	return 0
+}
+
+func (x *Partition) GetPartitionId() uint64 {
+	if x != nil {
+		return x.PartitionId
+	}
+	return 0
+}
+
+func (x *Partition) GetRelativePath() string {
+	if x != nil {
+		return x.RelativePath
+	}
+	return ""
+}
+
 // Storage represents a storage unit within a cluster.
 type Storage struct {
 	state         protoimpl.MessageState
@@ -111,7 +189,7 @@ type Storage struct {
 func (x *Storage) Reset() {
 	*x = Storage{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[1]
+		mi := &file_cluster_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -124,7 +202,7 @@ func (x *Storage) String() string {
 func (*Storage) ProtoMessage() {}
 
 func (x *Storage) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[1]
+	mi := &file_cluster_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -137,7 +215,7 @@ func (x *Storage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Storage.ProtoReflect.Descriptor instead.
 func (*Storage) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{1}
+	return file_cluster_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Storage) GetStorageId() uint64 {
@@ -196,7 +274,7 @@ type LeaderState struct {
 func (x *LeaderState) Reset() {
 	*x = LeaderState{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[2]
+		mi := &file_cluster_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -209,7 +287,7 @@ func (x *LeaderState) String() string {
 func (*LeaderState) ProtoMessage() {}
 
 func (x *LeaderState) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[2]
+	mi := &file_cluster_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -222,7 +300,7 @@ func (x *LeaderState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaderState.ProtoReflect.Descriptor instead.
 func (*LeaderState) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{2}
+	return file_cluster_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *LeaderState) GetGroupId() uint64 {
@@ -266,7 +344,7 @@ type BootstrapClusterRequest struct {
 func (x *BootstrapClusterRequest) Reset() {
 	*x = BootstrapClusterRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[3]
+		mi := &file_cluster_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -279,7 +357,7 @@ func (x *BootstrapClusterRequest) String() string {
 func (*BootstrapClusterRequest) ProtoMessage() {}
 
 func (x *BootstrapClusterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[3]
+	mi := &file_cluster_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +370,7 @@ func (x *BootstrapClusterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapClusterRequest.ProtoReflect.Descriptor instead.
 func (*BootstrapClusterRequest) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{3}
+	return file_cluster_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *BootstrapClusterRequest) GetClusterId() string {
@@ -315,7 +393,7 @@ type BootstrapClusterResponse struct {
 func (x *BootstrapClusterResponse) Reset() {
 	*x = BootstrapClusterResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[4]
+		mi := &file_cluster_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -328,7 +406,7 @@ func (x *BootstrapClusterResponse) String() string {
 func (*BootstrapClusterResponse) ProtoMessage() {}
 
 func (x *BootstrapClusterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[4]
+	mi := &file_cluster_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +419,7 @@ func (x *BootstrapClusterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapClusterResponse.ProtoReflect.Descriptor instead.
 func (*BootstrapClusterResponse) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{4}
+	return file_cluster_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BootstrapClusterResponse) GetCluster() *Cluster {
@@ -361,7 +439,7 @@ type GetClusterRequest struct {
 func (x *GetClusterRequest) Reset() {
 	*x = GetClusterRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[5]
+		mi := &file_cluster_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -374,7 +452,7 @@ func (x *GetClusterRequest) String() string {
 func (*GetClusterRequest) ProtoMessage() {}
 
 func (x *GetClusterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[5]
+	mi := &file_cluster_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +465,7 @@ func (x *GetClusterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClusterRequest.ProtoReflect.Descriptor instead.
 func (*GetClusterRequest) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{5}
+	return file_cluster_proto_rawDescGZIP(), []int{6}
 }
 
 // GetClusterResponse is the response message for retrieving information about a cluster.
@@ -403,7 +481,7 @@ type GetClusterResponse struct {
 func (x *GetClusterResponse) Reset() {
 	*x = GetClusterResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[6]
+		mi := &file_cluster_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -416,7 +494,7 @@ func (x *GetClusterResponse) String() string {
 func (*GetClusterResponse) ProtoMessage() {}
 
 func (x *GetClusterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[6]
+	mi := &file_cluster_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -429,7 +507,7 @@ func (x *GetClusterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetClusterResponse.ProtoReflect.Descriptor instead.
 func (*GetClusterResponse) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{6}
+	return file_cluster_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetClusterResponse) GetCluster() *Cluster {
@@ -456,7 +534,7 @@ type RegisterStorageRequest struct {
 func (x *RegisterStorageRequest) Reset() {
 	*x = RegisterStorageRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[7]
+		mi := &file_cluster_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -469,7 +547,7 @@ func (x *RegisterStorageRequest) String() string {
 func (*RegisterStorageRequest) ProtoMessage() {}
 
 func (x *RegisterStorageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[7]
+	mi := &file_cluster_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -482,7 +560,7 @@ func (x *RegisterStorageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterStorageRequest.ProtoReflect.Descriptor instead.
 func (*RegisterStorageRequest) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{7}
+	return file_cluster_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RegisterStorageRequest) GetStorageName() string {
@@ -519,7 +597,7 @@ type RegisterStorageResponse struct {
 func (x *RegisterStorageResponse) Reset() {
 	*x = RegisterStorageResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[8]
+		mi := &file_cluster_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -532,7 +610,7 @@ func (x *RegisterStorageResponse) String() string {
 func (*RegisterStorageResponse) ProtoMessage() {}
 
 func (x *RegisterStorageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[8]
+	mi := &file_cluster_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -545,7 +623,7 @@ func (x *RegisterStorageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterStorageResponse.ProtoReflect.Descriptor instead.
 func (*RegisterStorageResponse) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{8}
+	return file_cluster_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RegisterStorageResponse) GetStorage() *Storage {
@@ -574,7 +652,7 @@ type UpdateStorageRequest struct {
 func (x *UpdateStorageRequest) Reset() {
 	*x = UpdateStorageRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[9]
+		mi := &file_cluster_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -587,7 +665,7 @@ func (x *UpdateStorageRequest) String() string {
 func (*UpdateStorageRequest) ProtoMessage() {}
 
 func (x *UpdateStorageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[9]
+	mi := &file_cluster_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -600,7 +678,7 @@ func (x *UpdateStorageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStorageRequest.ProtoReflect.Descriptor instead.
 func (*UpdateStorageRequest) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{9}
+	return file_cluster_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateStorageRequest) GetStorageId() uint64 {
@@ -637,7 +715,7 @@ type UpdateStorageResponse struct {
 func (x *UpdateStorageResponse) Reset() {
 	*x = UpdateStorageResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_cluster_proto_msgTypes[10]
+		mi := &file_cluster_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -650,7 +728,7 @@ func (x *UpdateStorageResponse) String() string {
 func (*UpdateStorageResponse) ProtoMessage() {}
 
 func (x *UpdateStorageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cluster_proto_msgTypes[10]
+	mi := &file_cluster_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -663,12 +741,202 @@ func (x *UpdateStorageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStorageResponse.ProtoReflect.Descriptor instead.
 func (*UpdateStorageResponse) Descriptor() ([]byte, []int) {
-	return file_cluster_proto_rawDescGZIP(), []int{10}
+	return file_cluster_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateStorageResponse) GetStorage() *Storage {
 	if x != nil {
 		return x.Storage
+	}
+	return nil
+}
+
+// RegisterPartitionRequest is the request message to add a partition (repository + forks) to a
+// storage for tracking. The destinating storage is not necessarily the same as the authority
+// storage. For example, a partition is tracked by another storage on different node.
+type RegisterPartitionRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// partition is the registerting one.
+	Partition *Partition `protobuf:"bytes,1,opt,name=partition,proto3" json:"partition,omitempty"`
+}
+
+func (x *RegisterPartitionRequest) Reset() {
+	*x = RegisterPartitionRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_cluster_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RegisterPartitionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterPartitionRequest) ProtoMessage() {}
+
+func (x *RegisterPartitionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_cluster_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterPartitionRequest.ProtoReflect.Descriptor instead.
+func (*RegisterPartitionRequest) Descriptor() ([]byte, []int) {
+	return file_cluster_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RegisterPartitionRequest) GetPartition() *Partition {
+	if x != nil {
+		return x.Partition
+	}
+	return nil
+}
+
+// RegisterPartitionResponse is the response message of RegisterPartitionRequest.
+type RegisterPartitionResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// partition contains info of registered partition. If the registering partition already exists,
+	// it contains the partition info inside the statemachine.
+	Partition *Partition `protobuf:"bytes,1,opt,name=partition,proto3" json:"partition,omitempty"`
+}
+
+func (x *RegisterPartitionResponse) Reset() {
+	*x = RegisterPartitionResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_cluster_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RegisterPartitionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterPartitionResponse) ProtoMessage() {}
+
+func (x *RegisterPartitionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_cluster_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterPartitionResponse.ProtoReflect.Descriptor instead.
+func (*RegisterPartitionResponse) Descriptor() ([]byte, []int) {
+	return file_cluster_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RegisterPartitionResponse) GetPartition() *Partition {
+	if x != nil {
+		return x.Partition
+	}
+	return nil
+}
+
+// GetRegisteredPartitionsRequest is the request message to query for all registered partitions
+// that a storage is tracking.
+type GetRegisteredPartitionsRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *GetRegisteredPartitionsRequest) Reset() {
+	*x = GetRegisteredPartitionsRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_cluster_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetRegisteredPartitionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRegisteredPartitionsRequest) ProtoMessage() {}
+
+func (x *GetRegisteredPartitionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_cluster_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRegisteredPartitionsRequest.ProtoReflect.Descriptor instead.
+func (*GetRegisteredPartitionsRequest) Descriptor() ([]byte, []int) {
+	return file_cluster_proto_rawDescGZIP(), []int{14}
+}
+
+// GetRegisteredPartitionsResponse is the response message of GetRegisteredPartitionsRequest.
+type GetRegisteredPartitionsResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// partitions is the list of registered partitions.
+	Partitions []*Partition `protobuf:"bytes,1,rep,name=partitions,proto3" json:"partitions,omitempty"`
+}
+
+func (x *GetRegisteredPartitionsResponse) Reset() {
+	*x = GetRegisteredPartitionsResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_cluster_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetRegisteredPartitionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRegisteredPartitionsResponse) ProtoMessage() {}
+
+func (x *GetRegisteredPartitionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_cluster_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRegisteredPartitionsResponse.ProtoReflect.Descriptor instead.
+func (*GetRegisteredPartitionsResponse) Descriptor() ([]byte, []int) {
+	return file_cluster_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetRegisteredPartitionsResponse) GetPartitions() []*Partition {
+	if x != nil {
+		return x.Partitions
 	}
 	return nil
 }
@@ -691,7 +959,17 @@ var file_cluster_proto_rawDesc = []byte{
 	0x01, 0x28, 0x04, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x25, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
 	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79,
 	0x2e, 0x53, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a,
-	0x02, 0x38, 0x01, 0x22, 0xab, 0x01, 0x0a, 0x07, 0x53, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x12,
+	0x02, 0x38, 0x01, 0x22, 0x9d, 0x01, 0x0a, 0x09, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f,
+	0x6e, 0x12, 0x25, 0x0a, 0x0e, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x74, 0x79, 0x5f, 0x6e,
+	0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x61, 0x75, 0x74, 0x68, 0x6f,
+	0x72, 0x69, 0x74, 0x79, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x61, 0x75, 0x74, 0x68,
+	0x6f, 0x72, 0x69, 0x74, 0x79, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b,
+	0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x74, 0x79, 0x49, 0x64, 0x12, 0x21, 0x0a, 0x0c, 0x70,
+	0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x04, 0x52, 0x0b, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x64, 0x12, 0x23,
+	0x0a, 0x0d, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x76, 0x65, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x69, 0x76, 0x65, 0x50,
+	0x61, 0x74, 0x68, 0x22, 0xab, 0x01, 0x0a, 0x07, 0x53, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x12,
 	0x1d, 0x0a, 0x0a, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x04, 0x52, 0x09, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x49, 0x64, 0x12, 0x12,
 	0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61,
@@ -747,11 +1025,28 @@ var file_cluster_proto_rawDesc = []byte{
 	0x6f, 0x72, 0x61, 0x67, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x29, 0x0a,
 	0x07, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0f,
 	0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x53, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x52,
-	0x07, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x42, 0x34, 0x5a, 0x32, 0x67, 0x69, 0x74, 0x6c,
-	0x61, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x67, 0x69, 0x74, 0x6c, 0x61, 0x62, 0x2d, 0x6f, 0x72,
-	0x67, 0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2f, 0x76, 0x31, 0x36, 0x2f, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x70, 0x62, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x07, 0x73, 0x74, 0x6f, 0x72, 0x61, 0x67, 0x65, 0x22, 0x4b, 0x0a, 0x18, 0x52, 0x65, 0x67, 0x69,
+	0x73, 0x74, 0x65, 0x72, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x2f, 0x0a, 0x09, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f,
+	0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79,
+	0x2e, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x09, 0x70, 0x61, 0x72, 0x74,
+	0x69, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x4c, 0x0a, 0x19, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65,
+	0x72, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x2f, 0x0a, 0x09, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x50,
+	0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x09, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74,
+	0x69, 0x6f, 0x6e, 0x22, 0x20, 0x0a, 0x1e, 0x47, 0x65, 0x74, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74,
+	0x65, 0x72, 0x65, 0x64, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x54, 0x0a, 0x1f, 0x47, 0x65, 0x74, 0x52, 0x65, 0x67, 0x69,
+	0x73, 0x74, 0x65, 0x72, 0x65, 0x64, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x73,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x31, 0x0a, 0x0a, 0x70, 0x61, 0x72, 0x74,
+	0x69, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x67,
+	0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x50, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x52,
+	0x0a, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x42, 0x34, 0x5a, 0x32, 0x67,
+	0x69, 0x74, 0x6c, 0x61, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x67, 0x69, 0x74, 0x6c, 0x61, 0x62,
+	0x2d, 0x6f, 0x72, 0x67, 0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2f, 0x76, 0x31, 0x36, 0x2f,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x70,
+	0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -766,33 +1061,41 @@ func file_cluster_proto_rawDescGZIP() []byte {
 	return file_cluster_proto_rawDescData
 }
 
-var file_cluster_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_cluster_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_cluster_proto_goTypes = []any{
-	(*Cluster)(nil),                  // 0: gitaly.Cluster
-	(*Storage)(nil),                  // 1: gitaly.Storage
-	(*LeaderState)(nil),              // 2: gitaly.LeaderState
-	(*BootstrapClusterRequest)(nil),  // 3: gitaly.BootstrapClusterRequest
-	(*BootstrapClusterResponse)(nil), // 4: gitaly.BootstrapClusterResponse
-	(*GetClusterRequest)(nil),        // 5: gitaly.GetClusterRequest
-	(*GetClusterResponse)(nil),       // 6: gitaly.GetClusterResponse
-	(*RegisterStorageRequest)(nil),   // 7: gitaly.RegisterStorageRequest
-	(*RegisterStorageResponse)(nil),  // 8: gitaly.RegisterStorageResponse
-	(*UpdateStorageRequest)(nil),     // 9: gitaly.UpdateStorageRequest
-	(*UpdateStorageResponse)(nil),    // 10: gitaly.UpdateStorageResponse
-	nil,                              // 11: gitaly.Cluster.StoragesEntry
+	(*Cluster)(nil),                         // 0: gitaly.Cluster
+	(*Partition)(nil),                       // 1: gitaly.Partition
+	(*Storage)(nil),                         // 2: gitaly.Storage
+	(*LeaderState)(nil),                     // 3: gitaly.LeaderState
+	(*BootstrapClusterRequest)(nil),         // 4: gitaly.BootstrapClusterRequest
+	(*BootstrapClusterResponse)(nil),        // 5: gitaly.BootstrapClusterResponse
+	(*GetClusterRequest)(nil),               // 6: gitaly.GetClusterRequest
+	(*GetClusterResponse)(nil),              // 7: gitaly.GetClusterResponse
+	(*RegisterStorageRequest)(nil),          // 8: gitaly.RegisterStorageRequest
+	(*RegisterStorageResponse)(nil),         // 9: gitaly.RegisterStorageResponse
+	(*UpdateStorageRequest)(nil),            // 10: gitaly.UpdateStorageRequest
+	(*UpdateStorageResponse)(nil),           // 11: gitaly.UpdateStorageResponse
+	(*RegisterPartitionRequest)(nil),        // 12: gitaly.RegisterPartitionRequest
+	(*RegisterPartitionResponse)(nil),       // 13: gitaly.RegisterPartitionResponse
+	(*GetRegisteredPartitionsRequest)(nil),  // 14: gitaly.GetRegisteredPartitionsRequest
+	(*GetRegisteredPartitionsResponse)(nil), // 15: gitaly.GetRegisteredPartitionsResponse
+	nil,                                     // 16: gitaly.Cluster.StoragesEntry
 }
 var file_cluster_proto_depIdxs = []int32{
-	11, // 0: gitaly.Cluster.storages:type_name -> gitaly.Cluster.StoragesEntry
+	16, // 0: gitaly.Cluster.storages:type_name -> gitaly.Cluster.StoragesEntry
 	0,  // 1: gitaly.BootstrapClusterResponse.cluster:type_name -> gitaly.Cluster
 	0,  // 2: gitaly.GetClusterResponse.cluster:type_name -> gitaly.Cluster
-	1,  // 3: gitaly.RegisterStorageResponse.storage:type_name -> gitaly.Storage
-	1,  // 4: gitaly.UpdateStorageResponse.storage:type_name -> gitaly.Storage
-	1,  // 5: gitaly.Cluster.StoragesEntry.value:type_name -> gitaly.Storage
-	6,  // [6:6] is the sub-list for method output_type
-	6,  // [6:6] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	2,  // 3: gitaly.RegisterStorageResponse.storage:type_name -> gitaly.Storage
+	2,  // 4: gitaly.UpdateStorageResponse.storage:type_name -> gitaly.Storage
+	1,  // 5: gitaly.RegisterPartitionRequest.partition:type_name -> gitaly.Partition
+	1,  // 6: gitaly.RegisterPartitionResponse.partition:type_name -> gitaly.Partition
+	1,  // 7: gitaly.GetRegisteredPartitionsResponse.partitions:type_name -> gitaly.Partition
+	2,  // 8: gitaly.Cluster.StoragesEntry.value:type_name -> gitaly.Storage
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_cluster_proto_init() }
@@ -814,7 +1117,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[1].Exporter = func(v any, i int) any {
-			switch v := v.(*Storage); i {
+			switch v := v.(*Partition); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -826,7 +1129,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[2].Exporter = func(v any, i int) any {
-			switch v := v.(*LeaderState); i {
+			switch v := v.(*Storage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -838,7 +1141,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[3].Exporter = func(v any, i int) any {
-			switch v := v.(*BootstrapClusterRequest); i {
+			switch v := v.(*LeaderState); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -850,7 +1153,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[4].Exporter = func(v any, i int) any {
-			switch v := v.(*BootstrapClusterResponse); i {
+			switch v := v.(*BootstrapClusterRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -862,7 +1165,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[5].Exporter = func(v any, i int) any {
-			switch v := v.(*GetClusterRequest); i {
+			switch v := v.(*BootstrapClusterResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -874,7 +1177,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[6].Exporter = func(v any, i int) any {
-			switch v := v.(*GetClusterResponse); i {
+			switch v := v.(*GetClusterRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -886,7 +1189,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[7].Exporter = func(v any, i int) any {
-			switch v := v.(*RegisterStorageRequest); i {
+			switch v := v.(*GetClusterResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -898,7 +1201,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[8].Exporter = func(v any, i int) any {
-			switch v := v.(*RegisterStorageResponse); i {
+			switch v := v.(*RegisterStorageRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -910,7 +1213,7 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[9].Exporter = func(v any, i int) any {
-			switch v := v.(*UpdateStorageRequest); i {
+			switch v := v.(*RegisterStorageResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -922,7 +1225,67 @@ func file_cluster_proto_init() {
 			}
 		}
 		file_cluster_proto_msgTypes[10].Exporter = func(v any, i int) any {
+			switch v := v.(*UpdateStorageRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_cluster_proto_msgTypes[11].Exporter = func(v any, i int) any {
 			switch v := v.(*UpdateStorageResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_cluster_proto_msgTypes[12].Exporter = func(v any, i int) any {
+			switch v := v.(*RegisterPartitionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_cluster_proto_msgTypes[13].Exporter = func(v any, i int) any {
+			switch v := v.(*RegisterPartitionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_cluster_proto_msgTypes[14].Exporter = func(v any, i int) any {
+			switch v := v.(*GetRegisteredPartitionsRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_cluster_proto_msgTypes[15].Exporter = func(v any, i int) any {
+			switch v := v.(*GetRegisteredPartitionsResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -940,7 +1303,7 @@ func file_cluster_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_cluster_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
