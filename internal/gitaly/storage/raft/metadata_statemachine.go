@@ -17,7 +17,7 @@ type metadataStateMachine struct {
 	ctx              context.Context
 	groupID          raftID
 	replicaID        raftID
-	accessDB         dbAccessor
+	db               dbAccessor
 	replicaPlacement replicaPlacement
 }
 
@@ -55,7 +55,7 @@ func (s *metadataStateMachine) Open(stopC <-chan struct{}) (uint64, error) {
 
 // LastApplied returns the last applied index of the state machine.
 func (s *metadataStateMachine) LastApplied() (lastApplied raftID, err error) {
-	return lastApplied, s.accessDB(s.ctx, true, func(txn keyvalue.ReadWriter) error {
+	return lastApplied, s.db.read(s.ctx, func(txn keyvalue.ReadWriter) error {
 		lastApplied, err = s.getLastIndex(txn)
 		if err != nil {
 			err = fmt.Errorf("getting last index from DB: %w", err)
@@ -66,7 +66,7 @@ func (s *metadataStateMachine) LastApplied() (lastApplied raftID, err error) {
 
 // Cluster returns the latest cluster state of state machine.
 func (s *metadataStateMachine) Cluster() (cluster *gitalypb.Cluster, err error) {
-	return cluster, s.accessDB(s.ctx, true, func(txn keyvalue.ReadWriter) error {
+	return cluster, s.db.read(s.ctx, func(txn keyvalue.ReadWriter) error {
 		cluster, err = s.getCluster(txn)
 		if err != nil {
 			err = fmt.Errorf("getting cluster from DB: %w", err)
@@ -83,7 +83,7 @@ func (s *metadataStateMachine) Cluster() (cluster *gitalypb.Cluster, err error) 
 func (s *metadataStateMachine) Update(entries []statemachine.Entry) ([]statemachine.Entry, error) {
 	var returnedEntries []statemachine.Entry
 
-	if err := s.accessDB(s.ctx, false, func(txn keyvalue.ReadWriter) error {
+	if err := s.db.write(s.ctx, func(txn keyvalue.ReadWriter) error {
 		entries, err := s.update(txn, entries)
 		if err != nil {
 			return err
@@ -311,12 +311,12 @@ func (s *metadataStateMachine) getCluster(txn keyvalue.ReadWriter) (*gitalypb.Cl
 
 var _ = Statemachine(&metadataStateMachine{})
 
-func newMetadataStatemachine(ctx context.Context, groupID raftID, replicaID raftID, accessDB dbAccessor) *metadataStateMachine {
+func newMetadataStatemachine(ctx context.Context, groupID raftID, replicaID raftID, db dbAccessor) *metadataStateMachine {
 	return &metadataStateMachine{
 		ctx:              ctx,
 		groupID:          groupID,
 		replicaID:        replicaID,
-		accessDB:         accessDB,
+		db:               db,
 		replicaPlacement: newDefaultReplicaPlacement(),
 	}
 }

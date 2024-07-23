@@ -37,7 +37,7 @@ func parseInitialMembers(input map[string]string) (map[uint64]string, error) {
 	return initialMembers, nil
 }
 
-func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, accessDB dbAccessor, clusterCfg config.Raft, logger log.Logger) (*metadataRaftGroup, error) {
+func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, db dbAccessor, clusterCfg config.Raft, logger log.Logger) (*metadataRaftGroup, error) {
 	initialMembers, err := parseInitialMembers(clusterCfg.InitialMembers)
 	if err != nil {
 		return nil, fmt.Errorf("parsing initial members: %w", err)
@@ -55,7 +55,7 @@ func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, ac
 
 	var metadataSM Statemachine
 	if err := nodeHost.StartOnDiskReplica(initialMembers, false, func(groupID, replicaID uint64) statemachine.IOnDiskStateMachine {
-		return newMetadataStatemachine(ctx, raftID(groupID), raftID(replicaID), accessDB)
+		return newMetadataStatemachine(ctx, raftID(groupID), raftID(replicaID), db)
 	}, groupCfg); err != nil {
 		return nil, fmt.Errorf("starting metadata group: %w", err)
 	}

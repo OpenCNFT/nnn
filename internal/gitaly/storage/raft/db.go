@@ -10,27 +10,45 @@ import (
 
 // dbAccessor defines an interface to read/write values inside the key-value DB in a transactional
 // fashion. All changes are automatically committed after the callback function exits.
-type dbAccessor func(context.Context, bool, func(keyvalue.ReadWriter) error) error
+type dbAccessor interface {
+	read(context.Context, func(keyvalue.ReadWriter) error) error
+	write(context.Context, func(keyvalue.ReadWriter) error) error
+}
+
+// namespacedDBAccessor is a default implementation of dbAccessor interface.
+type namespacedDBAccessor struct {
+	access func(context.Context, bool, func(keyvalue.ReadWriter) error) error
+}
+
+func (a *namespacedDBAccessor) read(ctx context.Context, fn func(keyvalue.ReadWriter) error) error {
+	return a.access(ctx, true, fn)
+}
+
+func (a *namespacedDBAccessor) write(ctx context.Context, fn func(keyvalue.ReadWriter) error) error {
+	return a.access(ctx, false, fn)
+}
+
+func newNamespacedDBAccessor(ptnMgr *storagemgr.PartitionManager, storageName string, namespace []byte) *namespacedDBAccessor {
+	return &namespacedDBAccessor{
+		access: func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
+			return ptnMgr.StorageKV(ctx, storageName, readOnly, func(rw keyvalue.ReadWriter) error {
+				return fn(keyvalue.NewPrefixedReadWriter(rw, namespace))
+			})
+		},
+	}
+}
 
 // dbForStorage returns a namedspaced DB accessor function for specific information of a storage in
 // Raft cluster such as allocated storage ID, last applied replica groups, etc.
 func dbForStorage(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
-		return ptnMgr.StorageKV(ctx, storageName, readOnly, func(rw keyvalue.ReadWriter) error {
-			return fn(keyvalue.NewPrefixedReadWriter(rw, []byte("raft/self")))
-		})
-	}
+	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/self"))
 }
 
 // dbForMetadataGroup returns a namedspaced DB accessfor function to store the data of metadata Raft
 // group. Those data consists of cluster-wide information such as list of registered storages and
 // their replication groups, etc.
 func dbForMetadataGroup(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
-		return ptnMgr.StorageKV(ctx, storageName, readOnly, func(rw keyvalue.ReadWriter) error {
-			return fn(keyvalue.NewPrefixedReadWriter(rw, []byte("raft/cluster")))
-		})
-	}
+	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/cluster"))
 }
 
 var keyLastApplied = []byte("applied_lsn")

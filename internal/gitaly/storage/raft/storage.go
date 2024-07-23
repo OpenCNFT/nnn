@@ -20,6 +20,7 @@ type storageManager struct {
 	id            raftID
 	name          string
 	ptnMgr        *storagemgr.PartitionManager
+	db            dbAccessor
 	nodeHost      *dragonboat.NodeHost
 	persistedInfo *gitalypb.Storage
 }
@@ -28,6 +29,7 @@ type storageManager struct {
 func newStorageManager(name string, ptnMgr *storagemgr.PartitionManager, nodeHost *dragonboat.NodeHost) *storageManager {
 	return &storageManager{
 		name:     name,
+		db:       dbForStorage(ptnMgr, name),
 		ptnMgr:   ptnMgr,
 		nodeHost: nodeHost,
 	}
@@ -37,8 +39,7 @@ func newStorageManager(name string, ptnMgr *storagemgr.PartitionManager, nodeHos
 func (m *storageManager) Close() { m.nodeHost.Close() }
 
 func (m *storageManager) loadStorageInfo(ctx context.Context) error {
-	db := m.dbForStorage()
-	return db(ctx, false, func(txn keyvalue.ReadWriter) error {
+	return m.db.read(ctx, func(txn keyvalue.ReadWriter) error {
 		item, err := txn.Get([]byte("storage"))
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
@@ -59,8 +60,7 @@ func (m *storageManager) loadStorageInfo(ctx context.Context) error {
 }
 
 func (m *storageManager) saveStorageInfo(ctx context.Context, storage *gitalypb.Storage) error {
-	db := m.dbForStorage()
-	return db(ctx, false, func(txn keyvalue.ReadWriter) error {
+	return m.db.write(ctx, func(txn keyvalue.ReadWriter) error {
 		_, err := txn.Get([]byte("storage"))
 		if err == nil {
 			return fmt.Errorf("storage already exists")
@@ -85,10 +85,6 @@ func (m *storageManager) saveStorageInfo(ctx context.Context, storage *gitalypb.
 func (m *storageManager) clearStorageInfo() {
 	m.id = 0
 	m.persistedInfo = nil
-}
-
-func (m *storageManager) dbForStorage() dbAccessor {
-	return dbForStorage(m.ptnMgr, m.name)
 }
 
 func (m *storageManager) dbForMetadataGroup() dbAccessor {
