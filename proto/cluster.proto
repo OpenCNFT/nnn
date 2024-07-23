@@ -17,6 +17,20 @@ message Cluster {
   map<uint64, Storage> storages = 3;
 }
 
+// Partition represents a partition in a Raft cluster.
+message Partition {
+  // authority_name is the name of storage that creates this partition.
+  string authority_name = 1;
+  // authority_id is the unique ID of storage that creates this partition. The ID was allocated by
+  // the metadata Raft group.
+  uint64 authority_id = 2;
+  // partition_id is the partition ID of a partition *within the authority storage*. All
+  // repositories sharing a same origin have the same partition ID.
+  uint64 partition_id = 3;
+  // relative_path is the unique relative path of that partition.
+  string relative_path = 4;
+}
+
 // Storage represents a storage unit within a cluster.
 message Storage {
   // storage_id is the unique identifier for the storage.
@@ -99,4 +113,30 @@ message UpdateStorageRequest {
 message UpdateStorageResponse {
   // storage contains the details of the newly updated storage.
   Storage storage = 1;
+}
+
+// RegisterPartitionRequest is the request message to add a partition (repository + forks) to a
+// storage for tracking. The destinating storage is not necessarily the same as the authority
+// storage. For example, a partition is tracked by another storage on different node.
+message RegisterPartitionRequest {
+  // partition is the registerting one.
+  Partition partition = 1;
+}
+
+// RegisterPartitionResponse is the response message of RegisterPartitionRequest.
+message RegisterPartitionResponse {
+  // partition contains info of registered partition. If the registering partition already exists,
+  // it contains the partition info inside the statemachine.
+  Partition partition = 1;
+}
+
+// GetRegisteredPartitionsRequest is the request message to query for all registered partitions
+// that a storage is tracking.
+message GetRegisteredPartitionsRequest {
+}
+
+// GetRegisteredPartitionsResponse is the response message of GetRegisteredPartitionsRequest.
+message GetRegisteredPartitionsResponse {
+  // partitions is the list of registered partitions.
+  repeated Partition partitions = 1;
 }
