@@ -27,10 +27,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -517,13 +515,9 @@ func (t *testInProgressTracker) GetInProgress(key string) int {
 	return 0
 }
 
-func (t *testInProgressTracker) IncrementInProgress(key string) {
-	return
-}
+func (t *testInProgressTracker) IncrementInProgress(key string) {}
 
-func (t *testInProgressTracker) DecrementInProgress(key string) {
-	return
-}
+func (t *testInProgressTracker) DecrementInProgress(key string) {}
 
 func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 	t.Parallel()
@@ -621,7 +615,6 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 				repoProto *gitalypb.Repository,
 				repoPath string,
 			) {
-
 				tracker.thresholdReached = false
 				gittest.WriteCommit(t, cfg, repoPath,
 					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
@@ -665,38 +658,14 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 			cfg.BundleURI.Autogeneration = true
 
 			gitCmdFactory := gittest.NewCommandFactory(t, cfg)
-			locator := config.NewLocator(cfg)
 			catfileCache := catfile.NewCache(cfg)
 			t.Cleanup(catfileCache.Stop)
-
-			dbMgr, err := keyvalue.NewDBManager(
-				cfg.Storages,
-				keyvalue.NewBadgerStore,
-				helper.NewNullTickerFactory(),
-				logger,
-			)
-			require.NoError(t, err)
-			t.Cleanup(dbMgr.Close)
-
-			partitionManager, err := storagemgr.NewPartitionManager(
-				ctx,
-				cfg.Storages,
-				gitCmdFactory,
-				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-				logger,
-				dbMgr,
-				cfg.Prometheus,
-				nil,
-			)
-			require.NoError(t, err)
-			t.Cleanup(partitionManager.Close)
 
 			server := startSmartHTTPServerWithOptions(t, cfg, nil, []testserver.GitalyServerOpt{
 				testserver.WithBundleURISink(sink),
 				testserver.WithLogger(logger),
 				testserver.WithInProgressTracker(tracker),
 				testserver.WithTransactionRegistry(storagemgr.NewTransactionRegistry()),
-				testserver.WithPartitionManager(partitionManager),
 				testserver.WithGitCommandFactory(gitCmdFactory),
 			})
 

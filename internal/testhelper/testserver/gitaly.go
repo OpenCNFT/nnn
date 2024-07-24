@@ -609,11 +609,3 @@ func WithProcReceiveRegistry(registry *hook.ProcReceiveRegistry) GitalyServerOpt
 		return deps
 	}
 }
-
-// WithPartitionManager sets the proc receive registry that will be used for Gitaly services.
-func WithPartitionManager(partitionMgr *storagemgr.PartitionManager) GitalyServerOpt {
-	return func(deps gitalyServerDeps) gitalyServerDeps {
-		deps.partitionManager = partitionMgr
-		return deps
-	}
-}

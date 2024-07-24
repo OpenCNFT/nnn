@@ -16,7 +16,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
@@ -130,21 +129,13 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 
 	gitConfig = append(gitConfig, bundleuri.CapabilitiesGitConfig(ctx)...)
 
-	txID := storage.ExtractTransactionID(ctx)
+	originalRepo := req.GetRepository()
 
-	var originalRepo *gitalypb.Repository
+	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+		originalRepo = tx.OriginalRepository(req.GetRepository())
+	})
 
-	if txID != 0 {
-		currentTx, err := s.transactionRegistry.Get(txID)
-		if err != nil {
-			return nil, structerr.NewInternal("error getting transaction: %w", err)
-		}
-		originalRepo = currentTx.OriginalRepository(req.GetRepository())
-	} else {
-		originalRepo = req.GetRepository()
-	}
-
-	key := originalRepo.GetGlRepository()
+	key := originalRepo.GetStorageName() + ":" + originalRepo.GetRelativePath()
 
 	uploadPackConfig, err := bundleuri.UploadPackGitConfig(ctx, s.bundleURISink, req.GetRepository())
 	if err != nil {
@@ -157,35 +148,56 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 				ctx, cancel := context.WithTimeout(context.Background(), bundleGenerationTimeout)
 				defer cancel()
 
-				tx, err := s.partitionMgr.Begin(
-					ctx,
-					originalRepo.GetStorageName(),
-					0,
-					storagemgr.TransactionOptions{
-						ReadOnly:     true,
-						RelativePath: originalRepo.GetRelativePath(),
-					},
-				)
-				if err != nil {
-					ctxlogrus.Extract(ctx).WithError(err).Error("failed starting transaction")
-				}
-
-				ctx = storagectx.ContextWithTransaction(ctx, tx)
-
-				if err := s.bundleURISink.GenerateOneAtATime(ctx, localrepo.New(
-					s.logger,
-					s.locator,
-					s.gitCmdFactory,
-					s.catfileCache,
-					originalRepo)); err != nil {
-					ctxlogrus.Extract(ctx).WithError(err).Error("generate bundle")
-					if err := tx.Rollback(); err != nil && !errors.Is(err, storagemgr.ErrTransactionAlreadyCommitted) {
-						ctxlogrus.Extract(ctx).WithError(err).Error("failed rolling back transaction")
+				if s.partitionMgr != nil {
+					tx, err := s.partitionMgr.Begin(
+						ctx,
+						originalRepo.GetStorageName(),
+						0,
+						storagemgr.TransactionOptions{
+							ReadOnly:     true,
+							RelativePath: originalRepo.GetRelativePath(),
+						},
+					)
+					if err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("failed starting transaction")
+						return
 					}
-				}
 
-				if err := tx.Commit(ctx); err != nil && !errors.Is(err, storagemgr.ErrTransactionAlreadyCommitted) {
-					ctxlogrus.Extract(ctx).WithError(err).Error("committing transaction")
+					ctx = storagectx.ContextWithTransaction(ctx, tx)
+
+					if err := s.bundleURISink.GenerateOneAtATime(ctx, localrepo.New(
+						s.logger,
+						s.locator,
+						s.gitCmdFactory,
+						s.catfileCache,
+						originalRepo)); err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("generate bundle")
+						if tx == nil {
+							return
+						}
+
+						if err := tx.Rollback(); err != nil {
+							ctxlogrus.Extract(ctx).WithError(err).Error("failed rolling back transaction")
+							return
+						}
+
+						return
+					}
+
+					if err := tx.Commit(ctx); err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("committing transaction")
+					}
+				} else {
+					if err := s.bundleURISink.GenerateOneAtATime(ctx, localrepo.New(
+						s.logger,
+						s.locator,
+						s.gitCmdFactory,
+						s.catfileCache,
+						originalRepo)); err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("generate bundle")
+						ctxlogrus.Extract(ctx).WithError(err).Error("failed rolling back transaction")
+						return
+					}
 				}
 			}()
 		} else if !errors.Is(err, bundleuri.ErrSinkMissing) {
