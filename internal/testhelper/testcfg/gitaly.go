@@ -11,6 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/duration"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -48,6 +49,19 @@ func WithPackObjectsCacheEnabled() Option {
 	}
 }
 
+// WithDisableBundledGitSymlinking stops the builder from symlinking the
+// compiled bundled Git binaries in _build/bin to cfg.RuntimeDir. This is
+// useful for tests like cmd/gitaly/check_test.go which executes a test
+// against a compiled Gitaly binary. If this option is not supplied, both
+// the test and the Gitaly process it spawns will try to populate RuntimeDir
+// with the same binaries, which causes a "file exists" exception in
+// packed_binaries.go
+func WithDisableBundledGitSymlinking() Option {
+	return func(builder *GitalyCfgBuilder) {
+		builder.disableBundledGitSymlinking = true
+	}
+}
+
 // NewGitalyCfgBuilder returns gitaly configuration builder with configured set of options.
 func NewGitalyCfgBuilder(opts ...Option) GitalyCfgBuilder {
 	cfgBuilder := GitalyCfgBuilder{}
@@ -63,8 +77,9 @@ func NewGitalyCfgBuilder(opts ...Option) GitalyCfgBuilder {
 type GitalyCfgBuilder struct {
 	cfg config.Cfg
 
-	storages                []string
-	packObjectsCacheEnabled bool
+	storages                    []string
+	packObjectsCacheEnabled     bool
+	disableBundledGitSymlinking bool
 }
 
 // Build setups required filesystem structure, creates and returns configuration of the gitaly service.
@@ -102,6 +117,26 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 		cfg.RuntimeDir = filepath.Join(root, "runtime.d")
 		require.NoError(tb, os.Mkdir(cfg.RuntimeDir, mode.Directory))
 		require.NoError(tb, os.Mkdir(cfg.InternalSocketDir(), mode.Directory))
+
+		if !gc.disableBundledGitSymlinking {
+			// We do this symlinking to emulate what happens with the Git binaries in production:
+			// - In production, the Git binaries get unpacked by packed_binaries.go into Gitaly's RuntimeDir, which for
+			//   Omnibus is something like /var/opt/gitlab/gitaly/run/gitaly-<xxx>.
+			// - In testing, the binaries remain in the _build/bin directory of the repository root.
+			bundledGitBins, err := filepath.Glob(filepath.Join(testhelper.SourceRoot(tb), "_build", "bin", "gitaly-git-*"))
+			require.NoError(tb, err)
+
+			for _, targetPath := range bundledGitBins {
+				destinationPath := filepath.Join(cfg.RuntimeDir, filepath.Base(targetPath))
+
+				// It's possible that the same RuntimeDir is used across multiple invocations of
+				// testcfg.Build(), so we simply remove any existing symlinks.
+				if _, err := os.Lstat(destinationPath); err == nil {
+					require.NoError(tb, os.Remove(destinationPath))
+				}
+				require.NoError(tb, os.Symlink(targetPath, destinationPath))
+			}
+		}
 	}
 
 	if len(cfg.Storages) != 0 && len(gc.storages) != 0 {
@@ -149,6 +184,8 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 
 	cfg.Transactions.Enabled = testhelper.IsWALEnabled()
 
+	cfg.Git.UseBundledBinaries = true
+
 	require.NoError(tb, cfg.Sanitize())
 	require.NoError(tb, cfg.ValidateV2())
 
@@ -171,7 +208,7 @@ func WriteTemporaryGitalyConfigFile(tb testing.TB, cfg config.Cfg) string {
 
 	contents, err := toml.Marshal(cfg)
 	require.NoError(tb, err)
-	require.NoError(tb, os.WriteFile(path, contents, mode.File))
+	require.NoError(tb, os.WriteFile(path, contents, perm.SharedFile))
 
 	return path
 }
