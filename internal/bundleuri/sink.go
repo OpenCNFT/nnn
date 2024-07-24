@@ -41,8 +41,9 @@ var (
 // Sink is a wrapper around the storage bucket used for accessing/writing
 // bundleuri bundles.
 type Sink struct {
-	bucket              *blob.Bucket
-	bundleCreationMutex map[string]*sync.Mutex
+	bucket                   *blob.Bucket
+	bundleCreationInProgress map[string]struct{}
+	bundleCreationMutex      sync.Mutex
 
 	config sinkConfig
 }
@@ -71,8 +72,8 @@ func NewSink(ctx context.Context, uri string, options ...SinkOption) (*Sink, err
 	}
 
 	s := &Sink{
-		bucket:              bucket,
-		bundleCreationMutex: make(map[string]*sync.Mutex),
+		bucket:                   bucket,
+		bundleCreationInProgress: make(map[string]struct{}),
 	}
 
 	var c sinkConfig
@@ -119,40 +120,43 @@ func (s *Sink) getWriter(ctx context.Context, relativePath string) (io.WriteClos
 func (s *Sink) GenerateOneAtATime(ctx context.Context, repo *localrepo.Repo) error {
 	bundlePath := s.relativePath(repo, defaultBundle)
 
-	var m *sync.Mutex
-	var ok bool
+	s.bundleCreationMutex.Lock()
+	_, ok := s.bundleCreationInProgress[bundlePath]
 
-	if m, ok = s.bundleCreationMutex[bundlePath]; !ok {
-		s.bundleCreationMutex[bundlePath] = &sync.Mutex{}
-		m = s.bundleCreationMutex[bundlePath]
+	if ok {
+		s.bundleCreationMutex.Unlock()
+		return fmt.Errorf("%w: %s", ErrBundleGenerationInProgress, bundlePath)
 	}
 
-	if m.TryLock() {
-		defer m.Unlock()
-		errChan := make(chan error)
+	s.bundleCreationInProgress[bundlePath] = struct{}{}
+	s.bundleCreationMutex.Unlock()
+	defer func() {
+		s.bundleCreationMutex.Lock()
+		delete(s.bundleCreationInProgress, bundlePath)
+		s.bundleCreationMutex.Unlock()
+	}()
 
-		go func(ctx context.Context) {
-			select {
-			case errChan <- s.Generate(ctx, repo):
-			case <-ctx.Done():
-				errChan <- ctx.Err()
-			}
-		}(ctx)
+	errChan := make(chan error)
 
-		err := <-errChan
-
-		if s.config.notifyBundleGeneration != nil {
-			s.config.notifyBundleGeneration(bundlePath, err)
+	go func(ctx context.Context) {
+		select {
+		case errChan <- s.Generate(ctx, repo):
+		case <-ctx.Done():
+			errChan <- ctx.Err()
 		}
-	} else {
-		return fmt.Errorf("%w: %s", ErrBundleGenerationInProgress, bundlePath)
+	}(ctx)
+
+	err := <-errChan
+
+	if s.config.notifyBundleGeneration != nil {
+		s.config.notifyBundleGeneration(bundlePath, err)
 	}
 
 	return nil
 }
 
 // Generate creates a bundle for bundle-URI use into the bucket.
-func (s Sink) Generate(ctx context.Context, repo *localrepo.Repo) (returnErr error) {
+func (s *Sink) Generate(ctx context.Context, repo *localrepo.Repo) (returnErr error) {
 	ref, err := repo.HeadReference(ctx)
 	if err != nil {
 		return fmt.Errorf("resolve HEAD ref: %w", err)
@@ -195,7 +199,7 @@ func (s Sink) Generate(ctx context.Context, repo *localrepo.Repo) (returnErr err
 }
 
 // SignedURL returns a public URL to give anyone access to download the bundle from.
-func (s Sink) SignedURL(ctx context.Context, repo storage.Repository) (string, error) {
+func (s *Sink) SignedURL(ctx context.Context, repo storage.Repository) (string, error) {
 	relativePath := s.relativePath(repo, defaultBundle)
 
 	repoProto, ok := repo.(*gitalypb.Repository)
@@ -212,7 +216,7 @@ func (s Sink) SignedURL(ctx context.Context, repo storage.Repository) (string, e
 		if err == nil {
 			return "", ErrBundleNotFound
 		}
-		return "", fmt.Errorf("%w: %w", ErrBundleNotFound, err)
+		return "", fmt.Errorf("checking bundle existence: %w", err)
 	}
 
 	uri, err := s.bucket.SignedURL(ctx, relativePath, &blob.SignedURLOptions{
