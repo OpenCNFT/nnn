@@ -1,5 +1,9 @@
 # Gitaly changelog
 
+## 17.1.3 (2024-07-24)
+
+No changes.
+
 ## 17.1.2 (2024-07-09)
 
 No changes.
