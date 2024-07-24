@@ -5,6 +5,7 @@ package cgroups
 import (
 	"fmt"
 	"io/fs"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,6 +70,9 @@ func TestSetup_ParentCgroups(t *testing.T) {
 				MemoryBytes: 102400,
 				CPUShares:   256,
 				CPUQuotaUs:  200,
+				Repositories: cgroups.Repositories{
+					Count: 1,
+				},
 			},
 			expectedV1: expectedCgroup{
 				wantMemoryBytes: 102400,
@@ -86,6 +90,9 @@ func TestSetup_ParentCgroups(t *testing.T) {
 			name: "only memory limit set",
 			cfg: cgroups.Config{
 				MemoryBytes: 102400,
+				Repositories: cgroups.Repositories{
+					Count: 1,
+				},
 			},
 			expectedV1: expectedCgroup{
 				wantMemoryBytes: 102400,
@@ -98,6 +105,9 @@ func TestSetup_ParentCgroups(t *testing.T) {
 			name: "only cpu shares set",
 			cfg: cgroups.Config{
 				CPUShares: 512,
+				Repositories: cgroups.Repositories{
+					Count: 1,
+				},
 			},
 			expectedV1: expectedCgroup{
 				wantCPUShares: 512,
@@ -110,6 +120,9 @@ func TestSetup_ParentCgroups(t *testing.T) {
 			name: "only cpu quota set",
 			cfg: cgroups.Config{
 				CPUQuotaUs: 200,
+				Repositories: cgroups.Repositories{
+					Count: 1,
+				},
 			},
 			expectedV1: expectedCgroup{
 				wantCPUQuotaUs: 200,
@@ -241,8 +254,8 @@ func TestRepoCgroups(t *testing.T) {
 					// is creating repository directories in the correct location.
 					requireShards(t, version, mock, manager, pid)
 
-					groupID := uint(0) // Fixed - generated from the command
-					mock.setupMockCgroupFiles(t, manager, []uint{groupID})
+					groupID := []uint{0, 2} // Fixed - generated from the command
+					mock.setupMockCgroupFiles(t, manager, groupID)
 
 					require.False(t, manager.Ready())
 					require.NoError(t, manager.Setup())
@@ -256,7 +269,7 @@ func TestRepoCgroups(t *testing.T) {
 					_, err := manager.AddCommand(cmd)
 					require.NoError(t, err)
 
-					requireShards(t, version, mock, manager, pid, groupID)
+					requireShards(t, version, mock, manager, pid, groupID...)
 
 					var expected expectedCgroup
 					if version == 1 {
@@ -265,16 +278,14 @@ func TestRepoCgroups(t *testing.T) {
 						expected = tt.expectedV2
 					}
 
-					for shard := uint(0); shard < cfg.Repositories.Count; shard++ {
+					for _, shard := range groupID {
 						// The negative case where no directory should exist is asserted
 						// by `requireShards()`.
-						if shard == groupID {
-							cgRelPath := filepath.Join(
-								"gitaly", fmt.Sprintf("gitaly-%d", pid), fmt.Sprintf("repos-%d", shard),
-							)
+						cgRelPath := filepath.Join(
+							"gitaly", fmt.Sprintf("gitaly-%d", pid), fmt.Sprintf("repos-%d", shard),
+						)
 
-							requireCgroupComponents(t, version, mock.rootPath(), cgRelPath, expected)
-						}
+						requireCgroupComponents(t, version, mock.rootPath(), cgRelPath, expected)
 					}
 				})
 			}
@@ -285,17 +296,11 @@ func TestRepoCgroups(t *testing.T) {
 func TestAddCommand(t *testing.T) {
 	for _, version := range []int{1, 2} {
 		t.Run("cgroups-v"+strconv.Itoa(version), func(t *testing.T) {
-			pid := 1
+			pid := rand.Intn(10)
 			ctx := testhelper.Context(t)
 
 			t.Run("without overridden key", func(t *testing.T) {
-				mock := newMock(t, version)
-				config := defaultCgroupsConfig()
-				config.Repositories.Count = 10
-				config.Repositories.MemoryBytes = 1024
-				config.Repositories.CPUShares = 16
-				config.HierarchyRoot = "gitaly"
-				config.Mountpoint = mock.rootPath()
+				mock, config := setupMockCgroup(t, version)
 
 				cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 				require.NoError(t, cmd.Run())
@@ -304,30 +309,17 @@ func TestAddCommand(t *testing.T) {
 				mock.setupMockCgroupFiles(t, manager, []uint{})
 				require.NoError(t, manager.Setup())
 
-				groupID := uint(8) // Fixed - generated from the command
+				groupID := []uint{0, 8} // Fixed - generated from the command
 				_, err := manager.AddCommand(cmd)
 				require.NoError(t, err)
-				requireShards(t, version, mock, manager, pid, groupID)
-
-				for _, path := range mock.repoPaths(pid, groupID) {
-					procsPath := filepath.Join(path, "cgroup.procs")
-					content := readCgroupFile(t, procsPath)
-
-					cmdPid, err := strconv.Atoi(string(content))
-					require.NoError(t, err)
-
-					require.Equal(t, cmd.Process.Pid, cmdPid)
+				requireShards(t, version, mock, manager, pid, groupID...)
+				for _, shard := range groupID {
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, shard, uint(0))
 				}
 			})
 
 			t.Run("with overridden key", func(t *testing.T) {
-				mock := newMock(t, version)
-				config := defaultCgroupsConfig()
-				config.Repositories.Count = 10
-				config.Repositories.MemoryBytes = 1024
-				config.Repositories.CPUShares = 16
-				config.HierarchyRoot = "gitaly"
-				config.Mountpoint = mock.rootPath()
+				mock, config := setupMockCgroup(t, version)
 
 				cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 				require.NoError(t, cmd.Run())
@@ -336,57 +328,53 @@ func TestAddCommand(t *testing.T) {
 				mock.setupMockCgroupFiles(t, manager, []uint{})
 				require.NoError(t, manager.Setup())
 
-				groupID := uint(9) // Fixed - generated from the key
+				groupID := []uint{0, 9} // Fixed - generated from the key
 				_, err := manager.AddCommand(cmd, WithCgroupKey("foobar"))
 				require.NoError(t, err)
-				requireShards(t, version, mock, manager, pid, groupID)
-
-				for _, path := range mock.repoPaths(pid, groupID) {
-					procsPath := filepath.Join(path, "cgroup.procs")
-					content := readCgroupFile(t, procsPath)
-
-					cmdPid, err := strconv.Atoi(string(content))
-					require.NoError(t, err)
-
-					require.Equal(t, cmd.Process.Pid, cmdPid)
+				requireShards(t, version, mock, manager, pid, groupID...)
+				for _, shard := range groupID {
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, shard, uint(0))
 				}
 			})
 
 			t.Run("when AllocationSet is set", func(t *testing.T) {
-				mock := newMock(t, version)
-				config := defaultCgroupsConfig()
-				config.Repositories.Count = 10
+				mock, config := setupMockCgroup(t, version)
 				config.Repositories.MaxCgroupsPerRepo = 3
-				config.Repositories.MemoryBytes = 1024
-				config.Repositories.CPUShares = 16
-				config.HierarchyRoot = "gitaly"
-				config.Mountpoint = mock.rootPath()
 
 				manager := mock.newCgroupManager(config, testhelper.SharedLogger(t), pid)
-				mock.setupMockCgroupFiles(t, manager, []uint{})
+				groupIDs := []uint{8, 9, 0}
+				mock.setupMockCgroupFiles(t, manager, []uint{0})
 				require.NoError(t, manager.Setup())
 
 				rand := newMockRand(t, 3)
 				manager.rand = rand
 
-				groupIDs := []uint{8, 9, 0}
-				for i := 0; i < 3; i++ {
+				// Find a directory with /repos-\d in it's path from the parent cgroup path
+				cgroupPath := mock.repoPaths(pid, 0)[0]
+				filesFound, err := filepath.Glob(filepath.Dir(cgroupPath) + "/repos-[0-9]*")
+				require.NoError(t, err)
+
+				// Extract setupGroupID that was created
+				var setupGroupID uint64
+				for _, f := range filesFound {
+					repoNumber := getRepoNumber(t, f)
+					setupGroupID, err = strconv.ParseUint(repoNumber, 10, 64)
+					require.NoError(t, err)
+				}
+
+				// Assert that the invoked command pid matches the shard's cgroup.proc
+				for i := 0; i < len(groupIDs); i++ {
 					cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 					require.NoError(t, cmd.Run())
 					_, err := manager.AddCommand(cmd)
+
 					require.NoError(t, err)
-
-					for _, path := range mock.repoPaths(pid, groupIDs[i]) {
-						procsPath := filepath.Join(path, "cgroup.procs")
-						content := readCgroupFile(t, procsPath)
-
-						cmdPid, err := strconv.Atoi(string(content))
-						require.NoError(t, err)
-
-						require.Equal(t, cmd.Process.Pid, cmdPid)
-					}
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, groupIDs[i], uint(setupGroupID))
 				}
-
+				// Add the pid that got created from manager.Setup()
+				if !slices.Contains(groupIDs, uint(setupGroupID)) {
+					groupIDs = append(groupIDs, uint(setupGroupID))
+				}
 				requireShards(t, version, mock, manager, pid, groupIDs...)
 			})
 		})
@@ -936,7 +924,8 @@ func requireShards(t *testing.T, version int, mock mockCgroup, mgr *CGroupManage
 		cgroupPath := filepath.Join("gitaly",
 			fmt.Sprintf("gitaly-%d", pid), fmt.Sprintf("repos-%d", shard))
 		cgLock := mgr.status.getLock(cgroupPath)
-		require.Equal(t, shouldExist, cgLock.isCreated())
+		require.Equalf(t, shouldExist, cgLock.isCreated(),
+			"shard %d should exist (%t) but got %t", shard, shouldExist, cgLock.isCreated())
 
 		for _, diskPath := range mock.repoPaths(pid, shard) {
 			if shouldExist {
