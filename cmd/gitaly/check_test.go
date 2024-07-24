@@ -36,7 +36,7 @@ func TestCheckOK(t *testing.T) {
 			},
 			SecretFile: gitlab.WriteShellSecretFile(t, testhelper.TempDir(t), "the secret"),
 		},
-	}))
+	}), testcfg.WithDisableBundledGitSymlinking())
 	testcfg.BuildGitaly(t, cfg)
 
 	configPath := testcfg.WriteTemporaryGitalyConfigFile(t, cfg)
@@ -81,7 +81,7 @@ func TestCheckBadCreds(t *testing.T) {
 			},
 			SecretFile: gitlab.WriteShellSecretFile(t, testhelper.TempDir(t), "the secret"),
 		},
-	}))
+	}), testcfg.WithDisableBundledGitSymlinking())
 	testcfg.BuildGitaly(t, cfg)
 
 	configPath := testcfg.WriteTemporaryGitalyConfigFile(t, cfg)
