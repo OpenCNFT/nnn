@@ -528,6 +528,18 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 			},
 		},
+		{
+			desc: "starting a writing transaction with all repositories is an error",
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					ReadOnly:      false,
+					RelativePaths: nil,
+					ExpectedError: errWritableAllRepository,
+				},
+			},
+		},
 	}
 }
 

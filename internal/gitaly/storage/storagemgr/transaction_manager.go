@@ -91,6 +91,12 @@ var (
 	errReadOnlyHousekeeping       = errors.New("housekeeping in a read-only transaction")
 	errReadOnlyKeyValue           = errors.New("key-value writes in a read-only transaction")
 
+	// errWritableAllRepository is returned when a transaction is started with
+	// no relative path filter specified and is not read-only. Transactions do
+	// not currently support writing to multiple repositories and so a writable
+	// transaction without a specified target relative path would be ambiguous.
+	errWritableAllRepository = errors.New("cannot start writable all repository transaction")
+
 	// keyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
 	keyAppliedLSN = []byte("applied_lsn")
 )
@@ -328,18 +334,30 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 		opts = possibleOpts[0]
 	}
 
+	var relativePath string
+	if len(relativePaths) > 0 {
+		// Set the first repository as the tracked repository
+		relativePath = relativePaths[0]
+	}
+
+	if relativePaths == nil && !readOnly {
+		return nil, errWritableAllRepository
+	}
+
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.Begin", nil)
 	span.SetTag("readonly", readOnly)
+	span.SetTag("relativePath", relativePath)
 	defer span.Finish()
 
 	mgr.mutex.Lock()
 
 	txn := &Transaction{
-		readOnly:    readOnly,
-		commit:      mgr.commit,
-		snapshotLSN: mgr.appendedLSN,
-		finished:    make(chan struct{}),
-		metrics:     transactionMetrics{housekeeping: mgr.metrics.housekeeping},
+		readOnly:     readOnly,
+		commit:       mgr.commit,
+		snapshotLSN:  mgr.appendedLSN,
+		finished:     make(chan struct{}),
+		relativePath: relativePath,
+		metrics:      transactionMetrics{housekeeping: mgr.metrics.housekeeping},
 	}
 
 	mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Add(1)
@@ -427,12 +445,6 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 
 		if relativePaths == nil {
 			relativePaths = txn.partitionRelativePaths()
-		}
-
-		if len(relativePaths) > 0 {
-			// Set the first repository as the tracked repository
-			txn.relativePath = relativePaths[0]
-			span.SetTag("relativePath", txn.relativePath)
 		}
 
 		var err error

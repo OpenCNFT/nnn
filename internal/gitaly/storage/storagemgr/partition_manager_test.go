@@ -93,6 +93,8 @@ func TestPartitionManager(t *testing.T) {
 		partitionID storage.PartitionID
 		// alternateRelativePath is the relative path of the alternate repository.
 		alternateRelativePath string
+		// readOnly indicates if the transaction is read-only.
+		readOnly bool
 		// expectedState contains the partitions by their storages and their pending transaction count at
 		// the end of the step.
 		expectedState map[string]map[storage.PartitionID]uint
@@ -785,6 +787,7 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							storageName: cfg.Storages[0].Name,
 							partitionID: 2,
+							readOnly:    true,
 							expectedState: map[string]map[storage.PartitionID]uint{
 								"default": {
 									2: 1,
@@ -938,6 +941,7 @@ func TestPartitionManager(t *testing.T) {
 					txn, err := partitionManager.Begin(beginCtx, storageName, step.partitionID, TransactionOptions{
 						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
+						ReadOnly:              step.readOnly,
 					})
 					require.Equal(t, step.expectedError, err)
 
