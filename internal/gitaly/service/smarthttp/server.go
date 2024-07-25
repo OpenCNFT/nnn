@@ -34,7 +34,7 @@ type server struct {
 	backupLocator              backup.Locator
 	backupSink                 backup.Sink
 	bundleURISink              *bundleuri.Sink
-	inflightTracker            *service.InProgressTracker
+	inflightTracker            service.InProgressTracker
 	generateBundles            bool
 	partitionMgr               *storagemgr.PartitionManager
 	transactionRegistry        *storagemgr.TransactionRegistry

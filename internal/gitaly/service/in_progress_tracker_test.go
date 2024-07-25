@@ -14,12 +14,12 @@ func TestInProgressTracker(t *testing.T) {
 	testCases := []struct {
 		desc               string
 		expectedInProgress int
-		actions            func(*service.InProgressTracker)
+		actions            func(service.InProgressTracker)
 	}{
 		{
 			desc:               "one in flight",
 			expectedInProgress: 1,
-			actions: func(t *service.InProgressTracker) {
+			actions: func(t service.InProgressTracker) {
 				t.IncrementInProgress(key)
 				t.IncrementInProgress(key)
 				t.DecrementInProgress(key)
@@ -28,7 +28,7 @@ func TestInProgressTracker(t *testing.T) {
 		{
 			desc:               "two in flight with concurrent writes",
 			expectedInProgress: 2,
-			actions: func(t *service.InProgressTracker) {
+			actions: func(t service.InProgressTracker) {
 				var wg sync.WaitGroup
 
 				wg.Add(4)
