@@ -349,7 +349,7 @@ custom_hooks_path = '%[2]s/001.custom_hooks.tar'
 
 					return repo, repoPath
 				},
-				expectedErr: fmt.Errorf("manager: %w", fmt.Errorf("write bundle: %w: no changes to bundle", backup.ErrSkipped)),
+				expectedIncrement: "002",
 			},
 			{
 				desc: "previous backup, updates",
