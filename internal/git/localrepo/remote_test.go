@@ -406,8 +406,17 @@ func TestRepo_Push(t *testing.T) {
 				})
 				return New(logger, locator, gitCmdFactory, catfileCache, repoProto), "", nil
 			},
-			refspecs:     []string{"refs/heads/master"},
-			errorMessage: `git push: exit status 128, stderr: "fatal: no path specified; see 'git help pull' for valid url syntax\n"`,
+			refspecs: []string{"refs/heads/master"},
+			errorMessage: func() string {
+				version, err := gittest.NewCommandFactory(t, cfg).GitVersion(ctx)
+				require.NoError(t, err)
+
+				if version.GreaterOrEqual(git.NewRCVersion(2, 46, 0, 0)) {
+					return `git push: exit status 128, stderr: "fatal: bad repository ''\n"`
+				}
+
+				return `git push: exit status 128, stderr: "fatal: no path specified; see 'git help pull' for valid url syntax\n"`
+			}(),
 		},
 		{
 			desc: "in-memory remote",
