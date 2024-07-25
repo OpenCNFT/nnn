@@ -26,7 +26,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
@@ -506,6 +505,26 @@ func TestServer_PostUploadPackWithBundleURI(t *testing.T) {
 	}
 }
 
+type testInProgressTracker struct {
+	thresholdReached bool
+}
+
+func (t *testInProgressTracker) GetInProgress(key string) int {
+	if t.thresholdReached {
+		return concurrentUploadPackThreshold + 1
+	}
+
+	return 0
+}
+
+func (t *testInProgressTracker) IncrementInProgress(key string) {
+	return
+}
+
+func (t *testInProgressTracker) DecrementInProgress(key string) {
+	return
+}
+
 func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 	t.Parallel()
 
@@ -528,7 +547,7 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 			ctx context.Context,
 			cfg config.Cfg,
 			sink *bundleuri.Sink,
-			tracker *service.InProgressTracker,
+			tracker *testInProgressTracker,
 			repoProto *gitalypb.Repository,
 			repoPath string,
 		)
@@ -542,7 +561,7 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 				ctx context.Context,
 				cfg config.Cfg,
 				sink *bundleuri.Sink,
-				tracker *service.InProgressTracker,
+				tracker *testInProgressTracker,
 				repoProto *gitalypb.Repository,
 				repoPath string,
 			) {
@@ -550,13 +569,7 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
 					gittest.WithBranch("main"))
 
-				key := repoProto.GetGlRepository()
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
+				tracker.thresholdReached = true
 			},
 			expectBundleGenerated: true,
 			verifyBundle: func(t *testing.T, cfg config.Cfg, bundlePath string, commit git.ObjectID) {
@@ -575,20 +588,14 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 				ctx context.Context,
 				cfg config.Cfg,
 				sink *bundleuri.Sink,
-				tracker *service.InProgressTracker,
+				tracker *testInProgressTracker,
 				repoProto *gitalypb.Repository,
 				repoPath string,
 			) {
 				gittest.WriteCommit(t, cfg, repoPath,
 					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
 					gittest.WithBranch("main"))
-				key := repoProto.GetGlRepository()
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
-				tracker.IncrementInProgress(key)
+				tracker.thresholdReached = true
 
 				repo := localrepo.NewTestRepo(t, cfg, repoProto)
 				require.NoError(t, sink.Generate(ctx, repo))
@@ -610,10 +617,12 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 				ctx context.Context,
 				cfg config.Cfg,
 				sink *bundleuri.Sink,
-				tracker *service.InProgressTracker,
+				tracker *testInProgressTracker,
 				repoProto *gitalypb.Repository,
 				repoPath string,
 			) {
+
+				tracker.thresholdReached = false
 				gittest.WriteCommit(t, cfg, repoPath,
 					gittest.WithTreeEntries(gittest.TreeEntry{Mode: "100644", Path: "README", Content: "much"}),
 					gittest.WithBranch("main"))
@@ -644,7 +653,7 @@ func TestServer_PostUploadPackAutogenerateBundles(t *testing.T) {
 				errChan <- err
 			}
 
-			tracker := service.NewInProgressTracker()
+			tracker := &testInProgressTracker{}
 
 			sinkDir := t.TempDir()
 			sink, err := bundleuri.NewSink(ctx, "file://"+sinkDir, bundleuri.WithBundleGenerationNotifier(bundleGeneratedNotifier))
