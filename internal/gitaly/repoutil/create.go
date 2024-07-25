@@ -290,16 +290,6 @@ func writeRefs(
 	repo *gitalypb.Repository,
 	gitCmdFactory git.CommandFactory,
 ) error {
-	version, err := gitCmdFactory.GitVersion(ctx)
-	if err != nil {
-		return fmt.Errorf("getting git version: %w", err)
-	}
-
-	// We rely on 'git for-each-ref --include-root-refs' to list all refs.
-	if version.LessThan(git.NewVersion(2, 45, 0, 0)) {
-		return nil
-	}
-
 	stderr := &bytes.Buffer{}
 
 	// This doesn't consider dangling symrefs. This needs to be fixed in Git:
