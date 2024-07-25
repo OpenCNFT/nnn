@@ -186,7 +186,7 @@ func TestDiffBlobs(t *testing.T) {
 					version, err := gittest.NewCommandFactory(t, cfg).GitVersion(ctx)
 					require.NoError(t, err)
 
-					if version.GreaterOrEqual(git.NewVersion(2, 46, 0, 0)) {
+					if version.GreaterOrEqual(git.NewRCVersion(2, 46, 0, 0)) {
 						expectedResponse[0].Binary = false
 						expectedResponse[0].Patch = []byte("@@ -1 +1 @@\n-foo\n+bar\n")
 					}

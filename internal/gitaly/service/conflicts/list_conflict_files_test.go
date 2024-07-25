@@ -574,7 +574,7 @@ func TestListConflictFiles(t *testing.T) {
 					version, err := gittest.NewCommandFactory(t, cfg).GitVersion(ctx)
 					require.NoError(t, err)
 
-					if version.GreaterOrEqual(git.NewVersion(2, 46, 0, 0)) {
+					if version.GreaterOrEqual(git.NewRCVersion(2, 46, 0, 0)) {
 						data.expectedFiles = []*conflictFile{
 							{
 								Header: &gitalypb.ConflictFileHeader{
