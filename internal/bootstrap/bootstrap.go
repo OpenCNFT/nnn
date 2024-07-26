@@ -177,24 +177,29 @@ func (b *Bootstrap) Wait(gracePeriodTicker helper.Ticker, stopAction func()) err
 		return err
 	}
 
-	var err error
 	select {
 	case <-b.upgrader.Exit():
 		// this is the old process and a graceful upgrade is in progress
 		// the new process signaled its readiness and we started a graceful stop
 		// however no further upgrades can be started until this process is running
 		// we set a grace period and then we force a termination.
-		waitError := b.waitGracePeriod(gracePeriodTicker, shutdown, stopAction)
-
-		err = fmt.Errorf("graceful upgrade: %w", waitError)
+		b.logger.Info("[graceful upgrade] stopping old Gitaly")
+		if waitError := b.waitGracePeriod(gracePeriodTicker, shutdown, stopAction); waitError != nil {
+			return fmt.Errorf("graceful upgrade: %w", waitError)
+		}
+		b.logger.Info("[graceful upgrade] stopped old Gitaly")
 	case s := <-shutdown:
-		waitError := b.waitGracePeriod(gracePeriodTicker, shutdown, stopAction)
-		err = fmt.Errorf("received signal %q: wait: %w", s, waitError)
+		b.logger.Info("[shutdown] stopping Gitaly")
+		if waitError := b.waitGracePeriod(gracePeriodTicker, shutdown, stopAction); waitError != nil {
+			return fmt.Errorf("received signal %q: wait: %w", s, waitError)
+		}
+		b.logger.Info("[shutdown] stopped Gitaly gracefully")
 		b.upgrader.Stop()
-	case err = <-b.errChan:
+	case err := <-b.errChan:
+		return err
 	}
 
-	return err
+	return nil
 }
 
 func (b *Bootstrap) waitGracePeriod(gracePeriodTicker helper.Ticker, kill <-chan os.Signal, stopAction func()) error {
@@ -216,7 +221,7 @@ func (b *Bootstrap) waitGracePeriod(gracePeriodTicker helper.Ticker, kill <-chan
 	case <-kill:
 		return fmt.Errorf("force shutdown")
 	case <-b.allServersDone:
-		return fmt.Errorf("completed")
+		return nil
 	}
 }
 

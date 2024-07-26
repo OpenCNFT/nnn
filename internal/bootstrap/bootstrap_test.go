@@ -126,7 +126,7 @@ func TestBootstrap_signal(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, self.Signal(sig))
 
-			require.EqualError(t, fmt.Errorf("received signal %q: wait: completed", sig), (<-waitCh).Error())
+			require.NoError(t, <-waitCh)
 		})
 	}
 }
@@ -250,10 +250,7 @@ func TestBootstrap_gracefulUpgrade(t *testing.T) {
 
 	b, upgrader, _ := setup(t, ctx)
 
-	require.Equal(t,
-		fmt.Errorf("graceful upgrade: %w", fmt.Errorf("completed")),
-		performUpgrade(t, b, upgrader, helper.NewManualTicker(), nil, nil),
-	)
+	require.NoError(t, performUpgrade(t, b, upgrader, helper.NewManualTicker(), nil, nil))
 }
 
 func TestBootstrap_portReuse(t *testing.T) {
