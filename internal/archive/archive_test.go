@@ -53,8 +53,9 @@ func TestWriteTarball(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = archFile.Close() }()
 
-	err = writeTarball(
+	err = WriteTarball(
 		ctx,
+		testhelper.NewLogger(t),
 		archFile,
 		srcDir,
 		"a.txt",
