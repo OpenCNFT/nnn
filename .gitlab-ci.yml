@@ -299,6 +299,7 @@ test:reftable:
 
 test:nightly:
   <<: *test_definition
+  allow_failure: true
   variables:
     <<: *test_variables
     OVERRIDE_GIT_VERSION: ""
@@ -308,8 +309,8 @@ test:nightly:
         TEST_TARGET: [ test, test-with-praefect ]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      allow_failure: false
     - when: manual
-      allow_failure: true
 
 test:praefect_smoke:
   <<: *test_definition
