@@ -93,6 +93,8 @@ func TestPartitionManager(t *testing.T) {
 		partitionID storage.PartitionID
 		// alternateRelativePath is the relative path of the alternate repository.
 		alternateRelativePath string
+		// readOnly indicates if the transaction is read-only.
+		readOnly bool
 		// expectedState contains the partitions by their storages and their pending transaction count at
 		// the end of the step.
 		expectedState map[string]map[storage.PartitionID]uint
@@ -785,6 +787,7 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							storageName: cfg.Storages[0].Name,
 							partitionID: 2,
+							readOnly:    true,
 							expectedState: map[string]map[storage.PartitionID]uint{
 								"default": {
 									2: 1,
@@ -815,6 +818,45 @@ func TestPartitionManager(t *testing.T) {
 				// We don't have any steps in the test as we're just asserting that PartitionManager initializes
 				// correctly and removes read-only directories in staging directory.
 				return setupData{}
+			},
+		},
+		{
+			desc: "transaction committed for partition with relative path filter",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo := setupRepository(t, cfg, cfg.Storages[0])
+
+				return setupData{
+					steps: steps{
+						begin{
+							storageName: cfg.Storages[0].Name,
+							partitionID: 2,
+							repo:        repo,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						commit{},
+					},
+				}
+			},
+		},
+		{
+			desc: "beginning transaction on partition with relative path filter on different partition fails",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo := setupRepository(t, cfg, cfg.Storages[0])
+
+				return setupData{
+					steps: steps{
+						begin{
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   100,
+							repo:          repo,
+							expectedError: fmt.Errorf("partition ID does not match repository partition"),
+						},
+					},
+				}
 			},
 		},
 	} {
@@ -896,8 +938,10 @@ func TestPartitionManager(t *testing.T) {
 						storageName = step.repo.GetStorageName()
 						relativePath = step.repo.GetRelativePath()
 					}
-					txn, err := partitionManager.Begin(beginCtx, storageName, relativePath, step.partitionID, TransactionOptions{
+					txn, err := partitionManager.Begin(beginCtx, storageName, step.partitionID, TransactionOptions{
+						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
+						ReadOnly:              step.readOnly,
 					})
 					require.Equal(t, step.expectedError, err)
 
@@ -997,7 +1041,8 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer partitionManager.Close()
 
-	tx, err := partitionManager.Begin(ctx, cfg.Storages[0].Name, "relative-path", 0, TransactionOptions{
+	tx, err := partitionManager.Begin(ctx, cfg.Storages[0].Name, 0, TransactionOptions{
+		RelativePath: "relative-path",
 		AllowPartitionAssignmentWithoutRepository: true,
 	})
 	require.NoError(t, err)

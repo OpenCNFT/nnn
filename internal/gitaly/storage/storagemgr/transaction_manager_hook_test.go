@@ -55,7 +55,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -65,7 +65,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -96,7 +96,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -146,7 +146,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -161,7 +161,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -170,14 +170,14 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				CloseManager{},
 				StartManager{},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Rollback{
@@ -200,11 +200,11 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -226,7 +226,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -258,7 +258,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -271,7 +271,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -303,11 +303,11 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -331,7 +331,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -370,7 +370,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -385,7 +385,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -424,7 +424,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -439,7 +439,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -478,7 +478,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -493,12 +493,12 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{

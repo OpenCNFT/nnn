@@ -160,10 +160,10 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 				tx, err := s.partitionMgr.Begin(
 					ctx,
 					originalRepo.GetStorageName(),
-					originalRepo.GetRelativePath(),
 					0,
 					storagemgr.TransactionOptions{
-						ReadOnly: true,
+						ReadOnly:     true,
+						RelativePath: originalRepo.GetRelativePath(),
 					},
 				)
 				if err != nil {

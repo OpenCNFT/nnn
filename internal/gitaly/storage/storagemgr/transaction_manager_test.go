@@ -262,7 +262,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			desc: "begin returns if context is canceled before initialization",
 			steps: steps{
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 					Context: func() context.Context {
 						ctx, cancel := context.WithCancel(ctx)
 						cancel()
@@ -281,7 +281,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CloseManager{},
 				Commit{
@@ -303,7 +303,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 						},
 					},
 					Begin{
-						RelativePath: setup.RelativePath,
+						RelativePaths: []string{setup.RelativePath},
 					},
 					Commit{
 						Context: ctx,
@@ -343,7 +343,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					},
 				},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				CloseManager{},
 				Commit{
@@ -363,7 +363,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					ExpectedError: errSimulatedCrash,
 				},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					ReferenceUpdates: git.ReferenceUpdates{
@@ -413,11 +413,11 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RepositoryAssertion{
 					TransactionID: 1,
@@ -477,7 +477,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				// Transaction 3 is should see the new changes as it began after transaction 1 was committed.
@@ -524,7 +524,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Rollback{
@@ -532,7 +532,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       5,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -544,7 +544,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       6,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Rollback{
@@ -577,7 +577,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -621,7 +621,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -663,7 +663,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -672,7 +672,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -711,7 +711,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -720,7 +720,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -761,7 +761,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -772,7 +772,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -811,7 +811,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID:    1,
@@ -835,7 +835,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Prune{},
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					QuarantinedPacks: [][]byte{
@@ -867,7 +867,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Prune{},
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					QuarantinedPacks: [][]byte{
@@ -900,7 +900,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Prune{},
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					QuarantinedPacks: [][]byte{
@@ -925,7 +925,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -936,7 +936,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -968,7 +968,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -979,12 +979,12 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -1043,7 +1043,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				RepositoryAssertion{
 					TransactionID: 1,
@@ -1073,7 +1073,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					ExpectedError: errSimulatedCrash,
 				},
 				Begin{
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 					ExpectedError: errInitializationFailed,
 				},
 				AssertManager{
@@ -1086,7 +1086,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Rollback{},
 				Rollback{
@@ -1099,7 +1099,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{},
 				Rollback{
@@ -1117,7 +1117,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{},
 				Commit{
@@ -1135,7 +1135,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Rollback{},
 				Commit{
@@ -1148,8 +1148,8 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
-					ReadOnly:     true,
+					RelativePaths: []string{setup.RelativePath},
+					ReadOnly:      true,
 				},
 				Commit{},
 			},
@@ -1161,11 +1161,11 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 2,
@@ -1182,7 +1182,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				// This transaction was started before the commit, so it should see the original state.
@@ -1302,7 +1302,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
@@ -1323,7 +1323,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				}),
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
@@ -1367,7 +1367,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -1377,12 +1377,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
@@ -1413,7 +1413,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				}),
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
@@ -1479,7 +1479,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 					ReadOnly:      true,
 				},
 				Commit{
@@ -1490,7 +1490,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				}),
 				Begin{
 					TransactionID: 2,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 					ReadOnly:      true,
 				},
 				Commit{
@@ -1515,7 +1515,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -1525,12 +1525,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -1541,7 +1541,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -1606,7 +1606,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -1616,12 +1616,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Begin{
 					TransactionID:       3,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -1632,7 +1632,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Begin{
 					TransactionID:       4,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 2,
 				},
 				Commit{
@@ -1838,7 +1838,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 				require.NoError(b, err)
 
 				for j := 0; j < tc.concurrentUpdaters; j++ {
-					transaction, err := manager.Begin(ctx, repo.RelativePath, nil, false)
+					transaction, err := manager.Begin(ctx, []string{repo.RelativePath}, false)
 					require.NoError(b, err)
 					transaction.UpdateReferences(getReferenceUpdates(j, objectHash.ZeroOID, commit1))
 					require.NoError(b, transaction.Commit(ctx))
@@ -1858,7 +1858,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 					currentReferences := getReferenceUpdates(i, commit1, commit2)
 					nextReferences := getReferenceUpdates(i, commit2, commit1)
 
-					transaction, err := manager.Begin(ctx, relativePath, nil, false)
+					transaction, err := manager.Begin(ctx, []string{relativePath}, false)
 					require.NoError(b, err)
 					transaction.UpdateReferences(currentReferences)
 
@@ -1870,7 +1870,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 						defer transactionWG.Done()
 
 						for range transactionChan {
-							transaction, err := manager.Begin(ctx, relativePath, nil, false)
+							transaction, err := manager.Begin(ctx, []string{relativePath}, false)
 							require.NoError(b, err)
 							transaction.UpdateReferences(nextReferences)
 							assert.NoError(b, transaction.Commit(ctx))

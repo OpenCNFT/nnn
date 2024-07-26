@@ -15,7 +15,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -26,7 +26,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -59,7 +59,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -69,7 +69,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -105,7 +105,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 			steps: steps{
 				StartManager{},
 				Begin{
-					RelativePath: setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					ReferenceUpdates: git.ReferenceUpdates{
@@ -138,7 +138,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -149,7 +149,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -184,7 +184,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				StartManager{},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -195,7 +195,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
@@ -238,7 +238,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				},
 				Begin{
 					TransactionID: 1,
-					RelativePath:  setup.RelativePath,
+					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
 					TransactionID: 1,
@@ -257,7 +257,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				StartManager{},
 				Begin{
 					TransactionID:       2,
-					RelativePath:        setup.RelativePath,
+					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
 				Commit{

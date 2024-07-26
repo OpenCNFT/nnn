@@ -31,7 +31,7 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 // transactionManager is the interface of TransactionManager as used by PartitionManager. See the
 // TransactionManager's documentation for more details.
 type transactionManager interface {
-	Begin(context.Context, string, []string, bool, ...BeginOptions) (*Transaction, error)
+	Begin(context.Context, []string, bool, ...BeginOptions) (*Transaction, error)
 	Run() error
 	Close()
 	isClosing() bool
@@ -326,6 +326,8 @@ type TransactionOptions struct {
 	// ReadOnly indicates whether this is a read-only transaction. Read-only transactions are not
 	// configured with a quarantine directory and do not commit a log entry.
 	ReadOnly bool
+	// RelativePath specifies which repository in the partition will be the target.
+	RelativePath string
 	// AlternateRelativePath specifies a repository to include in the transaction's snapshot as well.
 	AlternateRelativePath string
 	// AllowPartitionAssignmentWithoutRepository determines whether a partition assignment should be
@@ -340,22 +342,25 @@ type TransactionOptions struct {
 // TransactionManager is not already running, a new one is created and used. The partition tracks
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
 //
-// Specifying storageName and relativePath will begin a transaction targeting a
-// repository. Specifying storageName and partitionID will being a transaction
-// targeting an entire partition.
-func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath string, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
+// Specifying storageName and partitionID will begin a transaction targeting an
+// entire partition. If the partitionID is zero, then the partition is detected
+// from opts.RelativePath.
+func (pm *PartitionManager) Begin(ctx context.Context, storageName string, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
 	storageMgr, ok := pm.storages[storageName]
 	if !ok {
 		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
 	}
 
-	if partitionID == invalidPartitionID {
-		relativePath, err := storage.ValidateRelativePath(storageMgr.path, relativePath)
+	var relativePaths []string
+
+	if opts.RelativePath != "" {
+		var err error
+		opts.RelativePath, err = storage.ValidateRelativePath(storageMgr.path, opts.RelativePath)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
 		}
 
-		partitionID, err = storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+		repoPartitionID, err := storageMgr.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
 		if err != nil {
 			if errors.Is(err, badger.ErrDBClosed) {
 				// The database is closed when PartitionManager is closing. Return a more
@@ -365,6 +370,13 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 
 			return nil, fmt.Errorf("get partition: %w", err)
 		}
+
+		if partitionID != invalidPartitionID && repoPartitionID != partitionID {
+			return nil, errors.New("partition ID does not match repository partition")
+		}
+
+		relativePaths = []string{opts.RelativePath}
+		partitionID = repoPartitionID
 	}
 
 	relativeStateDir := deriveStateDirectory(partitionID)
@@ -382,12 +394,11 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName, relativePath
 		return nil, err
 	}
 
-	var snapshottedRelativePaths []string
 	if opts.AlternateRelativePath != "" {
-		snapshottedRelativePaths = []string{opts.AlternateRelativePath}
+		relativePaths = append(relativePaths, opts.AlternateRelativePath)
 	}
 
-	transaction, err := ptn.transactionManager.Begin(ctx, relativePath, snapshottedRelativePaths, opts.ReadOnly, BeginOptions{
+	transaction, err := ptn.transactionManager.Begin(ctx, relativePaths, opts.ReadOnly, BeginOptions{
 		ForceExclusiveSnapshot: opts.ForceExclusiveSnapshot,
 	})
 	if err != nil {
@@ -442,7 +453,7 @@ func (pm *PartitionManager) StorageKV(ctx context.Context, storageName string, r
 	}
 	defer storageMgr.finalizeTransaction(ptn)
 
-	transaction, err := ptn.transactionManager.Begin(ctx, "", nil, readOnly)
+	transaction, err := ptn.transactionManager.Begin(ctx, []string{}, readOnly)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}

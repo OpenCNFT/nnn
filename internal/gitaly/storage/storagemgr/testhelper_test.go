@@ -630,11 +630,8 @@ type Begin struct {
 	// TransactionID is the identifier given to the transaction created. This is used to identify
 	// the transaction in later steps.
 	TransactionID int
-	// RelativePath is the relative path of the repository this transaction is operating on.
-	RelativePath string
-	// SnapshottedRelativePaths are the relative paths of the repositories to include in the snapshot
-	// in addition to the target repository.
-	SnapshottedRelativePaths []string
+	// RelativePath are the relative paths of the repositories this transaction is operating on.
+	RelativePaths []string
 	// ReadOnly indicates whether this is a read-only transaction.
 	ReadOnly bool
 	// Context is the context to use for the Begin call.
@@ -1035,7 +1032,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				beginCtx = step.Context
 			}
 
-			transaction, err := transactionManager.Begin(beginCtx, step.RelativePath, step.SnapshottedRelativePaths, step.ReadOnly)
+			transaction, err := transactionManager.Begin(beginCtx, step.RelativePaths, step.ReadOnly)
 			require.ErrorIs(t, err, step.ExpectedError)
 			if err == nil {
 				require.Equalf(t, step.ExpectedSnapshotLSN, transaction.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")
@@ -1481,7 +1478,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 			// Begin a transaction to wait until the manager has applied all log entries currently
 			// committed. This ensures the disk state assertions run with all log entries fully applied
 			// to the repository.
-			tx, err := mgr.Begin(ctx, "non-existent", nil, false)
+			tx, err := mgr.Begin(ctx, []string{"non-existent"}, false)
 			require.NoError(t, err)
 			require.NoError(t, tx.Rollback())
 

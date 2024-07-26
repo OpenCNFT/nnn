@@ -91,13 +91,21 @@ var (
 	errReadOnlyHousekeeping       = errors.New("housekeeping in a read-only transaction")
 	errReadOnlyKeyValue           = errors.New("key-value writes in a read-only transaction")
 
+	// errWritableAllRepository is returned when a transaction is started with
+	// no relative path filter specified and is not read-only. Transactions do
+	// not currently support writing to multiple repositories and so a writable
+	// transaction without a specified target relative path would be ambiguous.
+	errWritableAllRepository = errors.New("cannot start writable all repository transaction")
+
 	// keyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
 	keyAppliedLSN = []byte("applied_lsn")
 )
 
+const relativePathKeyPrefix = "r/"
+
 // relativePathKey generates the database key for storing relative paths in a partition.
 func relativePathKey(relativePath string) []byte {
-	return []byte("r/" + relativePath)
+	return []byte(relativePathKeyPrefix + relativePath)
 }
 
 // InvalidReferenceFormatError is returned when a reference name was invalid.
@@ -303,14 +311,13 @@ type BeginOptions struct {
 // The returned Transaction's read snapshot includes all writes that were committed prior to the
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
 //
-// relativePath is the relative path of the target repository the transaction is operating on.
-//
-// snapshottedRelativePaths are the relative paths to snapshot in addition to target repository.
-// These are read-only as the transaction can only perform changes against the target repository.
+// relativePaths are the repositories that will be part of the snapshot. Only
+// the first repository will be checked for writes. If relativePaths is nil
+// then all repositories in the partition will be included.
 //
 // readOnly indicates whether this is a read-only transaction. Read-only transactions are not
 // configured with a quarantine directory and do not commit a log entry.
-func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, snapshottedRelativePaths []string, readOnly bool, possibleOpts ...BeginOptions) (_ *Transaction, returnedErr error) {
+func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string, readOnly bool, possibleOpts ...BeginOptions) (_ *Transaction, returnedErr error) {
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
 	select {
@@ -325,6 +332,16 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 	var opts BeginOptions
 	if len(possibleOpts) > 0 {
 		opts = possibleOpts[0]
+	}
+
+	var relativePath string
+	if len(relativePaths) > 0 {
+		// Set the first repository as the tracked repository
+		relativePath = relativePaths[0]
+	}
+
+	if relativePaths == nil && !readOnly {
+		return nil, errWritableAllRepository
 	}
 
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.Begin", nil)
@@ -423,18 +440,21 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 	case <-mgr.ctx.Done():
 		return nil, ErrTransactionProcessingStopped
 	case <-readReady:
+		txn.db = mgr.db.NewTransaction(!txn.readOnly)
+		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
+
+		if relativePaths == nil {
+			relativePaths = txn.partitionRelativePaths()
+		}
+
 		var err error
 		txn.stagingDirectory, err = os.MkdirTemp(mgr.stagingDirectory, "")
 		if err != nil {
 			return nil, fmt.Errorf("mkdir temp: %w", err)
 		}
 
-		if txn.repositoryTarget() {
-			snapshottedRelativePaths = append(snapshottedRelativePaths, txn.relativePath)
-		}
-
 		if txn.snapshot, err = mgr.snapshotManager.GetSnapshot(ctx,
-			snapshottedRelativePaths,
+			relativePaths,
 			!txn.readOnly || opts.ForceExclusiveSnapshot,
 		); err != nil {
 			return nil, fmt.Errorf("get snapshot: %w", err)
@@ -464,9 +484,6 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 			}
 		}
 
-		txn.db = mgr.db.NewTransaction(!txn.readOnly)
-		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
-
 		return txn, nil
 	}
 }
@@ -474,6 +491,24 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePath string, s
 // repositoryTarget returns true if the transaction targets a repository.
 func (txn *Transaction) repositoryTarget() bool {
 	return txn.relativePath != ""
+}
+
+// partitionRelativePaths returns all known repository relative paths for the
+// transactions partition.
+func (txn *Transaction) partitionRelativePaths() []string {
+	it := txn.KV().NewIterator(keyvalue.IteratorOptions{
+		Prefix: []byte(relativePathKeyPrefix),
+	})
+	defer it.Close()
+
+	var relativePaths []string
+	for it.Rewind(); it.Valid(); it.Next() {
+		key := it.Item().Key()
+		relativePath := bytes.TrimPrefix(key, []byte(relativePathKeyPrefix))
+		relativePaths = append(relativePaths, string(relativePath))
+	}
+
+	return relativePaths
 }
 
 // originalPackedRefsFilePath returns the path of the original `packed-refs` file that records the state of the
