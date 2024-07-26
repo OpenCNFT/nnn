@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -98,16 +99,21 @@ func (s *server) sendTreeEntriesUnified(
 
 	var hasPageTokenTreeOID bool
 	treeRevision := revision
-	if p != nil && p.GetPageToken() != "" {
-		// Extract root tree OID from the token, if present.
-		// The root tree OID is used to ensure that subsequent paginated requests access the same tree
-		_, tokenTreeOID, _ := decodePageToken(p.GetPageToken())
-		if tokenTreeOID != "" {
-			treeRevision = tokenTreeOID
-			hasPageTokenTreeOID = true
+	if featureflag.TreeOIDPagination.IsEnabled(ctx) {
+		if p != nil && p.GetPageToken() != "" {
+			// Extract root tree OID from the token, if present.
+			// The root tree OID is used to ensure that subsequent paginated requests access the same tree
+			_, tokenTreeOID, _ := decodePageToken(p.GetPageToken())
+			if tokenTreeOID != "" {
+				treeRevision = tokenTreeOID
+				hasPageTokenTreeOID = true
+			}
 		}
 	}
 
+	// When tree OID resolved from the previous request is used instead of the revision,
+	// the path is no longer relative to the revision. Please refer https://gitlab.com/gitlab-org/gitaly/-/issues/4556#note_2004951285
+	// for more details.
 	if !hasPageTokenTreeOID {
 		readTreeOpts = append(readTreeOpts, localrepo.WithRelativePath(path))
 	}
