@@ -83,7 +83,7 @@ func TestManager_Start(t *testing.T) {
 		defer cluster.closeAll()
 
 		require.NoError(t, cluster.nodes[1].manager.Start())
-		require.Equal(t, raftID(1), cluster.nodes[1].manager.firstStorage.id)
+		require.Equal(t, raftID(1), cluster.nodes[1].manager.firstStorage.ID())
 
 		clusterInfo, err := cluster.nodes[1].manager.ClusterInfo()
 		require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestManager_Start(t *testing.T) {
 		defer cluster.closeAll()
 
 		require.NoError(t, cluster.nodes[1].manager.Start())
-		require.Equal(t, raftID(1), cluster.nodes[1].manager.firstStorage.id)
+		require.Equal(t, raftID(1), cluster.nodes[1].manager.firstStorage.ID())
 
 		require.EqualError(t, cluster.nodes[1].manager.Start(), "raft manager already started")
 	})
@@ -121,7 +121,7 @@ func TestManager_Start(t *testing.T) {
 					require.NoError(t, cluster.nodes[node].manager.Start())
 
 					storage := cluster.nodes[node].manager.firstStorage
-					require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+					require.Equal(t, storage.ID().ToUint64(), storage.persistedInfo.StorageId)
 					require.Equal(t, storage.name, storage.persistedInfo.Name)
 					require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 					require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
@@ -130,7 +130,7 @@ func TestManager_Start(t *testing.T) {
 				var expectedIDs, allocatedIDs []raftID
 				for i := raftID(1); i <= raftID(numNode); i++ {
 					expectedIDs = append(expectedIDs, i)
-					allocatedIDs = append(allocatedIDs, cluster.nodes[i].manager.firstStorage.id)
+					allocatedIDs = append(allocatedIDs, cluster.nodes[i].manager.firstStorage.ID())
 				}
 				require.ElementsMatch(t, expectedIDs, allocatedIDs)
 
@@ -144,13 +144,13 @@ func TestManager_Start(t *testing.T) {
 					require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 					require.Equal(t, uint64(numNode+1), clusterInfo.NextStorageId)
 					expectedInfo := &gitalypb.Storage{
-						StorageId:         storage.id.ToUint64(),
+						StorageId:         storage.ID().ToUint64(),
 						Name:              storage.name,
 						ReplicationFactor: 3,
 						NodeId:            node.ToUint64(),
-						ReplicaGroups:     replicaGroups(storage.id, uint64(numNode)),
+						ReplicaGroups:     replicaGroups(storage.ID(), uint64(numNode)),
 					}
-					testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
+					testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.ID().ToUint64()])
 				})
 			})
 		}(numNode)
@@ -170,7 +170,7 @@ func TestManager_Start(t *testing.T) {
 						require.Equal(t, true, cluster.nodes[node].manager.Ready())
 
 						storage := cluster.nodes[node].manager.firstStorage
-						require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+						require.Equal(t, storage.ID().ToUint64(), storage.persistedInfo.StorageId)
 						require.Equal(t, storage.name, storage.persistedInfo.Name)
 						require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 						require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
@@ -178,8 +178,8 @@ func TestManager_Start(t *testing.T) {
 
 					// The quorum is reached
 					require.ElementsMatch(t, []raftID{1, 2}, []raftID{
-						cluster.nodes[1].manager.firstStorage.id,
-						cluster.nodes[2].manager.firstStorage.id,
+						cluster.nodes[1].manager.firstStorage.ID(),
+						cluster.nodes[2].manager.firstStorage.ID(),
 					})
 
 					fanOut(2, func(node raftID) {
@@ -187,19 +187,18 @@ func TestManager_Start(t *testing.T) {
 						storage := mgr.firstStorage
 
 						clusterInfo, err := mgr.ClusterInfo()
-						fmt.Printf("%+v %+v\n", node, clusterInfo)
 						require.NoError(t, err)
 
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 						expectedInfo := &gitalypb.Storage{
-							StorageId:         storage.id.ToUint64(),
+							StorageId:         storage.ID().ToUint64(),
 							Name:              storage.name,
 							ReplicationFactor: 3,
 							NodeId:            node.ToUint64(),
-							ReplicaGroups:     replicaGroups(storage.id, 2),
+							ReplicaGroups:     replicaGroups(storage.ID(), 2),
 						}
-						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
+						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.ID().ToUint64()])
 					})
 
 					// Now the third node joins. It does not matter whether the third node bootstraps the cluster.
@@ -216,13 +215,13 @@ func TestManager_Start(t *testing.T) {
 						require.Equal(t, cluster.clusterID, clusterInfo.ClusterId)
 						require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 						expectedInfo := &gitalypb.Storage{
-							StorageId:         storage.id.ToUint64(),
+							StorageId:         storage.ID().ToUint64(),
 							Name:              storage.name,
 							ReplicationFactor: 3,
 							NodeId:            node.ToUint64(),
-							ReplicaGroups:     replicaGroups(storage.id, 3),
+							ReplicaGroups:     replicaGroups(storage.ID(), 3),
 						}
-						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
+						testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.ID().ToUint64()])
 					})
 				})
 			}(bootstrap)
@@ -276,7 +275,7 @@ func TestManager_Start(t *testing.T) {
 				require.NoError(t, cluster.nodes[node].manager.Start())
 
 				storage := cluster.nodes[node].manager.firstStorage
-				require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+				require.Equal(t, storage.ID().ToUint64(), storage.persistedInfo.StorageId)
 				require.Equal(t, storage.name, storage.persistedInfo.Name)
 				require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 				require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
@@ -288,8 +287,8 @@ func TestManager_Start(t *testing.T) {
 		})
 
 		require.ElementsMatch(t, []raftID{1, 2}, []raftID{
-			cluster.nodes[1].manager.firstStorage.id,
-			cluster.nodes[2].manager.firstStorage.id,
+			cluster.nodes[1].manager.firstStorage.ID(),
+			cluster.nodes[2].manager.firstStorage.ID(),
 		})
 
 		fanOut(3, func(node raftID) {
@@ -308,13 +307,13 @@ func TestManager_Start(t *testing.T) {
 				require.Equal(t, uint64(3), clusterInfo.NextStorageId)
 
 				expectedInfo := &gitalypb.Storage{
-					StorageId:         storage.id.ToUint64(),
+					StorageId:         storage.ID().ToUint64(),
 					Name:              storage.name,
 					ReplicationFactor: 3,
 					NodeId:            node.ToUint64(),
-					ReplicaGroups:     replicaGroups(storage.id, 2),
+					ReplicaGroups:     replicaGroups(storage.ID(), 2),
 				}
-				testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.id.ToUint64()])
+				testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[storage.ID().ToUint64()])
 			}
 		})
 	})
@@ -329,7 +328,7 @@ func TestManager_Start(t *testing.T) {
 			require.NoError(t, cluster.nodes[node].manager.Start())
 
 			storage := cluster.nodes[node].manager.firstStorage
-			require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+			require.Equal(t, storage.ID().ToUint64(), storage.persistedInfo.StorageId)
 			require.Equal(t, storage.name, storage.persistedInfo.Name)
 			require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 			require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
@@ -352,13 +351,13 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			expectedInfo := &gitalypb.Storage{
-				StorageId:         mgr.firstStorage.id.ToUint64(),
+				StorageId:         mgr.firstStorage.ID().ToUint64(),
 				Name:              mgr.firstStorage.name,
 				ReplicationFactor: 3,
 				NodeId:            node.ToUint64(),
-				ReplicaGroups:     replicaGroups(mgr.firstStorage.id, 3),
+				ReplicaGroups:     replicaGroups(mgr.firstStorage.ID(), 3),
 			}
-			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
+			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.ID().ToUint64()])
 		})
 	})
 
@@ -372,7 +371,7 @@ func TestManager_Start(t *testing.T) {
 			require.NoError(t, cluster.nodes[node].manager.Start())
 
 			storage := cluster.nodes[node].manager.firstStorage
-			require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+			require.Equal(t, storage.ID().ToUint64(), storage.persistedInfo.StorageId)
 			require.Equal(t, storage.name, storage.persistedInfo.Name)
 			require.Equal(t, uint64(3), storage.persistedInfo.ReplicationFactor)
 			require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
@@ -396,13 +395,13 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			expectedInfo := &gitalypb.Storage{
-				StorageId:         mgr.firstStorage.id.ToUint64(),
+				StorageId:         mgr.firstStorage.ID().ToUint64(),
 				Name:              mgr.firstStorage.name,
 				ReplicationFactor: 3,
 				NodeId:            node.ToUint64(),
-				ReplicaGroups:     replicaGroups(mgr.firstStorage.id, 3),
+				ReplicaGroups:     replicaGroups(mgr.firstStorage.ID(), 3),
 			}
-			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
+			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.ID().ToUint64()])
 		})
 	})
 
@@ -451,7 +450,7 @@ func TestManager_Start(t *testing.T) {
 			require.NoError(t, cluster.nodes[node].manager.Start())
 
 			storage := cluster.nodes[node].manager.firstStorage
-			require.Equal(t, storage.id.ToUint64(), storage.persistedInfo.StorageId)
+			require.Equal(t, storage.ID().ToUint64(), storage.persistedInfo.StorageId)
 			require.Equal(t, storage.name, storage.persistedInfo.Name)
 			require.Equal(t, uint64(1), storage.persistedInfo.ReplicationFactor)
 			require.Equal(t, node.ToUint64(), storage.persistedInfo.NodeId)
@@ -477,13 +476,13 @@ func TestManager_Start(t *testing.T) {
 			require.Equal(t, uint64(4), clusterInfo.NextStorageId)
 
 			expectedInfo := &gitalypb.Storage{
-				StorageId:         mgr.firstStorage.id.ToUint64(),
+				StorageId:         mgr.firstStorage.ID().ToUint64(),
 				Name:              mgr.firstStorage.name,
 				ReplicationFactor: 3, // New replication factor
 				NodeId:            node.ToUint64(),
-				ReplicaGroups:     replicaGroups(mgr.firstStorage.id, 3), // New replica groups
+				ReplicaGroups:     replicaGroups(mgr.firstStorage.ID(), 3), // New replica groups
 			}
-			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.id.ToUint64()])
+			testhelper.ProtoEqual(t, expectedInfo, clusterInfo.Storages[mgr.firstStorage.ID().ToUint64()])
 		})
 	})
 }
