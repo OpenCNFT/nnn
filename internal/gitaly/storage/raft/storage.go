@@ -21,6 +21,7 @@ type storageManager struct {
 	db            dbAccessor
 	nodeHost      *dragonboat.NodeHost
 	persistedInfo *gitalypb.Storage
+	replicator    *replicator
 }
 
 // newStorageManager returns an instance of storage manager.
@@ -34,7 +35,15 @@ func newStorageManager(name string, ptnMgr *storagemgr.PartitionManager, nodeHos
 }
 
 // Close closes the storage manager.
-func (m *storageManager) Close() { m.nodeHost.Close() }
+func (m *storageManager) Close() (returnedErr error) {
+	if m.replicator != nil {
+		if err := m.replicator.Close(); err != nil {
+			returnedErr = err
+		}
+	}
+	m.nodeHost.Close()
+	return
+}
 
 // ID returns the ID of the storage from persistent storage.
 func (m *storageManager) ID() raftID {
@@ -80,4 +89,8 @@ func (m *storageManager) saveStorageInfo(ctx context.Context, storage *gitalypb.
 
 func (m *storageManager) dbForMetadataGroup() dbAccessor {
 	return dbForMetadataGroup(m.ptnMgr, m.name)
+}
+
+func (m *storageManager) dbForReplicationGroup() dbAccessor {
+	return dbForReplicationGroup(m.ptnMgr, m.name)
 }
