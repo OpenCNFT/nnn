@@ -125,10 +125,15 @@ var dragonboatTestingProfile = func() dragonboatConfig.ExpertConfig {
 }()
 
 type testNode struct {
-	nodeHost *dragonboat.NodeHost
-	manager  *Manager
+	// Variables for a real manager.
+	cfg        config.Cfg
+	manager    *Manager
+	ptnManager *storagemgr.PartitionManager
+	close      func()
+
+	// Mock manager's functionalities.
 	sm       *testStateMachine
-	close    func()
+	nodeHost *dragonboat.NodeHost
 }
 
 type testRaftCluster struct {

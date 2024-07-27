@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/lni/dragonboat/v4"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -54,23 +53,27 @@ func TestManager_Start(t *testing.T) {
 			}
 
 			return &testNode{
-				manager: mgr,
-				close:   mgr.Close,
+				cfg:        cfg,
+				manager:    mgr,
+				ptnManager: ptnMgr,
+				close:      mgr.Close,
 			}, nil
 		}
 	}
 
-	resetManager := func(t *testing.T, m *Manager) {
-		m.metadataGroup = nil
-		for _, storageMgr := range m.storageManagers {
-			storageMgr.clearStorageInfo()
-			storageMgr.nodeHost.Close()
-			nodeHost, err := dragonboat.NewNodeHost(storageMgr.nodeHost.NodeHostConfig())
-			require.NoError(t, err)
-			storageMgr.nodeHost = nodeHost
-		}
-		m.started.Store(false)
-		m.closed.Store(false)
+	resetManager := func(t *testing.T, node *testNode) {
+		node.manager.Close()
+		m2, err := NewManager(
+			testhelper.Context(t),
+			node.cfg.Storages,
+			node.manager.clusterConfig,
+			node.manager.managerConfig,
+			node.ptnManager,
+			node.manager.logger)
+		require.NoError(t, err)
+
+		node.manager = m2
+		node.close = m2.Close
 	}
 
 	t.Run("bootstrap a singular cluster", func(t *testing.T) {
@@ -333,7 +336,7 @@ func TestManager_Start(t *testing.T) {
 		})
 
 		for _, node := range cluster.nodes {
-			resetManager(t, node.manager)
+			resetManager(t, node)
 		}
 
 		fanOut(3, func(node raftID) {
@@ -376,7 +379,7 @@ func TestManager_Start(t *testing.T) {
 		})
 
 		for _, node := range cluster.nodes {
-			resetManager(t, node.manager)
+			resetManager(t, node)
 			node.manager.managerConfig.BootstrapCluster = false
 		}
 
@@ -456,7 +459,7 @@ func TestManager_Start(t *testing.T) {
 		})
 
 		for _, node := range cluster.nodes {
-			resetManager(t, node.manager)
+			resetManager(t, node)
 			node.manager.managerConfig.BootstrapCluster = false
 			node.manager.clusterConfig.ReplicationFactor = 3
 		}

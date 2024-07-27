@@ -80,13 +80,6 @@ func (m *storageManager) saveStorageInfo(ctx context.Context, storage *gitalypb.
 	})
 }
 
-// clearStorageInfo clears the storage info inside the in-memory storage of the storage manager. It
-// does not clean the persisted info the DB.
-func (m *storageManager) clearStorageInfo() {
-	m.id = 0
-	m.persistedInfo = nil
-}
-
 func (m *storageManager) dbForMetadataGroup() dbAccessor {
 	return dbForMetadataGroup(m.ptnMgr, m.name)
 }
