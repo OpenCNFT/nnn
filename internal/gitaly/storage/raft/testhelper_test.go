@@ -360,7 +360,7 @@ func setupTestDBManager(t *testing.T, cfg config.Cfg) *keyvalue.DBManager {
 	return dbMgr
 }
 
-func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.PartitionManager {
+func setupTestDBManagerAndPartitionManager(t *testing.T, cfg config.Cfg) (*keyvalue.DBManager, *storagemgr.PartitionManager) {
 	logger := testhelper.NewLogger(t)
 	dbMgr := setupTestDBManager(t, cfg)
 
@@ -373,6 +373,12 @@ func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.Partiti
 	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
+
+	return dbMgr, partitionManager
+}
+
+func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.PartitionManager {
+	_, partitionManager := setupTestDBManagerAndPartitionManager(t, cfg)
 
 	return partitionManager
 }

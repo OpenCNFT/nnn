@@ -3,11 +3,15 @@ package raft
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/lni/dragonboat/v4"
 	dragonboatConf "github.com/lni/dragonboat/v4/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/backoff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -39,11 +43,13 @@ type ManagerConfig struct {
 // Manager is responsible for managing the Raft cluster for all storages.
 type Manager struct {
 	ctx           context.Context
+	cancel        context.CancelFunc
 	clusterConfig config.Raft
 	managerConfig ManagerConfig
 	logger        log.Logger
 	started       atomic.Bool
 	closed        atomic.Bool
+	running       sync.WaitGroup
 
 	storageManagers map[string]*storageManager
 	firstStorage    *storageManager
@@ -72,9 +78,10 @@ func NewManager(
 	if len(storages) > 1 {
 		return nil, fmt.Errorf("the support for multiple storages is temporarily disabled")
 	}
-
+	ctx, cancel := context.WithCancel(ctx)
 	m := &Manager{
 		ctx:           ctx,
+		cancel:        cancel,
 		clusterConfig: clusterCfg,
 		managerConfig: managerCfg,
 		logger: logger.WithFields(log.Fields{
@@ -84,6 +91,7 @@ func NewManager(
 			"raft_node_id":    clusterCfg.NodeID,
 		}),
 		storageManagers: map[string]*storageManager{},
+		running:         sync.WaitGroup{},
 	}
 
 	storage := storages[0]
@@ -126,6 +134,7 @@ func NewManager(
 // - Register the node's storage with the metadata Raft group. The metadata Raft group allocates a
 // new storage ID for each of them. They persist in their IDs. This type of ID is used for future
 // interaction with the cluster.
+// - Start the replicator that monitors to any storage/partition changes from desired groups.
 func (m *Manager) Start() (returnedErr error) {
 	if m.started.Load() {
 		return fmt.Errorf("raft manager already started")
@@ -160,18 +169,11 @@ func (m *Manager) Start() (returnedErr error) {
 		m.logger.WithField("cluster", cluster).Info("Raft cluster bootstrapped")
 	}
 
-	// Temporarily, we fetch the cluster info from the metadata Raft group directly. In the future,
-	// this node needs to contact a metadata authority.
-	// For more information: https://gitlab.com/groups/gitlab-org/-/epics/10864
-	cluster, err := m.metadataGroup.ClusterInfo()
-	if err != nil {
-		return fmt.Errorf("getting cluster info: %w", err)
-	}
-	if cluster.ClusterId != m.clusterConfig.ClusterID {
-		return fmt.Errorf("joining the wrong cluster, expected to join %q but joined %q", m.clusterConfig.ClusterID, cluster.ClusterId)
+	if err := m.registerStorages(); err != nil {
+		return err
 	}
 
-	if err := m.registerStorages(); err != nil {
+	if err := m.startReplicators(); err != nil {
 		return err
 	}
 
@@ -196,6 +198,17 @@ func (m *Manager) initMetadataGroup(storageMgr *storageManager) error {
 }
 
 func (m *Manager) registerStorages() error {
+	// Temporarily, we fetch the cluster info from the metadata Raft group directly. In the future,
+	// this node needs to contact a metadata authority.
+	// For more information: https://gitlab.com/groups/gitlab-org/-/epics/10864
+	cluster, err := m.metadataGroup.ClusterInfo()
+	if err != nil {
+		return fmt.Errorf("getting cluster info: %w", err)
+	}
+	if cluster.ClusterId != m.clusterConfig.ClusterID {
+		return fmt.Errorf("joining the wrong cluster, expected to join %q but joined %q", m.clusterConfig.ClusterID, cluster.ClusterId)
+	}
+
 	if m.managerConfig.testBeforeRegister != nil {
 		m.managerConfig.testBeforeRegister()
 	}
@@ -206,7 +219,7 @@ func (m *Manager) registerStorages() error {
 		if err := storageMgr.loadStorageInfo(m.ctx); err != nil {
 			return fmt.Errorf("loading persisted storage info: %w", err)
 		}
-		if storageMgr.persistedInfo == nil || storageMgr.persistedInfo.GetStorageId() == 0 {
+		if storageMgr.ID() == 0 {
 			storageInfo, err := m.metadataGroup.RegisterStorage(storageName)
 			if err != nil {
 				return fmt.Errorf("registering storage info: %w", err)
@@ -214,6 +227,10 @@ func (m *Manager) registerStorages() error {
 			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
 				return fmt.Errorf("saving storage info: %w", err)
 			}
+			m.logger.WithFields(log.Fields{
+				"raft.storage_name": storageName,
+				"raft.storage_id":   storageMgr.persistedInfo.GetStorageId(),
+			}).Info("storage registered")
 		} else if storageMgr.persistedInfo.NodeId != m.clusterConfig.NodeID || storageMgr.persistedInfo.ReplicationFactor != m.clusterConfig.ReplicationFactor {
 			// Changes that gonna affect replication. Gitaly needs to sync up those changes to metadata
 			// Raft group to shuffle the replication groups. We don't persit new info intentionally. The
@@ -227,11 +244,124 @@ func (m *Manager) registerStorages() error {
 			}
 		}
 		m.logger.WithFields(log.Fields{
-			"storage_name":       storageName,
-			"storage_id":         storageMgr.persistedInfo.GetStorageId(),
-			"replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
+			"raft.storage_name":       storageName,
+			"raft.storage_id":         storageMgr.persistedInfo.GetStorageId(),
+			"raft.replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
 		}).Info("storage joined the cluster")
 	}
+
+	return nil
+}
+
+func (m *Manager) initReplicationGroup(hostingID raftID, storageInfo *gitalypb.Storage, authority bool) (*replicationRaftGroup, error) {
+	var destinatingMgr *storageManager
+	for _, storageMgr := range m.storageManagers {
+		if storageMgr.ID() == hostingID {
+			destinatingMgr = storageMgr
+		}
+	}
+
+	if destinatingMgr == nil {
+		return nil, fmt.Errorf("storage %q is not managed by this node", storageInfo.GetName())
+	}
+
+	group, err := newReplicationGroup(
+		m.ctx,
+		authority,
+		storageInfo,
+		destinatingMgr.nodeHost,
+		destinatingMgr.dbForReplicationGroup(raftID(storageInfo.GetStorageId())),
+		m.clusterConfig,
+		m.logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing replication Raft group: %w", err)
+	}
+	return group, nil
+}
+
+func (m *Manager) startReplicators() error {
+	for _, storageMgr := range m.storageManagers {
+		replicator := newReplicator(m.ctx, storageMgr.ID(), m.logger, replicatorConfig{
+			initAuthorityGroup: func(storageInfo *gitalypb.Storage) (authority, error) {
+				return m.initReplicationGroup(raftID(storageInfo.GetStorageId()), storageInfo, true)
+			},
+			initReplicaGroup: func(hostingID raftID, storageInfo *gitalypb.Storage) (replica, error) {
+				return m.initReplicationGroup(hostingID, storageInfo, false)
+			},
+			getNodeAddr: m.getNodeAddr,
+			initPartitionGroup: func(_authorityID raftID, _partitionID raftID, _relativePath string) error {
+				// No-op now.
+				return nil
+			},
+		})
+		storageMgr.replicator = replicator
+	}
+
+	delay := backoff.NewDefaultExponential(rand.New(rand.NewSource(time.Now().UnixNano())))
+	delay.BaseDelay = 5 * time.Second
+	delay.MaxDelay = 60 * time.Second
+
+	errTimer := time.NewTimer(m.metadataGroup.maxNextElectionWait())
+
+	const maxNoUpdates = 30
+	var noUpdates uint
+	noUpdatesTimer := time.NewTimer(delay.BaseDelay)
+
+	m.running.Add(1)
+	go func() {
+		defer m.running.Done()
+		for {
+			var err error
+
+			clusterInfo, err := m.ClusterInfo()
+			if err == nil {
+				for _, storageMgr := range m.storageManagers {
+					var changes int
+					if changes, err = storageMgr.replicator.ApplyReplicaGroups(clusterInfo); err != nil {
+						break
+					}
+					if err = storageMgr.saveStorageInfo(m.ctx, clusterInfo.Storages[storageMgr.ID().ToUint64()]); err != nil {
+						break
+					}
+					if changes != 0 {
+						noUpdates = 0
+					}
+				}
+			}
+
+			if err != nil {
+				if m.ctx.Err() != nil {
+					return
+				}
+				m.logger.WithError(err).WithField("cluster", clusterInfo).Error("error while monitoring replica changes")
+				errTimer.Reset(m.metadataGroup.maxNextElectionWait())
+				noUpdates = 0
+				select {
+				case <-m.ctx.Done():
+					errTimer.Stop()
+					return
+				case <-errTimer.C:
+					errTimer.Stop()
+					continue
+				}
+			}
+
+			// Push back the next polling point of time. This practice reduces the polling
+			// rate when the cluster is stable.
+			if noUpdates < maxNoUpdates {
+				noUpdates++
+			}
+			noUpdatesTimer.Reset(delay.Backoff(noUpdates))
+			select {
+			case <-m.ctx.Done():
+				noUpdatesTimer.Stop()
+				return
+			case <-noUpdatesTimer.C:
+				noUpdatesTimer.Stop()
+			}
+		}
+	}()
 
 	return nil
 }
@@ -252,8 +382,12 @@ func (m *Manager) Close() {
 		m.logger.WithError(err).Warn("fail to stop metadata Raft group")
 	}
 	for _, storageMgr := range m.storageManagers {
-		storageMgr.Close()
+		if err := storageMgr.Close(); err != nil {
+			m.logger.WithError(err).Error("stopping storage")
+		}
 	}
+	m.cancel()
+	m.running.Wait()
 	m.logger.Info("Raft cluster has stopped")
 }
 
@@ -266,4 +400,14 @@ func (m *Manager) ClusterInfo() (*gitalypb.Cluster, error) {
 		return nil, fmt.Errorf("raft manager already closed")
 	}
 	return m.metadataGroup.ClusterInfo()
+}
+
+func (m *Manager) getNodeAddr(nodeID raftID) (string, error) {
+	// Right now, all storages are also initial members. In the future, the manager needs to contact
+	// the metadata Raft group or gossip.
+	addr, exist := m.clusterConfig.InitialMembers[fmt.Sprintf("%d", nodeID)]
+	if !exist {
+		return "", fmt.Errorf("address of storage %d does not exist", nodeID)
+	}
+	return addr, nil
 }
