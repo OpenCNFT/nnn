@@ -4,13 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -23,20 +18,9 @@ func TestDbForMetadataGroup(t *testing.T) {
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t, testcfg.WithStorages("node-1"))
 
-	logger := testhelper.NewLogger(t)
-	dbMgr := setupTestDBManager(t, cfg)
+	dbMgr, ptnManager := setupTestDBManagerAndPartitionManager(t, cfg)
 
-	cmdFactory := gittest.NewCommandFactory(t, cfg)
-	catfileCache := catfile.NewCache(cfg)
-	t.Cleanup(catfileCache.Stop)
-
-	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
-	require.NoError(t, err)
-	t.Cleanup(partitionManager.Close)
-
-	db := dbForMetadataGroup(partitionManager, "node-1")
+	db := dbForMetadataGroup(ptnManager, "node-1")
 	require.NoError(t, db.write(ctx, func(txn keyvalue.ReadWriter) error {
 		require.NoError(t, txn.Set([]byte("data-1"), []byte("one")))
 		return nil
@@ -96,19 +80,7 @@ func TestDbForStorage(t *testing.T) {
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t, testcfg.WithStorages("node-1"))
 
-	logger := testhelper.NewLogger(t)
-	dbMgr := setupTestDBManager(t, cfg)
-
-	cmdFactory := gittest.NewCommandFactory(t, cfg)
-	catfileCache := catfile.NewCache(cfg)
-	t.Cleanup(catfileCache.Stop)
-
-	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
-	require.NoError(t, err)
-	t.Cleanup(partitionManager.Close)
-
+	dbMgr, ptnManager := setupTestDBManagerAndPartitionManager(t, cfg)
 	storageInfo := &gitalypb.Storage{
 		StorageId:         1,
 		Name:              "node-1",
@@ -117,7 +89,7 @@ func TestDbForStorage(t *testing.T) {
 		ReplicaGroups:     []uint64{2, 3},
 	}
 
-	db := dbForStorage(partitionManager, "node-1")
+	db := dbForStorage(ptnManager, "node-1")
 	require.NoError(t, db.write(ctx, func(txn keyvalue.ReadWriter) error {
 		storage, err := proto.Marshal(storageInfo)
 		require.NoError(t, err)
@@ -166,6 +138,66 @@ func TestDbForStorage(t *testing.T) {
 			"p/\x00\x00\x00\x00\x00\x00\x00\x01/applied_lsn",
 			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/self/storage",
 		}, keys)
+		return nil
+	}))
+}
+
+func TestDbForReplicationGroup(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+	cfg := testcfg.Build(t, testcfg.WithStorages("node-1"))
+
+	dbMgr, ptnManager := setupTestDBManagerAndPartitionManager(t, cfg)
+
+	db1 := dbForReplicationGroup(ptnManager, 1, "node-1", 1)
+	db2 := dbForReplicationGroup(ptnManager, 1, "node-1", 2)
+	db3 := dbForReplicationGroup(ptnManager, 1, "node-1", 3)
+
+	require.NoError(t, db1.write(ctx, func(txn keyvalue.ReadWriter) error {
+		require.NoError(t, txn.Set([]byte("partitions/1"), []byte("@hashed/aa/bb/aabb")))
+		require.NoError(t, txn.Set([]byte("partitions/2"), []byte("@hashed/cc/dd/ccdd")))
+		require.NoError(t, txn.Set([]byte("partitions/3"), []byte("@hashed/ii/jj/iijj")))
+		return nil
+	}))
+
+	require.NoError(t, db2.write(ctx, func(txn keyvalue.ReadWriter) error {
+		require.NoError(t, txn.Set([]byte("partitions/1"), []byte("@hashed/aa/bb/aabb")))
+		require.NoError(t, txn.Set([]byte("partitions/2"), []byte("@hashed/ee/ff/eeff")))
+		return nil
+	}))
+
+	require.NoError(t, db3.write(ctx, func(txn keyvalue.ReadWriter) error {
+		require.NoError(t, txn.Set([]byte("partitions/1"), []byte("@hashed/aa/bb/aabb")))
+		require.NoError(t, txn.Set([]byte("partitions/2"), []byte("@hashed/gg/hh/gghh")))
+		return nil
+	}))
+
+	store, err := dbMgr.GetDB("node-1")
+	require.NoError(t, err)
+
+	require.NoError(t, store.View(func(txn keyvalue.ReadWriter) error {
+		it := txn.NewIterator(keyvalue.IteratorOptions{
+			Prefix: []byte("p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/"),
+		})
+		defer it.Close()
+
+		values := map[string][]byte{}
+		for it.Rewind(); it.Valid(); it.Next() {
+			k, err := it.Item().ValueCopy(nil)
+			require.NoError(t, err)
+			values[string(it.Item().Key())] = k
+		}
+
+		require.Equal(t, map[string][]byte{
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/authority/partitions/1":                                 []byte("@hashed/aa/bb/aabb"),
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/authority/partitions/2":                                 []byte("@hashed/cc/dd/ccdd"),
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/authority/partitions/3":                                 []byte("@hashed/ii/jj/iijj"),
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/replicas/\x00\x00\x00\x00\x00\x00\x00\x02/partitions/1": []byte("@hashed/aa/bb/aabb"),
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/replicas/\x00\x00\x00\x00\x00\x00\x00\x02/partitions/2": []byte("@hashed/ee/ff/eeff"),
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/replicas/\x00\x00\x00\x00\x00\x00\x00\x03/partitions/1": []byte("@hashed/aa/bb/aabb"),
+			"p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/replicas/\x00\x00\x00\x00\x00\x00\x00\x03/partitions/2": []byte("@hashed/gg/hh/gghh"),
+		}, values)
 		return nil
 	}))
 }
