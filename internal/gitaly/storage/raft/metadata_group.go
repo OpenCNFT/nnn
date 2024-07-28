@@ -61,9 +61,9 @@ func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, db
 	}
 
 	groupLogger := logger.WithFields(log.Fields{
-		"raft_group":      "metadata",
-		"raft_group_id":   MetadataGroupID,
-		"raft_replica_id": clusterCfg.NodeID,
+		"raft.group":      "metadata",
+		"raft.group_id":   MetadataGroupID,
+		"raft.replica_id": clusterCfg.NodeID,
 	})
 	groupLogger.Info("joined metadata group")
 

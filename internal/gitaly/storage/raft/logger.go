@@ -73,7 +73,7 @@ func SetLogger(logger log.Logger, suppressDefaultLog bool) {
 				name: pkgName,
 				Logger: logger.WithFields(log.Fields{
 					"component":      "raft",
-					"raft_component": strings.ToLower(pkgName),
+					"raft.component": strings.ToLower(pkgName),
 				}),
 			}
 		})
