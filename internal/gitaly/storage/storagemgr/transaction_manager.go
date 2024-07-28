@@ -875,6 +875,8 @@ type LogConsumer interface {
 	// LSNs are sent so that a newly initialized consumer is aware of the full range of
 	// entries it can process.
 	NotifyNewTransactions(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN)
+	// Close shuts down the log consumer. It is called when the partition manager shutdowns.
+	Close()
 }
 
 // LogManagerAccessor is the interface used by the LogManager coordinator. It is called by
@@ -889,7 +891,7 @@ type LogManagerAccessor interface {
 
 // LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
 // a function to close the LogConsumer.
-type LogConsumerFactory func(LogManagerAccessor) (_ LogConsumer, cleanup func())
+type LogConsumerFactory func(LogManagerAccessor) LogConsumer
 
 // LogManager is the interface used on the consumer side of the integration. The consumer
 // has the ability to acknowledge transactions as having been processed with AcknowledgeTransaction.

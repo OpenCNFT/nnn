@@ -54,8 +54,10 @@ type PartitionManager struct {
 	// transactionManagerFactory is a factory to create TransactionManagers. This shouldn't ever be changed
 	// during normal operation, but can be used to adjust the transaction manager's behaviour in tests.
 	transactionManagerFactory transactionManagerFactory
-	// consumerCleanup closes the LogConsumer.
-	consumerCleanup func()
+	// consumer is a hook that will be passed to the each TransactionManager. The Transactionmanager
+	// notifies the consumer of new transactions by invoking the NotifyNewTransaction method after
+	// they are committed.
+	consumer LogConsumer
 	// metrics accounts for all metrics of transaction operations. It will be
 	// passed down to each transaction manager and is shared between them. The
 	// metrics must be registered to be collected by prometheus collector.
@@ -284,13 +286,10 @@ func NewPartitionManager(
 		metrics:        metrics,
 	}
 
-	var logConsumer LogConsumer
-	var cleanup func()
 	if consumerFactory != nil {
-		logConsumer, cleanup = consumerFactory(pm)
+		pm.consumer = consumerFactory(pm)
 	}
 
-	pm.consumerCleanup = cleanup
 	pm.transactionManagerFactory = func(
 		logger log.Logger,
 		partitionID storage.PartitionID,
@@ -312,7 +311,7 @@ func NewPartitionManager(
 				metrics.housekeeping,
 				metrics.snapshot.Scope(storageMgr.name),
 			),
-			logConsumer,
+			pm.consumer,
 		)
 	}
 
@@ -447,6 +446,11 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 	fn(logManager)
 
 	return nil
+}
+
+// GetLogConsumer returns the registered log consumer if any.
+func (pm *PartitionManager) GetLogConsumer() LogConsumer {
+	return pm.consumer
 }
 
 // StorageKV executes the provided function against the storage's metadata DB. All write operations
@@ -603,8 +607,8 @@ func (pm *PartitionManager) Close() {
 		}()
 	}
 
-	if pm.consumerCleanup != nil {
-		pm.consumerCleanup()
+	if pm.consumer != nil {
+		pm.consumer.Close()
 	}
 
 	activeStorages.Wait()

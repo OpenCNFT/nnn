@@ -392,12 +392,12 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				return fmt.Errorf("resolving write-ahead log backup sink: %w", err)
 			}
 
-			consumerFactory = func(lma storagemgr.LogManagerAccessor) (storagemgr.LogConsumer, func()) {
+			consumerFactory = func(lma storagemgr.LogManagerAccessor) storagemgr.LogConsumer {
 				walArchiver := backup.NewLogEntryArchiver(logger, walSink, cfg.Backup.WALWorkerCount, lma)
 				prometheus.MustRegister(walArchiver)
 				walArchiver.Run()
 
-				return walArchiver, walArchiver.Close
+				return walArchiver
 			}
 		}
 
