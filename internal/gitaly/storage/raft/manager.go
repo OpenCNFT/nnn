@@ -79,9 +79,9 @@ func NewManager(
 		managerConfig: managerCfg,
 		logger: logger.WithFields(log.Fields{
 			"component":       "raft",
-			"raft_component":  "manager",
-			"raft_cluster_id": clusterCfg.ClusterID,
-			"raft_node_id":    clusterCfg.NodeID,
+			"raft.component":  "manager",
+			"raft.cluster_id": clusterCfg.ClusterID,
+			"raft.node_id":    clusterCfg.NodeID,
 		}),
 		storageManagers: map[string]*storageManager{},
 	}
@@ -96,7 +96,7 @@ func NewManager(
 		DefaultNodeRegistryEnabled: false,
 		EnableMetrics:              true,
 		RaftEventListener: &raftLogger{
-			Logger: m.logger.WithField("raft_component", "system"),
+			Logger: m.logger.WithField("raft.component", "system"),
 		},
 		Expert: managerCfg.expertConfig,
 	})
@@ -138,8 +138,8 @@ func (m *Manager) Start() (returnedErr error) {
 	}()
 
 	m.logger.WithFields(log.Fields{
-		"raft_config":       m.clusterConfig,
-		"raft_manager_conf": m.managerConfig,
+		"raft.config":       m.clusterConfig,
+		"raft.manager_conf": m.managerConfig,
 	}).Info("Raft cluster is starting")
 
 	// A Gitaly node contains multiple independent storages, and each storage maps to a dragonboat
