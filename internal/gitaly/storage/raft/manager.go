@@ -51,6 +51,7 @@ type Manager struct {
 	closed        atomic.Bool
 	running       sync.WaitGroup
 
+	logConsumer     *LogConsumer
 	storageManagers map[string]*storageManager
 	firstStorage    *storageManager
 	metadataGroup   *metadataRaftGroup
@@ -116,6 +117,15 @@ func NewManager(
 	if m.firstStorage == nil {
 		m.firstStorage = m.storageManagers[storage.Name]
 	}
+	consumer := ptnMgr.GetLogConsumer()
+	if consumer == nil {
+		return nil, fmt.Errorf("WAL log consumer has not been initialized")
+	}
+	raftLogConsumer, ok := consumer.(*LogConsumer)
+	if !ok {
+		return nil, fmt.Errorf("mismatched WAL log consumer, %T expected, %T found", raftLogConsumer, consumer)
+	}
+	m.logConsumer = raftLogConsumer
 
 	return m, nil
 }
@@ -281,7 +291,7 @@ func (m *Manager) initReplicationGroup(hostingID raftID, storageInfo *gitalypb.S
 }
 
 func (m *Manager) startReplicators() error {
-	for _, storageMgr := range m.storageManagers {
+	for storageName, storageMgr := range m.storageManagers {
 		replicator := newReplicator(m.ctx, storageMgr.ID(), m.logger, replicatorConfig{
 			initAuthorityGroup: func(storageInfo *gitalypb.Storage) (authority, error) {
 				return m.initReplicationGroup(raftID(storageInfo.GetStorageId()), storageInfo, true)
@@ -296,6 +306,9 @@ func (m *Manager) startReplicators() error {
 			},
 		})
 		storageMgr.replicator = replicator
+		if err := m.logConsumer.Push(storageName, replicator); err != nil {
+			return fmt.Errorf("registering storage %q to Raft's WAL log consumer: %w", storageName, err)
+		}
 	}
 
 	delay := backoff.NewDefaultExponential(rand.New(rand.NewSource(time.Now().UnixNano())))

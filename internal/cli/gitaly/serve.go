@@ -400,6 +400,13 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				return walArchiver
 			}
 		}
+		// WAL doesn't support multiple log consumers yet. So, Raft's consumer will shadow other consumers.
+		// This problem will be handled in https://gitlab.com/gitlab-org/gitaly/-/issues/6105.
+		if cfg.Raft.Enabled {
+			consumerFactory = func(lma storagemgr.LogManagerAccessor) storagemgr.LogConsumer {
+				return raft.NewLogConsumer(ctx, lma, logger)
+			}
+		}
 
 		partitionMgr, err = storagemgr.NewPartitionManager(
 			ctx,
