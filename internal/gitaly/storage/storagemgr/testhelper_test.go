@@ -842,6 +842,16 @@ type ConsumerAcknowledge struct {
 	LSN storage.LSN
 }
 
+// ConsumerReadEntry asserts the entry returned to the consumer at a point of time.
+type ConsumerReadEntry struct {
+	// LSN is the target LSN by the consumers.
+	LSN storage.LSN
+	// ExpectedEntry is the expected returned log entry.
+	ExpectedEntry *gitalypb.LogEntry
+	// ExpectedErr is the expected returned error string.
+	ExpectedErr string
+}
+
 // RemoveRepository removes the repository from the disk. It must be run with the TransactionManager
 // closed.
 type RemoveRepository struct{}
@@ -1354,6 +1364,15 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			transaction.WriteCommitGraphs(step.Config)
 		case ConsumerAcknowledge:
 			transactionManager.AcknowledgeTransaction(transactionManager.consumer, step.LSN)
+		case ConsumerReadEntry:
+			entry, err := transactionManager.ReadEntry(step.LSN)
+			if step.ExpectedErr == "" {
+				require.NoError(t, err)
+				testhelper.ProtoEqual(t, step.ExpectedEntry, entry)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), step.ExpectedErr)
+			}
 		case RepositoryAssertion:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction's snapshot asserted before beginning it")
 			transaction := openTransactions[step.TransactionID]

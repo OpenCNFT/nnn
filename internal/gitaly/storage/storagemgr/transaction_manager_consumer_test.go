@@ -2,6 +2,7 @@ package storagemgr
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
@@ -9,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
@@ -80,8 +82,34 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
+				ConsumerReadEntry{
+					LSN: 1,
+					ExpectedEntry: &gitalypb.LogEntry{
+						RelativePath: setup.RelativePath,
+						Operations: []*gitalypb.LogEntry_Operation{
+							{Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
+								CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
+									SourcePath:      []byte("1"),
+									DestinationPath: []byte(filepath.Join(setup.RelativePath, "refs/heads/main")),
+								},
+							}},
+						},
+						ReferenceTransactions: []*gitalypb.LogEntry_ReferenceTransaction{
+							{Changes: []*gitalypb.LogEntry_ReferenceTransaction_Change{
+								{
+									ReferenceName: []byte("refs/heads/main"),
+									NewOid:        []byte(setup.Commits.First.OID),
+								},
+							}},
+						},
+					},
+				},
 				ConsumerAcknowledge{
 					LSN: 1,
+				},
+				ConsumerReadEntry{
+					LSN:         1,
+					ExpectedErr: "requested log entry is gone",
 				},
 			},
 			expectedState: StateAssertion{
@@ -136,6 +164,14 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				},
 				ConsumerAcknowledge{
 					LSN: 2,
+				},
+				ConsumerReadEntry{
+					LSN:         1,
+					ExpectedErr: "requested log entry is gone",
+				},
+				ConsumerReadEntry{
+					LSN:         2,
+					ExpectedErr: "requested log entry is gone",
 				},
 			},
 			expectedState: StateAssertion{
