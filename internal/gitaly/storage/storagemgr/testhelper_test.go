@@ -897,6 +897,8 @@ func (lc *MockLogConsumer) NotifyNewTransactions(storageName string, partitionID
 	lc.highWaterMark = highWaterMark
 }
 
+func (lc *MockLogConsumer) Close() {}
+
 // ConsumerState is used to track the log positions received by the consumer and the corresponding
 // acknowledgements from the consumer to the manager. We deliberately do not track the LowWaterMark
 // sent to consumers as this is non-deterministic.
