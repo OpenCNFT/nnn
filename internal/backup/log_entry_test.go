@@ -20,6 +20,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 type mockLogManager struct {
@@ -68,6 +69,10 @@ func (lm *mockLogManager) AcknowledgeTransaction(_ storagemgr.LogConsumer, lsn s
 	if lsn == lm.finalLSN && len(lm.notifications) == 0 {
 		lm.finishFunc()
 	}
+}
+
+func (lm *mockLogManager) ReadEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
+	return nil, nil
 }
 
 func (lm *mockLogManager) SendNotification() {
