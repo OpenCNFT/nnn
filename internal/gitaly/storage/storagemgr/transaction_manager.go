@@ -899,6 +899,8 @@ type LogManager interface {
 	AcknowledgeTransaction(consumer LogConsumer, lsn storage.LSN)
 	// GetTransactionPath returns the path of the log entry's root directory.
 	GetTransactionPath(lsn storage.LSN) string
+	// ReadEntry returns the log entry object of the LSN.
+	ReadEntry(lsn storage.LSN) (*gitalypb.LogEntry, error)
 }
 
 // AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
@@ -917,6 +919,18 @@ func (mgr *TransactionManager) AcknowledgeTransaction(consumer LogConsumer, lsn 
 // GetTransactionPath returns the path of the log entry's root directory.
 func (mgr *TransactionManager) GetTransactionPath(lsn storage.LSN) string {
 	return walFilesPathForLSN(mgr.stateDirectory, lsn)
+}
+
+// ReadEntry returns the log entry object of the LSN.
+func (mgr *TransactionManager) ReadEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
+	if lsn < mgr.lowWaterMark() {
+		return nil, fmt.Errorf("requested log entry is gone")
+	}
+	entry, err := mgr.readLogEntry(lsn)
+	if err != nil {
+		return nil, fmt.Errorf("reading log entry: %w", err)
+	}
+	return entry, nil
 }
 
 // consumerPosition tracks the last LSN acknowledged for a consumer.
