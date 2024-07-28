@@ -63,6 +63,8 @@ func TestManager_Start(t *testing.T) {
 
 	resetManager := func(t *testing.T, node *testNode) {
 		node.manager.Close()
+		node.ptnManager.GetLogConsumer().Close()
+
 		m2, err := NewManager(
 			testhelper.Context(t),
 			node.cfg.Storages,

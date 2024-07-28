@@ -85,12 +85,14 @@ func SetLogger(logger log.Logger, suppressDefaultLog bool) {
 			dragonboatLogger.GetLogger("rsm").SetLevel(dragonboatLogger.WARNING)
 			dragonboatLogger.GetLogger("transport").SetLevel(dragonboatLogger.ERROR)
 			dragonboatLogger.GetLogger("grpc").SetLevel(dragonboatLogger.ERROR)
+			dragonboatLogger.GetLogger("logdb").SetLevel(dragonboatLogger.ERROR)
 		} else {
 			dragonboatLogger.GetLogger("dragonboat").SetLevel(dragonboatLogger.INFO)
 			dragonboatLogger.GetLogger("raft").SetLevel(dragonboatLogger.INFO)
 			dragonboatLogger.GetLogger("rsm").SetLevel(dragonboatLogger.INFO)
 			dragonboatLogger.GetLogger("transport").SetLevel(dragonboatLogger.INFO)
 			dragonboatLogger.GetLogger("grpc").SetLevel(dragonboatLogger.INFO)
+			dragonboatLogger.GetLogger("logdb").SetLevel(dragonboatLogger.INFO)
 		}
 	})
 }

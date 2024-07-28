@@ -161,9 +161,10 @@ func (l *LogConsumer) pushNotifications(notifications *notifications, pusher *re
 func (l *LogConsumer) initializeNotifications(storageName string) *notifications {
 	if _, ok := l.notifications[storageName]; !ok {
 		l.notifications[storageName] = &notifications{
-			storageName: storageName,
-			list:        &list.List{},
-			signal:      make(chan struct{}, 1),
+			storageName:     storageName,
+			list:            &list.List{},
+			signal:          make(chan struct{}, 1),
+			partitionStates: map[storage.PartitionID]*partitionState{},
 		}
 	}
 	return l.notifications[storageName]
