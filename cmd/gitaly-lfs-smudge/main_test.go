@@ -138,7 +138,8 @@ func TestGitalyLFSSmudge(t *testing.T) {
 				}
 			},
 			stdin:          strings.NewReader(lfsPointer),
-			expectedStdout: "hello world",
+			expectedErr:    "exit status 1",
+			expectedStderr: `new subprocess logger: "unmarshal: unexpected end of JSON input"`,
 		},
 		{
 			desc: "missing stdin",

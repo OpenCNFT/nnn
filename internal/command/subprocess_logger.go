@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
+	"github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/labkit/correlation"
 )
@@ -45,23 +44,15 @@ func envSubprocessLoggerConfiguration(cfg subprocessConfiguration) (string, erro
 // directory from the environment using getEnv and outputs logs in the given format log dir under a file defined
 // by logFileName. If `GITALY_LOG_CONFIGURATION` is set, it outputs the logs to the file descriptor using the configuration
 // from the environment variable.
-func NewSubprocessLogger(ctx context.Context, getEnv func(string) string, logFileName, format string) (_ log.Logger, _ io.Closer, returnedErr error) {
-	cfg := subprocessConfiguration{
-		Config: log.Config{
-			Level:  "info",
-			Format: format,
-		},
+func NewSubprocessLogger(ctx context.Context, getEnv func(string) string, component string) (_ log.Logger, _ io.Closer, returnedErr error) {
+	var cfg subprocessConfiguration
+	if err := json.Unmarshal([]byte(getEnv(EnvLogConfiguration)), &cfg); err != nil {
+		return nil, nil, fmt.Errorf("unmarshal: %w", err)
 	}
 
-	if value := getEnv(EnvLogConfiguration); value != "" {
-		if err := json.Unmarshal([]byte(value), &cfg); err != nil {
-			return nil, nil, fmt.Errorf("unmarshal: %w", err)
-		}
-	}
-
-	output, err := newSubprocessLoggerOutput(getEnv, logFileName, cfg.FileDescriptor)
-	if err != nil {
-		return nil, nil, fmt.Errorf("new subprocess logger output: %w", err)
+	output := os.NewFile(cfg.FileDescriptor, "log-writer")
+	if output == nil {
+		return nil, nil, fmt.Errorf("invalid log writer file descriptor: %d", cfg.FileDescriptor)
 	}
 
 	defer func() {
@@ -77,42 +68,8 @@ func NewSubprocessLogger(ctx context.Context, getEnv func(string) string, logFil
 		return nil, nil, fmt.Errorf("configure: %w", err)
 	}
 
-	if cfg.FileDescriptor > 0 {
-		// If the log server is in use, use the log file's name as the component for now to identify
-		// which log this entry comes from.
-		logger = logger.WithField("component", filepath.Base(logFileName))
-	}
-
-	return logger.WithField(correlation.FieldName, correlation.ExtractFromContext(ctx)), output, nil
-}
-
-type nopCloser struct{ io.Writer }
-
-func (nopCloser) Close() error { return nil }
-
-func newNopCloser(w io.Writer) io.WriteCloser {
-	return nopCloser{Writer: w}
-}
-
-func newSubprocessLoggerOutput(getEnv func(string) string, logFileName string, fileDescriptor uintptr) (io.WriteCloser, error) {
-	if fileDescriptor > 0 {
-		logWriter := os.NewFile(fileDescriptor, "log-writer")
-		if logWriter == nil {
-			return nil, fmt.Errorf("invalid log writer file descriptor: %d", fileDescriptor)
-		}
-
-		return logWriter, nil
-	}
-
-	output := newNopCloser(io.Discard)
-	if logDir := getEnv(log.GitalyLogDirEnvKey); logDir != "" {
-		if logFile, err := os.OpenFile(filepath.Join(logDir, logFileName), os.O_CREATE|os.O_APPEND|os.O_WRONLY, perm.SharedFile); err != nil {
-			// Ignore this error as we cannot do anything about it anyway. We cannot write anything to
-			// stdout or stderr as that might break hooks, and we have no other destination to log to.
-		} else {
-			output = logFile
-		}
-	}
-
-	return output, nil
+	return logger.WithFields(logrus.Fields{
+		"component":           component,
+		correlation.FieldName: correlation.ExtractFromContext(ctx),
+	}), output, nil
 }
