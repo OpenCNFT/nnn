@@ -349,7 +349,7 @@ func TestRecordAlternateUnlink(t *testing.T) {
 }
 
 func TestRecordReferenceUpdates(t *testing.T) {
-	testhelper.SkipWithReftable(t, "TransactionManager doesn't support reftables yet. See: https://gitlab.com/gitlab-org/gitaly/-/issues/5867")
+	testhelper.SkipWithReftable(t, "reftable reference updates are handled in storagemgr")
 
 	t.Parallel()
 

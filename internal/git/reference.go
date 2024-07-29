@@ -22,6 +22,14 @@ type ReferenceUpdate struct {
 	NewTarget ReferenceName
 }
 
+// IsRegularUpdate is used to check if the update is a regular reference
+// update, which updates a ref from an old OID to a new OID.
+//
+// This excludes symrefs and regular <> symref conversions.
+func (r *ReferenceUpdate) IsRegularUpdate() bool {
+	return r.OldTarget == "" && r.NewTarget == ""
+}
+
 // ReferenceUpdates contains references to update. Reference name is used as the key and the value
 // is the expected old tip and the desired new tip.
 type ReferenceUpdates map[ReferenceName]ReferenceUpdate
