@@ -517,8 +517,6 @@ gitaly_cgroup_procs_total{path="%s",subsystem="memory"} 1
 }
 
 func TestPruneOldCgroups(t *testing.T) {
-	testhelper.SkipQuarantinedTest(t, "https://gitlab.com/gitlab-org/gitaly/-/issues/6241")
-
 	t.Parallel()
 
 	testCases := []struct {
