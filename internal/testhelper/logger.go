@@ -2,15 +2,11 @@ package testhelper
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
-	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -161,23 +157,4 @@ func (h LoggerHook) LastEntry() *logrus.Entry {
 // Reset empties the list of intercepted log entries.
 func (h LoggerHook) Reset() {
 	h.hook.Reset()
-}
-
-// CreateTestLogDir creates a new log directory for testing purposes if the environment variable
-// `TEST_LOG_DIR` is set. The log directory will then be created as a subdirectory of the value that
-// `TEST_LOG_DIR` points to. The name of the subdirectory will match the executing test's name.
-//
-// Returns the name of the created log directory. If the environment variable is not set then this
-// functions returns an empty string.
-func CreateTestLogDir(tb testing.TB) string {
-	testLogDir := os.Getenv("TEST_LOG_DIR")
-	if len(testLogDir) == 0 {
-		return ""
-	}
-
-	logDir := filepath.Join(testLogDir, tb.Name())
-
-	require.NoError(tb, os.MkdirAll(logDir, mode.Directory))
-
-	return logDir
 }

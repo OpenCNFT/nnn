@@ -550,9 +550,8 @@ func TestGetArchive_environment(t *testing.T) {
 			desc:            "with LFS blobs",
 			includeLFSBlobs: true,
 			expectedEnv: map[string]struct{}{
-				"CORRELATION_ID=" + correlationID:   {},
-				smudgeEnv:                           {},
-				"GITALY_LOG_DIR=" + cfg.Logging.Dir: {},
+				"CORRELATION_ID=" + correlationID: {},
+				smudgeEnv:                         {},
 			},
 		},
 	} {
