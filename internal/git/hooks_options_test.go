@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
@@ -61,10 +60,7 @@ func TestWithRefHook(t *testing.T) {
 			expectedEnv := []string{
 				"GITALY_HOOKS_PAYLOAD",
 				"GITALY_LOG_DIR",
-			}
-
-			if featureflag.SubprocessLogger.IsEnabled(ctx) {
-				expectedEnv = append(expectedEnv, command.EnvLogConfiguration)
+				command.EnvLogConfiguration,
 			}
 
 			require.EqualValues(t, expectedEnv, actualEnvVars)
