@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
