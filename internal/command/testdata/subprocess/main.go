@@ -16,7 +16,7 @@ import (
 // main implements a helper binary for testing subprocess loggers. It sets up a subprocess logger and
 // reads logging commands from stdin on what to log so we can test the whole flow.
 func main() {
-	logger, closer, err := command.NewSubprocessLogger(context.Background(), os.Getenv, "file.log", "json")
+	logger, closer, err := command.NewSubprocessLogger(context.Background(), os.Getenv, "child-process")
 	if err != nil {
 		log.Fatalf("new subprocess logger: %q", err)
 	}

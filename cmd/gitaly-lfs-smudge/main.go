@@ -37,17 +37,18 @@ func main() {
 	ctx, finished := tracing.ExtractFromEnv(context.Background())
 	defer finished()
 
-	logger, logCloser, err := command.NewSubprocessLogger(ctx, os.Getenv, "gitaly_lfs_smudge.log", "json")
+	logger, logCloser, err := command.NewSubprocessLogger(ctx, os.Getenv, "gitaly-lfs-smudge")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error initializing log file for gitaly-lfs-smudge: %v", err)
-	} else {
-		defer func() {
-			if err := logCloser.Close(); err != nil {
-				fmt.Printf("close log: %q", err)
-				os.Exit(1)
-			}
-		}()
+		fmt.Fprintf(os.Stderr, "new subprocess logger: %q", err)
+		os.Exit(1)
 	}
+
+	defer func() {
+		if err := logCloser.Close(); err != nil {
+			fmt.Printf("close log: %q", err)
+			os.Exit(1)
+		}
+	}()
 
 	if err := run(ctx, os.Environ(), os.Stdout, os.Stdin, logger); err != nil {
 		logger.WithError(err).Error("gitaly-lfs-smudge failed")
