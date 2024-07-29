@@ -83,16 +83,6 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 		require.NoError(tb, os.Mkdir(cfg.BinDir, mode.Directory))
 	}
 
-	if cfg.Logging.Dir == "" {
-		logDir := testhelper.CreateTestLogDir(tb)
-		if len(logDir) != 0 {
-			cfg.Logging.Dir = logDir
-		} else {
-			cfg.Logging.Dir = filepath.Join(root, "log.d")
-			require.NoError(tb, os.Mkdir(cfg.Logging.Dir, mode.Directory))
-		}
-	}
-
 	if cfg.GitlabShell.Dir == "" {
 		cfg.GitlabShell.Dir = filepath.Join(root, "shell.d")
 		require.NoError(tb, os.Mkdir(cfg.GitlabShell.Dir, mode.Directory))

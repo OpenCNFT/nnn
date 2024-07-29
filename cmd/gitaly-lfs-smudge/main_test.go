@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,11 +11,19 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
 
-const logName = "gitaly_lfs_smudge.log"
+type capturedOutput struct {
+	log.Logger
+	output *bytes.Buffer
+}
+
+func (c capturedOutput) Output() io.Writer {
+	return c.output
+}
 
 func TestGitalyLFSSmudge(t *testing.T) {
 	ctx := testhelper.Context(t)
@@ -39,29 +46,28 @@ func TestGitalyLFSSmudge(t *testing.T) {
 	marshalledTLSCfg, err := json.Marshal(tlsCfg)
 	require.NoError(t, err)
 
-	standardEnv := func(logDir string) []string {
+	standardEnv := func() []string {
 		return []string{
 			"GL_REPOSITORY=project-1",
 			"GL_INTERNAL_CONFIG=" + string(marshalledGitlabCfg),
-			"GITALY_LOG_DIR=" + logDir,
 			"GITALY_TLS=" + string(marshalledTLSCfg),
 		}
 	}
 
 	for _, tc := range []struct {
-		desc              string
-		setup             func(t *testing.T) ([]string, string)
-		stdin             io.Reader
-		expectedErr       string
-		expectedStdout    string
-		expectedStderr    string
-		expectedLogRegexp string
+		desc               string
+		setup              func(t *testing.T) []string
+		noLogConfiguration bool
+		stdin              io.Reader
+		expectedErr        string
+		expectedStdout     string
+		expectedStderr     string
+		expectedLogRegexp  string
 	}{
 		{
 			desc: "success",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-				return standardEnv(logDir), filepath.Join(logDir, logName)
+			setup: func(t *testing.T) []string {
+				return standardEnv()
 			},
 			stdin:             strings.NewReader(lfsPointer),
 			expectedStdout:    "hello world",
@@ -69,9 +75,7 @@ func TestGitalyLFSSmudge(t *testing.T) {
 		},
 		{
 			desc: "success with single envvar",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-
+			setup: func(t *testing.T) []string {
 				cfg := smudge.Config{
 					GlRepository: "project-1",
 					Gitlab:       gitlabCfg,
@@ -81,10 +85,7 @@ func TestGitalyLFSSmudge(t *testing.T) {
 				env, err := cfg.Environment()
 				require.NoError(t, err)
 
-				return []string{
-					env,
-					"GITALY_LOG_DIR=" + logDir,
-				}, filepath.Join(logDir, "gitaly_lfs_smudge.log")
+				return []string{env}
 			},
 			stdin:             strings.NewReader(lfsPointer),
 			expectedStdout:    "hello world",
@@ -92,14 +93,11 @@ func TestGitalyLFSSmudge(t *testing.T) {
 		},
 		{
 			desc: "missing Gitlab repository",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-
+			setup: func(t *testing.T) []string {
 				return []string{
 					"GL_INTERNAL_CONFIG=" + string(marshalledGitlabCfg),
-					"GITALY_LOG_DIR=" + logDir,
 					"GITALY_TLS=" + string(marshalledTLSCfg),
-				}, filepath.Join(logDir, logName)
+				}
 			},
 			stdin:             strings.NewReader(lfsPointer),
 			expectedErr:       "exit status 1",
@@ -107,14 +105,11 @@ func TestGitalyLFSSmudge(t *testing.T) {
 		},
 		{
 			desc: "missing Gitlab configuration",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-
+			setup: func(t *testing.T) []string {
 				return []string{
 					"GL_REPOSITORY=project-1",
-					"GITALY_LOG_DIR=" + logDir,
 					"GITALY_TLS=" + string(marshalledTLSCfg),
-				}, filepath.Join(logDir, logName)
+				}
 			},
 			stdin:             strings.NewReader(lfsPointer),
 			expectedErr:       "exit status 1",
@@ -122,47 +117,42 @@ func TestGitalyLFSSmudge(t *testing.T) {
 		},
 		{
 			desc: "missing TLS configuration",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-
+			setup: func(t *testing.T) []string {
 				return []string{
 					"GL_REPOSITORY=project-1",
 					"GL_INTERNAL_CONFIG=" + string(marshalledGitlabCfg),
-					"GITALY_LOG_DIR=" + logDir,
-				}, filepath.Join(logDir, logName)
+				}
 			},
 			stdin:             strings.NewReader(lfsPointer),
 			expectedErr:       "exit status 1",
 			expectedLogRegexp: "unable to retrieve GITALY_TLS",
 		},
 		{
-			desc: "missing log configuration",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-
+			desc:               "missing log configuration",
+			noLogConfiguration: true,
+			setup: func(t *testing.T) []string {
 				return []string{
 					"GL_REPOSITORY=project-1",
 					"GL_INTERNAL_CONFIG=" + string(marshalledGitlabCfg),
 					"GITALY_TLS=" + string(marshalledTLSCfg),
-				}, filepath.Join(logDir, "gitaly_lfs_smudge.log")
+				}
 			},
 			stdin:          strings.NewReader(lfsPointer),
-			expectedStdout: "hello world",
+			expectedErr:    "exit status 1",
+			expectedStderr: `new subprocess logger: "unmarshal: unexpected end of JSON input"`,
 		},
 		{
 			desc: "missing stdin",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-				return standardEnv(logDir), filepath.Join(logDir, logName)
+			setup: func(t *testing.T) []string {
+				return standardEnv()
 			},
 			expectedErr:    "exit status 1",
 			expectedStdout: "Cannot read from STDIN. This command should be run by the Git 'smudge' filter\n",
 		},
 		{
 			desc: "non-LFS-pointer input",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-				return standardEnv(logDir), filepath.Join(logDir, logName)
+			setup: func(t *testing.T) []string {
+				return standardEnv()
 			},
 			stdin:             strings.NewReader("somethingsomething"),
 			expectedStdout:    "somethingsomething",
@@ -170,9 +160,8 @@ func TestGitalyLFSSmudge(t *testing.T) {
 		},
 		{
 			desc: "mixed input",
-			setup: func(t *testing.T) ([]string, string) {
-				logDir := testhelper.TempDir(t)
-				return standardEnv(logDir), filepath.Join(logDir, logName)
+			setup: func(t *testing.T) []string {
+				return standardEnv()
 			},
 			stdin:             strings.NewReader(lfsPointer + "\nsomethingsomething\n"),
 			expectedStdout:    lfsPointer + "\nsomethingsomething\n",
@@ -180,15 +169,24 @@ func TestGitalyLFSSmudge(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			env, logFile := tc.setup(t)
+			env := tc.setup(t)
 
-			var stdout, stderr bytes.Buffer
-			cmd, err := command.New(ctx, testhelper.SharedLogger(t), []string{binary},
+			var stdout, stderr, logOutput bytes.Buffer
+			opts := []command.Option{
 				command.WithStdin(tc.stdin),
 				command.WithStdout(&stdout),
 				command.WithStderr(&stderr),
 				command.WithEnvironment(env),
-			)
+			}
+
+			if !tc.noLogConfiguration {
+				opts = append(opts, command.WithSubprocessLogger(cfg.Logging.Config))
+			}
+
+			cmd, err := command.New(ctx, capturedOutput{
+				Logger: testhelper.SharedLogger(t),
+				output: &logOutput,
+			}, []string{binary}, opts...)
 			require.NoError(t, err)
 
 			err = cmd.Wait()
@@ -201,10 +199,10 @@ func TestGitalyLFSSmudge(t *testing.T) {
 			require.Equal(t, tc.expectedStderr, stderr.String())
 
 			if tc.expectedLogRegexp == "" {
-				require.NoFileExists(t, logFile)
+				require.Empty(t, logOutput.String())
 			} else {
-				logData := testhelper.MustReadFile(t, logFile)
-				require.Regexp(t, tc.expectedLogRegexp, string(logData))
+				logData := logOutput.String()
+				require.Regexp(t, tc.expectedLogRegexp, logData)
 			}
 		})
 	}

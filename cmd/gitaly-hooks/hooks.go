@@ -77,9 +77,9 @@ func main() {
 	ctx, finished := labkittracing.ExtractFromEnv(ctx)
 	defer finished()
 
-	logger, logCloser, err := command.NewSubprocessLogger(ctx, os.Getenv, "gitaly_hooks.log", "text")
+	logger, logCloser, err := command.NewSubprocessLogger(ctx, os.Getenv, "gitaly-hooks")
 	if err != nil {
-		fmt.Printf("configuring logger failed: %v", err)
+		fmt.Printf("new subprocess logger: %q", err)
 		os.Exit(1)
 	}
 

@@ -9,11 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	// GitalyLogDirEnvKey defines the environment variable used to specify the Gitaly log directory
-	GitalyLogDirEnvKey = "GITALY_LOG_DIR"
-)
-
 // SkipReplacingGlobalLoggers will cause `Configure()` to skip replacing global loggers. This is mostly a hack: command
 // line applications are expected to call `log.Configure()` in their subcommand actions, and that should indeed always
 // replace global loggers, as well. But when running tests, we invoke the subcommand actions multiple times, which is
@@ -27,7 +22,6 @@ var SkipReplacingGlobalLoggers bool
 
 // Config contains logging configuration values
 type Config struct {
-	Dir    string `toml:"dir,omitempty" json:"dir"`
 	Format string `toml:"format,omitempty" json:"format"`
 	Level  string `toml:"level,omitempty" json:"level"`
 }
