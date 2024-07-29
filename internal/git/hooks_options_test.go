@@ -59,7 +59,6 @@ func TestWithRefHook(t *testing.T) {
 
 			expectedEnv := []string{
 				"GITALY_HOOKS_PAYLOAD",
-				"GITALY_LOG_DIR",
 				command.EnvLogConfiguration,
 			}
 

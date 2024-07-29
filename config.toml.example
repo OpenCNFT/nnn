@@ -69,8 +69,6 @@ path = "/home/git/repositories"
 
 # # Optional. Configure Gitaly to output JSON-formatted log messages to stdout.
 # [logging]
-# # Directory where Gitaly stores extra log files.
-dir = "/home/git/gitlab/log"
 # # Log format. Either 'text' or 'json'.
 # format = "json"
 # # Optional. Set log level to only log entries with that severity or above.

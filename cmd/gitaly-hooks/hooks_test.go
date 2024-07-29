@@ -47,7 +47,6 @@ import (
 
 type glHookValues struct {
 	GLID, GLUsername, GLProtocol, GitObjectDir, RemoteIP string
-	GitalyLogDir                                         string
 	GitAlternateObjectDirs                               []string
 }
 
@@ -93,7 +92,6 @@ func envForHooks(tb testing.TB, ctx context.Context, cfg config.Cfg, repo *gital
 
 	env := append(command.AllowedEnvironment(os.Environ()), []string{
 		payload,
-		fmt.Sprintf("%s=%s", gitalylog.GitalyLogDirEnvKey, cfg.Logging.Dir),
 		"GITLAB_TRACING=opentracing://jaeger",
 		"user-tracer-id=1:2:3:4",
 	}...)
@@ -120,9 +118,6 @@ func envForHooks(tb testing.TB, ctx context.Context, cfg config.Cfg, repo *gital
 	}
 	if len(glHookValues.GitAlternateObjectDirs) > 0 {
 		env = append(env, fmt.Sprintf("GIT_ALTERNATE_OBJECT_DIRECTORIES=%s", strings.Join(glHookValues.GitAlternateObjectDirs, ":")))
-	}
-	if glHookValues.GitalyLogDir != "" {
-		env = append(env, fmt.Sprintf("GITALY_LOG_DIR=%s", glHookValues.GitalyLogDir))
 	}
 
 	return env
@@ -783,12 +778,9 @@ func TestRequestedHooks(t *testing.T) {
 func TestGitalyHooksPackObjects(t *testing.T) {
 	t.Parallel()
 
-	logDir := testhelper.TempDir(t)
-
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
-		Auth:    auth.Config{Token: "abc123"},
-		Logging: config.Logging{Config: gitalylog.Config{Dir: logDir}},
+		Auth: auth.Config{Token: "abc123"},
 	}))
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -884,8 +876,6 @@ func TestGitalyServerReturnsError(t *testing.T) {
 		t.Run(tc.hook, func(t *testing.T) {
 			t.Parallel()
 
-			logDir := testhelper.TempDir(t)
-
 			ctx := testhelper.Context(t)
 			cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
 				Auth:  auth.Config{Token: "abc123"},
@@ -930,11 +920,10 @@ func TestGitalyServerReturnsError(t *testing.T) {
 				command.WithSubprocessLogger(cfg.Logging.Config),
 				command.WithEnvironment(envForHooks(t, ctx, cfg, repo,
 					glHookValues{
-						GLID:         glID,
-						GLUsername:   glUsername,
-						GLProtocol:   "ssh",
-						RemoteIP:     remoteIP,
-						GitalyLogDir: logDir,
+						GLID:       glID,
+						GLUsername: glUsername,
+						GLProtocol: "ssh",
+						RemoteIP:   remoteIP,
 					},
 					proxyValues{})),
 				command.WithStdin(strings.NewReader(tc.stdin)),
