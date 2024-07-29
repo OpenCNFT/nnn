@@ -64,30 +64,30 @@ func TestWriteTarball(t *testing.T) {
 
 	expected := testhelper.DirectoryState{
 		"a.txt": {
-			Mode:    mode.File,
+			Mode:    TarFileMode,
 			Content: []byte("a"),
 		},
 		"nested1/": {
-			Mode: mode.Directory,
+			Mode: TarFileMode | ExecuteMode | fs.ModeDir,
 		},
 		"link.to.nested4": {
-			Mode: fs.ModePerm | fs.ModeSymlink,
+			Mode: TarFileMode | ExecuteMode | fs.ModeSymlink,
 		},
 		"link.to.target.txt": {
-			Mode: fs.ModePerm | fs.ModeSymlink,
+			Mode: TarFileMode | ExecuteMode | fs.ModeSymlink,
 		},
 		"nested2/nested/nested/nested/nested/d.txt": {
-			Mode:    mode.File,
+			Mode:    TarFileMode,
 			Content: []byte("d"),
 		},
 	}
 	expected[strings.Repeat("b", 150)+".txt"] = testhelper.DirectoryEntry{
-		Mode:    mode.File,
+		Mode:    TarFileMode,
 		Content: []byte("b"),
 	}
 	for i := 0; i < readDirEntriesPageSize+1; i++ {
 		expected[fmt.Sprintf("nested1/%d.txt", i)] = testhelper.DirectoryEntry{
-			Mode:    mode.File,
+			Mode:    TarFileMode,
 			Content: []byte{byte(i)},
 		}
 	}

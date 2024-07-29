@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/fs"
 	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/setup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -125,7 +126,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: &bytes.Buffer{},
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/": {Mode: mode.Directory},
+				"custom_hooks/": {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 			},
 		},
 		{
@@ -140,10 +141,10 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: mode.Directory},
-				"custom_hooks/pre-commit":  {Mode: mode.Executable, Content: []byte("pre-commit content")},
-				"custom_hooks/pre-push":    {Mode: mode.Executable, Content: []byte("pre-push content")},
-				"custom_hooks/pre-receive": {Mode: mode.Executable, Content: []byte("pre-receive content")},
+				"custom_hooks/":            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				"custom_hooks/pre-commit":  {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-commit content")},
+				"custom_hooks/pre-push":    {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-push content")},
+				"custom_hooks/pre-receive": {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-receive content")},
 			},
 		},
 		{
@@ -164,10 +165,10 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: mode.Directory},
-				"custom_hooks/pre-commit":  {Mode: mode.Executable, Content: []byte("pre-commit content")},
-				"custom_hooks/pre-push":    {Mode: mode.Executable, Content: []byte("pre-push content")},
-				"custom_hooks/pre-receive": {Mode: mode.Executable, Content: []byte("pre-receive content")},
+				"custom_hooks/":            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				"custom_hooks/pre-commit":  {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-commit content")},
+				"custom_hooks/pre-push":    {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-push content")},
+				"custom_hooks/pre-receive": {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-receive content")},
 			},
 		},
 	} {

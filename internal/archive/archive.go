@@ -19,8 +19,11 @@ const (
 // WriteTarball writes a tarball to an `io.Writer` for the provided path
 // containing the specified archive members. Members should be specified
 // relative to `path`.
+//
+// Symlinks will be included in the archive. Permissions are normalised to
+// allow global read/write.
 func WriteTarball(ctx context.Context, logger log.Logger, writer io.Writer, path string, members ...string) error {
-	cmdArgs := []string{"-c", "-f", "-", "-C", path}
+	cmdArgs := []string{"-c", "-f", "-", "-C", path, "--mode", "a+rwX"}
 
 	if runtime.GOOS == "darwin" {
 		cmdArgs = append(cmdArgs, "--no-mac-metadata")
