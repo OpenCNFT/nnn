@@ -3,7 +3,6 @@
 package cgroups
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -124,18 +123,6 @@ func (cgm *CGroupManager) Setup() error {
 	if err := cgm.handler.setupParent(cgm.configParentResources()); err != nil {
 		return err
 	}
-
-	// cmd run to force creation of repository cgroups
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "echo", "Gitaly")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("run command to force repository cgroups setup: %w", err)
-	}
-	if _, err := cgm.AddCommand(cmd, WithCgroupKey("setup")); err != nil {
-		return fmt.Errorf("could not add command in cgroups setup: %w", err)
-	}
-
 	cgm.enabled = true
 
 	return nil
@@ -146,7 +133,7 @@ func (cgm *CGroupManager) Ready() bool {
 	return cgm.enabled
 }
 
-// AddCommand adds a Cmd that has already started to a cgroup
+// AddCommand adds a Cmd to a cgroup
 func (cgm *CGroupManager) AddCommand(cmd *exec.Cmd, opts ...AddCommandOption) (string, error) {
 	if cmd.Process == nil {
 		return "", errors.New("cannot add command that has not yet been started")
@@ -172,18 +159,16 @@ func (cgm *CGroupManager) SupportsCloneIntoCgroup() bool {
 func (cgm *CGroupManager) maybeCreateCgroup(cgroupPath string) error {
 	lock := cgm.status.getLock(cgroupPath)
 
-	if lock != nil {
-		lock.once.Do(func() {
-			if err := cgm.handler.createCgroup(cgm.repoRes, cgroupPath); err != nil {
-				lock.creationError = err
-				return
-			}
+	lock.once.Do(func() {
+		if err := cgm.handler.createCgroup(cgm.repoRes, cgroupPath); err != nil {
+			lock.creationError = err
+			return
+		}
 
-			lock.created.Store(true)
-		})
-		return lock.creationError
-	}
-	return errors.New("could not get lock to create cgroup")
+		lock.created.Store(true)
+	})
+
+	return lock.creationError
 }
 
 // CloneIntoCgroup configures the cgroup parameters UseCgroupFD and CgroupFD in SysProcAttr
@@ -229,10 +214,7 @@ func (cgm *CGroupManager) cgroupPathForCommand(cmd *exec.Cmd, opts []AddCommandO
 
 func (cgm *CGroupManager) calcGroupID(rand randomizer, key string, count uint, allocationCount uint) uint {
 	checksum := crc32.ChecksumIEEE([]byte(key))
-	// Prevent divide by zero error
-	if count == 0 {
-		count++
-	}
+
 	// Pick a starting point
 	groupID := uint(checksum) % count
 	if allocationCount <= 1 {
