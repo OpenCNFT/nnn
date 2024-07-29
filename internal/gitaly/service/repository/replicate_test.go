@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -633,12 +632,6 @@ func TestFetchInternalRemote_successful(t *testing.T) {
 	// Use the `assert` package such that we can get information about why hooks have failed via
 	// the hook logs in case it did fail unexpectedly.
 	assert.NoError(t, fetchInternalRemote(ctx, &transaction.MockManager{}, connsPool, localRepo, remoteRepo))
-
-	if featureflag.SubprocessLogger.IsDisabled(ctx) {
-		hookLogs := filepath.Join(localCfg.Logging.Dir, "gitaly_hooks.log")
-		require.FileExists(t, hookLogs)
-		require.Equal(t, "", string(testhelper.MustReadFile(t, hookLogs)))
-	}
 
 	require.Equal(t,
 		string(gittest.Exec(t, remoteCfg, "-C", remoteRepoPath, "show-ref", "--head")),

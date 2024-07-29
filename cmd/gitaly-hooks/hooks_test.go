@@ -1062,9 +1062,6 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 			}
 
 			hookLogs := logOutput.String()
-			if featureflag.SubprocessLogger.IsDisabled(ctx) {
-				hookLogs = string(testhelper.MustReadFile(t, filepath.Join(cfg.Logging.Dir, "gitaly_hooks.log")))
-			}
 			require.NotEmpty(t, hookLogs)
 			require.Contains(t, hookLogs, tc.expectedLogs)
 			require.Contains(t, hookLogs, fmt.Sprintf("correlation_id=%s", correlationID))
