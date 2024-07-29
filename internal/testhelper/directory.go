@@ -108,7 +108,7 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 		require.NoError(tb, err)
 
 		actualEntry := DirectoryEntry{
-			Mode: fs.FileMode(header.Mode),
+			Mode: header.FileInfo().Mode(),
 		}
 
 		if header.Typeflag == tar.TypeReg {

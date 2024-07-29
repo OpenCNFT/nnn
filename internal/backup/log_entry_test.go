@@ -340,7 +340,7 @@ func TestLogEntryArchiver(t *testing.T) {
 					archive, err := os.Open(tarPath)
 					require.NoError(t, err)
 					testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
-						lsn.String() + "/":                          {Mode: mode.Directory.Perm()},
+						lsn.String() + "/":                          {Mode: mode.Directory},
 						filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
 						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 					})
@@ -446,7 +446,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.NoError(t, err)
 
 	testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
-		lsn.String() + "/":                          {Mode: mode.Directory.Perm()},
+		lsn.String() + "/":                          {Mode: mode.Directory},
 		filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
 		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 	})
