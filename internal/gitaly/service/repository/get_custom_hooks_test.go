@@ -3,14 +3,15 @@ package repository
 import (
 	"archive/tar"
 	"context"
-	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
@@ -25,33 +26,33 @@ func TestGetCustomHooks_successful(t *testing.T) {
 
 	for _, tc := range []struct {
 		desc         string
-		streamReader func(*testing.T, context.Context, *gitalypb.Repository, gitalypb.RepositoryServiceClient) *tar.Reader
+		streamReader func(*testing.T, context.Context, *gitalypb.Repository, gitalypb.RepositoryServiceClient) io.Reader
 	}{
 		{
 			desc: "GetCustomHooks",
-			streamReader: func(t *testing.T, ctx context.Context, repo *gitalypb.Repository, client gitalypb.RepositoryServiceClient) *tar.Reader {
+			streamReader: func(t *testing.T, ctx context.Context, repo *gitalypb.Repository, client gitalypb.RepositoryServiceClient) io.Reader {
 				request := &gitalypb.GetCustomHooksRequest{Repository: repo}
 				stream, err := client.GetCustomHooks(ctx, request)
 				require.NoError(t, err)
 
-				return tar.NewReader(streamio.NewReader(func() ([]byte, error) {
+				return streamio.NewReader(func() ([]byte, error) {
 					response, err := stream.Recv()
 					return response.GetData(), err
-				}))
+				})
 			},
 		},
 		{
 			desc: "BackupCustomHooks",
-			streamReader: func(t *testing.T, ctx context.Context, repo *gitalypb.Repository, client gitalypb.RepositoryServiceClient) *tar.Reader {
+			streamReader: func(t *testing.T, ctx context.Context, repo *gitalypb.Repository, client gitalypb.RepositoryServiceClient) io.Reader {
 				request := &gitalypb.BackupCustomHooksRequest{Repository: repo}
 				//nolint:staticcheck
 				stream, err := client.BackupCustomHooks(ctx, request)
 				require.NoError(t, err)
 
-				return tar.NewReader(streamio.NewReader(func() ([]byte, error) {
+				return streamio.NewReader(func() ([]byte, error) {
 					response, err := stream.Recv()
 					return response.GetData(), err
-				}))
+				})
 			},
 		},
 	} {
@@ -60,29 +61,29 @@ func TestGetCustomHooks_successful(t *testing.T) {
 			cfg, client := setupRepositoryService(t)
 			repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
 
-			expectedTarResponse := []string{
-				"custom_hooks/",
+			customHookFiles := []string{
 				"custom_hooks/pre-commit.sample",
 				"custom_hooks/prepare-commit-msg.sample",
 				"custom_hooks/pre-push.sample",
 			}
 			require.NoError(t, os.Mkdir(filepath.Join(repoPath, "custom_hooks"), mode.Directory), "Could not create custom_hooks dir")
-			for _, fileName := range expectedTarResponse[1:] {
+			for _, fileName := range customHookFiles {
 				require.NoError(t, os.WriteFile(filepath.Join(repoPath, fileName), []byte("Some hooks"), mode.Executable), fmt.Sprintf("Could not create %s", fileName))
 			}
 
 			reader := tc.streamReader(t, ctx, repo, client)
-			fileLength := 0
-			for {
-				file, err := reader.Next()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				require.NoError(t, err)
-				fileLength++
-				require.Contains(t, expectedTarResponse, file.Name)
+			expected := testhelper.DirectoryState{
+				"custom_hooks/": {
+					Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir,
+				},
 			}
-			require.Equal(t, fileLength, len(expectedTarResponse))
+			for _, fileName := range customHookFiles {
+				expected[fileName] = testhelper.DirectoryEntry{
+					Mode:    archive.TarFileMode | archive.ExecuteMode,
+					Content: []byte("Some hooks"),
+				}
+			}
+			testhelper.RequireTarState(t, reader, expected)
 		})
 	}
 }
