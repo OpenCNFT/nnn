@@ -217,6 +217,12 @@ docker rm -f $(docker ps -q --all -f name=praefect-pg) > /dev/null 2>1; \
 docker run --name praefect-pg -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -d postgres:12.6
 ```
 
+and run the tests by setting the appropriate `env` variables:
+
+```shell
+PGHOST=localhost PGPORT=5432 PGUSER=postgres make test-with-praefect
+```
+
 ### Useful snippets for creating a test
 
 #### testhelper package
