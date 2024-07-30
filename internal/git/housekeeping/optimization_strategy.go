@@ -37,7 +37,6 @@ type OptimizationStrategy interface {
 // HeuristicalOptimizationStrategy is an optimization strategy that is based on a set of
 // heuristics.
 type HeuristicalOptimizationStrategy struct {
-	gitVersion   git.Version
 	info         stats.RepositoryInfo
 	expireBefore time.Time
 }
@@ -47,7 +46,6 @@ type HeuristicalOptimizationStrategy struct {
 // repository can be decided without further disk reads.
 func NewHeuristicalOptimizationStrategy(gitVersion git.Version, info stats.RepositoryInfo) HeuristicalOptimizationStrategy {
 	return HeuristicalOptimizationStrategy{
-		gitVersion:   gitVersion,
 		info:         info,
 		expireBefore: time.Now().Add(stats.StaleObjectsGracePeriod),
 	}

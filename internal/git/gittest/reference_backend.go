@@ -42,10 +42,6 @@ func BackendSpecificRepoHash(t *testing.T, ctx context.Context,
 ) {
 	t.Helper()
 
-	if DefaultReferenceBackend == git.ReferenceBackendReftables {
-		SkipIfGitVersionLessThan(t, ctx, cfg, git.NewVersion(2, 45, 0, 0), "reftable support is added in 2.45")
-	}
-
 	err := filepath.WalkDir(repoPath, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err

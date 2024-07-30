@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
@@ -338,7 +337,6 @@ func TestHeuristicalOptimizationStrategy_ShouldRepackObjects(t *testing.T) {
 		{
 			desc: "geometric repack in object pool member with recent Git version",
 			strategy: HeuristicalOptimizationStrategy{
-				gitVersion: git.NewVersion(2, 40, 0, 1),
 				info: stats.RepositoryInfo{
 					Packfiles: stats.PackfilesInfo{
 						Count:          9,
