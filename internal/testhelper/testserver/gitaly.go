@@ -290,8 +290,6 @@ type gitalyServerDeps struct {
 	signingKey          string
 	transactionRegistry *storagemgr.TransactionRegistry
 	procReceiveRegistry *hook.ProcReceiveRegistry
-	partitionManager    *storagemgr.PartitionManager
-	inProgressTracker   *service.InProgressTracker
 }
 
 func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *service.Dependencies {
@@ -333,36 +331,29 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		gsd.procReceiveRegistry = hook.NewProcReceiveRegistry()
 	}
 
-	if gsd.inProgressTracker == nil {
-		gsd.inProgressTracker = service.NewInProgressTracker()
-	}
-
 	var partitionManager *storagemgr.PartitionManager
 	if testhelper.IsWALEnabled() {
-		if gsd.partitionManager == nil {
-			dbMgr, err := keyvalue.NewDBManager(
-				cfg.Storages,
-				keyvalue.NewBadgerStore,
-				helper.NewNullTickerFactory(),
-				gsd.logger,
-			)
-			require.NoError(tb, err)
-			tb.Cleanup(dbMgr.Close)
+		dbMgr, err := keyvalue.NewDBManager(
+			cfg.Storages,
+			keyvalue.NewBadgerStore,
+			helper.NewNullTickerFactory(),
+			gsd.logger,
+		)
+		require.NoError(tb, err)
+		tb.Cleanup(dbMgr.Close)
 
-			partitionManager, err = storagemgr.NewPartitionManager(
-				testhelper.Context(tb),
-				cfg.Storages,
-				gsd.gitCmdFactory,
-				localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
-				gsd.logger,
-				dbMgr,
-				cfg.Prometheus,
-				nil,
-			)
-			require.NoError(tb, err)
-			tb.Cleanup(partitionManager.Close)
-			gsd.partitionManager = partitionManager
-		}
+		partitionManager, err = storagemgr.NewPartitionManager(
+			testhelper.Context(tb),
+			cfg.Storages,
+			gsd.gitCmdFactory,
+			localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
+			gsd.logger,
+			dbMgr,
+			cfg.Prometheus,
+			nil,
+		)
+		require.NoError(tb, err)
+		tb.Cleanup(partitionManager.Close)
 	}
 
 	if gsd.hookMgr == nil {
@@ -442,12 +433,11 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		UpdaterWithHooks:    gsd.updaterWithHooks,
 		HousekeepingManager: gsd.housekeepingManager,
 		TransactionRegistry: gsd.transactionRegistry,
-		PartitionManager:    gsd.partitionManager,
+		PartitionManager:    partitionManager,
 		BackupSink:          gsd.backupSink,
 		BackupLocator:       gsd.backupLocator,
 		BundleURISink:       gsd.bundleURISink,
 		ProcReceiveRegistry: gsd.procReceiveRegistry,
-		InProgressTracker:   gsd.inProgressTracker,
 	}
 }
 
@@ -577,14 +567,6 @@ func WithBundleURISink(sink *bundleuri.Sink) GitalyServerOpt {
 	}
 }
 
-// WithInProgressTracker sets the bundleuri.Sink that will be used for Gitaly services
-func WithInProgressTracker(tracker *service.InProgressTracker) GitalyServerOpt {
-	return func(deps gitalyServerDeps) gitalyServerDeps {
-		deps.inProgressTracker = tracker
-		return deps
-	}
-}
-
 // WithSigningKey sets the signing key path that will be used for Gitaly
 // services.
 func WithSigningKey(signingKey string) GitalyServerOpt {
@@ -606,14 +588,6 @@ func WithTransactionRegistry(registry *storagemgr.TransactionRegistry) GitalySer
 func WithProcReceiveRegistry(registry *hook.ProcReceiveRegistry) GitalyServerOpt {
 	return func(deps gitalyServerDeps) gitalyServerDeps {
 		deps.procReceiveRegistry = registry
-		return deps
-	}
-}
-
-// WithPartitionManager sets the proc receive registry that will be used for Gitaly services.
-func WithPartitionManager(partitionMgr *storagemgr.PartitionManager) GitalyServerOpt {
-	return func(deps gitalyServerDeps) gitalyServerDeps {
-		deps.partitionManager = partitionMgr
 		return deps
 	}
 }
