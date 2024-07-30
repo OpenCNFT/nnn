@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -30,10 +30,18 @@ func TestCreateSnapshot(t *testing.T) {
 		}
 	}
 
+	ignoreContent := func(tb testing.TB, path string, content []byte) any {
+		return nil
+	}
+	umask := testhelper.Umask()
+	readPermission := umask.Mask(permission.OwnerRead | permission.GroupRead | permission.OthersRead)
+	writePermission := umask.Mask(permission.OwnerRead | permission.OwnerWrite | permission.GroupRead | permission.GroupWrite | permission.OthersRead | permission.OthersWrite)
+	dirPermission := umask.Mask(fs.ModePerm | fs.ModeDir)
+
 	type setupData struct {
-		repo            *Repo
-		expectedEntries []string
-		requireError    func(error)
+		repo          *Repo
+		expectedState testhelper.DirectoryState
+		requireError  func(error)
 	}
 
 	for _, tc := range []struct {
@@ -87,13 +95,6 @@ doesn't seem to test a realistic scenario.`)
 				// Unreachable objects should also be included in the snapshot.
 				unreachableCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("unreachable"))
 
-				// Generate packed-refs file, but also keep around the loose reference.
-				gittest.Exec(t, cfg, "-C", repoPath, "pack-refs", "--all", "--no-prune")
-				refs := gittest.FilesOrReftables(
-					[]string{"packed-refs", "refs/", "refs/heads/", "refs/heads/master", "refs/tags/"},
-					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
-
 				// The shallow file, used if the repository is a shallow clone, is also included in snapshots.
 				require.NoError(t, os.WriteFile(filepath.Join(repoPath, "shallow"), nil, mode.File))
 
@@ -107,18 +108,56 @@ doesn't seem to test a realistic scenario.`)
 					mode.File,
 				))
 
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         writePermission,
+						ParseContent: ignoreContent,
+					},
+					"shallow": {
+						Mode:         mode.File,
+						ParseContent: ignoreContent,
+					},
+				}
+				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+				expected[fmt.Sprintf("objects/%s/%s", unreachableCommitID[0:2], unreachableCommitID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+				expected[filepath.Join("objects/pack", index)] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+				expected[filepath.Join("objects/pack", packfile)] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+
+				// Generate packed-refs file, but also keep around the loose reference.
+				gittest.Exec(t, cfg, "-C", repoPath, "pack-refs", "--all", "--no-prune")
+				for _, ref := range gittest.FilesOrReftables(
+					[]string{"packed-refs", "refs/", "refs/heads/", "refs/heads/master", "refs/tags/"},
+					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
+				) {
+					mode := writePermission
+					if strings.HasSuffix(ref, "/") {
+						mode = dirPermission
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         mode,
+						ParseContent: ignoreContent,
+					}
+				}
+
 				return setupData{
-					repo: repo,
-					expectedEntries: append(
-						[]string{
-							"HEAD",
-							fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:]),
-							fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:]),
-							fmt.Sprintf("objects/%s/%s", unreachableCommitID[0:2], unreachableCommitID[2:]),
-							filepath.Join("objects/pack", index),
-							filepath.Join("objects/pack", packfile),
-							"shallow",
-						}, refs...),
+					repo:          repo,
+					expectedState: expected,
 				}
 			},
 		},
@@ -139,14 +178,30 @@ doesn't seem to test a realistic scenario.`)
 					mode.File,
 				))
 
-				refs := gittest.FilesOrReftables(
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         writePermission,
+						ParseContent: ignoreContent,
+					},
+				}
+
+				for _, ref := range gittest.FilesOrReftables(
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
+				) {
+					mode := writePermission
+					if strings.HasSuffix(ref, "/") {
+						mode = dirPermission
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         mode,
+						ParseContent: ignoreContent,
+					}
+				}
 
 				return setupData{
-					repo:            repo,
-					expectedEntries: append([]string{"HEAD"}, refs...),
+					repo:          repo,
+					expectedState: expected,
 				}
 			},
 		},
@@ -202,21 +257,38 @@ doesn't seem to test a realistic scenario.`)
 				))
 				gittest.RequireObjectExists(t, cfg, repoPath, commitID)
 
-				refs := gittest.FilesOrReftables(
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         writePermission,
+						ParseContent: ignoreContent,
+					},
+				}
+				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+
+				for _, ref := range gittest.FilesOrReftables(
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
+				) {
+					mode := writePermission
+					if strings.HasSuffix(ref, "/") {
+						mode = dirPermission
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         mode,
+						ParseContent: ignoreContent,
+					}
+				}
 
 				return setupData{
-					repo: repo,
-					expectedEntries: append(
-						[]string{
-							"HEAD",
-							fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:]),
-							fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:]),
-						},
-						refs...,
-					),
+					repo:          repo,
+					expectedState: expected,
 				}
 			},
 		},
@@ -249,21 +321,39 @@ doesn't seem to test a realistic scenario.`)
 				))
 				gittest.RequireObjectExists(t, cfg, repoPath, commitID)
 
-				refs := gittest.FilesOrReftables(
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         writePermission,
+						ParseContent: ignoreContent,
+					},
+				}
+
+				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
+					Mode:         readPermission,
+					ParseContent: ignoreContent,
+				}
+
+				for _, ref := range gittest.FilesOrReftables(
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
+				) {
+					mode := writePermission
+					if strings.HasSuffix(ref, "/") {
+						mode = dirPermission
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         mode,
+						ParseContent: ignoreContent,
+					}
+				}
 
 				return setupData{
-					repo: repo,
-					expectedEntries: append(
-						[]string{
-							"HEAD",
-							fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:]),
-							fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:]),
-						},
-						refs...,
-					),
+					repo:          repo,
+					expectedState: expected,
 				}
 			},
 		},
@@ -282,10 +372,7 @@ doesn't seem to test a realistic scenario.`)
 			}
 			require.NoError(t, err)
 
-			entries, err := archive.TarEntries(&data)
-			require.NoError(t, err)
-
-			require.ElementsMatch(t, entries, setup.expectedEntries)
+			testhelper.RequireTarState(t, &data, setup.expectedState)
 		})
 	}
 }
