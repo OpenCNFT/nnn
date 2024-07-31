@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
@@ -46,7 +48,7 @@ func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storag
 // blockOnPartitionClosing checks if any partitions are currently in the process of
 // closing. If some are, the function waits for the closing process to complete before
 // continuing. This is required in order to accurately validate partition state.
-func blockOnPartitionClosing(t *testing.T, pm *PartitionManager) {
+func blockOnPartitionClosing(t *testing.T, pm *PartitionManager, waitForFullClose bool) {
 	t.Helper()
 
 	var waitFor []chan struct{}
@@ -56,7 +58,12 @@ func blockOnPartitionClosing(t *testing.T, pm *PartitionManager) {
 			// The closePartition step closes the transaction manager directly without calling close
 			// on the partition, so we check the manager directly here as well.
 			if ptn.isClosing() || ptn.transactionManager.isClosing() {
-				waitFor = append(waitFor, ptn.transactionManagerClosed)
+				waiter := ptn.transactionManagerClosed
+				if waitForFullClose {
+					waiter = ptn.closed
+				}
+
+				waitFor = append(waitFor, waiter)
 			}
 		}
 		sp.mu.Unlock()
@@ -143,6 +150,17 @@ func TestPartitionManager(t *testing.T) {
 	// closeManager closes the partition manager. This is done to simulate errors for transactions
 	// being processed without a running partition manager.
 	type closeManager struct{}
+
+	type metricValues struct {
+		partitionsStartedTotal uint64
+		partitionsStoppedTotal uint64
+	}
+
+	// assertMetrics is a step used to assert the current state of metrics.
+	type assertMetrics struct {
+		defaultStorage metricValues
+		otherStorage   metricValues
+	}
 
 	// checkExpectedState validates that the partition manager contains the correct partitions and
 	// associated transaction count at the point of execution.
@@ -859,6 +877,106 @@ func TestPartitionManager(t *testing.T) {
 				}
 			},
 		},
+		{
+			desc: "records metrics correctly",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				return setupData{
+					steps: steps{
+						begin{
+							transactionID: 1,
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 1,
+							},
+						},
+						begin{
+							transactionID: 2,
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 2,
+								},
+							},
+						},
+						commit{
+							transactionID: 1,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 1,
+							},
+						},
+						commit{transactionID: 2},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 1,
+								partitionsStoppedTotal: 1,
+							},
+						},
+						begin{
+							transactionID: 3,
+							storageName:   cfg.Storages[0].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+							},
+						},
+						begin{
+							transactionID: 4,
+							storageName:   cfg.Storages[1].Name,
+							partitionID:   2,
+							readOnly:      true,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"default": {
+									2: 1,
+								},
+								"other-storage": {
+									2: 1,
+								},
+							},
+						},
+						commit{
+							transactionID: 3,
+							expectedState: map[string]map[storage.PartitionID]uint{
+								"other-storage": {
+									2: 1,
+								},
+							},
+						},
+						commit{transactionID: 4},
+						assertMetrics{
+							defaultStorage: metricValues{
+								partitionsStartedTotal: 2,
+								partitionsStoppedTotal: 2,
+							},
+							otherStorage: metricValues{
+								partitionsStartedTotal: 1,
+								partitionsStoppedTotal: 1,
+							},
+						},
+					},
+				}
+			},
+		},
 	} {
 		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
@@ -945,7 +1063,7 @@ func TestPartitionManager(t *testing.T) {
 					})
 					require.Equal(t, step.expectedError, err)
 
-					blockOnPartitionClosing(t, partitionManager)
+					blockOnPartitionClosing(t, partitionManager, true)
 					checkExpectedState(t, cfg, partitionManager, step.expectedState)
 
 					if err != nil {
@@ -982,7 +1100,7 @@ func TestPartitionManager(t *testing.T) {
 
 					require.ErrorIs(t, data.txn.Commit(commitCtx), step.expectedError)
 
-					blockOnPartitionClosing(t, partitionManager)
+					blockOnPartitionClosing(t, partitionManager, true)
 					checkExpectedState(t, cfg, partitionManager, step.expectedState)
 				case rollback:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction rolled back before being started")
@@ -990,7 +1108,7 @@ func TestPartitionManager(t *testing.T) {
 					data := openTransactionData[step.transactionID]
 					require.ErrorIs(t, data.txn.Rollback(), step.expectedError)
 
-					blockOnPartitionClosing(t, partitionManager)
+					blockOnPartitionClosing(t, partitionManager, true)
 					checkExpectedState(t, cfg, partitionManager, step.expectedState)
 				case closePartition:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction manager stopped before being started")
@@ -1001,7 +1119,7 @@ func TestPartitionManager(t *testing.T) {
 					// the normal means.
 					data.ptn.transactionManager.Close()
 
-					blockOnPartitionClosing(t, partitionManager)
+					blockOnPartitionClosing(t, partitionManager, false)
 				case finalizeTransaction:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction finalized before being started")
 
@@ -1013,6 +1131,25 @@ func TestPartitionManager(t *testing.T) {
 					partitionManagerStopped = true
 
 					partitionManager.Close()
+				case assertMetrics:
+					require.NoError(t, testutil.CollectAndCompare(partitionManager, strings.NewReader(fmt.Sprintf(`
+# HELP gitaly_partitions_started_total Number of partitions started.
+# TYPE gitaly_partitions_started_total counter
+gitaly_partitions_started_total{storage="default"} %d
+gitaly_partitions_started_total{storage="other-storage"} %d
+# HELP gitaly_partitions_stopped_total Number of partitions stopped.
+# TYPE gitaly_partitions_stopped_total counter
+gitaly_partitions_stopped_total{storage="default"} %d
+gitaly_partitions_stopped_total{storage="other-storage"} %d
+					`,
+						step.defaultStorage.partitionsStartedTotal,
+						step.otherStorage.partitionsStartedTotal,
+						step.defaultStorage.partitionsStoppedTotal,
+						step.otherStorage.partitionsStoppedTotal,
+					)),
+						"gitaly_partitions_started_total",
+						"gitaly_partitions_stopped_total",
+					))
 				}
 			}
 		})
@@ -1118,7 +1255,7 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 		require.False(t, tm.isClosing())
 	}))
 
-	blockOnPartitionClosing(t, partitionManager)
+	blockOnPartitionClosing(t, partitionManager, true)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
 }
 
@@ -1168,7 +1305,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 			return nil
 		}))
 
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 
 		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
@@ -1206,7 +1343,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 			return nil
 		}))
 
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 
 		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
@@ -1218,7 +1355,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 			return nil
 		}))
 
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 	})
 
@@ -1245,7 +1382,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 			return nil
 		}))
 
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 
 		// Attempt to delete key1 and set key2
@@ -1258,7 +1395,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 			return fmt.Errorf("something goes wrong")
 		}), "something goes wrong")
 
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 
 		// The above update doesn't take any effect because the underlying transaction is rolled back.
@@ -1280,7 +1417,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 			return nil
 		}))
 
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 	})
 
@@ -1327,7 +1464,7 @@ func TestPartitionManager_StorageKV(t *testing.T) {
 		}))
 
 		assertKeys()
-		blockOnPartitionClosing(t, partitionManager)
+		blockOnPartitionClosing(t, partitionManager, true)
 		requirePartitionOpen(t, storageMgr, ptnID, false)
 
 		require.EqualError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, true, func(kv keyvalue.ReadWriter) error {
