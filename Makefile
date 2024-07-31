@@ -140,6 +140,7 @@ OVERRIDE_GIT_VERSION ?= ${GIT_VERSION}
 # if it is either set to the empty string or "default".
 ifeq (${GIT_VERSION:default=},)
     override GIT_VERSION := ${GIT_VERSION_2_45}
+	export WITH_BUNDLED_GIT = YesPlease
 else
     # Support both vX.Y.Z and X.Y.Z version patterns, since callers across GitLab
     # use both.
@@ -204,10 +205,16 @@ BUILD_GEM_OPTIONS ?=
 ## Options to override the name of Gitaly gem
 BUILD_GEM_NAME ?= gitaly
 
+# Git binaries that are eventually embedded into the Gitaly binary.
+GIT_PACKED_EXECUTABLES       = $(addprefix ${BUILD_DIR}/bin/gitaly-, \
+									$(addsuffix -v2.45, ${GIT_EXECUTABLES}))
+
 # All executables provided by Gitaly.
 GITALY_EXECUTABLES           = $(addprefix ${BUILD_DIR}/bin/,$(notdir $(shell find ${SOURCE_DIR}/cmd -mindepth 1 -maxdepth 1 -type d -print)))
 # All executables packed inside the Gitaly binary.
-GITALY_PACKED_EXECUTABLES    = $(filter %gitaly-hooks %gitaly-gpg %gitaly-ssh %gitaly-lfs-smudge, ${GITALY_EXECUTABLES})
+GITALY_PACKED_EXECUTABLES    = $(filter %gitaly-hooks %gitaly-gpg %gitaly-ssh %gitaly-lfs-smudge, ${GITALY_EXECUTABLES}) \
+								${GIT_PACKED_EXECUTABLES}
+
 # All executables that should be installed.
 GITALY_INSTALLED_EXECUTABLES = $(filter-out ${GITALY_PACKED_EXECUTABLES}, ${GITALY_EXECUTABLES})
 # Find all Go source files.
@@ -304,7 +311,6 @@ build: build-bundled-git
 prepare-tests: build-bundled-git
 install: install-bundled-git
 
-export GITALY_TESTING_BUNDLED_GIT_PATH ?= ${BUILD_DIR}/bin
 else
 prepare-tests: ${DEPENDENCY_DIR}/git-distribution/git
 
@@ -583,6 +589,7 @@ ${BUILD_DIR}/bin/%: ${BUILD_DIR}/intermediate/% | ${BUILD_DIR}/bin
 clear-go-build-cache-if-needed:
 	${Q}if [ -d ${GOCACHE} ] && [ $$(du -sk ${GOCACHE} | cut -f 1) -gt ${GOCACHE_MAX_SIZE_KB} ]; then go clean --cache; fi
 
+${BUILD_DIR}/intermediate/gitaly:            build-bundled-git
 ${BUILD_DIR}/intermediate/gitaly:            GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
 ${BUILD_DIR}/intermediate/gitaly:            ${GITALY_PACKED_EXECUTABLES}
 ${BUILD_DIR}/intermediate/praefect:          GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}

@@ -243,6 +243,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	defer cleanup()
 	logger.WithField("duration_ms", time.Since(began).Milliseconds()).Info("finished initializing command factory")
 
+	logger.WithField("binary_path", gitCmdFactory.GetExecutionEnvironment(ctx).BinaryPath).Info("using Git binary")
+
 	began = time.Now()
 	gitVersion, err := gitCmdFactory.GitVersion(ctx)
 	if err != nil {
@@ -253,6 +255,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	if !gitVersion.IsSupported() {
 		return fmt.Errorf("unsupported Git version: %q", gitVersion)
 	}
+
+	logger.WithField("version", gitVersion.String()).Info("using Git version")
 
 	registry := backchannel.NewRegistry()
 	transactionManager := transaction.NewManager(cfg, logger, registry)
