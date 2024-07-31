@@ -248,6 +248,9 @@ func (m *Manager) Close() {
 	}
 	defer m.closed.Store(true)
 
+	if err := m.metadataGroup.Close(); err != nil {
+		m.logger.WithError(err).Warn("fail to stop metadata Raft group")
+	}
 	for _, storageMgr := range m.storageManagers {
 		storageMgr.Close()
 	}

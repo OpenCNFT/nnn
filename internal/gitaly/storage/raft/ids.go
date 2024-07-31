@@ -10,9 +10,6 @@ import (
 // internally. In Gitaly, "group" is used exclusively to refer to a Raft group.
 type raftID uint64
 
-// MetadataGroupID is a hard-coded ID of the cluster-wide metadata Raft group.
-const MetadataGroupID = raftID(1)
-
 // MarshalBinary returns a binary representation of the raftID.
 func (id raftID) MarshalBinary() []byte {
 	marshaled := make([]byte, binary.Size(id))
@@ -40,3 +37,13 @@ func (id raftID) ToUint64() uint64 {
 // needs to perform all necessary checks beforehand. However, the state machine must perform state
 // validation at its layer. The result is propagated to the caller to handle respectively.
 type updateResult uint64
+
+// MetadataGroupID is a hard-coded ID of the cluster-wide metadata Raft group.
+const MetadataGroupID = raftID(1)
+
+// AuthorityGroupID returns the ID of the Raft group that manages the partitions created by the
+// input storage. The ID has the form "XX000000", in which the first two bytes are the storage ID.
+// The cluster has the maximum of 2^16=65536 storages.
+func AuthorityGroupID(storageID raftID) raftID {
+	return storageID << 48
+}
