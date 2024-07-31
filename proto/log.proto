@@ -34,6 +34,10 @@ message LogEntry {
   message RepositoryDeletion {
   }
 
+  // RepositoryCreation models a repository creation.
+  message RepositoryCreation {
+  }
+
   // Housekeeping models a housekeeping run. It is supposed to handle housekeeping tasks for repositories such as the
   // cleanup of unneeded files and optimizations for the repository's data structures. It is a collection of smaller
   // tasks.
@@ -84,6 +88,8 @@ message LogEntry {
   repeated ReferenceTransaction reference_transactions = 2;
   // repository_deletion, when set, indicates this log entry deletes the repository.
   RepositoryDeletion repository_deletion = 6;
+  // repository_creation, when set, indicates this log entry creates the repository.
+  RepositoryCreation repository_creation = 11;
   // housekeeping, when set, indicates this log entry contains a housekeeping task.
   Housekeeping housekeeping = 9;
 

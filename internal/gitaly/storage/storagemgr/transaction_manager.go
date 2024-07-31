@@ -2177,6 +2177,10 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 			}
 		}
 
+		if transaction.repositoryCreation != nil {
+			logEntry.RepositoryCreation = &gitalypb.LogEntry_RepositoryCreation{}
+		}
+
 		if transaction.deleteRepository {
 			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 
