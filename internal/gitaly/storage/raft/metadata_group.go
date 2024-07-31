@@ -37,7 +37,7 @@ func parseInitialMembers(input map[string]string) (map[uint64]string, error) {
 	return initialMembers, nil
 }
 
-func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, accessDB dbAccessor, clusterCfg config.Raft, logger log.Logger) (*metadataRaftGroup, error) {
+func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, db dbAccessor, clusterCfg config.Raft, logger log.Logger) (*metadataRaftGroup, error) {
 	initialMembers, err := parseInitialMembers(clusterCfg.InitialMembers)
 	if err != nil {
 		return nil, fmt.Errorf("parsing initial members: %w", err)
@@ -55,7 +55,7 @@ func newMetadataRaftGroup(ctx context.Context, nodeHost *dragonboat.NodeHost, ac
 
 	var metadataSM Statemachine
 	if err := nodeHost.StartOnDiskReplica(initialMembers, false, func(groupID, replicaID uint64) statemachine.IOnDiskStateMachine {
-		return newMetadataStatemachine(ctx, raftID(groupID), raftID(replicaID), accessDB)
+		return newMetadataStatemachine(ctx, raftID(groupID), raftID(replicaID), db)
 	}, groupCfg); err != nil {
 		return nil, fmt.Errorf("starting metadata group: %w", err)
 	}
@@ -189,6 +189,33 @@ func (g *metadataRaftGroup) RegisterStorage(storageName string) (*gitalypb.Stora
 	}
 }
 
+// UpdateStorage requests the metadata group to update the info of a storage. The update likely
+// leads to a new replica group shuffle.
+func (g *metadataRaftGroup) UpdateStorage(storageID raftID, nodeID raftID, replicationFactor uint64) (*gitalypb.Storage, error) {
+	cluster, err := g.ClusterInfo()
+	if err != nil {
+		return nil, err
+	}
+	if cluster.Storages[storageID.ToUint64()] == nil {
+		return nil, fmt.Errorf("storage with ID %d not found", storageID)
+	}
+	result, response, err := g.requestUpdateStorage(storageID, nodeID, replicationFactor)
+	if err != nil {
+		return nil, fmt.Errorf("registering storage: %w", err)
+	}
+
+	switch result {
+	case resultUpdateStorageSuccessful:
+		return response.GetStorage(), nil
+	case resultUpdateStorageNotFound:
+		// Extremely rare occasion. This case occurs when the cluster or storage information is
+		// wiped out while this request is in-flight.
+		return nil, fmt.Errorf("storage with ID %d not found", storageID)
+	default:
+		return nil, fmt.Errorf("unsupported update result: %d", result)
+	}
+}
+
 // ClusterInfo fetches the latest cluster info from the metadata group.
 func (g *metadataRaftGroup) ClusterInfo() (*gitalypb.Cluster, error) {
 	response, err := g.requestGetCluster(defaultRetry)
@@ -248,6 +275,21 @@ func (g *metadataRaftGroup) requestRegisterStorage(storageName string, clusterCf
 		StorageName:       storageName,
 		ReplicationFactor: clusterCfg.ReplicationFactor,
 		NodeId:            clusterCfg.NodeID,
+	})
+}
+
+func (g *metadataRaftGroup) requestUpdateStorage(storageID raftID, nodeID raftID, replicationFactor uint64) (updateResult, *gitalypb.UpdateStorageResponse, error) {
+	requester := NewRequester[*gitalypb.UpdateStorageRequest, *gitalypb.UpdateStorageResponse](
+		g.nodeHost, g.groupID, g.logger, requestOption{
+			retry:       defaultRetry,
+			timeout:     g.maxNextElectionWait(),
+			exponential: g.backoffProfile,
+		},
+	)
+	return requester.SyncWrite(g.ctx, &gitalypb.UpdateStorageRequest{
+		StorageId:         storageID.ToUint64(),
+		NodeId:            nodeID.ToUint64(),
+		ReplicationFactor: replicationFactor,
 	})
 }
 

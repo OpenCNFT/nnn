@@ -133,6 +133,7 @@ type testNode struct {
 
 type testRaftCluster struct {
 	sync.Mutex
+	testCfg        *testRaftClusterConfig
 	clusterID      string
 	initialMembers map[uint64]string
 	nodes          map[raftID]*testNode
@@ -218,7 +219,7 @@ func (c *testRaftCluster) createRaftConfig(node raftID) config.Raft {
 	for node, addr := range c.initialMembers {
 		initialMembers[fmt.Sprintf("%d", node)] = addr
 	}
-	return config.Raft{
+	cfg := config.Raft{
 		Enabled:           true,
 		ClusterID:         c.clusterID,
 		NodeID:            node.ToUint64(),
@@ -229,10 +230,15 @@ func (c *testRaftCluster) createRaftConfig(node raftID) config.Raft {
 		ElectionTicks:     config.RaftDefaultElectionTicks,
 		HeartbeatTicks:    config.RaftDefaultHeartbeatTicks,
 	}
+	if c.testCfg.withRaftClusterConfig != nil {
+		cfg = c.testCfg.withRaftClusterConfig(cfg)
+	}
+	return cfg
 }
 
 type testRaftClusterConfig struct {
-	startNode nodeStarter
+	startNode             nodeStarter
+	withRaftClusterConfig func(cfg config.Raft) config.Raft
 }
 
 type testRaftClusterOption func(*testRaftClusterConfig)
@@ -243,6 +249,12 @@ type nodeStarter func(*testRaftCluster, raftID) (*testNode, error)
 func withNodeStarter(startNode nodeStarter) testRaftClusterOption {
 	return func(cfg *testRaftClusterConfig) {
 		cfg.startNode = startNode
+	}
+}
+
+func withRaftClusterConfig(modifier func(cfg config.Raft) config.Raft) testRaftClusterOption {
+	return func(cfg *testRaftClusterConfig) {
+		cfg.withRaftClusterConfig = modifier
 	}
 }
 
@@ -264,6 +276,7 @@ func newTestRaftCluster(t *testing.T, numNodes int, options ...testRaftClusterOp
 	require.NoError(t, err)
 
 	cluster := &testRaftCluster{
+		testCfg:        cfg,
 		clusterID:      id.String(),
 		nodes:          map[raftID]*testNode{},
 		initialMembers: map[uint64]string{},

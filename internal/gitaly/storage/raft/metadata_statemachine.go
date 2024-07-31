@@ -17,7 +17,7 @@ type metadataStateMachine struct {
 	ctx              context.Context
 	groupID          raftID
 	replicaID        raftID
-	accessDB         dbAccessor
+	db               dbAccessor
 	replicaPlacement replicaPlacement
 }
 
@@ -27,11 +27,12 @@ const (
 	resultRegisterStorageSuccessful
 	resultStorageAlreadyRegistered
 	resultRegisterStorageClusterNotBootstrappedYet
+	resultUpdateStorageSuccessful
+	resultUpdateStorageNotFound
 )
 
 var (
 	initialStorageID = raftID(1)
-	keyLastApplied   = []byte("applied_lsn")
 	keyClusterInfo   = []byte("cluster")
 )
 
@@ -54,7 +55,7 @@ func (s *metadataStateMachine) Open(stopC <-chan struct{}) (uint64, error) {
 
 // LastApplied returns the last applied index of the state machine.
 func (s *metadataStateMachine) LastApplied() (lastApplied raftID, err error) {
-	return lastApplied, s.accessDB(s.ctx, true, func(txn keyvalue.ReadWriter) error {
+	return lastApplied, s.db.read(s.ctx, func(txn keyvalue.ReadWriter) error {
 		lastApplied, err = s.getLastIndex(txn)
 		if err != nil {
 			err = fmt.Errorf("getting last index from DB: %w", err)
@@ -65,7 +66,7 @@ func (s *metadataStateMachine) LastApplied() (lastApplied raftID, err error) {
 
 // Cluster returns the latest cluster state of state machine.
 func (s *metadataStateMachine) Cluster() (cluster *gitalypb.Cluster, err error) {
-	return cluster, s.accessDB(s.ctx, true, func(txn keyvalue.ReadWriter) error {
+	return cluster, s.db.read(s.ctx, func(txn keyvalue.ReadWriter) error {
 		cluster, err = s.getCluster(txn)
 		if err != nil {
 			err = fmt.Errorf("getting cluster from DB: %w", err)
@@ -78,10 +79,11 @@ func (s *metadataStateMachine) Cluster() (cluster *gitalypb.Cluster, err error) 
 // following operations:
 //   - gitalypb.BootstrapClusterRequest to bootstrap a cluster for the first time.
 //   - gitalypb.RegisterStorageRequest to register a new storage.
+//   - gitalypb.UpdateStorageRequest to update info of a storage.
 func (s *metadataStateMachine) Update(entries []statemachine.Entry) ([]statemachine.Entry, error) {
 	var returnedEntries []statemachine.Entry
 
-	if err := s.accessDB(s.ctx, false, func(txn keyvalue.ReadWriter) error {
+	if err := s.db.write(s.ctx, func(txn keyvalue.ReadWriter) error {
 		entries, err := s.update(txn, entries)
 		if err != nil {
 			return err
@@ -136,27 +138,6 @@ func (s *metadataStateMachine) update(txn keyvalue.ReadWriter, entries []statema
 	return returnedEntries, nil
 }
 
-// SupportRead returns whether s supports the requested read operation.
-func (s *metadataStateMachine) SupportRead(req proto.Message) bool {
-	switch req.(type) {
-	case *gitalypb.GetClusterRequest:
-		return true
-	}
-
-	return false
-}
-
-// SupportWrite returns whether s supports the requested write operation.
-func (s *metadataStateMachine) SupportWrite(req proto.Message) bool {
-	switch req.(type) {
-	case *gitalypb.BootstrapClusterRequest,
-		*gitalypb.RegisterStorageRequest:
-		return true
-	}
-
-	return false
-}
-
 func (s *metadataStateMachine) updateEntry(cluster *gitalypb.Cluster, entry *statemachine.Entry) (*statemachine.Result, error) {
 	msg, err := anyProtoUnmarshal(entry.Cmd)
 	if err != nil {
@@ -168,6 +149,8 @@ func (s *metadataStateMachine) updateEntry(cluster *gitalypb.Cluster, entry *sta
 		return s.handleBootstrapClusterRequest(req, cluster)
 	case *gitalypb.RegisterStorageRequest:
 		return s.handleRegisterStorageRequest(req, cluster)
+	case *gitalypb.UpdateStorageRequest:
+		return s.handleUpdateStorageRequest(req, cluster)
 	}
 
 	return nil, fmt.Errorf("request not supported: %s", msg.ProtoReflect().Descriptor().Name())
@@ -226,6 +209,38 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 	}
 
 	result.Value = uint64(resultRegisterStorageSuccessful)
+	result.Data = response
+	return &result, nil
+}
+
+func (s *metadataStateMachine) handleUpdateStorageRequest(req *gitalypb.UpdateStorageRequest, cluster *gitalypb.Cluster) (*statemachine.Result, error) {
+	var result statemachine.Result
+
+	if cluster.ClusterId == "" || cluster.NextStorageId == 0 {
+		result.Value = uint64(resultUpdateStorageNotFound)
+		return &result, nil
+	}
+
+	if cluster.Storages == nil {
+		cluster.Storages = map[uint64]*gitalypb.Storage{}
+	}
+
+	storage := cluster.Storages[req.GetStorageId()]
+	if storage == nil {
+		result.Value = uint64(resultUpdateStorageNotFound)
+		return &result, nil
+	}
+
+	storage.ReplicationFactor = req.GetReplicationFactor()
+	storage.NodeId = req.GetNodeId()
+	s.replicaPlacement.apply(cluster.Storages)
+
+	response, err := anyProtoMarshal(&gitalypb.UpdateStorageResponse{Storage: storage})
+	if err != nil {
+		return nil, fmt.Errorf("marshaling register response: %w", err)
+	}
+
+	result.Value = uint64(resultUpdateStorageSuccessful)
 	result.Data = response
 	return &result, nil
 }
@@ -296,12 +311,12 @@ func (s *metadataStateMachine) getCluster(txn keyvalue.ReadWriter) (*gitalypb.Cl
 
 var _ = Statemachine(&metadataStateMachine{})
 
-func newMetadataStatemachine(ctx context.Context, groupID raftID, replicaID raftID, accessDB dbAccessor) *metadataStateMachine {
+func newMetadataStatemachine(ctx context.Context, groupID raftID, replicaID raftID, db dbAccessor) *metadataStateMachine {
 	return &metadataStateMachine{
 		ctx:              ctx,
 		groupID:          groupID,
 		replicaID:        replicaID,
-		accessDB:         accessDB,
+		db:               db,
 		replicaPlacement: newDefaultReplicaPlacement(),
 	}
 }

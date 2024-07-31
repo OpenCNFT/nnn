@@ -8,12 +8,10 @@ import (
 
 	"github.com/lni/dragonboat/v4"
 	dragonboatConf "github.com/lni/dragonboat/v4/config"
-	"github.com/lni/dragonboat/v4/statemachine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
-	"google.golang.org/protobuf/proto"
 )
 
 // Group is an abstract data structure that stores information of a Raft group.
@@ -26,71 +24,6 @@ type Group struct {
 	logger        log.Logger
 	nodeHost      *dragonboat.NodeHost
 	statemachine  Statemachine
-}
-
-// Statemachine is an interface that wraps dragonboat's statemachine. It is a superset of
-// dragonboat's IOnDiskStateMachine interface.
-type Statemachine interface {
-	// This interface has the following functions.
-	statemachine.IOnDiskStateMachine
-	// Open implements Open function of IOnDiskStateMachine interface. It opens the existing on disk
-	// state machine to be used or it creates a new state machine with empty state if it does not exist.
-	// Open returns the most recent index value of the Raft log that has been persisted, or it returns 0
-	// when the state machine is a new one.
-	// Open(<-chan struct{}) (uint64, error)
-
-	// Update implements Update function of IOnDiskStateMachine instance. The input Entry slice is a
-	// list of continuous proposed and committed commands from clients. At this point, the input entries
-	// are finalized and acknowledged by all replicas. The application is responsible for validating the
-	// data before submitting the log for replication. The statemachine must handle known application
-	// errors, races, conflicts, etc. and return the result back. The log entry is still applied but
-	// not necessarily leads to any changes. Otherwise, the cluster is unable to move on without
-	// manual interventions. The error is returned if there is a non-recoverable problem with
-	// underlying storage so that the log entries will be retried later.
-	// The library guarantees linearizable access to this function and the monotonic index
-	// increment. It's worth nothing that the indices are not necessarily continuous because the
-	// library might include some internal operations which are transparent to the statemachine.
-	// Update([]statemachine.Entry) ([]statemachine.Entry, error)
-
-	// Lookup queries the state of the IOnDiskStateMachine instance. The caller is guaranteed to be
-	// on the same node of this statemachine. So, the request and response are in protobuf format.
-	// No need to marshal it back and forth.
-	// Lookup(interface{}) (interface{}, error)
-
-	// Sync synchronizes all in-core state of the state machine to persisted storage so the state
-	// machine can continue from its latest state after reboot. Our underlying DB flushes to disk right
-	// after a transaction finishes.
-	// Sync() error
-
-	// PrepareSnapshot prepares the snapshot to be concurrently captured and streamed. The
-	// implemented struct must create a snapshot including all entries before the last index at the
-	// time this function is called exclusively. The statemachine will continue to accept new
-	// updates while the snapshot is being created.
-	// PrepareSnapshot() (interface{}, error)
-
-	// SaveSnapshot saves the point in time state of the IOnDiskStateMachine
-	// instance identified by the input state identifier, which is usually not
-	// the latest state of the IOnDiskStateMachine instance, to the provided
-	// io.Writer.
-	// SaveSnapshot(interface{}, io.Writer, <-chan struct{}) error
-
-	// RecoverFromSnapshot recovers the state of the IOnDiskStateMachine instance
-	// from a snapshot captured by the SaveSnapshot() method on a remote node.
-	// RecoverFromSnapshot(io.Reader, <-chan struct{}) error
-
-	// Close closes the IOnDiskStateMachine instance. Close is invoked when the
-	// state machine is in a ready-to-exit state in which there will be no further
-	// call to the Update, Sync, PrepareSnapshot, SaveSnapshot and the
-	// RecoverFromSnapshot method.
-	// Our DB is managed by an outsider manager. So, this is a no-op.
-	// Close() error
-
-	// LastApplied returns the last applied index of the state machine.
-	LastApplied() (raftID, error)
-	// SupportRead returns if the statemachine supports input read operation.
-	SupportRead(proto.Message) bool
-	// SupportWrite returns if the statemachine supports input write operation.
-	SupportWrite(proto.Message) bool
 }
 
 // ManagerConfig contains the configuration options for the Raft manager.
@@ -238,30 +171,8 @@ func (m *Manager) Start() (returnedErr error) {
 		return fmt.Errorf("joining the wrong cluster, expected to join %q but joined %q", m.clusterConfig.ClusterID, cluster.ClusterId)
 	}
 
-	if m.managerConfig.testBeforeRegister != nil {
-		m.managerConfig.testBeforeRegister()
-	}
-
-	// Register storage ID if not exist. Similarly, this operation is handled by the metadata group.
-	// It will be handled by the metadata authority in the future.
-	for storageName, storageMgr := range m.storageManagers {
-		if err := storageMgr.loadStorageInfo(m.ctx); err != nil {
-			return fmt.Errorf("loading persisted storage info: %w", err)
-		}
-		if storageMgr.persistedInfo == nil || storageMgr.persistedInfo.GetStorageId() == 0 {
-			storageInfo, err := m.metadataGroup.RegisterStorage(storageName)
-			if err != nil {
-				return fmt.Errorf("registering storage info: %w", err)
-			}
-			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
-				return fmt.Errorf("saving storage info: %w", err)
-			}
-		}
-		m.logger.WithFields(log.Fields{
-			"storage_name":       storageName,
-			"storage_id":         storageMgr.persistedInfo.GetStorageId(),
-			"replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
-		}).Info("storage joined the cluster")
+	if err := m.registerStorages(); err != nil {
+		return err
 	}
 
 	m.logger.Info("Raft cluster has started")
@@ -282,6 +193,47 @@ func (m *Manager) initMetadataGroup(storageMgr *storageManager) error {
 	m.metadataGroup = metadataGroup
 
 	return m.metadataGroup.WaitReady()
+}
+
+func (m *Manager) registerStorages() error {
+	if m.managerConfig.testBeforeRegister != nil {
+		m.managerConfig.testBeforeRegister()
+	}
+
+	// Register storage ID if not exist. Similarly, this operation is handled by the metadata group.
+	// It will be handled by the metadata authority in the future.
+	for storageName, storageMgr := range m.storageManagers {
+		if err := storageMgr.loadStorageInfo(m.ctx); err != nil {
+			return fmt.Errorf("loading persisted storage info: %w", err)
+		}
+		if storageMgr.persistedInfo == nil || storageMgr.persistedInfo.GetStorageId() == 0 {
+			storageInfo, err := m.metadataGroup.RegisterStorage(storageName)
+			if err != nil {
+				return fmt.Errorf("registering storage info: %w", err)
+			}
+			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
+				return fmt.Errorf("saving storage info: %w", err)
+			}
+		} else if storageMgr.persistedInfo.NodeId != m.clusterConfig.NodeID || storageMgr.persistedInfo.ReplicationFactor != m.clusterConfig.ReplicationFactor {
+			// Changes that gonna affect replication. Gitaly needs to sync up those changes to metadata
+			// Raft group to shuffle the replication groups. We don't persit new info intentionally. The
+			// replication of this node will be applied by the replicators later.
+			if _, err := m.metadataGroup.UpdateStorage(
+				raftID(storageMgr.persistedInfo.StorageId),
+				raftID(m.clusterConfig.NodeID),
+				m.clusterConfig.ReplicationFactor,
+			); err != nil {
+				return fmt.Errorf("updating storage info: %w", err)
+			}
+		}
+		m.logger.WithFields(log.Fields{
+			"storage_name":       storageName,
+			"storage_id":         storageMgr.persistedInfo.GetStorageId(),
+			"replication_factor": storageMgr.persistedInfo.GetReplicationFactor(),
+		}).Info("storage joined the cluster")
+	}
+
+	return nil
 }
 
 // Ready returns if the Raft manager is ready.
