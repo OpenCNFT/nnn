@@ -18,6 +18,8 @@ type hookFunc func(hookContext)
 type hookContext struct {
 	// closeManager calls the calls Close on the TransactionManager.
 	closeManager func()
+	// accessManager triggers a callback against the TransactionManager.
+	accessManager func(func(*TransactionManager))
 }
 
 // installHooks takes the hooks in the test setup and configures them in the TransactionManager.
@@ -41,6 +43,9 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 			*destination = func() {
 				runHook(hookContext{
 					closeManager: mgr.Close,
+					accessManager: func(callback func(*TransactionManager)) {
+						callback(mgr)
+					},
 				})
 			}
 		}

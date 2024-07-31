@@ -3,20 +3,33 @@ package storagemgr
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
+	assertLogEntryHasRepositoryCreation := func(hookCtx hookContext) {
+		hookCtx.accessManager(func(mgr *TransactionManager) {
+			entry, err := mgr.readLogEntry(mgr.appliedLSN + 1)
+			require.NoError(t, err)
+			testhelper.ProtoEqual(t, &gitalypb.LogEntry_RepositoryCreation{}, entry.RepositoryCreation)
+		})
+	}
 	return []transactionTestCase{
 		{
 			desc: "create repository when it doesn't exist",
 			steps: steps{
 				RemoveRepository{},
-				StartManager{},
+				StartManager{
+					Hooks: testTransactionHooks{
+						BeforeApplyLogEntry: assertLogEntryHasRepositoryCreation,
+					},
+				},
 				Begin{
 					RelativePaths: []string{setup.RelativePath},
 				},
@@ -78,7 +91,11 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			desc: "create repository with full state",
 			steps: steps{
 				RemoveRepository{},
-				StartManager{},
+				StartManager{
+					Hooks: testTransactionHooks{
+						BeforeApplyLogEntry: assertLogEntryHasRepositoryCreation,
+					},
+				},
 				Begin{
 					RelativePaths: []string{setup.RelativePath},
 				},
@@ -263,7 +280,8 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				RemoveRepository{},
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeApplyLogEntry: func(hookContext) {
+						BeforeApplyLogEntry: func(hc hookContext) {
+							assertLogEntryHasRepositoryCreation(hc)
 							panic(errSimulatedCrash)
 						},
 					},
@@ -333,7 +351,11 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
 				},
-				StartManager{},
+				StartManager{
+					Hooks: testTransactionHooks{
+						BeforeApplyLogEntry: assertLogEntryHasRepositoryCreation,
+					},
+				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
