@@ -4,6 +4,8 @@ package gitaly;
 
 option go_package = "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb";
 
+import "log.proto";
+
 // Cluster represents the metadata of a Raft Cluster.
 message Cluster {
   // cluster_id is the cluster's UUID. It's used to verify that a storage has joined the correct
@@ -129,6 +131,13 @@ message RegisterPartitionResponse {
   // it contains the partition info inside the statemachine.
   Partition partition = 1;
 }
+
+message BroadcastLogEntryRequest {
+  Partition partition = 1;
+  LogEntry entry = 2;
+}
+
+message BroadcastLogEntryResponse { }
 
 // GetRegisteredPartitionsRequest is the request message to query for all registered partitions
 // that a storage is tracking.

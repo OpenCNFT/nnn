@@ -31,6 +31,7 @@ type authority interface {
 	RegisterPartition(partitionID raftID, relativePath string) (*gitalypb.Partition, error)
 	// RegisterReplica registers a replica to the list of known replicas of the authority.
 	RegisterReplica(ctx context.Context, nodeID raftID, replicaAddr string) error
+	BroadcastEntry(partitionID raftID, relativePath string, entry *gitalypb.LogEntry) error
 }
 
 // storageTracker tracks the partition deletion/creation activities of a replica.
@@ -106,11 +107,8 @@ func (r *replicator) ApplyReplicaGroups(cluster *gitalypb.Cluster) (int, error) 
 		return 0, fmt.Errorf("storage with ID %d does not exist", r.authorityID)
 	}
 
+	replicatingStorages := r.stringifyReplicatingStorages()
 	storagesToReplicate := r.storagesToReplicate(cluster)
-	r.logger.WithFields(log.Fields{
-		"raft.replicating_storages":  r.stringifyReplicatingStorages(),
-		"raft.storages_to_replicate": r.stringifyStorageMap(storagesToReplicate),
-	}).Info("applying replica groups")
 
 	// First, initialize the authority storage, which is the storage managed by this node.
 	if r.authority == nil {
@@ -181,7 +179,12 @@ func (r *replicator) ApplyReplicaGroups(cluster *gitalypb.Cluster) (int, error) 
 		}).Info("tracking storage")
 	}
 
-	r.logger.Info(fmt.Sprintf("applied replica groups, %d changes", changes))
+	if changes != 0 {
+		r.logger.WithFields(log.Fields{
+			"raft.replicating_storages":  replicatingStorages,
+			"raft.storages_to_replicate": r.stringifyStorageMap(storagesToReplicate),
+		}).Info(fmt.Sprintf("applied replica groups, %d changes", changes))
+	}
 	return changes, nil
 }
 
@@ -190,6 +193,13 @@ func (r *replicator) ApplyReplicaGroups(cluster *gitalypb.Cluster) (int, error) 
 func (r *replicator) BroadcastNewPartition(partitionID raftID, relativePath string) error {
 	if _, err := r.authority.RegisterPartition(partitionID, relativePath); err != nil {
 		return fmt.Errorf("registering partition: %w", err)
+	}
+	return nil
+}
+
+func (r *replicator) BroadcastLogEntry(partitionID raftID, relativePath string, entry *gitalypb.LogEntry) error {
+	if r.authority != nil {
+		return r.authority.BroadcastEntry(partitionID, relativePath, entry)
 	}
 	return nil
 }
@@ -253,14 +263,21 @@ func (r *replicator) trackStorage(storageID raftID, poller replica) {
 func (r *replicator) untrackStorage(storageID raftID) error {
 	tracker := r.storageTrackers[storageID]
 	tracker.cancel()
-
-	select {
-	case <-time.After(defaultReplicatorTimeout):
+	defer func() {
 		delete(r.storageTrackers, storageID)
-		return fmt.Errorf("deadline exceeded while untracking storage")
-	case <-tracker.done:
-		return tracker.poller.Close()
+	}()
+
+	if err := tracker.poller.Close(); err != nil {
+		return fmt.Errorf("closing poller: %w", err)
 	}
+	return nil
+
+	// select {
+	// case <-time.After(defaultReplicatorTimeout):
+	// 	return fmt.Errorf("deadline exceeded while untracking storage")
+	// case <-tracker.done:
+	// 	return nil
+	// }
 }
 
 func (r *replicator) pollPartitionsFromStorage(tracker *storageTracker) {
@@ -281,6 +298,9 @@ func (r *replicator) pollPartitionsFromStorage(tracker *storageTracker) {
 			}).WithError(err).Error("fail to poll partritions from storage")
 			continue
 		}
+		if len(partitions) == 0 {
+			continue
+		}
 		for _, operation := range partitions {
 			partition := operation.partition
 			if partition == nil {
@@ -292,6 +312,8 @@ func (r *replicator) pollPartitionsFromStorage(tracker *storageTracker) {
 				fields := log.Fields{
 					"raft.authority_id":   partition.GetAuthorityId(),
 					"raft.authority_name": partition.GetAuthorityName(),
+					"raft.storage_id":     r.authority.StorageID(),
+					"raft.storage_name":   r.authority.StorageName(),
 					"raft.partition_id":   partition.GetPartitionId(),
 					"raft.relative_path":  partition.GetRelativePath(),
 				}
@@ -304,6 +326,21 @@ func (r *replicator) pollPartitionsFromStorage(tracker *storageTracker) {
 					continue
 				}
 				r.logger.WithFields(fields).Debug("tracking partition")
+			case opNewLogEntry:
+				fields := log.Fields{
+					"raft.authority_id":   partition.GetAuthorityId(),
+					"raft.authority_name": partition.GetAuthorityName(),
+					"raft.storage_id":     r.authority.StorageID(),
+					"raft.storage_name":   r.authority.StorageName(),
+					"raft.partition_id":   partition.GetPartitionId(),
+					"raft.relative_path":  partition.GetRelativePath(),
+					"raft.log_entry":      operation.entry,
+				}
+				if r.authorityID == raftID(partition.GetAuthorityId()) {
+					r.logger.WithFields(fields).Debug("broadcast log entry")
+				} else {
+					r.logger.WithFields(fields).Debug("receive log entry")
+				}
 			default:
 				r.logger.WithFields(log.Fields{
 					"raft.partition_id":  partition.GetPartitionId(),
@@ -333,8 +370,8 @@ func newReplicator(ctx context.Context, authorityID raftID, logger log.Logger, c
 		ctx:         ctx,
 		authorityID: authorityID,
 		logger: logger.WithFields(log.Fields{
-			"raft.component":            "replicator",
-			"raft.authority_storage_id": authorityID,
+			"raft.component":  "replicator",
+			"raft.storage_id": authorityID,
 		}),
 		config:          config,
 		storageTrackers: map[raftID]*storageTracker{},

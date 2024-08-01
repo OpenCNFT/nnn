@@ -128,7 +128,7 @@ func newReplicationGroup(
 // Stop stops the group by cancelling the context and closing connecting channels.
 func (g *replicationRaftGroup) Close() (returnedErr error) {
 	g.cancel()
-	if err := g.nodeHost.StopReplica(g.groupConfig.ShardID, g.groupID.ToUint64()); err != nil {
+	if err := g.nodeHost.StopReplica(g.groupConfig.ShardID, g.groupConfig.ReplicaID); err != nil {
 		returnedErr = err
 	}
 	close(g.newOperation)
@@ -199,7 +199,7 @@ func (g *replicationRaftGroup) StorageName() string {
 
 // StorageID is a getter that returns the group's target storage ID.
 func (g *replicationRaftGroup) StorageID() raftID {
-	return g.groupID
+	return g.storageID
 }
 
 // initialize pushes all partitions in the state machine to the list of pending operations. It runs
@@ -270,6 +270,20 @@ func (g *replicationRaftGroup) RegisterPartition(partitionID raftID, relativePat
 	}
 }
 
+func (g *replicationRaftGroup) BroadcastEntry(partitionID raftID, relativePath string, entry *gitalypb.LogEntry) error {
+	result, _, err := g.broadcastLogEntry(partitionID, relativePath, entry)
+	if err != nil {
+		return fmt.Errorf("sending BroadcastLogEntry: %w", err)
+	}
+
+	switch result {
+	case resultRegisterPartitionSuccessfully:
+		return nil
+	default:
+		return fmt.Errorf("unknown result code %d", result)
+	}
+}
+
 // GetRegisteredPartitions returns the list of all registered partitions. Warning. This function is
 // not suitable to be called too frequently.
 func (g *replicationRaftGroup) GetRegisteredPartitions() ([]*gitalypb.Partition, error) {
@@ -295,6 +309,25 @@ func (g *replicationRaftGroup) requestRegisterPartition(partitionID raftID, rela
 			PartitionId:   partitionID.ToUint64(),
 			RelativePath:  relativePath,
 		},
+	})
+}
+
+func (g *replicationRaftGroup) broadcastLogEntry(partitionID raftID, relativePath string, entry *gitalypb.LogEntry) (updateResult, *gitalypb.BroadcastLogEntryResponse, error) {
+	requester := NewRequester[*gitalypb.BroadcastLogEntryRequest, *gitalypb.BroadcastLogEntryResponse](
+		g.nodeHost, g.groupID, g.logger, requestOption{
+			retry:       defaultRetry,
+			timeout:     g.maxNextElectionWait(),
+			exponential: g.backoffProfile,
+		},
+	)
+	return requester.SyncWrite(g.ctx, &gitalypb.BroadcastLogEntryRequest{
+		Partition: &gitalypb.Partition{
+			AuthorityName: g.storageName,
+			AuthorityId:   g.storageID.ToUint64(),
+			PartitionId:   partitionID.ToUint64(),
+			RelativePath:  relativePath,
+		},
+		Entry: entry,
 	})
 }
 

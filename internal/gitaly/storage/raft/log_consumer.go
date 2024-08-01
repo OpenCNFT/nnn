@@ -147,6 +147,24 @@ func (l *LogConsumer) pushNotifications(notifications *notifications, pusher *re
 								"raft.partition_id":   n.partitionID,
 							}).Error("fail to broadcast new partition")
 						}
+					} else {
+						var shouldBroadcast bool
+						if len(entry.ReferenceTransactions) > 0 || entry.Housekeeping != nil {
+							shouldBroadcast = true
+						}
+						for _, o := range entry.Operations {
+							if o.GetCreateHardLink() != nil || o.GetRemoveDirectoryEntry() != nil || o.GetCreateDirectory() != nil {
+								shouldBroadcast = true
+							}
+						}
+						if shouldBroadcast {
+							if err := pusher.replicator.BroadcastLogEntry(raftID(n.partitionID), entry.RelativePath, entry); err != nil {
+								l.logger.WithError(err).WithFields(log.Fields{
+									"raft.authority_name": notifications.storageName,
+									"raft.partition_id":   n.partitionID,
+								}).Error("fail to broadcast new entry")
+							}
+						}
 					}
 					manager.AcknowledgeTransaction(l, lsn)
 				}

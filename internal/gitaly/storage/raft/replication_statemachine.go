@@ -22,6 +22,7 @@ const (
 	// - When the Raft group is restarted.
 	// - When the Raft group detects a new partition creation.
 	opTrackPartition = partitionOpType(iota)
+	opNewLogEntry
 )
 
 // partitionOperation defines an operation to perform on a partition. From the scope of replication
@@ -29,6 +30,7 @@ const (
 type partitionOperation struct {
 	op        partitionOpType
 	partition *gitalypb.Partition
+	entry     *gitalypb.LogEntry
 }
 
 const (
@@ -164,6 +166,22 @@ func (s *replicationStateMachine) updateEntry(txn keyvalue.ReadWriter, entry *st
 		response, err := anyProtoMarshal(&gitalypb.RegisterPartitionResponse{Partition: returnedPartition})
 		if err != nil {
 			return nil, fmt.Errorf("marshaling RegisterPartitionResponse: %w", err)
+		}
+		result.Data = response
+
+		return &result, nil
+	case *gitalypb.BroadcastLogEntryRequest:
+		result.Value = uint64(resultRegisterPartitionSuccessfully)
+
+		s.callbackOps = append(s.callbackOps, &partitionOperation{
+			op:        opNewLogEntry,
+			partition: req.GetPartition(),
+			entry:     req.GetEntry(),
+		})
+
+		response, err := anyProtoMarshal(&gitalypb.BroadcastLogEntryResponse{})
+		if err != nil {
+			return nil, fmt.Errorf("marshaling BroadcastLogEntryResponse: %w", err)
 		}
 		result.Data = response
 

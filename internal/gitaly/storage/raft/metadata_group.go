@@ -235,7 +235,7 @@ func (g *metadataRaftGroup) WaitReady() error {
 
 // Close closes the Raft group.
 func (g *metadataRaftGroup) Close() error {
-	return g.nodeHost.StopReplica(g.groupConfig.ShardID, g.groupID.ToUint64())
+	return g.nodeHost.StopReplica(g.groupConfig.ShardID, g.groupConfig.ReplicaID)
 }
 
 func (g *metadataRaftGroup) maxHeartbeatWait() time.Duration {

@@ -313,7 +313,7 @@ func (m *Manager) startReplicators() error {
 
 	delay := backoff.NewDefaultExponential(rand.New(rand.NewSource(time.Now().UnixNano())))
 	delay.BaseDelay = 5 * time.Second
-	delay.MaxDelay = 60 * time.Second
+	delay.MaxDelay = 30 * time.Second
 
 	errTimer := time.NewTimer(m.metadataGroup.maxNextElectionWait())
 
