@@ -1746,11 +1746,20 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 					},
 					// When the path is to a submodule, the repository resolves the revision to the
 					// commit ID for the submodule. This OID does not exist in the repository.
-					// Consequently, when the object is checked to ensure it is a tree, an object
-					// not found error is returned.
+					// This results in the provided path being considered invalid and an error is
+					// returned.
 					expectedErr: testhelper.WithInterceptedMetadataItems(
-						structerr.NewInternal("reading tree: check object type: object not found"),
-						structerr.MetadataItem{Key: "revision", Value: submodule},
+						structerr.NewNotFound("revision doesn't exist").WithDetail(
+							&gitalypb.GetTreeEntriesError{
+								Error: &gitalypb.GetTreeEntriesError_ResolveTree{
+									ResolveTree: &gitalypb.ResolveRevisionError{
+										Revision: []byte(commitID),
+									},
+								},
+							},
+						),
+						structerr.MetadataItem{Key: "path", Value: "submodule"},
+						structerr.MetadataItem{Key: "revision", Value: commitID},
 					),
 				}
 			},
