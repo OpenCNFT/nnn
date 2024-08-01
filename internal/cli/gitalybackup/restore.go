@@ -187,13 +187,20 @@ func (cmd *restoreSubcommand) run(ctx context.Context, logger log.Logger, stdin 
 	var removalErrors []error
 	for storageName, repos := range existingRepos {
 		for _, repo := range repos {
-			if _, ok := restoredRepos[storageName][backup.NewRepositoryKey(repo)]; !ok {
-				// If we have dangling repos (those which exist in the storage but
-				// weren't part of the restore), they need to be deleted so the
-				// state of repos in Gitaly matches that in the Rails DB.
-				if err := removeRepository(ctx, pool, repo); err != nil {
-					removalErrors = append(removalErrors, fmt.Errorf("storage_name %q relative_path %q: %w", storageName, repo.RelativePath, err))
-				}
+			if _, ok := restoredRepos[storageName][backup.NewRepositoryKey(repo)]; ok {
+				continue
+			}
+			if storage.IsPoolRepository(repo) {
+				// Pool repositories are not backed up and so these
+				// repositories will always be considered dangling.
+				continue
+			}
+
+			// If we have dangling repos (those which exist in the storage but
+			// weren't part of the restore), they need to be deleted so the
+			// state of repos in Gitaly matches that in the Rails DB.
+			if err := removeRepository(ctx, pool, repo); err != nil {
+				removalErrors = append(removalErrors, fmt.Errorf("storage_name %q relative_path %q: %w", storageName, repo.RelativePath, err))
 			}
 		}
 	}
