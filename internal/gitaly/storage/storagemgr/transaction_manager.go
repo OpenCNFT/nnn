@@ -2799,7 +2799,7 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 // to transaction operations.
 //
 // To ensure that we don't modify existing tables and autocompact, we lock the existing tables
-// before applying the updates. This way the reftable backend willl only create new tables
+// before applying the updates. This way the reftable backend will only create new tables
 func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 	ctx context.Context,
 	referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction,
