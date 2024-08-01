@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -47,7 +47,6 @@ import (
 
 type glHookValues struct {
 	GLID, GLUsername, GLProtocol, GitObjectDir, RemoteIP string
-	GitalyLogDir                                         string
 	GitAlternateObjectDirs                               []string
 }
 
@@ -93,7 +92,6 @@ func envForHooks(tb testing.TB, ctx context.Context, cfg config.Cfg, repo *gital
 
 	env := append(command.AllowedEnvironment(os.Environ()), []string{
 		payload,
-		fmt.Sprintf("%s=%s", gitalylog.GitalyLogDirEnvKey, cfg.Logging.Dir),
 		"GITLAB_TRACING=opentracing://jaeger",
 		"user-tracer-id=1:2:3:4",
 	}...)
@@ -120,9 +118,6 @@ func envForHooks(tb testing.TB, ctx context.Context, cfg config.Cfg, repo *gital
 	}
 	if len(glHookValues.GitAlternateObjectDirs) > 0 {
 		env = append(env, fmt.Sprintf("GIT_ALTERNATE_OBJECT_DIRECTORIES=%s", strings.Join(glHookValues.GitAlternateObjectDirs, ":")))
-	}
-	if glHookValues.GitalyLogDir != "" {
-		env = append(env, fmt.Sprintf("GITALY_LOG_DIR=%s", glHookValues.GitalyLogDir))
 	}
 
 	return env
@@ -217,40 +212,47 @@ func testHooksPrePostReceive(t *testing.T, cfg config.Cfg, repo *gitalypb.Reposi
 		t.Run(fmt.Sprintf("hookName: %s", hookName), func(t *testing.T) {
 			customHookOutputPath := gittest.WriteEnvToCustomHook(t, repoPath, hookName)
 
-			var stderr, stdout bytes.Buffer
-			stdin := bytes.NewBuffer([]byte(changes))
-			require.NoError(t, err)
-			cmd := exec.Command(cfg.BinaryPath("gitaly-hooks"))
-			cmd.Args = []string{hookName}
-			cmd.Stderr = &stderr
-			cmd.Stdout = &stdout
-			cmd.Stdin = stdin
-			cmd.Env = envForHooks(
-				t,
-				ctx,
-				cfg,
-				repo,
-				glHookValues{
-					GLID:                   glID,
-					GLUsername:             glUsername,
-					GLProtocol:             glProtocol,
-					GitObjectDir:           c.GitObjectDir,
-					GitAlternateObjectDirs: c.GitAlternateObjectDirs,
-					RemoteIP:               remoteIP,
-				},
-				proxyValues{
-					HTTPProxy:  httpProxy,
-					HTTPSProxy: httpsProxy,
-					NoProxy:    noProxy,
-				},
-				"GIT_PUSH_OPTION_COUNT=2",
-				"GIT_PUSH_OPTION_0=gitpushoption1",
-				"GIT_PUSH_OPTION_1=gitpushoption2",
+			// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+			// in the command line. Create a symbolic link to the hook and execute that instead
+			// so the first argument is as expected.
+			hookPath := filepath.Join(t.TempDir(), hookName)
+			require.NoError(t, os.Symlink(cfg.BinaryPath("gitaly-hooks"), hookPath))
+
+			var stdout, stderr bytes.Buffer
+			cmd, err := command.New(ctx,
+				testhelper.SharedLogger(t),
+				[]string{hookPath},
+				command.WithSubprocessLogger(cfg.Logging.Config),
+				command.WithEnvironment(envForHooks(
+					t,
+					ctx,
+					cfg,
+					repo,
+					glHookValues{
+						GLID:                   glID,
+						GLUsername:             glUsername,
+						GLProtocol:             glProtocol,
+						GitObjectDir:           c.GitObjectDir,
+						GitAlternateObjectDirs: c.GitAlternateObjectDirs,
+						RemoteIP:               remoteIP,
+					},
+					proxyValues{
+						HTTPProxy:  httpProxy,
+						HTTPSProxy: httpsProxy,
+						NoProxy:    noProxy,
+					},
+					"GIT_PUSH_OPTION_COUNT=2",
+					"GIT_PUSH_OPTION_0=gitpushoption1",
+					"GIT_PUSH_OPTION_1=gitpushoption2",
+				)),
+				command.WithStdin(strings.NewReader(changes)),
+				command.WithStdout(&stdout),
+				command.WithStderr(&stderr),
+				command.WithDir(repoPath),
 			)
+			require.NoError(t, err)
 
-			cmd.Dir = repoPath
-
-			err = cmd.Run()
+			err = cmd.Wait()
 			assert.Empty(t, stderr.String())
 			assert.Empty(t, stdout.String())
 			require.NoError(t, err)
@@ -336,16 +338,25 @@ func testHooksUpdate(t *testing.T, ctx context.Context, cfg config.Cfg, glValues
 	// ... and a second custom hook that dumps the environment variables.
 	customHookEnvPath := gittest.WriteEnvToCustomHook(t, repoPath, "update")
 
-	var stdout, stderr bytes.Buffer
-	cmd := exec.Command(cfg.BinaryPath("gitaly-hooks"))
-	cmd.Args = []string{"update", refval, oldval, newval}
-	cmd.Env = envForHooks(t, ctx, cfg, repo, glValues, proxyValues{})
-	cmd.Dir = repoPath
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.Dir = repoPath
+	// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+	// in the command line. Create a symbolic link to the hook and execute that instead
+	// so the first argument is as expected.
+	updatePath := filepath.Join(t.TempDir(), "update")
+	require.NoError(t, os.Symlink(cfg.BinaryPath("gitaly-hooks"), updatePath))
 
-	require.NoError(t, cmd.Run())
+	var stdout, stderr bytes.Buffer
+	cmd, err := command.New(ctx,
+		testhelper.SharedLogger(t),
+		[]string{updatePath, refval, oldval, newval},
+		command.WithSubprocessLogger(cfg.Logging.Config),
+		command.WithEnvironment(envForHooks(t, ctx, cfg, repo, glValues, proxyValues{})),
+		command.WithStdout(&stdout),
+		command.WithStderr(&stderr),
+		command.WithDir(repoPath),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, cmd.Wait())
 	require.Empty(t, stdout.String())
 	require.Empty(t, stderr.String())
 
@@ -369,13 +380,13 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 	testcases := []struct {
 		desc    string
 		primary bool
-		verify  func(*testing.T, *exec.Cmd, *bytes.Buffer, *bytes.Buffer, *transaction.TrackingManager, string)
+		verify  func(*testing.T, *command.Command, *bytes.Buffer, *bytes.Buffer, *transaction.TrackingManager, string)
 	}{
 		{
 			desc:    "Primary calls out to post_receive endpoint",
 			primary: true,
-			verify: func(t *testing.T, cmd *exec.Cmd, stdout, stderr *bytes.Buffer, txManager *transaction.TrackingManager, customHookOutputPath string) {
-				err := cmd.Run()
+			verify: func(t *testing.T, cmd *command.Command, stdout, stderr *bytes.Buffer, txManager *transaction.TrackingManager, customHookOutputPath string) {
+				err := cmd.Wait()
 				code, ok := command.ExitStatus(err)
 				require.True(t, ok, "expect exit status in %v", err)
 
@@ -389,8 +400,8 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 		{
 			desc:    "Secondary does not call out to post_receive endpoint",
 			primary: false,
-			verify: func(t *testing.T, cmd *exec.Cmd, stdout, stderr *bytes.Buffer, txManager *transaction.TrackingManager, customHookOutputPath string) {
-				err := cmd.Run()
+			verify: func(t *testing.T, cmd *command.Command, stdout, stderr *bytes.Buffer, txManager *transaction.TrackingManager, customHookOutputPath string) {
+				err := cmd.Wait()
 				require.NoError(t, err)
 
 				require.Empty(t, stdout.String())
@@ -477,13 +488,23 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 			env := envForHooks(t, ctx, cfg, repo, glHookValues{}, proxyValues{})
 			env = append(env, hooksPayload)
 
-			cmd := exec.Command(gitalyHooksPath)
-			cmd.Args = []string{"post-receive"}
-			cmd.Env = env
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			cmd.Stdin = bytes.NewBuffer([]byte(changes))
-			cmd.Dir = repoPath
+			// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+			// in the command line. Create a symbolic link to the hook and execute that instead
+			// so the first argument is as expected.
+			postReceivePath := filepath.Join(t.TempDir(), "post-receive")
+			require.NoError(t, os.Symlink(gitalyHooksPath, postReceivePath))
+
+			cmd, err := command.New(ctx,
+				logger,
+				[]string{postReceivePath},
+				command.WithSubprocessLogger(cfg.Logging.Config),
+				command.WithEnvironment(env),
+				command.WithStdin(bytes.NewBuffer([]byte(changes))),
+				command.WithStdout(&stdout),
+				command.WithStderr(&stderr),
+				command.WithDir(repoPath),
+			)
+			require.NoError(t, err)
 
 			tc.verify(t, cmd, &stdout, &stderr, txManager, customHookOutputPath)
 		})
@@ -551,14 +572,23 @@ func TestHooksProcReceive(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, pktline.WriteFlush(&stdin))
 
+			// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+			// in the command line. Create a symbolic link to the hook and execute that instead
+			// so the first argument is as expected.
+			procReceivePath := filepath.Join(t.TempDir(), "proc-receive")
+			require.NoError(t, os.Symlink(hooksPath, procReceivePath))
+
 			var stdout, stderr bytes.Buffer
-			cmd := exec.Command(hooksPath)
-			cmd.Args = []string{"proc-receive"}
-			cmd.Env = env
-			cmd.Stdin = &stdin
-			cmd.Stdout = &stdout
-			cmd.Stderr = &stderr
-			require.NoError(t, cmd.Start())
+			cmd, err := command.New(ctx,
+				testhelper.SharedLogger(t),
+				[]string{procReceivePath},
+				command.WithSubprocessLogger(cfg.Logging.Config),
+				command.WithEnvironment(env),
+				command.WithStdin(&stdin),
+				command.WithStdout(&stdout),
+				command.WithStderr(&stderr),
+			)
+			require.NoError(t, err)
 
 			if tc.expectedExitCode == 0 {
 				handler := <-handlers
@@ -618,24 +648,33 @@ func TestHooksNotAllowed(t *testing.T) {
 
 	runHookServiceWithGitlabClient(t, cfg, true, gitlabClient)
 
+	// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+	// in the command line. Create a symbolic link to the hook and execute that instead
+	// so the first argument is as expected.
+	preReceivePath := filepath.Join(t.TempDir(), "pre-receive")
+	require.NoError(t, os.Symlink(gitalyHooksPath, preReceivePath))
+
 	var stderr, stdout bytes.Buffer
+	cmd, err := command.New(ctx,
+		testhelper.SharedLogger(t),
+		[]string{preReceivePath},
+		command.WithSubprocessLogger(cfg.Logging.Config),
+		command.WithEnvironment(envForHooks(t, ctx, cfg, repo,
+			glHookValues{
+				GLID:       glID,
+				GLUsername: glUsername,
+				GLProtocol: glProtocol,
+				RemoteIP:   remoteIP,
+			},
+			proxyValues{})),
+		command.WithStdin(strings.NewReader(changes)),
+		command.WithStdout(&stdout),
+		command.WithStderr(&stderr),
+		command.WithDir(repoPath),
+	)
+	require.NoError(t, err)
 
-	cmd := exec.Command(gitalyHooksPath)
-	cmd.Args = []string{"pre-receive"}
-	cmd.Stderr = &stderr
-	cmd.Stdout = &stdout
-	cmd.Stdin = strings.NewReader(changes)
-	cmd.Env = envForHooks(t, ctx, cfg, repo,
-		glHookValues{
-			GLID:       glID,
-			GLUsername: glUsername,
-			GLProtocol: glProtocol,
-			RemoteIP:   remoteIP,
-		},
-		proxyValues{})
-	cmd.Dir = repoPath
-
-	require.Error(t, cmd.Run())
+	require.Error(t, cmd.Wait())
 	require.Equal(t, "GitLab: 401 Unauthorized\n", stderr.String())
 	require.Equal(t, "", stdout.String())
 	require.NoFileExists(t, customHookOutputPath)
@@ -656,6 +695,8 @@ func TestRequestedHooks(t *testing.T) {
 			t.Run("unrequested hook is ignored", func(t *testing.T) {
 				t.Parallel()
 
+				ctx := testhelper.Context(t)
+
 				cfg := testcfg.Build(t)
 				testcfg.BuildGitalyHooks(t, cfg)
 				testcfg.BuildGitalySSH(t, cfg)
@@ -672,14 +713,27 @@ func TestRequestedHooks(t *testing.T) {
 				).Env()
 				require.NoError(t, err)
 
-				cmd := exec.Command(cfg.BinaryPath("gitaly-hooks"))
-				cmd.Args = hookArgs
-				cmd.Env = []string{payload}
-				require.NoError(t, cmd.Run())
+				// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+				// in the command line. Create a symbolic link to the hook and execute that instead
+				// so the first argument is as expected.
+				requestedHookPath := filepath.Join(t.TempDir(), hookArgs[0])
+				require.NoError(t, os.Symlink(cfg.BinaryPath("gitaly-hooks"), requestedHookPath))
+
+				cmd, err := command.New(ctx,
+					testhelper.SharedLogger(t),
+					append([]string{requestedHookPath}, hookArgs[1:]...),
+					command.WithSubprocessLogger(cfg.Logging.Config),
+					command.WithEnvironment([]string{payload}),
+				)
+				require.NoError(t, err)
+
+				require.NoError(t, cmd.Wait())
 			})
 
 			t.Run("requested hook runs", func(t *testing.T) {
 				t.Parallel()
+
+				ctx := testhelper.Context(t)
 
 				cfg := testcfg.Build(t)
 				testcfg.BuildGitalyHooks(t, cfg)
@@ -697,15 +751,25 @@ func TestRequestedHooks(t *testing.T) {
 				).Env()
 				require.NoError(t, err)
 
-				cmd := exec.Command(cfg.BinaryPath("gitaly-hooks"))
-				cmd.Args = hookArgs
-				cmd.Env = []string{payload}
+				// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+				// in the command line. Create a symbolic link to the hook and execute that instead
+				// so the first argument is as expected.
+				requestedHookPath := filepath.Join(t.TempDir(), hookArgs[0])
+				require.NoError(t, os.Symlink(cfg.BinaryPath("gitaly-hooks"), requestedHookPath))
+
+				cmd, err := command.New(ctx,
+					testhelper.SharedLogger(t),
+					append([]string{requestedHookPath}, hookArgs[1:]...),
+					command.WithSubprocessLogger(cfg.Logging.Config),
+					command.WithEnvironment([]string{payload}),
+				)
+				require.NoError(t, err)
 
 				// We simply check that there is an error here as an indicator that
 				// the hook logic ran. We don't care for the actual error because we
 				// know that in the previous testcase without the hook being
 				// requested, there was no error.
-				require.Error(t, cmd.Run(), "hook should have run and failed due to incomplete setup")
+				require.Error(t, cmd.Wait(), "hook should have run and failed due to incomplete setup")
 			})
 		})
 	}
@@ -714,12 +778,9 @@ func TestRequestedHooks(t *testing.T) {
 func TestGitalyHooksPackObjects(t *testing.T) {
 	t.Parallel()
 
-	logDir := testhelper.TempDir(t)
-
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
-		Auth:    auth.Config{Token: "abc123"},
-		Logging: config.Logging{Config: gitalylog.Config{Dir: logDir}},
+		Auth: auth.Config{Token: "abc123"},
 	}))
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -766,6 +827,15 @@ func TestGitalyHooksPackObjects(t *testing.T) {
 	}
 }
 
+type capturedOutput struct {
+	gitalylog.Logger
+	output *bytes.Buffer
+}
+
+func (c capturedOutput) Output() io.Writer {
+	return c.output
+}
+
 func TestGitalyServerReturnsError(t *testing.T) {
 	resourceExhaustedErr := structerr.NewResourceExhausted("%w", limiter.ErrMaxQueueTime).WithDetail(&gitalypb.LimitError{
 		ErrorMessage: limiter.ErrMaxQueueTime.Error(),
@@ -806,8 +876,6 @@ func TestGitalyServerReturnsError(t *testing.T) {
 		t.Run(tc.hook, func(t *testing.T) {
 			t.Parallel()
 
-			logDir := testhelper.TempDir(t)
-
 			ctx := testhelper.Context(t)
 			cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
 				Auth:  auth.Config{Token: "abc123"},
@@ -836,28 +904,39 @@ func TestGitalyServerReturnsError(t *testing.T) {
 			gitalyHooksPath := testcfg.BuildGitalyHooks(t, cfg)
 			testcfg.BuildGitalySSH(t, cfg)
 
-			var stderr, stdout bytes.Buffer
+			// `gitaly-hooks` expects to be invoked with the hook's name as the first argument
+			// in the command line. Create a symbolic link to the hook and execute that instead
+			// so the first argument is as expected.
+			hookPath := filepath.Join(t.TempDir(), tc.hook)
+			require.NoError(t, os.Symlink(gitalyHooksPath, hookPath))
 
-			cmd := exec.Command(gitalyHooksPath)
-			cmd.Args = append([]string{tc.hook}, tc.args...)
-			cmd.Stderr = &stderr
-			cmd.Stdout = &stdout
-			cmd.Stdin = strings.NewReader(tc.stdin)
-			cmd.Env = envForHooks(t, ctx, cfg, repo,
-				glHookValues{
-					GLID:         glID,
-					GLUsername:   glUsername,
-					GLProtocol:   "ssh",
-					RemoteIP:     remoteIP,
-					GitalyLogDir: logDir,
+			var stdout, stderr, logOutput bytes.Buffer
+			cmd, err := command.New(ctx,
+				capturedOutput{
+					Logger: testhelper.SharedLogger(t),
+					output: &logOutput,
 				},
-				proxyValues{})
-			cmd.Dir = repoPath
+				append([]string{hookPath}, tc.args...),
+				command.WithSubprocessLogger(cfg.Logging.Config),
+				command.WithEnvironment(envForHooks(t, ctx, cfg, repo,
+					glHookValues{
+						GLID:       glID,
+						GLUsername: glUsername,
+						GLProtocol: "ssh",
+						RemoteIP:   remoteIP,
+					},
+					proxyValues{})),
+				command.WithStdin(strings.NewReader(tc.stdin)),
+				command.WithStdout(&stdout),
+				command.WithStderr(&stderr),
+				command.WithDir(repoPath),
+			)
+			require.NoError(t, err)
 
-			require.Error(t, cmd.Run())
+			require.Error(t, cmd.Wait())
 			require.Equal(t, tc.expectedStderr, stderr.String())
 			require.Equal(t, "", stdout.String())
-			hookLogs := string(testhelper.MustReadFile(t, filepath.Join(logDir, "gitaly_hooks.log")))
+			hookLogs := logOutput.String()
 
 			require.NotEmpty(t, hookLogs)
 			require.Contains(t, hookLogs, "error executing git hook")
@@ -909,8 +988,6 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			logDir := testhelper.TempDir(t)
-
 			ctx := testhelper.Context(t)
 			cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
 				Auth:  auth.Config{Token: "abc123"},
@@ -931,25 +1008,41 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 				},
 			})
 
-			args := []string{
-				"clone",
-				"-u",
-				"git -c uploadpack.allowFilter -c uploadpack.packObjectsHook=" + cfg.BinaryPath("gitaly-hooks") + " upload-pack",
-				"--quiet",
-				"--no-local",
-				"--bare",
-				repoPath,
-				testhelper.TempDir(t),
-			}
+			cfg.PackObjectsCache.Enabled = true
+
+			var logOutput bytes.Buffer
+			cmdFactory, clean, err := git.NewExecCommandFactory(cfg, capturedOutput{
+				Logger: testhelper.SharedLogger(t),
+				output: &logOutput,
+			})
+			require.NoError(t, err)
+			defer clean()
+
+			ctx = correlation.ContextWithCorrelation(ctx, correlationID)
+			ctx = featureflag.IncomingCtxWithFeatureFlag(ctx, enabledFeatureFlag, true)
+			ctx = featureflag.IncomingCtxWithFeatureFlag(ctx, disabledFeatureFlag, false)
 
 			var stderr, stdout bytes.Buffer
+			cmd, err := cmdFactory.New(ctx, repo, git.Command{
+				Name: "clone",
+				Flags: []git.Option{
+					git.ValueFlag{Name: "-u", Value: "git -c uploadpack.allowFilter -c uploadpack.packObjectsHook=" + cfg.BinaryPath("gitaly-hooks") + " upload-pack"},
+					git.Flag{Name: "--quiet"},
+					git.Flag{Name: "--no-local"},
+					git.Flag{Name: "--bare"},
+				},
+				Args: []string{repoPath, testhelper.TempDir(t)},
+			},
+				git.WithPackObjectsHookEnv(repo, "ssh"),
+				git.WithStdout(&stdout),
+				git.WithStderr(&stderr),
+			)
+			require.NoError(t, err)
 
-			gittest.ExecOpts(t, cfg, gittest.ExecConfig{
-				Env:              envForHooks(t, ctx, cfg, repo, glHookValues{GitalyLogDir: logDir}, proxyValues{}),
-				Stdout:           &stdout,
-				Stderr:           &stderr,
-				ExpectedExitCode: 128,
-			}, args...)
+			waitErr := cmd.Wait()
+			exitCode, ok := command.ExitStatus(waitErr)
+			require.True(t, ok, waitErr)
+			require.Equal(t, 128, exitCode)
 
 			require.Equal(t, "", stdout.String())
 
@@ -957,7 +1050,7 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 				require.Contains(t, stderr.String(), expectedLine)
 			}
 
-			hookLogs := string(testhelper.MustReadFile(t, filepath.Join(logDir, "gitaly_hooks.log")))
+			hookLogs := logOutput.String()
 			require.NotEmpty(t, hookLogs)
 			require.Contains(t, hookLogs, tc.expectedLogs)
 			require.Contains(t, hookLogs, fmt.Sprintf("correlation_id=%s", correlationID))

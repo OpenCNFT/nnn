@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
@@ -551,9 +550,8 @@ func TestGetArchive_environment(t *testing.T) {
 			desc:            "with LFS blobs",
 			includeLFSBlobs: true,
 			expectedEnv: map[string]struct{}{
-				"CORRELATION_ID=" + correlationID:   {},
-				smudgeEnv:                           {},
-				"GITALY_LOG_DIR=" + cfg.Logging.Dir: {},
+				"CORRELATION_ID=" + correlationID: {},
+				smudgeEnv:                         {},
 			},
 		},
 	} {
@@ -575,17 +573,15 @@ func TestGetArchive_environment(t *testing.T) {
 
 			// Check that EnvLogConfiguration is present but don't assert its
 			// contents as part of this test.
-			if featureflag.SubprocessLogger.IsEnabled(ctx) {
-				found := false
-				for env := range actualEnv {
-					if strings.HasPrefix(env, command.EnvLogConfiguration+"=") {
-						found = true
-						delete(actualEnv, env)
-					}
+			foundEnvLogConfiguration := false
+			for env := range actualEnv {
+				if strings.HasPrefix(env, command.EnvLogConfiguration+"=") {
+					foundEnvLogConfiguration = true
+					delete(actualEnv, env)
 				}
-
-				require.True(t, found)
 			}
+
+			require.True(t, foundEnvLogConfiguration)
 
 			require.Equal(t, tc.expectedEnv, actualEnv)
 		})

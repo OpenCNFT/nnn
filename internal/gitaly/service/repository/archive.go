@@ -14,7 +14,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/gitaly/v16/streamio"
@@ -28,7 +27,6 @@ type archiveParams struct {
 	format       string
 	archivePath  string
 	exclude      []string
-	loggingDir   string
 }
 
 func (s *server) GetArchive(in *gitalypb.GetArchiveRequest, stream gitalypb.RepositoryService_GetArchiveServer) error {
@@ -91,7 +89,6 @@ func (s *server) GetArchive(in *gitalypb.GetArchiveRequest, stream gitalypb.Repo
 		format:       format,
 		archivePath:  path,
 		exclude:      exclude,
-		loggingDir:   s.loggingCfg.Dir,
 	})
 }
 
@@ -231,7 +228,6 @@ func (s *server) handleArchive(ctx context.Context, p archiveParams) error {
 		env = append(
 			env,
 			smudgeEnv,
-			fmt.Sprintf("%s=%s", log.GitalyLogDirEnvKey, p.loggingDir),
 		)
 		config = append(config, smudgeGitConfig)
 	}
