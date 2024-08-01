@@ -36,6 +36,11 @@ func TestRestoreSubcommand(t *testing.T) {
 	})
 	gittest.WriteCommit(t, cfg, existRepoPath, gittest.WithBranch(git.DefaultBranch))
 
+	// This pool is also dangling but should not be removed after the backup is restored.
+	_, poolRepoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+		RelativePath: gittest.NewObjectPoolName(t),
+	})
+
 	// The backupDir contains the artifacts that would've been created as part of a backup.
 	backupDir := testhelper.TempDir(t)
 	testhelper.WriteFiles(t, backupDir, map[string]any{
@@ -100,10 +105,12 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 	cmd.Writer = io.Discard
 
 	require.DirExists(t, existRepoPath)
+	require.DirExists(t, poolRepoPath)
 
 	require.NoError(t, cmd.RunContext(ctx, args))
 
 	require.NoDirExists(t, existRepoPath)
+	require.DirExists(t, poolRepoPath)
 
 	// Ensure the repos were restored correctly.
 	for _, repo := range repos {
@@ -137,6 +144,11 @@ func TestRestoreSubcommand_serverSide(t *testing.T) {
 		RelativePath: "existing_repo",
 	})
 	gittest.WriteCommit(t, cfg, existRepoPath, gittest.WithBranch(git.DefaultBranch))
+
+	// This pool is dangling but should not be removed after the backup is restored.
+	_, poolRepoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+		RelativePath: gittest.NewObjectPoolName(t),
+	})
 
 	testhelper.WriteFiles(t, backupDir, map[string]any{
 		filepath.Join(existingRepo.RelativePath + ".bundle"): gittest.Exec(t, cfg, "-C", existRepoPath, "bundle", "create", "-", "--all"),
@@ -199,10 +211,12 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 	cmd.Writer = io.Discard
 
 	require.DirExists(t, existRepoPath)
+	require.DirExists(t, poolRepoPath)
 
 	require.NoError(t, cmd.RunContext(ctx, args))
 
 	require.NoDirExists(t, existRepoPath)
+	require.DirExists(t, poolRepoPath)
 
 	for _, repo := range repos {
 		repoPath := filepath.Join(cfg.Storages[0].Path, gittest.GetReplicaPath(t, ctx, cfg, repo))
