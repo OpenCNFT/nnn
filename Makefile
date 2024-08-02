@@ -176,7 +176,7 @@ endif
 
 # git-filter-repo target
 GIT_FILTER_REPO                      ?= ${BUILD_DIR}/bin/git-filter-repo
-GIT_FILTER_REPO_VERSION              ?= v2.38.0
+GIT_FILTER_REPO_VERSION              ?= v2.45.0
 GIT_FILTER_REPO_REPO_URL             ?= https://github.com/newren/git-filter-repo
 GIT_FILTER_REPO_SOURCE_DIR           ?= ${DEPENDENCY_DIR}/git-filter-repo
 
