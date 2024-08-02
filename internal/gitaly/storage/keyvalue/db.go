@@ -28,6 +28,11 @@ func internalDirectoryPath(storagePath string) string {
 	return filepath.Join(storagePath, config.GitalyDataPrefix)
 }
 
+// DatabaseDirectoryPath returns the path of the database.
+func DatabaseDirectoryPath(storagePath string) string {
+	return filepath.Join(internalDirectoryPath(storagePath), "database")
+}
+
 // DBManager manages the life-cycles of per-storage databases. It provides methods to access the
 // databases as well as manages the garbage collection for each of them.
 type DBManager struct {
@@ -61,7 +66,7 @@ func NewDBManager(
 	for _, configuredStorage := range configuredStorages {
 		internalDir := internalDirectoryPath(configuredStorage.Path)
 
-		databaseDir := filepath.Join(internalDir, "database")
+		databaseDir := DatabaseDirectoryPath(configuredStorage.Path)
 		if err := os.MkdirAll(databaseDir, mode.Directory); err != nil && !errors.Is(err, fs.ErrExist) {
 			return nil, fmt.Errorf("create storage's database directory: %w", err)
 		}

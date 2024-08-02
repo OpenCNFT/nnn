@@ -439,6 +439,49 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				return fmt.Errorf("starting raft manager: %w", err)
 			}
 		}
+	} else {
+		storagePaths := make([]string, len(cfg.Storages))
+		for i := range cfg.Storages {
+			storagePaths[i] = cfg.Storages[i].Path
+		}
+
+		if mayHaveWAL, err := storagemgr.MayHavePendingWAL(storagePaths); err != nil {
+			return fmt.Errorf("may have pending WAL: %w", err)
+		} else if mayHaveWAL {
+			dbMgr, err := keyvalue.NewDBManager(
+				cfg.Storages,
+				keyvalue.NewBadgerStore,
+				helper.NewTimerTickerFactory(time.Minute),
+				logger,
+			)
+			if err != nil {
+				return fmt.Errorf("new db manager: %w", err)
+			}
+			defer dbMgr.Close()
+
+			partitionMgr, err := storagemgr.NewPartitionManager(
+				ctx,
+				cfg.Storages,
+				gitCmdFactory,
+				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+				logger,
+				dbMgr,
+				cfg.Prometheus,
+				nil,
+			)
+			if err != nil {
+				return fmt.Errorf("new partition manager: %w", err)
+			}
+			defer partitionMgr.Close()
+
+			prometheus.MustRegister(partitionMgr)
+
+			recoveryMiddleware := storagemgr.NewTransactionRecoveryMiddleware(protoregistry.GitalyProtoPreregistered, partitionMgr)
+			txMiddleware = server.TransactionMiddleware{
+				UnaryInterceptor:  recoveryMiddleware.UnaryServerInterceptor(),
+				StreamInterceptor: recoveryMiddleware.StreamServerInterceptor(),
+			}
+		}
 	}
 
 	housekeepingManager := housekeepingmgr.New(cfg.Prometheus, logger, transactionManager, partitionMgr)
