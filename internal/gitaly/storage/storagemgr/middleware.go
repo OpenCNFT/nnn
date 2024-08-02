@@ -62,14 +62,11 @@ var repositoryCreatingRPCs = map[string]struct{}{
 // forceExclusiveSnapshot forces the RPCs to use an exclusive snapshot. This is a temporary
 // workaround for some RPCs that do not work well with shared read-only snapshots yet.
 var forceExclusiveSnapshot = map[string]bool{
-	// GetSnapshot builds the archive using whatever permissions are on the
+	// GetCustomHooks builds the archive using whatever permissions are on the
 	// disk. This leads to returning an archive where all of the directories
 	// are read-only. As this is used by replication, this leads to replication
 	// failures as TAR would fail unarchiving child entries into directories as
 	// they are read-only
-	gitalypb.RepositoryService_GetSnapshot_FullMethodName: true,
-	// GetCustomHooks has a similar issue with producing an archive that contains
-	// read-only directories.
 	gitalypb.RepositoryService_GetCustomHooks_FullMethodName: true,
 	// GetInfoAttributes is a read-only RPC that is performing a write if there
 	// is an 'info/attributes' file in the repository. This is related to

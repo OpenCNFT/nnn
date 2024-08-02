@@ -30,7 +30,7 @@ func TestGetSnapshot(t *testing.T) {
 	ctx := testhelper.Context(t)
 	cfg, client := setupRepositoryService(t)
 
-	getSnapshot := func(tb testing.TB, ctx context.Context, client gitalypb.RepositoryServiceClient, req *gitalypb.GetSnapshotRequest) ([]byte, error) {
+	getSnapshot := func(tb testing.TB, ctx context.Context, client gitalypb.RepositoryServiceClient, req *gitalypb.GetSnapshotRequest) (io.Reader, error) {
 		stream, err := client.GetSnapshot(ctx, req)
 		if err != nil {
 			return nil, err
@@ -44,7 +44,7 @@ func TestGetSnapshot(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
 		_, err = io.Copy(buf, reader)
 
-		return buf.Bytes(), err
+		return buf, err
 	}
 
 	equalError := func(tb testing.TB, expected error) func(error) {
@@ -54,10 +54,15 @@ func TestGetSnapshot(t *testing.T) {
 		}
 	}
 
+	ignoreContent := func(tb testing.TB, path string, content []byte) any {
+		return nil
+	}
+
 	type setupData struct {
 		repo            *gitalypb.Repository
 		expectedEntries []string
 		requireError    func(error)
+		expectedState   testhelper.DirectoryState
 	}
 
 	for _, tc := range []struct {
@@ -131,13 +136,6 @@ func TestGetSnapshot(t *testing.T) {
 				// Unreachable objects should also be included in the snapshot.
 				unreachableCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("unreachable"))
 
-				// Generate packed-refs file, but also keep around the loose reference.
-				gittest.Exec(t, cfg, "-C", repoPath, "pack-refs", "--all", "--no-prune")
-				refs := gittest.FilesOrReftables(
-					[]string{"packed-refs", "refs/", "refs/heads/", "refs/heads/master", "refs/tags/"},
-					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
-
 				// The shallow file, used if the repository is a shallow clone, is also included in snapshots.
 				require.NoError(t, os.WriteFile(filepath.Join(repoPath, "shallow"), nil, mode.File))
 
@@ -151,18 +149,56 @@ func TestGetSnapshot(t *testing.T) {
 					mode.File,
 				))
 
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         archive.TarFileMode,
+						ParseContent: ignoreContent,
+					},
+					"shallow": {
+						Mode:         archive.TarFileMode,
+						ParseContent: ignoreContent,
+					},
+				}
+				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
+					Mode:         archive.TarFileMode,
+					ParseContent: ignoreContent,
+				}
+				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
+					Mode:         archive.TarFileMode,
+					ParseContent: ignoreContent,
+				}
+				expected[fmt.Sprintf("objects/%s/%s", unreachableCommitID[0:2], unreachableCommitID[2:])] = testhelper.DirectoryEntry{
+					Mode:         archive.TarFileMode,
+					ParseContent: ignoreContent,
+				}
+				expected[filepath.Join("objects/pack", index)] = testhelper.DirectoryEntry{
+					Mode:         archive.TarFileMode,
+					ParseContent: ignoreContent,
+				}
+				expected[filepath.Join("objects/pack", packfile)] = testhelper.DirectoryEntry{
+					Mode:         archive.TarFileMode,
+					ParseContent: ignoreContent,
+				}
+
+				// Generate packed-refs file, but also keep around the loose reference.
+				gittest.Exec(t, cfg, "-C", repoPath, "pack-refs", "--all", "--no-prune")
+				for _, ref := range gittest.FilesOrReftables(
+					[]string{"packed-refs", "refs/", "refs/heads/", "refs/heads/master", "refs/tags/"},
+					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
+				) {
+					m := archive.TarFileMode
+					if strings.HasSuffix(ref, "/") {
+						m |= archive.ExecuteMode | fs.ModeDir
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         m,
+						ParseContent: ignoreContent,
+					}
+				}
+
 				return setupData{
-					repo: repoProto,
-					expectedEntries: append(
-						[]string{
-							"HEAD",
-							fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:]),
-							fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:]),
-							fmt.Sprintf("objects/%s/%s", unreachableCommitID[0:2], unreachableCommitID[2:]),
-							filepath.Join("objects/pack", index),
-							filepath.Join("objects/pack", packfile),
-							"shallow",
-						}, refs...),
+					repo:          repoProto,
+					expectedState: expected,
 				}
 			},
 		},
@@ -181,14 +217,30 @@ func TestGetSnapshot(t *testing.T) {
 				altObjectDir := filepath.Join(repoPath, "alt-object-dir")
 				require.NoError(t, os.WriteFile(altFile, []byte(fmt.Sprintf("%s\n", altObjectDir)), 0o000))
 
-				refs := gittest.FilesOrReftables(
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         archive.TarFileMode,
+						ParseContent: ignoreContent,
+					},
+				}
+
+				for _, ref := range gittest.FilesOrReftables(
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
+				) {
+					m := archive.TarFileMode
+					if strings.HasSuffix(ref, "/") {
+						m |= archive.ExecuteMode | fs.ModeDir
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         m,
+						ParseContent: ignoreContent,
+					}
+				}
 
 				setupData := setupData{
-					repo:            repoProto,
-					expectedEntries: append([]string{"HEAD"}, refs...),
+					repo:          repoProto,
+					expectedState: expected,
 				}
 
 				if testhelper.IsWALEnabled() {
@@ -196,7 +248,7 @@ func TestGetSnapshot(t *testing.T) {
 					setupData.requireError = func(actual error) {
 						// Skipping an alternate due to bad permissions could lead to corrupted snapshots. It would be better
 						// to fix the problem, so we don't strive to match the behavior here with transactions.
-						require.Regexp(t, "begin transaction: get snapshot: new exclusive snapshot: create repository snapshots: get alternate path: read alternates file: open: open .+/objects/info/alternates: permission denied$", actual.Error())
+						require.Regexp(t, "begin transaction: get snapshot: new shared snapshot: create repository snapshots: get alternate path: read alternates file: open: open .+/objects/info/alternates: permission denied$", actual.Error())
 					}
 				}
 
@@ -231,22 +283,35 @@ func TestGetSnapshot(t *testing.T) {
 				))
 				gittest.RequireObjectExists(t, cfg, repoPath, commitID)
 
-				refs := gittest.FilesOrReftables(
+				expected := testhelper.DirectoryState{
+					"HEAD": {
+						Mode:         archive.TarFileMode,
+						ParseContent: ignoreContent,
+					},
+				}
+
+				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
+					Mode:         archive.TarFileMode,
+					ParseContent: ignoreContent,
+				}
+
+				for _, ref := range gittest.FilesOrReftables(
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
-				)
+				) {
+					m := archive.TarFileMode
+					if strings.HasSuffix(ref, "/") {
+						m |= archive.ExecuteMode | fs.ModeDir
+					}
+					expected[ref] = testhelper.DirectoryEntry{
+						Mode:         m,
+						ParseContent: ignoreContent,
+					}
+				}
 
 				return setupData{
-					repo: repoProto,
-					expectedEntries: append(
-						[]string{
-							"HEAD",
-							// The commit ID is not included because it exists in an alternate object
-							// database that is outside the storage root.
-							fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:]),
-						},
-						refs...,
-					),
+					repo:          repoProto,
+					expectedState: expected,
 				}
 			},
 		},
@@ -257,17 +322,14 @@ func TestGetSnapshot(t *testing.T) {
 
 			setup := tc.setup(t)
 
-			data, err := getSnapshot(t, ctx, client, &gitalypb.GetSnapshotRequest{Repository: setup.repo})
+			archive, err := getSnapshot(t, ctx, client, &gitalypb.GetSnapshotRequest{Repository: setup.repo})
 			if setup.requireError != nil {
 				setup.requireError(err)
 				return
 			}
 			require.NoError(t, err)
 
-			entries, err := archive.TarEntries(bytes.NewReader(data))
-			require.NoError(t, err)
-
-			require.ElementsMatch(t, entries, setup.expectedEntries)
+			testhelper.RequireTarState(t, archive, setup.expectedState)
 		})
 	}
 }
