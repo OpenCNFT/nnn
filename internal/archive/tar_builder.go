@@ -9,8 +9,21 @@ import (
 	"regexp"
 	"strings"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
 	"golang.org/x/sys/unix"
 )
+
+// TarFileMode is the minimum file permission given to files in tar archives in
+// order to normalise the restrictive permissions used by read snapshots. It is
+// expected that on extraction these permissions will be restricted by umask.
+const TarFileMode = permission.OwnerRead | permission.OwnerWrite |
+	permission.GroupRead | permission.GroupWrite |
+	permission.OthersRead | permission.OthersWrite
+
+// ExecuteMode gives execute permissions to all. When permissions are
+// normalized, the restrictive owner only execute permission needs to be
+// expanded to all.
+const ExecuteMode = permission.OwnerExecute | permission.GroupExecute | permission.OthersExecute
 
 // TarBuilder writes a .tar archive to an io.Writer. The contents of the archive
 // are determined by successive calls to `File` and `RecursiveDir`.
@@ -60,6 +73,10 @@ func (t *TarBuilder) entry(fi os.FileInfo, filename string, r io.Reader) error {
 	}
 
 	hdr.Name = filename
+	hdr.Mode |= int64(TarFileMode)
+	if hdr.Mode&int64(permission.OwnerExecute) != 0 {
+		hdr.Mode |= int64(ExecuteMode)
+	}
 
 	if err := t.tarWriter.WriteHeader(hdr); err != nil {
 		return err

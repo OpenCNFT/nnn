@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -33,10 +33,6 @@ func TestCreateSnapshot(t *testing.T) {
 	ignoreContent := func(tb testing.TB, path string, content []byte) any {
 		return nil
 	}
-	umask := testhelper.Umask()
-	readPermission := umask.Mask(permission.OwnerRead | permission.GroupRead | permission.OthersRead)
-	writePermission := umask.Mask(permission.OwnerRead | permission.OwnerWrite | permission.GroupRead | permission.GroupWrite | permission.OthersRead | permission.OthersWrite)
-	dirPermission := umask.Mask(fs.ModePerm | fs.ModeDir)
 
 	type setupData struct {
 		repo          *Repo
@@ -110,32 +106,32 @@ doesn't seem to test a realistic scenario.`)
 
 				expected := testhelper.DirectoryState{
 					"HEAD": {
-						Mode:         writePermission,
+						Mode:         archive.TarFileMode,
 						ParseContent: ignoreContent,
 					},
 					"shallow": {
-						Mode:         mode.File,
+						Mode:         archive.TarFileMode,
 						ParseContent: ignoreContent,
 					},
 				}
 				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 				expected[fmt.Sprintf("objects/%s/%s", unreachableCommitID[0:2], unreachableCommitID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 				expected[filepath.Join("objects/pack", index)] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 				expected[filepath.Join("objects/pack", packfile)] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 
@@ -145,12 +141,12 @@ doesn't seem to test a realistic scenario.`)
 					[]string{"packed-refs", "refs/", "refs/heads/", "refs/heads/master", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
-					mode := writePermission
+					m := archive.TarFileMode
 					if strings.HasSuffix(ref, "/") {
-						mode = dirPermission
+						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
-						Mode:         mode,
+						Mode:         m,
 						ParseContent: ignoreContent,
 					}
 				}
@@ -180,7 +176,7 @@ doesn't seem to test a realistic scenario.`)
 
 				expected := testhelper.DirectoryState{
 					"HEAD": {
-						Mode:         writePermission,
+						Mode:         archive.TarFileMode,
 						ParseContent: ignoreContent,
 					},
 				}
@@ -189,12 +185,12 @@ doesn't seem to test a realistic scenario.`)
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
-					mode := writePermission
+					m := archive.TarFileMode
 					if strings.HasSuffix(ref, "/") {
-						mode = dirPermission
+						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
-						Mode:         mode,
+						Mode:         m,
 						ParseContent: ignoreContent,
 					}
 				}
@@ -259,16 +255,16 @@ doesn't seem to test a realistic scenario.`)
 
 				expected := testhelper.DirectoryState{
 					"HEAD": {
-						Mode:         writePermission,
+						Mode:         archive.TarFileMode,
 						ParseContent: ignoreContent,
 					},
 				}
 				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 
@@ -276,12 +272,12 @@ doesn't seem to test a realistic scenario.`)
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
-					mode := writePermission
+					m := archive.TarFileMode
 					if strings.HasSuffix(ref, "/") {
-						mode = dirPermission
+						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
-						Mode:         mode,
+						Mode:         m,
 						ParseContent: ignoreContent,
 					}
 				}
@@ -323,17 +319,17 @@ doesn't seem to test a realistic scenario.`)
 
 				expected := testhelper.DirectoryState{
 					"HEAD": {
-						Mode:         writePermission,
+						Mode:         archive.TarFileMode,
 						ParseContent: ignoreContent,
 					},
 				}
 
 				expected[fmt.Sprintf("objects/%s/%s", treeID[0:2], treeID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 				expected[fmt.Sprintf("objects/%s/%s", commitID[0:2], commitID[2:])] = testhelper.DirectoryEntry{
-					Mode:         readPermission,
+					Mode:         archive.TarFileMode,
 					ParseContent: ignoreContent,
 				}
 
@@ -341,12 +337,12 @@ doesn't seem to test a realistic scenario.`)
 					[]string{"refs/", "refs/heads/", "refs/tags/"},
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
-					mode := writePermission
+					m := archive.TarFileMode
 					if strings.HasSuffix(ref, "/") {
-						mode = dirPermission
+						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
-						Mode:         mode,
+						Mode:         m,
 						ParseContent: ignoreContent,
 					}
 				}
