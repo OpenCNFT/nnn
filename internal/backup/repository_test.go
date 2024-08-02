@@ -1,6 +1,8 @@
 package backup_test
 
 import (
+	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -209,4 +211,46 @@ func TestLocalRepository_SetHeadReference(t *testing.T) {
 
 	require.Equal(t, expectedHead, actualHead)
 	require.NotEqual(t, newHead, actualHead)
+}
+
+func TestCreateBundlePatterns_HandleEOF(t *testing.T) {
+	cfg := testcfg.Build(t)
+	ctx := testhelper.Context(t)
+
+	cfg.SocketPath = testserver.RunGitalyServer(t, cfg, setup.RegisterAll)
+
+	conn, err := client.Dial(ctx, cfg.SocketPath)
+	require.NoError(t, err)
+	defer testhelper.MustClose(t, conn)
+
+	// setting nil repository to replicate server returning early error
+	rr := backup.NewRemoteRepository(nil, conn)
+
+	require.ErrorContains(t,
+		rr.CreateBundle(ctx, io.Discard, rand.New(rand.NewSource(0))),
+		"repository not set",
+	)
+}
+
+func TestRemoteRepository_ResetRefs_HandleEOF(t *testing.T) {
+	cfg := testcfg.Build(t)
+	testcfg.BuildGitalyHooks(t, cfg)
+	cfg.SocketPath = testserver.RunGitalyServer(t, cfg, setup.RegisterAll)
+	ctx := testhelper.Context(t)
+
+	conn, err := client.Dial(ctx, cfg.SocketPath)
+	require.NoError(t, err)
+	defer testhelper.MustClose(t, conn)
+
+	repo, _ := gittest.CreateRepository(t, ctx, cfg)
+	rr := backup.NewRemoteRepository(repo, conn)
+
+	// Create a large number of references to pass chunker limit
+	refs := make([]git.Reference, 30000)
+	for i := range refs {
+		// Set references to an invalid ObjectID to trigger error
+		refs[i] = git.NewReference("refs/heads/main", "invalid-object-id")
+	}
+
+	require.ErrorContains(t, rr.ResetRefs(ctx, refs), "invalid object ID")
 }
