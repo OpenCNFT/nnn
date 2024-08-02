@@ -439,11 +439,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					Repositories: RepositoryStates{
 						setup.RelativePath: {
 							DefaultBranch: "refs/heads/main",
-							References: &ReferencesState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/main": setup.Commits.First.OID,
+							References: gittest.FilesOrReftables(
+								&ReferencesState{
+									FilesBackend: &FilesBackendState{
+										LooseReferences: map[git.ReferenceName]git.ObjectID{
+											"refs/heads/main": setup.Commits.First.OID,
+										},
+									},
+								}, &ReferencesState{
+									ReftableBackend: &ReftableBackendState{
+										References: map[git.ReferenceName]git.ObjectID{
+											"refs/heads/main": setup.Commits.First.OID,
+										},
+									},
 								},
-							},
+							),
 						},
 					},
 				},
@@ -607,11 +617,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					Repositories: RepositoryStates{
 						setup.RelativePath: {
 							DefaultBranch: "refs/heads/main",
-							References: &ReferencesState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/main": setup.Commits.First.OID,
+							References: gittest.FilesOrReftables(
+								&ReferencesState{
+									FilesBackend: &FilesBackendState{
+										LooseReferences: map[git.ReferenceName]git.ObjectID{
+											"refs/heads/main": setup.Commits.First.OID,
+										},
+									},
+								}, &ReferencesState{
+									ReftableBackend: &ReftableBackendState{
+										References: map[git.ReferenceName]git.ObjectID{
+											"refs/heads/main": setup.Commits.First.OID,
+										},
+									},
 								},
-							},
+							),
 							Objects: []git.ObjectID{
 								setup.ObjectHash.EmptyTreeOID,
 								setup.Commits.First.OID,
@@ -682,11 +702,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Third.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -715,11 +745,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
@@ -764,11 +804,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
@@ -811,11 +861,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
@@ -860,12 +920,23 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/existing": setup.Commits.First.OID,
-								"refs/heads/new":      setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/existing": setup.Commits.First.OID,
+										"refs/heads/new":      setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/existing": setup.Commits.First.OID,
+										"refs/heads/new":      setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
@@ -912,11 +983,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
@@ -1321,11 +1402,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					Repositories: RepositoryStates{
 						setup.RelativePath: {
 							DefaultBranch: "refs/heads/new-head",
-							References: &ReferencesState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/main": setup.Commits.First.OID,
+							References: gittest.FilesOrReftables(
+								&ReferencesState{
+									FilesBackend: &FilesBackendState{
+										LooseReferences: map[git.ReferenceName]git.ObjectID{
+											"refs/heads/main": setup.Commits.First.OID,
+										},
+									},
+								}, &ReferencesState{
+									ReftableBackend: &ReftableBackendState{
+										References: map[git.ReferenceName]git.ObjectID{
+											"refs/heads/main": setup.Commits.First.OID,
+										},
+									},
 								},
-							},
+							),
 							Objects: []git.ObjectID{
 								setup.ObjectHash.EmptyTreeOID,
 								setup.Commits.First.OID,
@@ -1356,11 +1447,21 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/new-head",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
@@ -1492,12 +1593,23 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/heads/branch-1": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -1603,13 +1715,25 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/heads/branch-1": setup.Commits.First.OID,
-								"refs/heads/branch-2": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -1735,13 +1859,25 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/heads/branch-1": setup.Commits.First.OID,
-								"refs/heads/branch-2": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -1841,14 +1977,27 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/heads/branch-1": setup.Commits.First.OID,
-								"refs/heads/branch-2": setup.Commits.First.OID,
-								"refs/heads/branch-3": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+										"refs/heads/branch-3": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+										"refs/heads/branch-3": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},

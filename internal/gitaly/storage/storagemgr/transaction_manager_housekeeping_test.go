@@ -95,21 +95,35 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID,
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								// But `main` in packed-refs file points to the first
-								// commit.
-								"refs/heads/main":  setup.Commits.First.OID,
-								"refs/tags/v1.0.0": lightweightTag,
-								"refs/tags/v2.0.0": annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										// But `main` in packed-refs file points to the first
+										// commit.
+										"refs/heads/main":  setup.Commits.First.OID,
+										"refs/tags/v1.0.0": lightweightTag,
+										"refs/tags/v2.0.0": annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										// It's shadowed by the loose reference.
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								// It's shadowed by the loose reference.
-								"refs/heads/main": setup.Commits.Second.OID,
-							},
-						},
+						),
 					},
 				},
 			},
@@ -172,17 +186,32 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID,
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								"refs/heads/branch-3": setup.Commits.Diverging.OID,
-								"refs/heads/main":     setup.Commits.Second.OID,
-								"refs/tags/v1.0.0":    lightweightTag,
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						),
 					},
 				},
 			},
@@ -227,19 +256,36 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1":       setup.Commits.Second.OID,
-								"refs/heads/branch-2":       setup.Commits.Third.OID,
-								"refs/heads/main":           setup.Commits.First.OID,
-								"refs/keep-around/1":        setup.Commits.First.OID,
-								"refs/merge-requests/1":     setup.Commits.Second.OID,
-								"refs/tags/v1.0.0":          lightweightTag,
-								"refs/tags/v2.0.0":          annotatedTag.OID,
-								"refs/very/deep/nested/ref": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1":       setup.Commits.Second.OID,
+										"refs/heads/branch-2":       setup.Commits.Third.OID,
+										"refs/heads/main":           setup.Commits.First.OID,
+										"refs/keep-around/1":        setup.Commits.First.OID,
+										"refs/merge-requests/1":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":          lightweightTag,
+										"refs/tags/v2.0.0":          annotatedTag.OID,
+										"refs/very/deep/nested/ref": setup.Commits.Third.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1":       setup.Commits.Second.OID,
+										"refs/heads/branch-2":       setup.Commits.Third.OID,
+										"refs/heads/main":           setup.Commits.First.OID,
+										"refs/keep-around/1":        setup.Commits.First.OID,
+										"refs/merge-requests/1":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":          lightweightTag,
+										"refs/tags/v2.0.0":          annotatedTag.OID,
+										"refs/very/deep/nested/ref": setup.Commits.Third.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						),
 					},
 				},
 			},
@@ -282,22 +328,38 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID,
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/tags/v1.0.0":    lightweightTag,
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										// Although ref creation commits beforehand, pack-refs
+										// task is unaware of these new refs. It keeps them as
+										// loose refs.
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/keep-around/1":  setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/keep-around/1":  setup.Commits.First.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								// Although ref creation commits beforehand, pack-refs
-								// task is unaware of these new refs. It keeps them as
-								// loose refs.
-								"refs/heads/branch-3": setup.Commits.Diverging.OID,
-								"refs/keep-around/1":  setup.Commits.First.OID,
-							},
-						},
+						),
 					},
 				},
 			},
@@ -340,21 +402,37 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID,
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/tags/v1.0.0":    lightweightTag,
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										// pack-refs task is unaware of these new refs. It keeps
+										// them as loose refs.
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/keep-around/1":  setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/keep-around/1":  setup.Commits.First.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								// pack-refs task is unaware of these new refs. It keeps
-								// them as loose refs.
-								"refs/heads/branch-3": setup.Commits.Diverging.OID,
-								"refs/keep-around/1":  setup.Commits.First.OID,
-							},
-						},
+						),
 					},
 				},
 			},
@@ -399,22 +477,36 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID, // Outdated
-								"refs/heads/branch-2": setup.Commits.Third.OID,  // Outdated
-								"refs/heads/main":     setup.Commits.First.OID,  // Outdated
-								"refs/tags/v1.0.0":    lightweightTag,           // Outdated
-								"refs/tags/v2.0.0":    annotatedTag.OID,         // Still up-to-date
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID, // Outdated
+										"refs/heads/branch-2": setup.Commits.Third.OID,  // Outdated
+										"refs/heads/main":     setup.Commits.First.OID,  // Outdated
+										"refs/tags/v1.0.0":    lightweightTag,           // Outdated
+										"refs/tags/v2.0.0":    annotatedTag.OID,         // Still up-to-date
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										// Updated refs shadow the ones in the packed-refs file.
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/heads/branch-1": setup.Commits.Third.OID,
+										"refs/heads/branch-2": setup.Commits.Diverging.OID,
+										"refs/tags/v1.0.0":    setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/heads/branch-1": setup.Commits.Third.OID,
+										"refs/heads/branch-2": setup.Commits.Diverging.OID,
+										"refs/tags/v1.0.0":    setup.Commits.First.OID,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								// Updated refs shadow the ones in the packed-refs file.
-								"refs/heads/main":     setup.Commits.Second.OID,
-								"refs/heads/branch-1": setup.Commits.Third.OID,
-								"refs/heads/branch-2": setup.Commits.Diverging.OID,
-								"refs/tags/v1.0.0":    setup.Commits.First.OID,
-							},
-						},
+						),
 					},
 				},
 			},
@@ -459,21 +551,35 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID, // Outdated
-								"refs/heads/branch-2": setup.Commits.Third.OID,  // Outdated
-								"refs/heads/main":     setup.Commits.First.OID,  // Outdated
-								"refs/tags/v1.0.0":    lightweightTag,           // Outdated
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID, // Outdated
+										"refs/heads/branch-2": setup.Commits.Third.OID,  // Outdated
+										"refs/heads/main":     setup.Commits.First.OID,  // Outdated
+										"refs/tags/v1.0.0":    lightweightTag,           // Outdated
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/heads/branch-1": setup.Commits.Third.OID,
+										"refs/heads/branch-2": setup.Commits.Diverging.OID,
+										"refs/tags/v1.0.0":    setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/heads/branch-1": setup.Commits.Third.OID,
+										"refs/heads/branch-2": setup.Commits.Diverging.OID,
+										"refs/tags/v1.0.0":    setup.Commits.First.OID,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":     setup.Commits.Second.OID,
-								"refs/heads/branch-1": setup.Commits.Third.OID,
-								"refs/heads/branch-2": setup.Commits.Diverging.OID,
-								"refs/tags/v1.0.0":    setup.Commits.First.OID,
-							},
-						},
+						),
 					},
 				},
 			},
@@ -522,17 +628,29 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							// Empty packed-refs. It means the pack-refs task is not
-							// executed.
-							PackedReferences: nil,
-							// Deleted refs went away.
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									// Empty packed-refs. It means the pack-refs task is not
+									// executed.
+									PackedReferences: nil,
+									// Deleted refs went away.
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -588,14 +706,27 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID,
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								"refs/tags/v1.0.0":    lightweightTag,
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -682,12 +813,22 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 							setup.Commits.First.OID,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						),
 					},
 					"member": {
 						Objects: []git.ObjectID{
@@ -737,14 +878,26 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-2": setup.Commits.Third.OID,
-								"refs/heads/main":     setup.Commits.First.OID,
-								"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						),
 					},
 				},
 			},
@@ -810,12 +963,22 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/empty-dir/parent/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/empty-dir/parent/main": setup.Commits.First.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/empty-dir/parent/main": setup.Commits.First.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						),
 					},
 				},
 			},
@@ -839,9 +1002,17 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: defaultReferences,
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 					},
 				},
 			},
@@ -867,9 +1038,17 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: defaultReferences,
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 					},
 				},
 			},
@@ -919,10 +1098,18 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: defaultReferences,
-							LooseReferences:  map[git.ReferenceName]git.ObjectID{},
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: defaultReferences,
+									LooseReferences:  map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 					},
 				},
 			},
@@ -1005,12 +1192,22 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 							setup.Commits.First.OID,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						),
 					},
 					"member": {
 						Objects: []git.ObjectID{
@@ -1067,10 +1264,18 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							PackedReferences: defaultReferences,
-							LooseReferences:  map[git.ReferenceName]git.ObjectID{},
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: defaultReferences,
+									LooseReferences:  map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 					},
 				},
 			},
@@ -1127,9 +1332,17 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{},
+								},
+							},
+						),
 						Objects: []git.ObjectID{},
 					},
 				},
@@ -1211,7 +1424,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							// Loose objects stay intact.
 							LooseObjects: []git.ObjectID{
@@ -1265,7 +1488,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							// Unreachable objects are packed.
 							LooseObjects: nil,
@@ -1315,7 +1548,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -1364,7 +1607,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							LooseObjects: nil,
 							Packfiles: []*PackfileState{
@@ -1417,7 +1670,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							LooseObjects: nil,
 							Packfiles: []*PackfileState{
@@ -1474,7 +1737,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -1525,7 +1798,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							// Unreachable objects are pruned.
 							LooseObjects: nil,
@@ -1577,7 +1860,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -1627,7 +1920,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							LooseObjects: nil,
 							Packfiles: []*PackfileState{
@@ -1708,7 +2011,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							LooseObjects: nil,
 							Packfiles: []*PackfileState{
@@ -1759,7 +2072,17 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References:    &ReferencesState{LooseReferences: defaultReferences},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: defaultReferences,
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: defaultReferences,
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							LooseObjects:      append(defaultReachableObjects, setup.Commits.Unreachable.OID, setup.Commits.Orphan.OID),
 							Packfiles:         []*PackfileState{},
@@ -1815,9 +2138,17 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{},
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{},
 						},
@@ -1870,11 +2201,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -1951,11 +2292,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Third.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2039,11 +2390,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Third.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2123,11 +2484,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2228,11 +2599,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Diverging.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Diverging.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Diverging.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2335,11 +2716,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2422,11 +2813,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2514,11 +2915,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2604,12 +3015,23 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.First.OID,
-								"refs/heads/branch-2": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.First.OID,
+										"refs/heads/branch-2": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2683,11 +3105,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -2902,11 +3334,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							HasMultiPackIndex: false,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
 					"member": {
@@ -2933,11 +3375,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							},
 							HasMultiPackIndex: false,
 						},
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Alternate:           "../../pool/objects",
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
@@ -3041,12 +3493,23 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							HasMultiPackIndex: false,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":   setup.Commits.First.OID,
-								"refs/heads/branch": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":   setup.Commits.First.OID,
+										"refs/heads/branch": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":   setup.Commits.First.OID,
+										"refs/heads/branch": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
 					"member": {
@@ -3187,11 +3650,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							HasMultiPackIndex: false,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
 					"member": {
@@ -3220,11 +3693,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							},
 							HasMultiPackIndex: false,
 						},
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch": setup.Commits.Third.OID,
+									},
+								},
 							},
-						},
+						),
 						Alternate:           "../../pool/objects",
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
@@ -3336,11 +3819,21 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							HasMultiPackIndex: false,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.First.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
 							},
-						},
+						),
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
 					"member": {
@@ -3362,12 +3855,23 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 							},
 							HasMultiPackIndex: false,
 						},
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/branch-1": setup.Commits.Second.OID,
-								"refs/heads/branch-2": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+									},
+								},
 							},
-						},
+						),
 						Alternate:           "../../pool/objects",
 						FullRepackTimestamp: &FullRepackTimestamp{Exists: true},
 					},
@@ -3576,11 +4080,21 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main": setup.Commits.Second.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.Second.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{
@@ -3633,9 +4147,17 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{},
-						},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{},
+								},
+							},
+						),
 						Packfiles: &PackfilesState{
 							CommitGraphs: &stats.CommitGraphInfo{
 								Exists:                 true,
@@ -3792,12 +4314,23 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							LooseReferences: map[git.ReferenceName]git.ObjectID{
-								"refs/heads/main":   setup.Commits.Second.OID,
-								"refs/heads/branch": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":   setup.Commits.Second.OID,
+										"refs/heads/branch": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									References: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":   setup.Commits.Second.OID,
+										"refs/heads/branch": setup.Commits.Third.OID,
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{
 								{

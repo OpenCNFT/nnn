@@ -60,13 +60,29 @@ type RepositoryState struct {
 	FullRepackTimestamp *FullRepackTimestamp
 }
 
-// ReferencesState describes the asserted state of packed-refs and loose references. It's mostly used for verifying
-// pack-refs housekeeping task.
-type ReferencesState struct {
+// FilesBackendState contains the reference state for the files backend. There is
+// separation for loose refs and packed refs so we can assert them individually.
+type FilesBackendState struct {
 	// PackedReferences is the content of pack-refs file, line by line
 	PackedReferences map[git.ReferenceName]git.ObjectID
 	// LooseReferences is the exact list of loose references outside packed-refs.
 	LooseReferences map[git.ReferenceName]git.ObjectID
+}
+
+// ReftableBackendState holds the reference state for the reftable backend. Since
+// there are no different types of references, we contain a list of all references.
+type ReftableBackendState struct {
+	// References is the complete list of references.
+	References map[git.ReferenceName]git.ObjectID
+}
+
+// ReferencesState describes the asserted state of packed-refs and loose references. It's mostly used for verifying
+// pack-refs housekeeping task.
+type ReferencesState struct {
+	// FilesBackend contains the state for the files backend.
+	FilesBackend *FilesBackendState
+	// ReftableBackend contains the state for the reftable backend.
+	ReftableBackend *ReftableBackendState
 }
 
 // PackfilesState describes the asserted state of all packfiles and common multi-pack-index.
@@ -159,17 +175,17 @@ func RequireRepositoryState(tb testing.TB, ctx context.Context, cfg config.Cfg, 
 	var actualReferencesState *ReferencesState
 
 	if refBackend == git.ReferenceBackendFiles {
-		actualReferencesState, err = collectReferencesState(tb, expected, repoPath)
+		actualReferencesState, err = collectFilesReferencesState(tb, expected, repoPath)
 		require.NoError(tb, err)
 
 		// Verify if the combination of packed-refs and loose refs match the point of view of Git.
 		referencesFromFile := map[git.ReferenceName]git.ObjectID{}
 		if actualReferencesState != nil {
-			for name, oid := range actualReferencesState.PackedReferences {
+			for name, oid := range actualReferencesState.FilesBackend.PackedReferences {
 				referencesFromFile[name] = oid
 			}
 
-			for name, oid := range actualReferencesState.LooseReferences {
+			for name, oid := range actualReferencesState.FilesBackend.LooseReferences {
 				referencesFromFile[name] = oid
 			}
 		}
@@ -193,23 +209,11 @@ func RequireRepositoryState(tb testing.TB, ctx context.Context, cfg config.Cfg, 
 			return nil
 		}))
 	} else if refBackend == git.ReferenceBackendReftables {
-		// For the reftable backend, there are no loose references and packed references.
-		// So here we simply map all the references to be loose references in the actual
-		// as well as the expected state.
-		if len(gitReferences) > 0 {
-			actualReferencesState = &ReferencesState{
-				LooseReferences: make(map[git.ReferenceName]git.ObjectID),
-			}
-
-			for _, reference := range gitReferences {
-				actualReferencesState.LooseReferences[reference.Name] = git.ObjectID(reference.Target)
-			}
-		}
-
 		if expected.References != nil {
-			for reference, target := range expected.References.PackedReferences {
-				expected.References.LooseReferences[reference] = target
-				delete(expected.References.PackedReferences, reference)
+			actualReferencesState = &ReferencesState{
+				ReftableBackend: &ReftableBackendState{
+					References: actualGitReferences,
+				},
 			}
 		}
 	} else {
@@ -320,7 +324,7 @@ func RequireRepositoryState(tb testing.TB, ctx context.Context, cfg config.Cfg, 
 	testhelper.RequireDirectoryState(tb, filepath.Join(repoPath, repoutil.CustomHooksDir), "", expected.CustomHooks)
 }
 
-func collectReferencesState(tb testing.TB, expected RepositoryState, repoPath string) (*ReferencesState, error) {
+func collectFilesReferencesState(tb testing.TB, expected RepositoryState, repoPath string) (*ReferencesState, error) {
 	if expected.References == nil {
 		return nil, nil
 	}
@@ -379,8 +383,10 @@ func collectReferencesState(tb testing.TB, expected RepositoryState, repoPath st
 	}))
 
 	return &ReferencesState{
-		PackedReferences: packedReferences,
-		LooseReferences:  looseReferences,
+		FilesBackend: &FilesBackendState{
+			PackedReferences: packedReferences,
+			LooseReferences:  looseReferences,
+		},
 	}, nil
 }
 
