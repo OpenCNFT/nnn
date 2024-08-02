@@ -61,8 +61,28 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -114,8 +134,28 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -178,8 +218,38 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.Second.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 3,
+											MaxIndex: 3,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -246,8 +316,28 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -345,10 +435,48 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main":  setup.Commits.First.OID,
-										"refs/heads/other": setup.Commits.Second.OID,
-										"refs/heads/third": setup.Commits.Third.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 3,
+											MaxIndex: 3,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/other",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 4,
+											MaxIndex: 4,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/third",
+													Target: setup.Commits.Third.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -406,8 +534,28 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -69,11 +70,21 @@ type FilesBackendState struct {
 	LooseReferences map[git.ReferenceName]git.ObjectID
 }
 
+// ReftableTable denotes a single table in the reftable backend.
+type ReftableTable struct {
+	// MinIndex refers to the minimum index of all reftables.
+	MinIndex uint64
+	// MaxIndex refers to the maximum index of all reftables.
+	MaxIndex uint64
+	// References is the complete list of references.
+	References []git.Reference
+}
+
 // ReftableBackendState holds the reference state for the reftable backend. Since
 // there are no different types of references, we contain a list of all references.
 type ReftableBackendState struct {
-	// References is the complete list of references.
-	References map[git.ReferenceName]git.ObjectID
+	// Tables denotes the list of reftable tables.
+	Tables []ReftableTable
 }
 
 // ReferencesState describes the asserted state of packed-refs and loose references. It's mostly used for verifying
@@ -165,9 +176,9 @@ func RequireRepositoryState(tb testing.TB, ctx context.Context, cfg config.Cfg, 
 	headReference, err := repo.HeadReference(ctx)
 	require.NoError(tb, err)
 
-	actualGitReferences := map[git.ReferenceName]git.ObjectID{}
 	gitReferences, err := repo.GetReferences(ctx)
 	require.NoError(tb, err)
+	actualGitReferences := map[git.ReferenceName]git.ObjectID{}
 	for _, ref := range gitReferences {
 		actualGitReferences[ref.Name] = git.ObjectID(ref.Target)
 	}
@@ -209,13 +220,8 @@ func RequireRepositoryState(tb testing.TB, ctx context.Context, cfg config.Cfg, 
 			return nil
 		}))
 	} else if refBackend == git.ReferenceBackendReftables {
-		if expected.References != nil {
-			actualReferencesState = &ReferencesState{
-				ReftableBackend: &ReftableBackendState{
-					References: actualGitReferences,
-				},
-			}
-		}
+		actualReferencesState, err = collectReftableReferencesState(tb, expected, repoPath, headReference, actualGitReferences)
+		require.NoError(tb, err)
 	} else {
 		tb.Errorf("unknown reference backend: %s", refBackend)
 	}
@@ -322,6 +328,83 @@ func RequireRepositoryState(tb testing.TB, ctx context.Context, cfg config.Cfg, 
 		},
 	)
 	testhelper.RequireDirectoryState(tb, filepath.Join(repoPath, repoutil.CustomHooksDir), "", expected.CustomHooks)
+}
+
+func collectReftableReferencesState(
+	tb testing.TB,
+	expected RepositoryState,
+	repoPath string,
+	headReference git.ReferenceName,
+	expectedReferences map[git.ReferenceName]git.ObjectID,
+) (*ReferencesState, error) {
+	if expected.References == nil {
+		return nil, nil
+	}
+
+	state := &ReferencesState{
+		ReftableBackend: &ReftableBackendState{
+			Tables: []ReftableTable{},
+		},
+	}
+
+	tableNames, err := git.ReadReftablesList(repoPath)
+	require.NoError(tb, err)
+
+	expectedFiles := map[string]struct{}{"tables.list": {}}
+	for _, tableName := range tableNames {
+		expectedFiles[tableName] = struct{}{}
+	}
+
+	actualFiles := map[string]struct{}{}
+	dirEntries, err := os.ReadDir(filepath.Join(repoPath, "reftable"))
+	require.NoError(tb, err)
+
+	for _, entry := range dirEntries {
+		actualFiles[entry.Name()] = struct{}{}
+	}
+	require.Equal(tb, expectedFiles, actualFiles, "reftables directory contained unexpected files not present in tables.list")
+
+	actualReferences := make(map[git.ReferenceName]git.ObjectID)
+
+	for _, tableName := range tableNames {
+		table := ReftableTable{}
+
+		data, err := os.ReadFile(filepath.Join(repoPath, "reftable", tableName))
+		require.NoError(tb, err)
+
+		matches := git.ReftableTableNameRegex.FindAllStringSubmatch(tableName, -1)
+		require.Equal(tb, 1, len(matches))
+		require.Equal(tb, 3, len(matches[0]))
+		table.MinIndex, err = strconv.ParseUint(matches[0][1], 10, 0)
+		require.NoError(tb, err)
+		table.MaxIndex, err = strconv.ParseUint(matches[0][2], 10, 0)
+		require.NoError(tb, err)
+
+		reftable, err := git.NewReftable(data)
+		require.NoError(tb, err)
+
+		table.References, err = reftable.IterateRefs()
+		require.NoError(tb, err)
+
+		for _, reference := range table.References {
+			actualReferences[reference.Name] = git.ObjectID(reference.Target)
+		}
+
+		state.ReftableBackend.Tables = append(state.ReftableBackend.Tables, table)
+	}
+
+	// We need to remove the tombstone refs so we can do a comparison.
+	for reference, target := range actualReferences {
+		if target == gittest.DefaultObjectHash.ZeroOID {
+			delete(actualReferences, reference)
+		}
+	}
+
+	// Append the head reference to actualGitReferences so we can compare the two maps
+	expectedReferences["HEAD"] = git.ObjectID(headReference)
+	require.Equal(tb, expectedReferences, actualReferences)
+
+	return state, nil
 }
 
 func collectFilesReferencesState(tb testing.TB, expected RepositoryState, repoPath string) (*ReferencesState, error) {

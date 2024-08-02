@@ -66,8 +66,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -140,8 +154,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -168,8 +196,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/new-branch": setup.Commits.Second.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/new-branch",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -250,8 +292,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -341,8 +397,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -479,8 +549,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -510,8 +594,28 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.Second.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1208,8 +1312,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1229,8 +1347,28 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1305,8 +1443,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1326,8 +1478,28 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.Second.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1392,8 +1564,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/main": setup.Commits.First.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 2,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/main",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/main",
+														Target: setup.Commits.First.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1434,8 +1620,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1541,8 +1741,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/main": setup.Commits.First.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 2,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/main",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/main",
+														Target: setup.Commits.First.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1572,8 +1786,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/branch": setup.Commits.Third.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 3,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/branch",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/branch",
+														Target: setup.Commits.Third.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1620,8 +1848,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1651,8 +1893,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/branch": setup.Commits.Third.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 3,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/branch",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch",
+													Target: setup.Commits.Third.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1739,8 +1995,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/main": setup.Commits.First.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 2,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/main",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/main",
+														Target: setup.Commits.First.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1761,8 +2031,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/branch": setup.Commits.Second.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 3,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/branch",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/branch",
+														Target: setup.Commits.Second.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1797,8 +2081,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1819,8 +2117,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/branch": setup.Commits.Second.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 3,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/branch",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1895,8 +2207,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/main": setup.Commits.First.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 2,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/main",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/main",
+														Target: setup.Commits.First.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1917,8 +2243,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 									},
 								}, &ReferencesState{
 									ReftableBackend: &ReftableBackendState{
-										References: map[git.ReferenceName]git.ObjectID{
-											"refs/heads/branch": setup.Commits.Second.OID,
+										Tables: []ReftableTable{
+											{
+												MinIndex: 1,
+												MaxIndex: 3,
+												References: []git.Reference{
+													{
+														Name:       "HEAD",
+														Target:     "refs/heads/branch",
+														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/branch",
+														Target: setup.Commits.Second.OID.String(),
+													},
+												},
+											},
 										},
 									},
 								},
@@ -1953,8 +2293,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},
@@ -1975,8 +2329,22 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 								},
 							}, &ReferencesState{
 								ReftableBackend: &ReftableBackendState{
-									References: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/branch": setup.Commits.Second.OID,
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 3,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/branch",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
 									},
 								},
 							},

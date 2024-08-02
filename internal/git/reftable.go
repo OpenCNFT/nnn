@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 type reftableHeader struct {
@@ -330,4 +333,24 @@ func NewReftable(content []byte) (*reftable, error) {
 	t.footer = &f
 
 	return t, nil
+}
+
+// ReadReftablesList returns a list of tables in the "tables.list" for the
+// reftable backend.
+func ReadReftablesList(repoPath string) ([]string, error) {
+	tablesListPath := filepath.Join(repoPath, "reftable", "tables.list")
+
+	data, err := os.ReadFile(tablesListPath)
+	if err != nil {
+		return []string{}, fmt.Errorf("reading tables.list: %w", err)
+	}
+
+	list := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	for _, line := range list {
+		if !ReftableTableNameRegex.Match([]byte(line)) {
+			return list, fmt.Errorf("unrecognized reftable name: %s", line)
+		}
+	}
+
+	return list, nil
 }
