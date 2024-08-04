@@ -463,7 +463,7 @@ func (mgr *Manager) writeBundle(ctx context.Context, repo Repository, step *Step
 
 	if err := repo.CreateBundle(ctx, w, patterns); err != nil {
 		if errors.Is(err, localrepo.ErrEmptyBundle) {
-			return fmt.Errorf("write bundle: %w: no changes to bundle", ErrSkipped)
+			return nil
 		}
 		return fmt.Errorf("write bundle: %w", err)
 	}
