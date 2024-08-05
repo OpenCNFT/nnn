@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -33,6 +34,8 @@ const ExecuteMode = permission.OwnerExecute | permission.GroupExecute | permissi
 //
 // TarBuilder is **not** safe for concurrent use.
 type TarBuilder struct {
+	allowSymlinks bool
+
 	basePath  string
 	tarWriter *tar.Writer
 
@@ -60,10 +63,21 @@ func (t *TarBuilder) setErr(err error) error {
 
 func (t *TarBuilder) entry(fi os.FileInfo, filename string, r io.Reader) error {
 	if !fi.Mode().IsRegular() && !fi.Mode().IsDir() {
-		return fmt.Errorf("unsupported mode for %v: %v", filename, fi.Mode())
+		if !t.allowSymlinks && fi.Mode()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("unsupported mode for %v: %v", filename, fi.Mode())
+		}
 	}
 
-	hdr, err := tar.FileInfoHeader(fi, "")
+	var link string
+	if fi.Mode()&fs.ModeSymlink != 0 {
+		var err error
+		link, err = os.Readlink(t.join(filename))
+		if err != nil {
+			return err
+		}
+	}
+
+	hdr, err := tar.FileInfoHeader(fi, link)
 	if err != nil {
 		return err
 	}
@@ -112,11 +126,11 @@ func (t *TarBuilder) walk(path string, fi os.FileInfo, err error) error {
 	}
 
 	// Ignore symlinks and special files in directories
-	if !fi.Mode().IsRegular() {
+	if !t.allowSymlinks && !fi.Mode().IsRegular() {
 		return nil
 	}
 
-	return t.File(rel, true)
+	return t.file(fi, rel, true)
 }
 
 // File writes a single regular file to the archive. It is an error if the file
@@ -127,6 +141,26 @@ func (t *TarBuilder) walk(path string, fi os.FileInfo, err error) error {
 func (t *TarBuilder) File(rel string, mustExist bool) error {
 	if t.err != nil {
 		return t.err
+	}
+
+	filename := t.join(rel)
+
+	fi, err := os.Lstat(filename)
+	if err != nil {
+		// The file doesn't exist, but we've been told that's OK
+		if os.IsNotExist(err) && !mustExist {
+			return nil
+		}
+
+		return t.setErr(err)
+	}
+
+	return t.file(fi, rel, mustExist)
+}
+
+func (t *TarBuilder) file(fi fs.FileInfo, rel string, mustExist bool) error {
+	if t.allowSymlinks && fi.Mode()&fs.ModeSymlink != 0 {
+		return t.setErr(t.entry(fi, rel, nil))
 	}
 
 	filename := t.join(rel)
@@ -144,11 +178,6 @@ func (t *TarBuilder) File(rel string, mustExist bool) error {
 	}
 
 	defer file.Close()
-
-	fi, err := file.Stat()
-	if err != nil {
-		return t.setErr(err)
-	}
 
 	return t.setErr(t.entry(fi, rel, file))
 }

@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"runtime"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -23,21 +21,15 @@ const (
 // Symlinks will be included in the archive. Permissions are normalised to
 // allow global read/write.
 func WriteTarball(ctx context.Context, logger log.Logger, writer io.Writer, path string, members ...string) error {
-	cmdArgs := []string{"-c", "-f", "-", "-C", path, "--mode", "a+rwX"}
+	builder := NewTarBuilder(path, writer)
+	builder.allowSymlinks = true
 
-	if runtime.GOOS == "darwin" {
-		cmdArgs = append(cmdArgs, "--no-mac-metadata")
+	for _, member := range members {
+		_ = builder.RecursiveDir(member, true)
 	}
 
-	cmdArgs = append(cmdArgs, members...)
-
-	cmd, err := command.New(ctx, logger, append([]string{"tar"}, cmdArgs...), command.WithStdout(writer))
-	if err != nil {
-		return fmt.Errorf("executing tar command: %w", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("waiting for tar command completion: %w", err)
+	if err := builder.Close(); err != nil {
+		return fmt.Errorf("write tarball: %w", err)
 	}
 
 	return nil
