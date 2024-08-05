@@ -69,6 +69,10 @@ No changes.
 
 - [config: Don't allow storages to share a path](gitlab-org/gitaly@1f2789d97fd7b7d104a1ebaabbea90f9e5e4bff8) ([merge request](gitlab-org/gitaly!6849))
 
+## 16.11.8 (2024-08-05)
+
+No changes.
+
 ## 16.11.7 (2024-07-23)
 
 No changes.
