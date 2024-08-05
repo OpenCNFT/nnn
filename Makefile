@@ -212,8 +212,7 @@ GIT_PACKED_EXECUTABLES       = $(addprefix ${BUILD_DIR}/bin/gitaly-, \
 # All executables provided by Gitaly.
 GITALY_EXECUTABLES           = $(addprefix ${BUILD_DIR}/bin/,$(notdir $(shell find ${SOURCE_DIR}/cmd -mindepth 1 -maxdepth 1 -type d -print)))
 # All executables packed inside the Gitaly binary.
-GITALY_PACKED_EXECUTABLES    = $(filter %gitaly-hooks %gitaly-gpg %gitaly-ssh %gitaly-lfs-smudge, ${GITALY_EXECUTABLES}) \
-								${GIT_PACKED_EXECUTABLES}
+GITALY_PACKED_EXECUTABLES    = $(filter %gitaly-hooks %gitaly-gpg %gitaly-ssh %gitaly-lfs-smudge, ${GITALY_EXECUTABLES})
 
 # All executables that should be installed.
 GITALY_INSTALLED_EXECUTABLES = $(filter-out ${GITALY_PACKED_EXECUTABLES}, ${GITALY_EXECUTABLES})
@@ -343,7 +342,7 @@ run_go_tests += \
 endif
 
 .PHONY: prepare-tests
-prepare-tests: ${GOTESTSUM} ${GITALY_PACKED_EXECUTABLES} ${GIT_FILTER_REPO}
+prepare-tests: ${GOTESTSUM} ${GITALY_PACKED_EXECUTABLES} ${GIT_FILTER_REPO} ${GIT_PACKED_EXECUTABLES}
 	${Q}mkdir -p "$(dir ${TEST_JUNIT_REPORT})"
 
 .PHONY: prepare-debug
@@ -424,12 +423,12 @@ ${TOOLS_DIR}/gitaly-linters.so: ${SOURCE_DIR}/tools/golangci-lint/go.sum $(wildc
 
 .PHONY: lint
 ## Run Go linter.
-lint: ${GOLANGCI_LINT} ${GITALY_PACKED_EXECUTABLES} ${TOOLS_DIR}/gitaly-linters.so lint-gitaly-linters
+lint: ${GOLANGCI_LINT} ${GITALY_PACKED_EXECUTABLES} ${GIT_PACKED_EXECUTABLES} ${TOOLS_DIR}/gitaly-linters.so lint-gitaly-linters
 	${Q}${GOLANGCI_LINT} run --build-tags "${SERVER_BUILD_TAGS}" --out-format tab --config ${GOLANGCI_LINT_CONFIG} ${GOLANGCI_LINT_OPTIONS}
 
 .PHONY: lint-fix
 ## Run Go linter and write back fixes to the files (not supported by all linters).
-lint-fix: ${GOLANGCI_LINT} ${GITALY_PACKED_EXECUTABLES} ${TOOLS_DIR}/gitaly-linters.so
+lint-fix: ${GOLANGCI_LINT} ${GITALY_PACKED_EXECUTABLES} ${GIT_PACKED_EXECUTABLES} ${TOOLS_DIR}/gitaly-linters.so
 	${Q}${GOLANGCI_LINT} run --fix --build-tags "${SERVER_BUILD_TAGS}" --out-format tab --config ${GOLANGCI_LINT_CONFIG} ${GOLANGCI_LINT_OPTIONS}
 
 .PHONY: lint-docs
@@ -591,7 +590,7 @@ clear-go-build-cache-if-needed:
 
 ${BUILD_DIR}/intermediate/gitaly:            build-bundled-git
 ${BUILD_DIR}/intermediate/gitaly:            GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
-${BUILD_DIR}/intermediate/gitaly:            ${GITALY_PACKED_EXECUTABLES}
+${BUILD_DIR}/intermediate/gitaly:            ${GITALY_PACKED_EXECUTABLES} ${GIT_PACKED_EXECUTABLES}
 ${BUILD_DIR}/intermediate/praefect:          GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
 ${BUILD_DIR}/intermediate/%:                 clear-go-build-cache-if-needed .FORCE
 	@ # We're building intermediate binaries first which contain a fixed build ID
