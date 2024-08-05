@@ -134,7 +134,8 @@ func TestNewProtoRegistry(t *testing.T) {
 
 	for serviceName, methods := range expectedResults {
 		for methodName, opType := range methods {
-			method := fmt.Sprintf("/gitaly.%s/%s", serviceName, methodName)
+			const packageName = "gitaly"
+			method := formatFullMethodName(packageName, serviceName, methodName)
 
 			methodInfo, err := GitalyProtoPreregistered.LookupMethod(method)
 			require.NoError(t, err)
@@ -142,6 +143,10 @@ func TestNewProtoRegistry(t *testing.T) {
 			require.Equalf(t, opType, methodInfo.Operation, "expect %s:%s to have the correct op type", serviceName, methodName)
 			require.Equal(t, method, methodInfo.FullMethodName())
 			require.False(t, GitalyProtoPreregistered.IsInterceptedMethod(method), method)
+
+			require.Equal(t, packageName, methodInfo.Package())
+			require.Equal(t, serviceName, methodInfo.Service())
+			require.Equal(t, methodName, methodInfo.Method())
 		}
 	}
 }
