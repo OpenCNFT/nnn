@@ -123,8 +123,8 @@ func TestRetryPolicy(t *testing.T) {
 			failRequest = true
 
 			resp, err := client.ObjectFormat(ctx, &gitalypb.ObjectFormatRequest{Repository: repo})
-			require.Equal(t, retryableError, err)
-			require.Nil(t, resp)
+			require.NoError(t, err)
+			testhelper.ProtoEqual(t, &gitalypb.ObjectFormatResponse{}, resp)
 		})
 	})
 
@@ -149,8 +149,8 @@ func TestRetryPolicy(t *testing.T) {
 			require.NoError(t, err)
 
 			resp, err := stream.Recv()
-			require.Equal(t, retryableError, err)
-			require.Nil(t, resp)
+			require.NoError(t, err)
+			testhelper.ProtoEqual(t, &gitalypb.GetCustomHooksResponse{}, resp)
 		})
 	})
 }
