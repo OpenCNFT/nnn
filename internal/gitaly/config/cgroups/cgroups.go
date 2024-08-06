@@ -96,12 +96,23 @@ type Repositories struct {
 
 // Validate runs validation on all fields and compose all found errors.
 func (r *Repositories) Validate(memBytes int64, cpuShares uint64, cpuQuotaUs int64) error {
-	return cfgerror.New().
+	errs := cfgerror.New().
 		Append(cfgerror.InRange(0, r.Count, r.MaxCgroupsPerRepo, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "max_cgroups_per_repo").
-		Append(cfgerror.InRange(0, memBytes, r.MemoryBytes, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "memory_bytes").
-		Append(cfgerror.InRange(0, cpuShares, r.CPUShares, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "cpu_shares").
-		Append(cfgerror.InRange(0, cpuQuotaUs, r.CPUQuotaUs, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "cpu_quota_us").
-		AsError()
+		Append(cfgerror.IsNaturalNumber(memBytes), "memory_bytes").
+		Append(cfgerror.IsNaturalNumber(cpuQuotaUs), "cpu_quota_us")
+
+	// 0 implies no limit, so we only validate the range if the user explicitly set the value.
+	if memBytes > 0 {
+		errs = errs.Append(cfgerror.InRange(0, memBytes, r.MemoryBytes, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "memory_bytes")
+	}
+	if cpuShares > 0 {
+		errs = errs.Append(cfgerror.InRange(0, cpuShares, r.CPUShares, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "cpu_shares")
+	}
+	if cpuQuotaUs > 0 {
+		errs = errs.Append(cfgerror.InRange(0, cpuQuotaUs, r.CPUQuotaUs, cfgerror.InRangeOptIncludeMin, cfgerror.InRangeOptIncludeMax), "cpu_quota_us")
+	}
+
+	return errs.AsError()
 }
 
 // Memory is a struct storing cgroups memory config
