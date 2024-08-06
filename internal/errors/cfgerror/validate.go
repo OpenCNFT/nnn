@@ -267,6 +267,15 @@ func IsSupportedValue[T comparable](value T, supportedValues ...T) error {
 	return NewValidationError(fmt.Errorf("%w: %v", ErrUnsupportedValue, value))
 }
 
+// IsNaturalNumber ensures that value is >= 0.
+func IsNaturalNumber[T Numeric](value T) error {
+	if value < 0 {
+		return NewValidationError(fmt.Errorf("%w: %v", ErrUnsupportedValue, value))
+	}
+
+	return nil
+}
+
 type numeric[T Numeric] struct {
 	value T
 }
