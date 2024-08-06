@@ -41,14 +41,14 @@ func newNamespacedDBAccessor(ptnMgr *storagemgr.PartitionManager, storageName st
 // dbForStorage returns a namedspaced DB accessor function for specific information of a storage in
 // Raft cluster such as allocated storage ID, last applied replica groups, etc.
 func dbForStorage(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/self"))
+	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/self/"))
 }
 
 // dbForMetadataGroup returns a namedspaced DB accessfor function to store the data of metadata Raft
 // group. Those data consists of cluster-wide information such as list of registered storages and
 // their replication groups, etc.
 func dbForMetadataGroup(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/cluster"))
+	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/cluster/"))
 }
 
 var keyLastApplied = []byte("applied_lsn")
