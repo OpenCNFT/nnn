@@ -38,9 +38,7 @@ func New(protos ...*descriptorpb.FileDescriptorProto) (*Registry, error) {
 	for _, p := range protos {
 		for _, svc := range p.GetService() {
 			for _, method := range svc.GetMethod() {
-				fullMethodName := fmt.Sprintf("/%s.%s/%s",
-					p.GetPackage(), svc.GetName(), method.GetName(),
-				)
+				fullMethodName := formatFullMethodName(p.GetPackage(), svc.GetName(), method.GetName())
 
 				if intercepted, err := protoutil.IsInterceptedMethod(svc, method); err != nil {
 					return nil, fmt.Errorf("is intercepted: %w", err)
@@ -49,7 +47,7 @@ func New(protos ...*descriptorpb.FileDescriptorProto) (*Registry, error) {
 					continue
 				}
 
-				mi, err := parseMethodInfo(p, method, fullMethodName)
+				mi, err := parseMethodInfo(p, svc, method)
 				if err != nil {
 					return nil, err
 				}

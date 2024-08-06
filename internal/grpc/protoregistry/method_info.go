@@ -67,8 +67,10 @@ type MethodInfo struct {
 	Scope       Scope
 	requestName string // protobuf message name for input type
 	// requestType is the RPC's request type.
-	requestType    protoreflect.MessageType
-	fullMethodName string
+	requestType protoreflect.MessageType
+	fileDesc    *descriptorpb.FileDescriptorProto
+	serviceDesc *descriptorpb.ServiceDescriptorProto
+	methodDesc  *descriptorpb.MethodDescriptorProto
 }
 
 // TargetRepo returns the target repository for a protobuf message if it exists
@@ -84,7 +86,27 @@ func (mi MethodInfo) AdditionalRepo(msg proto.Message) (*gitalypb.Repository, er
 
 //nolint:revive // This is unintentionally missing documentation.
 func (mi MethodInfo) FullMethodName() string {
-	return mi.fullMethodName
+	return formatFullMethodName(mi.fileDesc.GetPackage(), mi.serviceDesc.GetName(), mi.methodDesc.GetName())
+}
+
+// Package returns the name of the package the method is defined in.
+func (mi MethodInfo) Package() string {
+	return mi.fileDesc.GetPackage()
+}
+
+// Service returns the name of the service the method is defined in.
+func (mi MethodInfo) Service() string {
+	return mi.serviceDesc.GetName()
+}
+
+// Method returns the name of the method.
+func (mi MethodInfo) Method() string {
+	return mi.methodDesc.GetName()
+}
+
+// formatFullMethodName returns the full method name composed from the components.
+func formatFullMethodName(packageName, serviceName, methodName string) string {
+	return fmt.Sprintf("/%s.%s/%s", packageName, serviceName, methodName)
 }
 
 // ErrRepositoryFieldNotFound indicates that the repository field could not be found.
@@ -188,9 +210,9 @@ func (mi MethodInfo) NewRequest() proto.Message {
 }
 
 func parseMethodInfo(
-	p *descriptorpb.FileDescriptorProto,
+	fileDesc *descriptorpb.FileDescriptorProto,
+	serviceDesc *descriptorpb.ServiceDescriptorProto,
 	methodDesc *descriptorpb.MethodDescriptorProto,
-	fullMethodName string,
 ) (MethodInfo, error) {
 	opMsg, err := protoutil.GetOpExtension(methodDesc)
 	if err != nil {
@@ -226,11 +248,13 @@ func parseMethodInfo(
 	}
 
 	mi := MethodInfo{
-		Operation:      opCode,
-		Scope:          scope,
-		requestName:    requestName,
-		requestType:    requestType,
-		fullMethodName: fullMethodName,
+		Operation:   opCode,
+		Scope:       scope,
+		requestName: requestName,
+		requestType: requestType,
+		fileDesc:    fileDesc,
+		serviceDesc: serviceDesc,
+		methodDesc:  methodDesc,
 	}
 
 	return mi, nil

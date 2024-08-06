@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/dnsresolver"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	gitalyx509 "gitlab.com/gitlab-org/gitaly/v16/internal/x509"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	grpccorrelation "gitlab.com/gitlab-org/labkit/correlation/grpc"
@@ -238,20 +239,27 @@ func cloneOpts(opts []grpc.DialOption) []grpc.DialOption {
 }
 
 func defaultServiceConfig() string {
+	// Compile the list of retryable methods. Only RPCs marked as accessors are safe to
+	// retry. Mutators are not safe to retry as they may not be idempotent.
+	var retryableMethods []*gitalypb.MethodConfig_Name
+	for _, methodInfo := range protoregistry.GitalyProtoPreregistered.Methods() {
+		if methodInfo.Operation != protoregistry.OpAccessor {
+			continue
+		}
+
+		retryableMethods = append(retryableMethods, &gitalypb.MethodConfig_Name{
+			Service: fmt.Sprintf("%s.%s", methodInfo.Package(), methodInfo.Service()),
+			Method:  methodInfo.Method(),
+		})
+	}
+
 	serviceConfig := &gitalypb.ServiceConfig{
 		LoadBalancingConfig: []*gitalypb.LoadBalancingConfig{{
 			Policy: &gitalypb.LoadBalancingConfig_RoundRobin{},
 		}},
 		MethodConfig: []*gitalypb.MethodConfig{
 			{
-				Name: []*gitalypb.MethodConfig_Name{
-					{Service: "gitaly.SmartHTTPService", Method: "InfoRefsUploadPack"},
-					{Service: "gitaly.SmartHTTPService", Method: "PostUploadPack"},
-					{Service: "gitaly.SmartHTTPService", Method: "PostUploadPackWithSidechannel"},
-					{Service: "gitaly.SSHService", Method: "SSHUploadArchive"},
-					{Service: "gitaly.SSHService", Method: "SSHUploadPack"},
-					{Service: "gitaly.SSHService", Method: "SSHUploadPackWithSidechannel"},
-				},
+				Name: retryableMethods,
 				// This should be kept in sync with the RetryPolicy used by rails in the GitLab project
 				// in lib/gitlab/gitaly_client.rb.
 				RetryPolicy: &gitalypb.MethodConfig_RetryPolicy{
