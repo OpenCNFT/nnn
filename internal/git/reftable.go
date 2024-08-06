@@ -115,8 +115,8 @@ func (t *reftable) getVarInt(start uint, blockEnd uint) (uint, uint, error) {
 }
 
 // getRefsFromBlock provides the ref udpates from a reference block.
-func (t *reftable) getRefsFromBlock(b *reftableBlock) (ReferenceUpdates, error) {
-	u := make(map[ReferenceName]ReferenceUpdate)
+func (t *reftable) getRefsFromBlock(b *reftableBlock) ([]Reference, error) {
+	var references []Reference
 
 	prefix := ""
 
@@ -129,12 +129,12 @@ func (t *reftable) getRefsFromBlock(b *reftableBlock) (ReferenceUpdates, error) 
 
 		idx, prefixLength, err = t.getVarInt(idx, b.RestartStart)
 		if err != nil {
-			return u, fmt.Errorf("getting prefix length: %w", err)
+			return nil, fmt.Errorf("getting prefix length: %w", err)
 		}
 
 		idx, suffixLength, err = t.getVarInt(idx, b.RestartStart)
 		if err != nil {
-			return u, fmt.Errorf("getting suffix length: %w", err)
+			return nil, fmt.Errorf("getting suffix length: %w", err)
 		}
 
 		extra := (suffixLength & 0x7)
@@ -145,27 +145,29 @@ func (t *reftable) getRefsFromBlock(b *reftableBlock) (ReferenceUpdates, error) 
 
 		idx, updateIndexDelta, err = t.getVarInt(idx, b.FullBlockSize)
 		if err != nil {
-			return u, fmt.Errorf("getting update index delta: %w", err)
+			return nil, fmt.Errorf("getting update index delta: %w", err)
 		}
 		// we don't use this for now
 		_ = updateIndexDelta
 
-		refUpdate := ReferenceUpdate{}
+		reference := Reference{
+			Name: ReferenceName(refname),
+		}
 
 		switch extra {
 		case 0:
 			// Deletion, no value
-			refUpdate.NewOID = t.shaFormat().ZeroOID
+			reference.Target = t.shaFormat().ZeroOID.String()
 		case 1:
 			// Regular reference
 			hashSize := t.shaFormat().Hash().Size()
-			refUpdate.NewOID = ObjectID(hex.EncodeToString(t.src[idx : idx+uint(hashSize)]))
+			reference.Target = ObjectID(hex.EncodeToString(t.src[idx : idx+uint(hashSize)])).String()
 
 			idx += uint(hashSize)
 		case 2:
 			// Peeled Tag
 			hashSize := t.shaFormat().Hash().Size()
-			refUpdate.NewOID = ObjectID(hex.EncodeToString(t.src[idx : idx+uint(hashSize)]))
+			reference.Target = ObjectID(hex.EncodeToString(t.src[idx : idx+uint(hashSize)])).String()
 
 			idx += uint(hashSize)
 
@@ -178,23 +180,25 @@ func (t *reftable) getRefsFromBlock(b *reftableBlock) (ReferenceUpdates, error) 
 			var size uint
 			idx, size, err = t.getVarInt(idx, b.FullBlockSize)
 			if err != nil {
-				return u, fmt.Errorf("getting symref size: %w", err)
+				return nil, fmt.Errorf("getting symref size: %w", err)
 			}
 
-			refUpdate.NewTarget = ReferenceName(t.src[idx : idx+size])
+			reference.Target = ReferenceName(t.src[idx : idx+size]).String()
+			reference.IsSymbolic = true
 			idx = idx + size
 		}
 
-		u[ReferenceName(refname)] = refUpdate
 		prefix = refname
+
+		references = append(references, reference)
 	}
 
-	return u, nil
+	return references, nil
 }
 
 // parseRefBlock parses a block and if it is a ref block, provides
 // all the reference updates.
-func (t *reftable) parseRefBlock(headerOffset, blockStart, blockEnd uint) (ReferenceUpdates, error) {
+func (t *reftable) parseRefBlock(headerOffset, blockStart, blockEnd uint) ([]Reference, error) {
 	currentBS := t.extractBlockLen(blockStart + headerOffset)
 
 	fullBlockSize := t.parseBlockSize()
@@ -219,13 +223,13 @@ func (t *reftable) parseRefBlock(headerOffset, blockStart, blockEnd uint) (Refer
 }
 
 // IterateRefs provides all the refs present in a table.
-func (t *reftable) IterateRefs() (ReferenceUpdates, error) {
+func (t *reftable) IterateRefs() ([]Reference, error) {
 	if t.footer == nil {
 		return nil, fmt.Errorf("table not instantiated")
 	}
 
 	offset := uint(0)
-	allUpdates := make(map[ReferenceName]ReferenceUpdate)
+	var allRefs []Reference
 
 	for offset < t.size {
 		headerOffset := uint(0)
@@ -243,23 +247,21 @@ func (t *reftable) IterateRefs() (ReferenceUpdates, error) {
 			return nil, nil
 		}
 
-		u, err := t.parseRefBlock(headerOffset, blockStart, blockEnd)
+		references, err := t.parseRefBlock(headerOffset, blockStart, blockEnd)
 		if err != nil {
 			return nil, fmt.Errorf("parsing block: %w", err)
 		}
 
-		if u == nil {
+		if len(references) == 0 {
 			break
 		}
 
-		for ref, val := range u {
-			allUpdates[ref] = val
-		}
+		allRefs = append(allRefs, references...)
 
 		offset = blockEnd
 	}
 
-	return allUpdates, nil
+	return allRefs, nil
 }
 
 // NewReftable instantiates a new reftable from the given reftable content.

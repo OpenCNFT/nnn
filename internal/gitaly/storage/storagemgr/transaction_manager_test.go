@@ -114,8 +114,22 @@ func buildReftableDirectory(data map[int][]git.ReferenceUpdates) testhelper.Dire
 					table, err := git.NewReftable(content)
 					require.NoError(tb, err)
 
-					refUpdates, err := table.IterateRefs()
+					references, err := table.IterateRefs()
 					require.NoError(tb, err)
+
+					refUpdates := make(git.ReferenceUpdates)
+
+					for _, reference := range references {
+						update := git.ReferenceUpdate{}
+
+						if reference.IsSymbolic {
+							update.NewTarget = git.ReferenceName(reference.Target)
+						} else {
+							update.NewOID = git.ObjectID(reference.Target)
+						}
+
+						refUpdates[reference.Name] = update
+					}
 
 					return refUpdates
 				},
