@@ -346,12 +346,18 @@ func reserveEphemeralAddrs(t *testing.T, count int) []string {
 	return addrs
 }
 
-func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.PartitionManager {
+func setupTestDBManager(t *testing.T, cfg config.Cfg) *keyvalue.DBManager {
 	logger := testhelper.NewLogger(t)
-
 	dbMgr, err := keyvalue.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	t.Cleanup(dbMgr.Close)
+
+	return dbMgr
+}
+
+func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.PartitionManager {
+	logger := testhelper.NewLogger(t)
+	dbMgr := setupTestDBManager(t, cfg)
 
 	cmdFactory := gittest.NewCommandFactory(t, cfg)
 	catfileCache := catfile.NewCache(cfg)
