@@ -97,14 +97,7 @@ func loadConfig(configPath string) (config.Cfg, error) {
 		return config.Cfg{}, err
 	}
 
-	var validateFunc func() error
-	if useValidateV2, _ := env.GetBool("GITALY_USE_VALIDATE_V2", false); useValidateV2 {
-		validateFunc = cfg.ValidateV2
-	} else {
-		validateFunc = cfg.Validate
-	}
-
-	if err := validateFunc(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return config.Cfg{}, fmt.Errorf("invalid config: %w", err)
 	}
 
@@ -153,6 +146,15 @@ func configure(configPath string) (config.Cfg, log.Logger, error) {
 	logger, err := log.Configure(log.NewSyncWriter(os.Stdout), cfg.Logging.Format, cfg.Logging.Level, urlSanitizer)
 	if err != nil {
 		return config.Cfg{}, nil, fmt.Errorf("configuring logger failed: %w", err)
+	}
+
+	if err := cfg.ValidateV2(); err != nil {
+		logger.Warn(
+			fmt.Sprintf(
+				"The current configurations will cause Gitaly to fail to start up in future versions. Please run 'gitaly configuration validate < %s' and fix the errors that are printed.",
+				configPath,
+			),
+		)
 	}
 
 	if undo, err := maxprocs.Set(maxprocs.Logger(func(s string, i ...interface{}) {
