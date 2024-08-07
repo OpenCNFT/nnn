@@ -1,5 +1,11 @@
 # Gitaly changelog
 
+## 17.2.2 (2024-08-06)
+
+### Fixed (1 change)
+
+- [gitalybackup: Do not consider pool repos dangling on restore](gitlab-org/security/gitaly@028aa939e2d88a7d2f55ee1b29a7715d8026f44a)
+
 ## 17.2.1 (2024-07-24)
 
 No changes.
