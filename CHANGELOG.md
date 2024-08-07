@@ -1,5 +1,11 @@
 # Gitaly changelog
 
+## 17.2.2 (2024-08-06)
+
+### Fixed (1 change)
+
+- [gitalybackup: Do not consider pool repos dangling on restore](gitlab-org/security/gitaly@028aa939e2d88a7d2f55ee1b29a7715d8026f44a)
+
 ## 17.2.1 (2024-07-24)
 
 No changes.
@@ -14,6 +20,10 @@ No changes.
 
 - [Ensure page token is for the same tree](gitlab-org/gitaly@1ab723e39f5b7921e2ec7343fb2c0e55a7b45954) ([merge request](gitlab-org/gitaly!7068))
 - [git: Allow reading the attributes for 'git-merge-tree(1)'](gitlab-org/gitaly@2635c20f5a062507aee3282f87df797193e1c1aa) ([merge request](gitlab-org/gitaly!7066))
+
+## 17.1.4 (2024-08-06)
+
+No changes.
 
 ## 17.1.3 (2024-07-24)
 
@@ -32,6 +42,10 @@ No changes.
 ### Fixed (1 change)
 
 - [Don't retain write buffer when chunking responses](gitlab-org/gitaly@cb83b8d4133ceff869685b8dbd4badbcddfa580a) ([merge request](gitlab-org/gitaly!6990))
+
+## 17.0.6 (2024-08-06)
+
+No changes.
 
 ## 17.0.5 (2024-07-24)
 
