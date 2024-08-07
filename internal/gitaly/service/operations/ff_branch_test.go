@@ -6,30 +6,35 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb/testproto"
 )
 
 func TestUserFFBranch(t *testing.T) {
+	testhelper.NewFeatureSets(featureflag.UserFFBranchStructuredErrors).Run(t, testUserFFBranch)
+}
+
+func testUserFFBranch(t *testing.T, ctx context.Context) {
 	t.Parallel()
 
-	ctx := testhelper.Context(t)
 	ctx, cfg, client := setupOperationsService(t, ctx)
 
 	type setupData struct {
 		repoPath         string
 		request          *gitalypb.UserFFBranchRequest
 		expectedResponse *gitalypb.UserFFBranchResponse
+		expectedErr      error
 	}
 
 	testCases := []struct {
-		desc        string
-		setup       func(t *testing.T, ctx context.Context) setupData
-		expectedErr error
+		desc  string
+		setup func(t *testing.T, ctx context.Context) setupData
 	}{
 		{
 			desc: "successful",
@@ -54,7 +59,6 @@ func TestUserFFBranch(t *testing.T) {
 					},
 				}
 			},
-			expectedErr: nil,
 		},
 		{
 			desc: "successful + expectedOldOID",
@@ -80,7 +84,6 @@ func TestUserFFBranch(t *testing.T) {
 					},
 				}
 			},
-			expectedErr: nil,
 		},
 		{
 			desc: "empty repository",
@@ -97,9 +100,9 @@ func TestUserFFBranch(t *testing.T) {
 						CommitId: commitToMerge.String(),
 						Branch:   []byte("master"),
 					},
+					expectedErr: structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet),
 				}
 			},
-			expectedErr: structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet),
 		},
 		{
 			desc: "empty user",
@@ -116,9 +119,9 @@ func TestUserFFBranch(t *testing.T) {
 						CommitId:   commitToMerge.String(),
 						Branch:     []byte("master"),
 					},
+					expectedErr: structerr.NewInvalidArgument("empty user"),
 				}
 			},
-			expectedErr: structerr.NewInvalidArgument("empty user"),
 		},
 		{
 			desc: "empty commit",
@@ -135,9 +138,9 @@ func TestUserFFBranch(t *testing.T) {
 						User:       gittest.TestUser,
 						Branch:     []byte("master"),
 					},
+					expectedErr: structerr.NewInvalidArgument("empty commit id"),
 				}
 			},
-			expectedErr: structerr.NewInvalidArgument("empty commit id"),
 		},
 		{
 			desc: "non-existing commit",
@@ -155,9 +158,9 @@ func TestUserFFBranch(t *testing.T) {
 						CommitId:   gittest.DefaultObjectHash.ZeroOID.String(),
 						Branch:     []byte("master"),
 					},
+					expectedErr: structerr.NewInternal(`checking for ancestry: invalid commit: "%s"`, gittest.DefaultObjectHash.ZeroOID),
 				}
 			},
-			expectedErr: structerr.NewInternal(`checking for ancestry: invalid commit: "%s"`, gittest.DefaultObjectHash.ZeroOID),
 		},
 		{
 			desc: "empty branch",
@@ -174,9 +177,9 @@ func TestUserFFBranch(t *testing.T) {
 						CommitId:   commitToMerge.String(),
 						User:       gittest.TestUser,
 					},
+					expectedErr: structerr.NewInvalidArgument("empty branch name"),
 				}
 			},
-			expectedErr: structerr.NewInvalidArgument("empty branch name"),
 		},
 		{
 			desc: "non-existing branch",
@@ -194,9 +197,9 @@ func TestUserFFBranch(t *testing.T) {
 						User:       gittest.TestUser,
 						Branch:     []byte("main"),
 					},
+					expectedErr: structerr.NewInvalidArgument("reference not found"),
 				}
 			},
-			expectedErr: structerr.NewInvalidArgument("reference not found"),
 		},
 		{
 			desc: "commit is not a descendant of branch head",
@@ -216,9 +219,9 @@ func TestUserFFBranch(t *testing.T) {
 						User:       gittest.TestUser,
 						Branch:     []byte("master"),
 					},
+					expectedErr: structerr.NewFailedPrecondition("not fast forward"),
 				}
 			},
-			expectedErr: structerr.NewFailedPrecondition("not fast forward"),
 		},
 		{
 			desc: "invalid expectedOldOID",
@@ -237,11 +240,11 @@ func TestUserFFBranch(t *testing.T) {
 						Branch:         []byte("master"),
 						ExpectedOldOid: "foobar",
 					},
+					expectedErr: testhelper.WithInterceptedMetadata(
+						structerr.NewInvalidArgument(fmt.Sprintf(`invalid expected old object ID: invalid object ID: "foobar", expected length %v, got 6`, gittest.DefaultObjectHash.EncodedLen())),
+						"old_object_id", "foobar"),
 				}
 			},
-			expectedErr: testhelper.WithInterceptedMetadata(
-				structerr.NewInvalidArgument(fmt.Sprintf(`invalid expected old object ID: invalid object ID: "foobar", expected length %v, got 6`, gittest.DefaultObjectHash.EncodedLen())),
-				"old_object_id", "foobar"),
 		},
 		{
 			desc: "valid SHA, but not existing expectedOldOID",
@@ -260,11 +263,11 @@ func TestUserFFBranch(t *testing.T) {
 						Branch:         []byte("master"),
 						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
 					},
+					expectedErr: testhelper.WithInterceptedMetadata(
+						structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
+						"old_object_id", gittest.DefaultObjectHash.ZeroOID),
 				}
 			},
-			expectedErr: testhelper.WithInterceptedMetadata(
-				structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
-				"old_object_id", gittest.DefaultObjectHash.ZeroOID),
 		},
 		{
 			desc: "expectedOldOID pointing to old commit",
@@ -283,6 +286,34 @@ func TestUserFFBranch(t *testing.T) {
 					gittest.TreeEntry{Path: "goo", Mode: "100644", Content: "something"},
 				))
 
+				expectedResponse := &gitalypb.UserFFBranchResponse{}
+				var expectedErr error
+
+				if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
+					expectedResponse = nil
+					expectedErr = structerr.NewFailedPrecondition("update reference with hooks: reference update: reference does not point to expected object").
+						WithDetail(&testproto.ErrorMetadata{
+							Key:   []byte("actual_object_id"),
+							Value: []byte(secondCommit),
+						}).
+						WithDetail(&testproto.ErrorMetadata{
+							Key:   []byte("expected_object_id"),
+							Value: []byte(firstCommit),
+						}).
+						WithDetail(&testproto.ErrorMetadata{
+							Key:   []byte("reference"),
+							Value: []byte("refs/heads/master"),
+						}).
+						WithDetail(&gitalypb.UserFFBranchError{
+							Error: &gitalypb.UserFFBranchError_ReferenceUpdate{
+								ReferenceUpdate: &gitalypb.ReferenceUpdateError{
+									OldOid: firstCommit.String(),
+									NewOid: commitToMerge.String(),
+								},
+							},
+						})
+				}
+
 				return setupData{
 					repoPath: repoPath,
 					request: &gitalypb.UserFFBranchRequest{
@@ -294,7 +325,8 @@ func TestUserFFBranch(t *testing.T) {
 					},
 					// empty response is the expected (legacy) behavior when we fail to
 					// update the ref.
-					expectedResponse: &gitalypb.UserFFBranchResponse{},
+					expectedResponse: expectedResponse,
+					expectedErr:      expectedErr,
 				}
 			},
 		},
@@ -309,7 +341,7 @@ func TestUserFFBranch(t *testing.T) {
 			data := tc.setup(t, ctx)
 
 			resp, err := client.UserFFBranch(ctx, data.request)
-			testhelper.RequireGrpcError(t, tc.expectedErr, err)
+			testhelper.RequireGrpcError(t, data.expectedErr, err)
 			testhelper.ProtoEqual(t, data.expectedResponse, resp)
 
 			if data.expectedResponse != nil && data.expectedResponse.BranchUpdate != nil {
@@ -321,9 +353,12 @@ func TestUserFFBranch(t *testing.T) {
 }
 
 func TestUserFFBranch_failingHooks(t *testing.T) {
+	testhelper.NewFeatureSets(featureflag.UserFFBranchStructuredErrors).Run(t, testUserFFBranchFailingHooks)
+}
+
+func testUserFFBranchFailingHooks(t *testing.T, ctx context.Context) {
 	t.Parallel()
 
-	ctx := testhelper.Context(t)
 	ctx, cfg, client := setupOperationsService(t, ctx)
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
@@ -339,11 +374,30 @@ func TestUserFFBranch_failingHooks(t *testing.T) {
 
 	hookContent := []byte("#!/bin/sh\necho 'failure'\nexit 1")
 
+	hookNameToHookType := map[string]gitalypb.CustomHookError_HookType{
+		"pre-receive": gitalypb.CustomHookError_HOOK_TYPE_PRERECEIVE,
+		"update":      gitalypb.CustomHookError_HOOK_TYPE_UPDATE,
+	}
+
 	for _, hookName := range gitlabPreHooks {
 		t.Run(hookName, func(t *testing.T) {
 			gittest.WriteCustomHook(t, repoPath, hookName, hookContent)
 
 			resp, err := client.UserFFBranch(ctx, request)
+			if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
+				testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("failure\n").
+					WithDetail(&gitalypb.UserMergeBranchError{
+						Error: &gitalypb.UserMergeBranchError_CustomHook{
+							CustomHook: &gitalypb.CustomHookError{
+								HookType: hookNameToHookType[hookName],
+								Stdout:   []byte("failure\n"),
+							},
+						},
+					}), err)
+				require.Nil(t, resp)
+				return
+			}
+
 			require.Nil(t, err)
 			require.Contains(t, resp.PreReceiveError, "failure")
 		})
