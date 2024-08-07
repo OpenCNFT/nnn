@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -76,6 +77,15 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 	if err := s.updateReferenceWithHooks(ctx, in.GetRepository(), in.User, quarantineDir, referenceName, commitID, revision); err != nil {
 		var customHookErr updateref.CustomHookError
 		if errors.As(err, &customHookErr) {
+			if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
+				return nil, structerr.NewPermissionDenied("%w", customHookErr).WithDetail(
+					&gitalypb.UserMergeBranchError{
+						Error: &gitalypb.UserMergeBranchError_CustomHook{
+							CustomHook: customHookErr.Proto(),
+						},
+					})
+			}
+
 			return &gitalypb.UserFFBranchResponse{
 				PreReceiveError: customHookErr.Error(),
 			}, nil
@@ -83,6 +93,18 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 
 		var updateRefError updateref.Error
 		if errors.As(err, &updateRefError) {
+			if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
+				return nil, structerr.NewFailedPrecondition("update reference with hooks: %w", err).
+					WithDetail(&gitalypb.UserFFBranchError{
+						Error: &gitalypb.UserFFBranchError_ReferenceUpdate{
+							ReferenceUpdate: &gitalypb.ReferenceUpdateError{
+								OldOid: revision.String(),
+								NewOid: commitID.String(),
+							},
+						},
+					})
+			}
+
 			// When an error happens updating the reference, e.g. because of a race
 			// with another update, then Ruby code didn't send an error but just an
 			// empty response.
