@@ -100,6 +100,7 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 
 	actual := DirectoryState{}
 	tr := tar.NewReader(tarball)
+tarReader:
 	for {
 		header, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -108,14 +109,25 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 		require.NoError(tb, err)
 
 		actualEntry := DirectoryEntry{
-			Mode: fs.FileMode(header.Mode),
+			Mode: header.FileInfo().Mode(),
 		}
 
 		if header.Typeflag == tar.TypeReg {
-			b, err := io.ReadAll(tr)
+			content, err := io.ReadAll(tr)
 			require.NoError(tb, err)
 
-			actualEntry.Content = b
+			actualEntry.Content = content
+			// Find prefect match or glob matching (/wal/1/pack*.pack, for example).
+			for pattern, expectedEntry := range expected {
+				matched, err := filepath.Match(pattern, header.Name)
+				if err == nil && matched {
+					if expectedEntry.ParseContent != nil {
+						actualEntry.Content = expectedEntry.ParseContent(tb, header.Name, content)
+					}
+					actual[pattern] = actualEntry
+					continue tarReader
+				}
+			}
 		}
 
 		actual[header.Name] = actualEntry
@@ -125,7 +137,16 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 		expected = DirectoryState{}
 	}
 
-	ProtoEqual(tb, expected, actual)
+	// Functions are never equal unless they are nil, see https://pkg.go.dev/reflect#DeepEqual.
+	// So to check of equality we set the ParseContent functions to nil.
+	// We use a copy so we don't unexpectedly modify the original.
+	expectedCopy := make(DirectoryState, len(expected))
+	for key, value := range expected {
+		value.ParseContent = nil
+		expectedCopy[key] = value
+	}
+
+	ProtoEqual(tb, expectedCopy, actual)
 }
 
 // MustCreateCustomHooksTar creates a temporary custom hooks tar archive on disk
