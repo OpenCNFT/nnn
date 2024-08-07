@@ -23,6 +23,12 @@ service ServerService {
 
   // ReadinessCheck runs the set of the checks to make sure service is in operational state.
   rpc ReadinessCheck(ReadinessCheckRequest) returns (ReadinessCheckResponse);
+
+  // ServerSignature returns the contents of the public key used to sign
+  // commits made through the GitLab UI or Web IDE.
+  // See https://docs.gitlab.com/ee/user/project/repository/signed_commits/#verify-commits-made-in-the-web-ui
+  // for more information.
+  rpc ServerSignature(ServerSignatureRequest) returns (ServerSignatureResponse);
 }
 
 // ServerInfoRequest ...
@@ -125,4 +131,14 @@ message ReadinessCheckResponse {
     // failure_response is set if at least one check failed.
     Failure failure_response = 2;
   }
+}
+
+// ServerSignatureRequest is the request for the ServerSignature RPC.
+message ServerSignatureRequest {
+}
+
+// ServerSignatureResponse is the response for the ServerSignature RPC.
+message ServerSignatureResponse {
+  // public_key is the string with a content of the public key.
+  bytes public_key = 1;
 }
