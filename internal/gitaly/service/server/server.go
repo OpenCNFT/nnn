@@ -10,16 +10,18 @@ import (
 
 type server struct {
 	gitalypb.UnimplementedServerServiceServer
-	logger        log.Logger
-	gitCmdFactory git.CommandFactory
-	storages      []config.Storage
+	logger            log.Logger
+	gitCmdFactory     git.CommandFactory
+	storages          []config.Storage
+	gitSigningKeyPath string
 }
 
 // NewServer creates a new instance of a grpc ServerServiceServer
 func NewServer(deps *service.Dependencies) gitalypb.ServerServiceServer {
 	return &server{
-		logger:        deps.GetLogger(),
-		gitCmdFactory: deps.GetGitCmdFactory(),
-		storages:      deps.GetCfg().Storages,
+		logger:            deps.GetLogger(),
+		gitCmdFactory:     deps.GetGitCmdFactory(),
+		storages:          deps.GetCfg().Storages,
+		gitSigningKeyPath: deps.GetCfg().Git.SigningKey,
 	}
 }

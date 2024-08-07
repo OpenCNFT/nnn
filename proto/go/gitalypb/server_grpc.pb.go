@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	ServerService_ServerInfo_FullMethodName     = "/gitaly.ServerService/ServerInfo"
-	ServerService_DiskStatistics_FullMethodName = "/gitaly.ServerService/DiskStatistics"
-	ServerService_ClockSynced_FullMethodName    = "/gitaly.ServerService/ClockSynced"
-	ServerService_ReadinessCheck_FullMethodName = "/gitaly.ServerService/ReadinessCheck"
+	ServerService_ServerInfo_FullMethodName      = "/gitaly.ServerService/ServerInfo"
+	ServerService_DiskStatistics_FullMethodName  = "/gitaly.ServerService/DiskStatistics"
+	ServerService_ClockSynced_FullMethodName     = "/gitaly.ServerService/ClockSynced"
+	ServerService_ReadinessCheck_FullMethodName  = "/gitaly.ServerService/ReadinessCheck"
+	ServerService_ServerSignature_FullMethodName = "/gitaly.ServerService/ServerSignature"
 )
 
 // ServerServiceClient is the client API for ServerService service.
@@ -40,6 +41,11 @@ type ServerServiceClient interface {
 	ClockSynced(ctx context.Context, in *ClockSyncedRequest, opts ...grpc.CallOption) (*ClockSyncedResponse, error)
 	// ReadinessCheck runs the set of the checks to make sure service is in operational state.
 	ReadinessCheck(ctx context.Context, in *ReadinessCheckRequest, opts ...grpc.CallOption) (*ReadinessCheckResponse, error)
+	// ServerSignature returns the contents of the public key used to sign
+	// commits made through the GitLab UI or Web IDE.
+	// See https://docs.gitlab.com/ee/user/project/repository/signed_commits/#verify-commits-made-in-the-web-ui
+	// for more information.
+	ServerSignature(ctx context.Context, in *ServerSignatureRequest, opts ...grpc.CallOption) (*ServerSignatureResponse, error)
 }
 
 type serverServiceClient struct {
@@ -90,6 +96,16 @@ func (c *serverServiceClient) ReadinessCheck(ctx context.Context, in *ReadinessC
 	return out, nil
 }
 
+func (c *serverServiceClient) ServerSignature(ctx context.Context, in *ServerSignatureRequest, opts ...grpc.CallOption) (*ServerSignatureResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ServerSignatureResponse)
+	err := c.cc.Invoke(ctx, ServerService_ServerSignature_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ServerServiceServer is the server API for ServerService service.
 // All implementations must embed UnimplementedServerServiceServer
 // for forward compatibility
@@ -105,6 +121,11 @@ type ServerServiceServer interface {
 	ClockSynced(context.Context, *ClockSyncedRequest) (*ClockSyncedResponse, error)
 	// ReadinessCheck runs the set of the checks to make sure service is in operational state.
 	ReadinessCheck(context.Context, *ReadinessCheckRequest) (*ReadinessCheckResponse, error)
+	// ServerSignature returns the contents of the public key used to sign
+	// commits made through the GitLab UI or Web IDE.
+	// See https://docs.gitlab.com/ee/user/project/repository/signed_commits/#verify-commits-made-in-the-web-ui
+	// for more information.
+	ServerSignature(context.Context, *ServerSignatureRequest) (*ServerSignatureResponse, error)
 	mustEmbedUnimplementedServerServiceServer()
 }
 
@@ -123,6 +144,9 @@ func (UnimplementedServerServiceServer) ClockSynced(context.Context, *ClockSynce
 }
 func (UnimplementedServerServiceServer) ReadinessCheck(context.Context, *ReadinessCheckRequest) (*ReadinessCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadinessCheck not implemented")
+}
+func (UnimplementedServerServiceServer) ServerSignature(context.Context, *ServerSignatureRequest) (*ServerSignatureResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ServerSignature not implemented")
 }
 func (UnimplementedServerServiceServer) mustEmbedUnimplementedServerServiceServer() {}
 
@@ -209,6 +233,24 @@ func _ServerService_ReadinessCheck_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ServerService_ServerSignature_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ServerSignatureRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerServiceServer).ServerSignature(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ServerService_ServerSignature_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServiceServer).ServerSignature(ctx, req.(*ServerSignatureRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ServerService_ServiceDesc is the grpc.ServiceDesc for ServerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -231,6 +273,10 @@ var ServerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReadinessCheck",
 			Handler:    _ServerService_ReadinessCheck_Handler,
+		},
+		{
+			MethodName: "ServerSignature",
+			Handler:    _ServerService_ServerSignature_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

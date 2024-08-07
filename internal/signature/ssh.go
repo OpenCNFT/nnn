@@ -104,6 +104,11 @@ func (sk *SSHSigningKey) CreateSignature(contentToSign []byte, _ time.Time) ([]b
 	return armoredSignature, nil
 }
 
+// PublicKey returns a public key for SSH key
+func (sk *SSHSigningKey) PublicKey() ([]byte, error) {
+	return ssh.MarshalAuthorizedKey(sk.PrivateKey.PublicKey()), nil
+}
+
 // Verify method verifies whether a signature has been created by this signing key
 func (sk *SSHSigningKey) Verify(signatureText, signedText []byte) error {
 	block, rest := pem.Decode(signatureText)
