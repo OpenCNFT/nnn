@@ -46,6 +46,7 @@ func TestWriteTarball(t *testing.T) {
 	writeFile(t, filepath.Join(srcDir, "nested4/stub.txt"), []byte("symlinked"))
 	// link to the folder above
 	require.NoError(t, os.Symlink(filepath.Join(srcDir, "nested4"), filepath.Join(srcDir, "link.to.nested4")))
+	require.NoError(t, os.Symlink("nested4", filepath.Join(srcDir, "relative.link.to.nested4")))
 
 	var archFile bytes.Buffer
 	err := WriteTarball(
@@ -59,6 +60,7 @@ func TestWriteTarball(t *testing.T) {
 		"nested2/nested/nested/nested/nested/d.txt",
 		"link.to.target.txt",
 		"link.to.nested4",
+		"relative.link.to.nested4",
 	)
 	require.NoError(t, err)
 
@@ -71,10 +73,16 @@ func TestWriteTarball(t *testing.T) {
 			Mode: TarFileMode | ExecuteMode | fs.ModeDir,
 		},
 		"link.to.nested4": {
-			Mode: TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Mode:    TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Content: filepath.Join(srcDir, "nested4"),
+		},
+		"relative.link.to.nested4": {
+			Mode:    TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Content: "nested4",
 		},
 		"link.to.target.txt": {
-			Mode: TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Mode:    TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Content: filepath.Join(srcDir, "nested3/target.txt"),
 		},
 		"nested2/nested/nested/nested/nested/d.txt": {
 			Mode:    TarFileMode,

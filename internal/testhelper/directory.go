@@ -112,7 +112,8 @@ tarReader:
 			Mode: header.FileInfo().Mode(),
 		}
 
-		if header.Typeflag == tar.TypeReg {
+		switch header.Typeflag {
+		case tar.TypeReg:
 			content, err := io.ReadAll(tr)
 			require.NoError(tb, err)
 
@@ -128,6 +129,8 @@ tarReader:
 					continue tarReader
 				}
 			}
+		case tar.TypeLink, tar.TypeSymlink:
+			actualEntry.Content = header.Linkname
 		}
 
 		actual[header.Name] = actualEntry
