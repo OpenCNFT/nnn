@@ -289,13 +289,8 @@ func TestAddCommand(t *testing.T) {
 			ctx := testhelper.Context(t)
 
 			t.Run("without overridden key", func(t *testing.T) {
-				mock := newMock(t, version)
-				config := defaultCgroupsConfig()
-				config.Repositories.Count = 10
-				config.Repositories.MemoryBytes = 1024
-				config.Repositories.CPUShares = 16
-				config.HierarchyRoot = "gitaly"
-				config.Mountpoint = mock.rootPath()
+				mock, config := setupMockCgroup(t, version)
+				require.NoError(t, config.Validate())
 
 				cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 				require.NoError(t, cmd.Run())
@@ -309,25 +304,12 @@ func TestAddCommand(t *testing.T) {
 				require.NoError(t, err)
 				requireShards(t, version, mock, manager, pid, groupID)
 
-				for _, path := range mock.repoPaths(pid, groupID) {
-					procsPath := filepath.Join(path, "cgroup.procs")
-					content := readCgroupFile(t, procsPath)
-
-					cmdPid, err := strconv.Atoi(string(content))
-					require.NoError(t, err)
-
-					require.Equal(t, cmd.Process.Pid, cmdPid)
-				}
+				pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, groupID)
 			})
 
 			t.Run("with overridden key", func(t *testing.T) {
-				mock := newMock(t, version)
-				config := defaultCgroupsConfig()
-				config.Repositories.Count = 10
-				config.Repositories.MemoryBytes = 1024
-				config.Repositories.CPUShares = 16
-				config.HierarchyRoot = "gitaly"
-				config.Mountpoint = mock.rootPath()
+				mock, config := setupMockCgroup(t, version)
+				require.NoError(t, config.Validate())
 
 				cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 				require.NoError(t, cmd.Run())
@@ -341,26 +323,13 @@ func TestAddCommand(t *testing.T) {
 				require.NoError(t, err)
 				requireShards(t, version, mock, manager, pid, groupID)
 
-				for _, path := range mock.repoPaths(pid, groupID) {
-					procsPath := filepath.Join(path, "cgroup.procs")
-					content := readCgroupFile(t, procsPath)
-
-					cmdPid, err := strconv.Atoi(string(content))
-					require.NoError(t, err)
-
-					require.Equal(t, cmd.Process.Pid, cmdPid)
-				}
+				pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, groupID)
 			})
 
 			t.Run("when AllocationSet is set", func(t *testing.T) {
-				mock := newMock(t, version)
-				config := defaultCgroupsConfig()
-				config.Repositories.Count = 10
+				mock, config := setupMockCgroup(t, version)
 				config.Repositories.MaxCgroupsPerRepo = 3
-				config.Repositories.MemoryBytes = 1024
-				config.Repositories.CPUShares = 16
-				config.HierarchyRoot = "gitaly"
-				config.Mountpoint = mock.rootPath()
+				require.NoError(t, config.Validate())
 
 				manager := mock.newCgroupManager(config, testhelper.SharedLogger(t), pid)
 				mock.setupMockCgroupFiles(t, manager, []uint{})
@@ -376,15 +345,7 @@ func TestAddCommand(t *testing.T) {
 					_, err := manager.AddCommand(cmd)
 					require.NoError(t, err)
 
-					for _, path := range mock.repoPaths(pid, groupIDs[i]) {
-						procsPath := filepath.Join(path, "cgroup.procs")
-						content := readCgroupFile(t, procsPath)
-
-						cmdPid, err := strconv.Atoi(string(content))
-						require.NoError(t, err)
-
-						require.Equal(t, cmd.Process.Pid, cmdPid)
-					}
+					pidExistsInCgroupProcs(t, &mock, pid, cmd.Process.Pid, groupIDs[i])
 				}
 
 				requireShards(t, version, mock, manager, pid, groupIDs...)
