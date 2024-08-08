@@ -130,14 +130,14 @@ GIT_VERSION ?=
 ## The Git version used for bundled Git v2.43.
 GIT_VERSION_2_43 ?= v2.43.5
 ## The Git version used for bundled Git v2.44.
-GIT_VERSION_2_44 ?= v2.44.2.gl1
+GIT_VERSION_2_44 ?= 0ab3e9541f52704c6d4772ff822511364d707816
 ## The Git version used for bundled Git v2.45.
 GIT_VERSION_2_45 ?= v2.45.2
 
 ## Skip overriding the Git version and instead use the Git version as specified
 ## in the Git sources. This is required when building Git from a version that
 ## cannot be parsed by Gitaly.
-SKIP_OVERRIDING_GIT_VERSION ?=
+SKIP_OVERRIDING_GIT_VERSION ?= true
 
 # The default version is used in case the caller does not set the variable or
 # if it is either set to the empty string or "default".
