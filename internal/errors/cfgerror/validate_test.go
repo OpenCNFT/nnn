@@ -350,3 +350,12 @@ func TestNotEmptyMap(t *testing.T) {
 	require.Equal(t, NewValidationError(ErrNotSet), NotEmptyMap(map[int]string{}))
 	require.Equal(t, NewValidationError(ErrNotSet), NotEmptyMap(map[string]int{}))
 }
+
+func TestIsPositive(t *testing.T) {
+	t.Parallel()
+	require.NoError(t, IsNaturalNumber(0))
+	require.NoError(t, IsNaturalNumber(1))
+	require.NoError(t, IsNaturalNumber(1.5))
+	require.Equal(t, NewValidationError(fmt.Errorf("%w: -1", ErrUnsupportedValue)), IsNaturalNumber(-1))
+	require.Equal(t, NewValidationError(fmt.Errorf("%w: -1.5", ErrUnsupportedValue)), IsNaturalNumber(-1.5))
+}
