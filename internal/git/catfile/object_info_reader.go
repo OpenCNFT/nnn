@@ -11,6 +11,20 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
+// ObjectInfoReader returns information about an object referenced by a given revision.
+type ObjectInfoReader interface {
+	cacheable
+
+	// Info requests information about the revision pointed to by the given revision.
+	Info(context.Context, git.Revision) (*ObjectInfo, error)
+
+	// Queue returns an Queue that can be used to batch multiple object info
+	// requests. Using the queue is more efficient than using `Info()` when requesting a bunch
+	// of objects. The returned function must be executed after use of the Queue has
+	// finished.
+	Queue(context.Context) (Queue, func(), error)
+}
+
 // ObjectInfo represents a header returned by `git cat-file --batch`
 type ObjectInfo struct {
 	Oid  git.ObjectID
@@ -98,18 +112,4 @@ func ParseObjectInfo(objectHash git.ObjectHash, stdout *bufio.Reader, nulTermina
 		Size:   objectSize,
 		Format: objectHash.Format,
 	}, nil
-}
-
-// ObjectInfoReader returns information about an object referenced by a given revision.
-type ObjectInfoReader interface {
-	cacheable
-
-	// Info requests information about the revision pointed to by the given revision.
-	Info(context.Context, git.Revision) (*ObjectInfo, error)
-
-	// Queue returns an Queue that can be used to batch multiple object info
-	// requests. Using the queue is more efficient than using `Info()` when requesting a bunch
-	// of objects. The returned function must be executed after use of the Queue has
-	// finished.
-	Queue(context.Context) (Queue, func(), error)
 }
