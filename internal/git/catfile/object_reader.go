@@ -63,10 +63,26 @@ type objectReader struct {
 	queueInUse int32
 }
 
+type objectReaderConfig struct {
+	disableMailmap bool
+}
+
+// ObjectReaderOption are options which can be passed to newObjectReader to set
+// required configuration.
+type ObjectReaderOption func(cfg *objectReaderConfig)
+
+// WithoutMailmap ensure mailmap entries are not considered.
+func WithoutMailmap() ObjectReaderOption {
+	return func(cfg *objectReaderConfig) {
+		cfg.disableMailmap = true
+	}
+}
+
 func newObjectReader(
 	ctx context.Context,
 	repo git.RepositoryExecutor,
 	counter *prometheus.CounterVec,
+	opts ...ObjectReaderOption,
 ) (*objectReader, error) {
 	flags := []git.Option{
 		git.Flag{Name: "-Z"},
@@ -74,7 +90,12 @@ func newObjectReader(
 		git.Flag{Name: "--buffer"},
 	}
 
-	if featureflag.MailmapOptions.IsEnabled(ctx) {
+	var cfg objectReaderConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	if featureflag.MailmapOptions.IsEnabled(ctx) && !cfg.disableMailmap {
 		flags = append([]git.Option{git.Flag{Name: "--use-mailmap"}}, flags...)
 	}
 
