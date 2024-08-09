@@ -904,6 +904,8 @@ message GetCommitSignaturesResponse {
   bytes signed_text = 3;
   // signer of the commit
   Signer signer = 4;
+  // author provides the original commit author information without 'mailmap'.
+  CommitAuthor author = 5;
 }
 
 // GetCommitMessagesRequest is the request for the GetCommitMessages RPC.

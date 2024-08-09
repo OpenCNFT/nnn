@@ -161,6 +161,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 							Signature:  []byte(pgpSignature),
 							SignedText: []byte(commitData),
 							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+							Author: &gitalypb.CommitAuthor{
+								Email: []byte("bugfixer@email.com"),
+							},
 						},
 					},
 				}
@@ -184,6 +187,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 							Signature:  []byte(pgpSignature),
 							SignedText: []byte(commitData),
 							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+							Author: &gitalypb.CommitAuthor{
+								Email: []byte("bugfixer@email.com"),
+							},
 						},
 					},
 				}
@@ -207,6 +213,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 							Signature:  []byte(pgpSignature),
 							SignedText: []byte(commitData),
 							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+							Author: &gitalypb.CommitAuthor{
+								Email: []byte("bugfixer@email.com"),
+							},
 						},
 					},
 				}
@@ -230,6 +239,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 							Signature:  []byte(sshSignature),
 							SignedText: []byte(commitData),
 							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+							Author: &gitalypb.CommitAuthor{
+								Email: []byte("bugfixer@email.com"),
+							},
 						},
 					},
 				}
@@ -268,6 +280,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 							Signature:  []byte(sshSignature),
 							SignedText: []byte(commitData),
 							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+							Author: &gitalypb.CommitAuthor{
+								Email: []byte("bugfixer@email.com"),
+							},
 						},
 					},
 				}
@@ -347,6 +362,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 									gittest.DefaultCommitterSignature,
 								)),
 								Signer: gitalypb.GetCommitSignaturesResponse_SIGNER_SYSTEM,
+								Author: &gitalypb.CommitAuthor{
+									Email: []byte("scrooge@mcduck.com"),
+								},
 							},
 							{
 								CommitId: rotatedKeyCommitID.String(),
@@ -361,6 +379,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 									gittest.DefaultCommitterSignature,
 								)),
 								Signer: gitalypb.GetCommitSignaturesResponse_SIGNER_SYSTEM,
+								Author: &gitalypb.CommitAuthor{
+									Email: []byte("scrooge@mcduck.com"),
+								},
 							},
 						},
 						nil,
@@ -391,6 +412,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 							Signature:  []byte(pgpSignature),
 							SignedText: []byte(commitData),
 							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+							Author: &gitalypb.CommitAuthor{
+								Email: []byte("bugfixer@email.com"),
+							},
 						},
 					},
 				}
@@ -456,6 +480,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 									gittest.DefaultCommitterSignature,
 								)),
 								Signer: gitalypb.GetCommitSignaturesResponse_SIGNER_SYSTEM,
+								Author: &gitalypb.CommitAuthor{
+									Email: []byte("scrooge@mcduck.com"),
+								},
 							},
 						},
 						nil,
@@ -499,6 +526,9 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 				require.Equal(t, string(expected.Signature), string(actualResponses[i].Signature))
 				require.Equal(t, string(expected.SignedText), string(actualResponses[i].SignedText))
 				require.Equal(t, string(expected.Signer), string(actualResponses[i].Signer))
+				// It's sufficient to check if the email holds true since that is what we're most
+				// concerned about, because 'mailmap' could swap it out.
+				require.Equal(t, expected.Author.Email, actualResponses[i].Author.Email)
 			}
 		})
 	}

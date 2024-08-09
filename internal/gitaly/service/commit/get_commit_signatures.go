@@ -70,12 +70,12 @@ func (s *server) GetCommitSignatures(request *gitalypb.GetCommitSignaturesReques
 
 		signer := gitalypb.GetCommitSignaturesResponse_SIGNER_USER
 		if signingKeys != nil {
-			if err := signingKeys.Verify(signature, commit.SignatureData.Payload); err == nil {
+			if signingKeys.Verify(signature, commit.SignatureData.Payload) == nil {
 				signer = gitalypb.GetCommitSignaturesResponse_SIGNER_SYSTEM
 			}
 		}
 
-		if err = sendResponse(commitID, signature, commit.SignatureData.Payload, signer, stream); err != nil {
+		if err = sendResponse(signature, commit, signer, stream); err != nil {
 			return structerr.NewInternal("%w", err)
 		}
 	}
@@ -84,20 +84,20 @@ func (s *server) GetCommitSignatures(request *gitalypb.GetCommitSignaturesReques
 }
 
 func sendResponse(
-	commitID string,
-	signatureKey []byte,
-	commitText []byte,
+	signature []byte,
+	commit *catfile.Commit,
 	signer gitalypb.GetCommitSignaturesResponse_Signer,
 	stream gitalypb.CommitService_GetCommitSignaturesServer,
 ) error {
-	if len(signatureKey) <= 0 {
+	if len(signature) <= 0 {
 		return nil
 	}
 
 	err := stream.Send(&gitalypb.GetCommitSignaturesResponse{
-		CommitId:  commitID,
-		Signature: signatureKey,
+		CommitId:  commit.Id,
+		Signature: signature,
 		Signer:    signer,
+		Author:    commit.Author,
 	})
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func sendResponse(
 		return stream.Send(&gitalypb.GetCommitSignaturesResponse{SignedText: p})
 	})
 
-	msgReader := bytes.NewReader(commitText)
+	msgReader := bytes.NewReader(commit.SignatureData.Payload)
 
 	_, err = io.Copy(streamWriter, msgReader)
 	if err != nil {
