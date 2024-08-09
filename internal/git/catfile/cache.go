@@ -59,9 +59,7 @@ type ProcessCache struct {
 	monitorTicker helper.Ticker
 	monitorDone   chan interface{}
 
-	objectReaders        processes
-	objectContentReaders processes
-	objectInfoReaders    processes
+	objectReaders processes
 
 	catfileCacheCounter     *prometheus.CounterVec
 	currentCatfileProcesses prometheus.Gauge
@@ -82,12 +80,6 @@ func newCache(ttl time.Duration, maxLen int, monitorTicker helper.Ticker) *Proce
 
 	processCache := &ProcessCache{
 		ttl: ttl,
-		objectContentReaders: processes{
-			maxLen: maxLen,
-		},
-		objectInfoReaders: processes{
-			maxLen: maxLen,
-		},
 		objectReaders: processes{
 			maxLen: maxLen,
 		},
@@ -152,8 +144,6 @@ func (c *ProcessCache) monitor() {
 	for {
 		select {
 		case <-c.monitorTicker.C():
-			c.objectContentReaders.EnforceTTL(time.Now())
-			c.objectInfoReaders.EnforceTTL(time.Now())
 			c.objectReaders.EnforceTTL(time.Now())
 			c.monitorTicker.Reset()
 		case <-c.monitorDone:
@@ -316,15 +306,11 @@ func (c *ProcessCache) getOrCreateProcess(
 }
 
 func (c *ProcessCache) reportCacheMembers() {
-	c.catfileCacheMembers.WithLabelValues("object_content_reader").Set(float64(c.objectContentReaders.EntryCount()))
-	c.catfileCacheMembers.WithLabelValues("object_info_reader").Set(float64(c.objectInfoReaders.EntryCount()))
 	c.catfileCacheMembers.WithLabelValues("object_reader").Set(float64(c.objectReaders.EntryCount()))
 }
 
 // Evict evicts all cached processes from the cache.
 func (c *ProcessCache) Evict() {
-	c.objectContentReaders.Evict()
-	c.objectInfoReaders.Evict()
 	c.objectReaders.Evict()
 }
 
