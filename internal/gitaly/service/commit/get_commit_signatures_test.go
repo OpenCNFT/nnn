@@ -368,6 +368,101 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 				}
 			},
 		},
+		{
+			desc: "commit signed before mailmap entry",
+			setup: func(t *testing.T) setupData {
+				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig", pgpSignature, "Signed commit message\n")
+
+				mailmapContents := "A U Thor <author@example.com> Bug Fixer <bugfixer@email.com>"
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{Path: ".mailmap", Mode: "100644", Content: mailmapContents},
+				), gittest.WithBranch("main"))
+
+				return setupData{
+					request: &gitalypb.GetCommitSignaturesRequest{
+						Repository: repoProto,
+						CommitIds: []string{
+							commitID.String(),
+						},
+					},
+					expectedResponses: []*gitalypb.GetCommitSignaturesResponse{
+						{
+							CommitId:   commitID.String(),
+							Signature:  []byte(pgpSignature),
+							SignedText: []byte(commitData),
+							Signer:     gitalypb.GetCommitSignaturesResponse_SIGNER_USER,
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "commit signed by gitaly before mailmap entry",
+			setup: func(t *testing.T) setupData {
+				repo := localrepo.NewTestRepo(t, cfg, repoProto)
+
+				blobID := gittest.WriteBlob(t, cfg, repoPath, []byte("updated"))
+
+				tree := &localrepo.TreeEntry{
+					Type: localrepo.Tree,
+					Mode: "040000",
+					Entries: []*localrepo.TreeEntry{
+						{Path: "file", Mode: "100644", OID: blobID},
+					},
+				}
+				require.NoError(t, tree.Write(ctx, repo))
+
+				commitID, err := repo.WriteCommit(ctx, localrepo.WriteCommitConfig{
+					TreeID:         tree.OID,
+					AuthorName:     gittest.DefaultCommitterName,
+					AuthorEmail:    gittest.DefaultCommitterMail,
+					CommitterName:  gittest.DefaultCommitterName,
+					CommitterEmail: gittest.DefaultCommitterMail,
+					AuthorDate:     gittest.DefaultCommitTime,
+					CommitterDate:  gittest.DefaultCommitTime,
+					Message:        "message",
+					GitConfig:      cfg.Git,
+					Sign:           featureflag.GPGSigning.IsEnabled(ctx),
+				})
+				require.NoError(t, err)
+
+				mailmapContents := "A U Thor <author@example.com> Scrooge McDuck <scrooge@mcduck.com>"
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{Path: ".mailmap", Mode: "100644", Content: mailmapContents},
+				), gittest.WithBranch("main"))
+
+				ed25519SHA1Signature := string(testhelper.MustReadFile(t, "testdata/signing_ssh_key_ed25519.sig"))
+				ed25519SHA256Signature := string(testhelper.MustReadFile(t, "testdata/signing_ssh_key_ed25519_sha256.sig"))
+
+				return setupData{
+					request: &gitalypb.GetCommitSignaturesRequest{
+						Repository: repoProto,
+						CommitIds: []string{
+							commitID.String(),
+						},
+					},
+					expectedResponses: testhelper.EnabledOrDisabledFlag(ctx, featureflag.GPGSigning,
+						[]*gitalypb.GetCommitSignaturesResponse{
+							{
+								CommitId: commitID.String(),
+								Signature: []byte(gittest.ObjectHashDependent(t, map[string]string{
+									"sha1":   ed25519SHA1Signature,
+									"sha256": ed25519SHA256Signature,
+								})),
+								SignedText: []byte(fmt.Sprintf(
+									"tree %s\nauthor %s\ncommitter %s\n\nmessage",
+									tree.OID,
+									gittest.DefaultCommitterSignature,
+									gittest.DefaultCommitterSignature,
+								)),
+								Signer: gitalypb.GetCommitSignaturesResponse_SIGNER_SYSTEM,
+							},
+						},
+						nil,
+					),
+				}
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			setup := tc.setup(t)

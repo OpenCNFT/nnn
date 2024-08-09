@@ -170,6 +170,8 @@ service CommitService {
   }
 
   // GetCommitSignatures parses the commit signature information for the provided commitish object IDs.
+  // The RPC doesn't use 'mailmap' to ensure that signature verification is done against the original
+  // information which contains the non-mapped commit author.
   rpc GetCommitSignatures(GetCommitSignaturesRequest) returns (stream GetCommitSignaturesResponse) {
     option (op_type) = {
       op: ACCESSOR

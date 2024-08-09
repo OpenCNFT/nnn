@@ -32,7 +32,7 @@ func (s *server) GetCommitSignatures(request *gitalypb.GetCommitSignaturesReques
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	objectReader, cancel, err := s.catfileCache.ObjectReader(ctx, repo)
+	objectReader, cancel, err := s.catfileCache.ObjectReaderWithoutMailmap(ctx, repo)
 	if err != nil {
 		return structerr.NewInternal("%w", err)
 	}

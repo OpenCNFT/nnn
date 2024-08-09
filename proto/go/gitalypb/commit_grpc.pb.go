@@ -108,6 +108,8 @@ type CommitServiceClient interface {
 	// FilterShasWithSignatures filters out signed commits.
 	FilterShasWithSignatures(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[FilterShasWithSignaturesRequest, FilterShasWithSignaturesResponse], error)
 	// GetCommitSignatures parses the commit signature information for the provided commitish object IDs.
+	// The RPC doesn't use 'mailmap' to ensure that signature verification is done against the original
+	// information which contains the non-mapped commit author.
 	GetCommitSignatures(ctx context.Context, in *GetCommitSignaturesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetCommitSignaturesResponse], error)
 	// GetCommitMessages returns the commits messages for the provided commitish object IDs.
 	GetCommitMessages(ctx context.Context, in *GetCommitMessagesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetCommitMessagesResponse], error)
@@ -552,6 +554,8 @@ type CommitServiceServer interface {
 	// FilterShasWithSignatures filters out signed commits.
 	FilterShasWithSignatures(grpc.BidiStreamingServer[FilterShasWithSignaturesRequest, FilterShasWithSignaturesResponse]) error
 	// GetCommitSignatures parses the commit signature information for the provided commitish object IDs.
+	// The RPC doesn't use 'mailmap' to ensure that signature verification is done against the original
+	// information which contains the non-mapped commit author.
 	GetCommitSignatures(*GetCommitSignaturesRequest, grpc.ServerStreamingServer[GetCommitSignaturesResponse]) error
 	// GetCommitMessages returns the commits messages for the provided commitish object IDs.
 	GetCommitMessages(*GetCommitMessagesRequest, grpc.ServerStreamingServer[GetCommitMessagesResponse]) error
