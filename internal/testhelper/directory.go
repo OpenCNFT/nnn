@@ -111,8 +111,11 @@ tarReader:
 		actualEntry := DirectoryEntry{
 			Mode: header.FileInfo().Mode(),
 		}
+		actualName := header.Name
 
 		switch header.Typeflag {
+		case tar.TypeDir:
+			actualName = strings.TrimSuffix(actualName, string(os.PathSeparator))
 		case tar.TypeReg:
 			content, err := io.ReadAll(tr)
 			require.NoError(tb, err)
@@ -133,11 +136,7 @@ tarReader:
 			actualEntry.Content = header.Linkname
 		}
 
-		actual[header.Name] = actualEntry
-	}
-
-	if expected == nil {
-		expected = DirectoryState{}
+		actual[actualName] = actualEntry
 	}
 
 	// Functions are never equal unless they are nil, see https://pkg.go.dev/reflect#DeepEqual.

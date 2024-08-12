@@ -69,7 +69,7 @@ func TestWriteTarball(t *testing.T) {
 			Mode:    TarFileMode,
 			Content: []byte("a"),
 		},
-		"nested1/": {
+		"nested1": {
 			Mode: TarFileMode | ExecuteMode | fs.ModeDir,
 		},
 		"link.to.nested4": {

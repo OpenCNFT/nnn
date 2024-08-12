@@ -1,6 +1,8 @@
 package testhelper
 
 import (
+	"archive/tar"
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -49,7 +51,6 @@ func TestRequireDirectoryState(t *testing.T) {
 
 	rootDir := t.TempDir()
 	relativePath := "assertion-root"
-	umask := Umask()
 
 	require.NoError(t,
 		os.MkdirAll(
@@ -77,6 +78,50 @@ func TestRequireDirectoryState(t *testing.T) {
 			mode.File,
 		),
 	)
+
+	testRequireState(t, rootDir, func(tb testing.TB, expectedState DirectoryState) {
+		tb.Helper()
+		RequireDirectoryState(tb, rootDir, relativePath, expectedState)
+	})
+}
+
+func TestRequireTarState(t *testing.T) {
+	t.Parallel()
+
+	umask := Umask()
+	// Simulate umask here so that the result matches what the filesystem would do.
+	modePerm := int64(umask.Mask(fs.ModePerm))
+
+	testRequireState(t, "/", func(tb testing.TB, expectedState DirectoryState) {
+		tb.Helper()
+		writeFile := func(writer *tar.Writer, path string, mode int64, content string) {
+			require.NoError(tb, writer.WriteHeader(&tar.Header{
+				Name: path,
+				Mode: mode,
+				Size: int64(len(content)),
+			}))
+			_, err := writer.Write([]byte(content))
+			require.NoError(tb, err)
+		}
+
+		var buffer bytes.Buffer
+		writer := tar.NewWriter(&buffer)
+		defer MustClose(tb, writer)
+
+		require.NoError(tb, writer.WriteHeader(&tar.Header{Name: "/assertion-root/", Mode: modePerm}))
+		require.NoError(tb, writer.WriteHeader(&tar.Header{Name: "/assertion-root/dir-a/", Mode: modePerm}))
+		require.NoError(tb, writer.WriteHeader(&tar.Header{Name: "/assertion-root/dir-b/", Mode: int64(mode.Directory)}))
+		writeFile(writer, "/assertion-root/dir-a/unparsed-file", modePerm, "raw content")
+		writeFile(writer, "/assertion-root/parsed-file", int64(mode.File), "raw content")
+
+		RequireTarState(tb, &buffer, expectedState)
+	})
+}
+
+func testRequireState(t *testing.T, rootDir string, requireState func(testing.TB, DirectoryState)) {
+	t.Helper()
+
+	umask := Umask()
 
 	for _, tc := range []struct {
 		desc                 string
@@ -159,7 +204,7 @@ func TestRequireDirectoryState(t *testing.T) {
 			tc.modifyAssertion(expectedState)
 
 			recordedTB := &tbRecorder{tb: t}
-			RequireDirectoryState(recordedTB, rootDir, relativePath, expectedState)
+			requireState(recordedTB, expectedState)
 
 			if tc.expectedErrorMessage != "" {
 				require.Contains(t,

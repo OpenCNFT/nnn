@@ -187,7 +187,8 @@ func TestGetSnapshot(t *testing.T) {
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
@@ -229,7 +230,8 @@ func TestGetSnapshot(t *testing.T) {
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
@@ -300,7 +302,8 @@ func TestGetSnapshot(t *testing.T) {
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
