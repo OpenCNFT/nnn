@@ -1727,6 +1727,78 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 				}
 			},
 		},
+		{
+			desc: "path to submodule",
+			setup: func(t *testing.T) setupData {
+				_, submoduleRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				submodule := gittest.WriteCommit(t, cfg, submoduleRepoPath)
+
+				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{Path: "submodule", Mode: "160000", OID: submodule},
+				))
+
+				return setupData{
+					request: &gitalypb.GetTreeEntriesRequest{
+						Repository: repo,
+						Revision:   []byte(commitID),
+						Path:       []byte("submodule"),
+					},
+					// When the path is to a submodule, the repository resolves the revision to the
+					// commit ID for the submodule. This OID does not exist in the repository.
+					// This results in the provided path being considered invalid and an error is
+					// returned.
+					expectedErr: testhelper.WithInterceptedMetadataItems(
+						structerr.NewNotFound("revision doesn't exist").WithDetail(
+							&gitalypb.GetTreeEntriesError{
+								Error: &gitalypb.GetTreeEntriesError_ResolveTree{
+									ResolveTree: &gitalypb.ResolveRevisionError{
+										Revision: []byte(commitID),
+									},
+								},
+							},
+						),
+						structerr.MetadataItem{Key: "path", Value: "submodule"},
+						structerr.MetadataItem{Key: "revision", Value: commitID},
+					),
+				}
+			},
+		},
+		{
+			desc: "path inside submodule",
+			setup: func(t *testing.T) setupData {
+				_, submoduleRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				submodule := gittest.WriteCommit(t, cfg, submoduleRepoPath)
+
+				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{Path: "submodule", Mode: "160000", OID: submodule},
+				))
+
+				return setupData{
+					request: &gitalypb.GetTreeEntriesRequest{
+						Repository: repo,
+						Revision:   []byte(commitID),
+						Path:       []byte("submodule/foo"),
+					},
+					// When the path is in a submodule, the repository is unable to resolve the
+					// revision and consequently is considered invalid.
+					expectedErr: testhelper.WithInterceptedMetadataItems(
+						structerr.NewInvalidArgument("invalid revision or path").WithDetail(
+							&gitalypb.GetTreeEntriesError{
+								Error: &gitalypb.GetTreeEntriesError_ResolveTree{
+									ResolveTree: &gitalypb.ResolveRevisionError{
+										Revision: []byte(commitID),
+									},
+								},
+							},
+						),
+						structerr.MetadataItem{Key: "path", Value: "submodule/foo"},
+						structerr.MetadataItem{Key: "revision", Value: commitID},
+					),
+				}
+			},
+		},
 	} {
 		tc := tc
 

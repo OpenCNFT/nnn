@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
@@ -698,6 +699,14 @@ func (repo *Repo) ReadTree(ctx context.Context, treeish git.Revision, options ..
 	// Perform a preliminary check on the revision to ensure it's treeish.
 	obj, err := objectReader.Info(ctx, treeOID.Revision())
 	if err != nil {
+		// If the resolved revision does not exist, the repository is either corrupt or the revision
+		// refers to the commit ID of a Git submodule. We assume it is the latter if a relative path
+		// is present. Reading tree entries from a submodule is not supported and consequently an
+		// error is returned.
+		if errors.As(err, &catfile.NotFoundError{}) && c.relativePath != "" {
+			return nil, fmt.Errorf("reading resolved revision: %w", ErrTreeNotExist)
+		}
+
 		return nil, fmt.Errorf("check object type: %w", err)
 	}
 	if obj.Type != "tree" {

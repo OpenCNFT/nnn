@@ -404,6 +404,14 @@ func TestReadTree(t *testing.T) {
 		{OID: treeWithSubtreeAndBlob, Mode: "040000", Path: "subdir"},
 	})
 
+	_, submoduleRepoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+		SkipCreationViaService: true,
+	})
+	submodule := gittest.WriteCommit(t, cfg, submoduleRepoPath)
+	treeWithSubmodule := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+		{Path: "submodule", Mode: "160000", OID: submodule},
+	})
+
 	for _, tc := range []struct {
 		desc         string
 		treeish      git.Revision
@@ -583,6 +591,22 @@ func TestReadTree(t *testing.T) {
 		{
 			desc:        "listing nonexistent object fails",
 			treeish:     "does-not-exist",
+			expectedErr: git.ErrReferenceNotFound,
+		},
+		{
+			desc:    "path to submodule",
+			treeish: treeWithSubmodule.Revision(),
+			options: []ReadTreeOption{
+				WithRelativePath("submodule"),
+			},
+			expectedErr: ErrTreeNotExist,
+		},
+		{
+			desc:    "path inside submodule",
+			treeish: treeWithSubmodule.Revision(),
+			options: []ReadTreeOption{
+				WithRelativePath("submodule/foo"),
+			},
 			expectedErr: git.ErrReferenceNotFound,
 		},
 	} {
