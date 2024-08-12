@@ -176,7 +176,7 @@ func TestReferenceTransactionHook(t *testing.T) {
 					NewOID: gittest.DefaultObjectHash.ZeroOID,
 				},
 			},
-			expectedDefaultBranchUpdated: true,
+			expectedDefaultBranchUpdated: false,
 		},
 		{
 			desc:          "hook triggers transaction with committed state without transaction",
@@ -189,6 +189,39 @@ func TestReferenceTransactionHook(t *testing.T) {
 				},
 			},
 			expectedReftxHash: stdin,
+		},
+		{
+			desc: "hook triggers transaction with default branch update",
+			stdin: []byte(fmt.Sprintf(
+				`%[1]s %[2]s refs/heads/branch-1
+%[2]s %[1]s refs/heads/branch-2
+ref:refs/heads/main ref:refs/heads/branch-1 HEAD
+`,
+				gittest.DefaultObjectHash.ZeroOID,
+				gittest.DefaultObjectHash.EmptyTreeOID,
+			)),
+			state: gitalypb.ReferenceTransactionHookRequest_COMMITTED,
+			expectedResponse: &gitalypb.ReferenceTransactionHookResponse{
+				ExitStatus: &gitalypb.ExitStatus{
+					Value: 0,
+				},
+			},
+			expectedReftxHash: stdin,
+			expectedReferenceUpdates: git.ReferenceUpdates{
+				"refs/heads/branch-1": {
+					OldOID: gittest.DefaultObjectHash.ZeroOID,
+					NewOID: gittest.DefaultObjectHash.EmptyTreeOID,
+				},
+				"refs/heads/branch-2": {
+					OldOID: gittest.DefaultObjectHash.EmptyTreeOID,
+					NewOID: gittest.DefaultObjectHash.ZeroOID,
+				},
+				"HEAD": {
+					OldTarget: "refs/heads/main",
+					NewTarget: "refs/heads/branch-1",
+				},
+			},
+			expectedDefaultBranchUpdated: true,
 		},
 		{
 			desc:              "hook fails with failed vote",
