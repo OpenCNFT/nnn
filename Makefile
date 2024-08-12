@@ -131,10 +131,9 @@ GIT_VERSION ?=
 ## The Git version used for bundled Git v2.45.
 GIT_VERSION_2_45 ?= v2.45.2
 
-# The default version is used in case the caller does not set the variable or
-# if it is either set to the empty string or "default".
 ifeq (${GIT_VERSION:default=},)
-    override GIT_VERSION := ${GIT_VERSION_2_45}
+	# When GIT_VERSION is not explicitly set, we build and use the bundled Git
+	# binaries.
 	export WITH_BUNDLED_GIT = YesPlease
 else
     # Support both vX.Y.Z and X.Y.Z version patterns, since callers across GitLab
