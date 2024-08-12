@@ -23,7 +23,7 @@ import (
 
 type mockTransactionServer struct {
 	voteTransactionFunc func(context.Context, *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error)
-	*gitalypb.UnimplementedRefTransactionServer
+	gitalypb.UnimplementedRefTransactionServer
 }
 
 func (m mockTransactionServer) VoteTransaction(ctx context.Context, req *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
