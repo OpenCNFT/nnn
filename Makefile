@@ -311,7 +311,9 @@ prepare-tests: build-bundled-git
 install: install-bundled-git
 
 else
+build: build-git
 prepare-tests: ${DEPENDENCY_DIR}/git-distribution/git
+install: install-git
 
 export GITALY_TESTING_GIT_BINARY ?= ${DEPENDENCY_DIR}/git-distribution/bin-wrappers/git
 endif
