@@ -123,18 +123,13 @@ GIT_EXECUTABLES += git
 GIT_EXECUTABLES += git-remote-http
 GIT_EXECUTABLES += git-http-backend
 
-## The version of Git to build and test Gitaly with when not used
-## WITH_BUNDLED_GIT=YesPlease. Can be set to an arbitrary Git revision with
-## tags, branches, and commit ids.
+## Override the Git version with a custom version if specified. If set to empty
+## we do not add the version file and instead use the Git version as specified in
+## the Git sources. This is useful to build upon Git features which aren't yet
+## part of a release or a version that cannot be parsed by Gitaly (custom refs).
 GIT_VERSION ?=
 ## The Git version used for bundled Git v2.45.
 GIT_VERSION_2_45 ?= v2.45.2
-
-## Override the Git version with a custom version if specified. If set to empty
-## we do not add the version file and instead use the Git version as specified i
-## the Git sources. This is useful to build upon Git features which aren't yet
-## part of a release or a version that cannot be parsed by Gitaly (custom refs).
-OVERRIDE_GIT_VERSION ?= ${GIT_VERSION}
 
 # The default version is used in case the caller does not set the variable or
 # if it is either set to the empty string or "default".
@@ -382,7 +377,7 @@ bench: ${BENCHMARK_REPO} prepare-tests
 ## Run Go tests with git's reftable backend.
 ## Since the reftable code isn't tagged in Git yet, to run it locally
 ## we have to specify the git version too:
-## 'GIT_DEFAULT_REF_FORMAT=reftable OVERRIDE_GIT_VERSION="v99.99.99" GIT_VERSION="master" make test-go'
+## 'GIT_DEFAULT_REF_FORMAT=reftable GIT_VERSION="master" make test-go'
 test-with-reftable: export GIT_DEFAULT_REF_FORMAT = reftable
 test-with-reftable: test-go
 
@@ -626,13 +621,15 @@ ${DEPENDENCY_DIR}/git-%/Makefile: ${DEPENDENCY_DIR}/git-%.version
 	${Q}${GIT} -C "${@D}" fetch --depth 1 ${GIT_QUIET} origin ${GIT_VERSION}
 	${Q}${GIT} -C "${@D}" reset --hard
 	${Q}${GIT} -C "${@D}" checkout ${GIT_QUIET} --detach FETCH_HEAD
-ifeq ($(OVERRIDE_GIT_VERSION),)
+ifeq (${GIT_VERSION:default=},)
+	@ # Allow Git to auto-detect the version via git-describe(1).
 	${Q}rm -f "${@D}"/version
 else
-	@ # We're writing the version into the "version" file in Git's own source
-	@ # directory. If it exists, Git's Makefile will pick it up and use it as
-	@ # the version instead of auto-detecting via git-describe(1).
-	${Q}echo ${OVERRIDE_GIT_VERSION} >"${@D}"/version
+	@ # Hardcode a valid but non-existent Git version, because GIT_VERSION may
+	@ # not be specified in a semver format. For example, GIT_VERSION could be
+	@ # `next`, `master`, `<commit SHA>` which Gitaly wouldn't be able to parse
+	@ # as a valid Git version.
+	${Q}echo v99.99.99 >"${@D}"/version
 endif
 	${Q}touch $@
 
