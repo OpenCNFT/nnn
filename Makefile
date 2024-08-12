@@ -123,12 +123,18 @@ GIT_EXECUTABLES += git
 GIT_EXECUTABLES += git-remote-http
 GIT_EXECUTABLES += git-http-backend
 
-## Override the Git version with a custom version if specified. If set to empty
-## we do not add the version file and instead use the Git version as specified in
-## the Git sources. This is useful to build upon Git features which aren't yet
-## part of a release or a version that cannot be parsed by Gitaly (custom refs).
+## GIT_VERSION can be used to specify a custom tag, branch, or commit of Git to
+## build. The built binaries remain in ${DEPENDENCY_DIR}/git-distribution and
+## are not used by Gitaly by default. This is useful for testing ad-hoc builds
+## of Git.
+## The version reported by `git --version` will be v99.99.99.
 GIT_VERSION ?=
-## The Git version used for bundled Git v2.45.
+
+## GIT_VERSION_x_xx specifies the tag to use for version x_xx of bundled Git.
+## This tag is typically bumped for patch releases. It can also be overridden
+## to a branch or commit SHA.
+## The version reported by `git --version` will be the version closest to the
+## revision.
 GIT_VERSION_2_45 ?= v2.45.2
 
 ifeq (${GIT_VERSION:default=},)
