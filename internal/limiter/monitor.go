@@ -194,3 +194,46 @@ func NewPackObjectsConcurrencyMonitor(latencyBuckets []float64) *PromMonitor {
 		requestsDroppedVec,
 	)
 }
+
+// NewBundleGenerationConcurrencyMonitor returns a concurrency monitor for use
+// with limiting pack objects processes.
+func NewBundleGenerationConcurrencyMonitor(latencyBuckets []float64) *PromMonitor {
+	acquiringSecondsVec := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "gitaly_bundle_generation_acquiring_seconds",
+			Help:    "Histogram of time calls are rate limited (in seconds)",
+			Buckets: latencyBuckets,
+		},
+		nil,
+	)
+
+	inProgressVec := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "gitaly_bundle_generation_in_progress",
+			Help: "Gauge of number of concurrent in-progress calls",
+		},
+	)
+
+	queuedVec := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "gitaly_bundle_generation_queued",
+			Help: "Gauge of number of queued calls",
+		},
+	)
+
+	requestsDroppedVec := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "gitaly_bundle_generation_dropped_total",
+			Help: "Number of requests dropped from the queue",
+		},
+		[]string{"reason"},
+	)
+
+	return newPromMonitor(
+		TypeBundleGeneration,
+		queuedVec,
+		inProgressVec,
+		acquiringSecondsVec,
+		requestsDroppedVec,
+	)
+}
