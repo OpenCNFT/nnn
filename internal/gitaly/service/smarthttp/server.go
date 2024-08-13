@@ -34,6 +34,7 @@ type server struct {
 	backupLocator              backup.Locator
 	backupSink                 backup.Sink
 	bundleURISink              *bundleuri.Sink
+	bundleGenerationMgr        *bundleuri.BundleGenerationManager
 }
 
 // NewServer creates a new instance of a grpc SmartHTTPServer
@@ -52,10 +53,11 @@ func NewServer(deps *service.Dependencies, serverOpts ...ServerOpt) gitalypb.Sma
 			prometheus.CounterOpts{},
 			[]string{"git_negotiation_feature"},
 		),
-		infoRefCache:  newInfoRefCache(deps.GetLogger(), deps.GetDiskCache()),
-		backupLocator: deps.GetBackupLocator(),
-		backupSink:    deps.GetBackupSink(),
-		bundleURISink: deps.GetBundleURISink(),
+		infoRefCache:        newInfoRefCache(deps.GetLogger(), deps.GetDiskCache()),
+		backupLocator:       deps.GetBackupLocator(),
+		backupSink:          deps.GetBackupSink(),
+		bundleURISink:       deps.GetBundleURISink(),
+		bundleGenerationMgr: deps.GetBundleGenerationManager(),
 	}
 
 	for _, serverOpt := range serverOpts {

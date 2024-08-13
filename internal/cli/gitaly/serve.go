@@ -542,10 +542,44 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	}
 
 	var bundleURISink *bundleuri.Sink
+	var bundleGenerationMgr *bundleuri.BundleGenerationManager
 	if cfg.BundleURI.GoCloudURL != "" {
-		bundleURISink, err = bundleuri.NewSink(ctx, cfg.BundleURI.GoCloudURL)
+		bundleURISink, err = bundleuri.NewSink(
+			ctx,
+			cfg.BundleURI.GoCloudURL,
+		)
 		if err != nil {
 			return fmt.Errorf("create bundle-URI sink: %w", err)
+		}
+
+		if cfg.BundleURI.Autogeneration {
+			var bundleGenerationLimit *limiter.AdaptiveLimit
+			if cfg.BundleURI.Concurrency.Adaptive {
+				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{
+					Initial:       cfg.BundleURI.Concurrency.InitialLimit,
+					Max:           cfg.BundleURI.Concurrency.MaxLimit,
+					Min:           cfg.BundleURI.Concurrency.MinLimit,
+					BackoffFactor: limiter.DefaultBackoffFactor,
+				})
+			} else {
+				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{Initial: cfg.BundleURI.Concurrency.MaxConcurrency})
+			}
+
+			bundleGenerationMonitor := limiter.NewPackObjectsConcurrencyMonitor(
+				cfg.Prometheus.GRPCLatencyBuckets,
+			)
+			bundleGenerationLimiter := limiter.NewConcurrencyLimiter(
+				bundleGenerationLimit,
+				cfg.BundleURI.Concurrency.MaxQueueSize,
+				cfg.BundleURI.Concurrency.MaxQueueWait.Duration(),
+				bundleGenerationMonitor,
+			)
+			prometheus.MustRegister(bundleGenerationMonitor)
+
+			bundleGenerationMgr = bundleuri.NewBundleGenerationManager(
+				bundleURISink,
+				bundleGenerationLimiter,
+			)
 		}
 	}
 
@@ -592,6 +626,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			BackupSink:          backupSink,
 			BackupLocator:       backupLocator,
 			BundleURISink:       bundleURISink,
+			BundleGenerationMgr: bundleGenerationMgr,
 		})
 		b.RegisterStarter(starter.New(c, srv, logger))
 	}
