@@ -406,7 +406,7 @@ func TestListConflictFiles(t *testing.T) {
 				return setupData{
 					client:        client,
 					request:       request,
-					expectedError: structerr.NewFailedPrecondition("could not lookup 'our' OID: reference not found"),
+					expectedError: structerr.NewInvalidArgument("could not lookup 'our' OID: reference not found"),
 				}
 			},
 		},
@@ -430,7 +430,7 @@ func TestListConflictFiles(t *testing.T) {
 				return setupData{
 					client:        client,
 					request:       request,
-					expectedError: structerr.NewFailedPrecondition("could not lookup 'their' OID: reference not found"),
+					expectedError: structerr.NewInvalidArgument("could not lookup 'their' OID: reference not found"),
 				}
 			},
 		},

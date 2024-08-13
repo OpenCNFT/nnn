@@ -402,6 +402,9 @@ func (s *server) repoWithBranchCommit(ctx context.Context, sourceRepo *localrepo
 
 	oid, err := targetRepo.ResolveRevision(ctx, targetRevision)
 	if err != nil {
+		if errors.Is(err, git.ErrReferenceNotFound) {
+			return structerr.NewInvalidArgument("could not resolve target revision %q: %w", targetRevision, err).WithMetadata("revision", oid)
+		}
 		return fmt.Errorf("could not resolve target revision %q: %w", targetRevision, err)
 	}
 
