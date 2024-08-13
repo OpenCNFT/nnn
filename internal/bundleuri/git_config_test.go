@@ -2,7 +2,6 @@ package bundleuri
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -60,7 +58,7 @@ func testUploadPackGitConfig(t *testing.T, ctx context.Context) {
 				return setupData{}
 			},
 			expectedConfig: nil,
-			expectedErr:    errors.New("bundle-URI sink missing"),
+			expectedErr:    ErrSinkMissing,
 		},
 		{
 			desc: "no bundle found",
@@ -74,7 +72,7 @@ func testUploadPackGitConfig(t *testing.T, ctx context.Context) {
 				}
 			},
 			expectedConfig: nil,
-			expectedErr:    structerr.NewNotFound("no bundle available"),
+			expectedErr:    ErrBundleNotFound,
 		},
 		{
 			desc: "not signed",

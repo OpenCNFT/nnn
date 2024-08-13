@@ -105,7 +105,7 @@ func TestSink_SignedURL(t *testing.T) {
 		{
 			desc:        "fails with missing bundle",
 			setup:       func(t *testing.T, sinkDir string, sink *Sink) {},
-			expectedErr: structerr.NewNotFound("no bundle available"),
+			expectedErr: ErrBundleNotFound,
 		},
 	} {
 		tc := tc

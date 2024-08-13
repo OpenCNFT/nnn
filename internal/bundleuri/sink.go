@@ -29,6 +29,9 @@ const (
 	defaultExpiry = 10 * time.Minute
 )
 
+// ErrBundleNotFound indicates that no bundle could be found for a given repository.
+var ErrBundleNotFound = errors.New("no bundle found")
+
 // Sink is a wrapper around the storage bucket used for accessing/writing
 // bundleuri bundles.
 type Sink struct {
@@ -132,9 +135,9 @@ func (s Sink) SignedURL(ctx context.Context, repo storage.Repository) (string, e
 
 	if exists, err := s.bucket.Exists(ctx, relativePath); !exists {
 		if err == nil {
-			return "", structerr.NewNotFound("no bundle available")
+			return "", ErrBundleNotFound
 		}
-		return "", structerr.NewNotFound("no bundle available: %w", err)
+		return "", fmt.Errorf("checking bundle existence: %w", err)
 	}
 
 	uri, err := s.bucket.SignedURL(ctx, relativePath, &blob.SignedURLOptions{
