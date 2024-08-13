@@ -119,7 +119,7 @@ type Cfg struct {
 	// This setting is thus deprecated and should ideally not be used anymore.
 	GitlabShell            GitlabShell         `toml:"gitlab-shell,omitempty" json:"gitlab-shell"`
 	Hooks                  Hooks               `toml:"hooks,omitempty" json:"hooks"`
-	Concurrency            []Concurrency       `toml:"concurrency,omitempty" json:"concurrency"`
+	Concurrency            []RPCConcurrency    `toml:"concurrency,omitempty" json:"concurrency"`
 	RateLimiting           []RateLimiting      `toml:"rate_limiting,omitempty" json:"rate_limiting"`
 	GracefulRestartTimeout duration.Duration   `toml:"graceful_restart_timeout,omitempty" json:"graceful_restart_timeout"`
 	DailyMaintenance       DailyJob            `toml:"daily_maintenance,omitempty" json:"daily_maintenance"`
@@ -466,12 +466,20 @@ type Logging struct {
 	Sentry
 }
 
-// Concurrency allows endpoints to be limited to a maximum concurrency per repo.
+// RPCConcurrency defines Concurrency for RPCs
+type RPCConcurrency struct {
+	Concurrency
+	// RPC is the name of the RPC to set concurrency limits for
+	RPC string `toml:"rpc" json:"rpc"`
+	// MaxPerRepo is the maximum number of concurrent calls for a given repository. This config is used only
+	// if Adaptive is false.
+	MaxPerRepo int `toml:"max_per_repo" json:"max_per_repo"`
+}
+
+// Concurrency allowsoperati9ons  to be limited to a maximum concurrency per repo.
 // Requests that come in after the maximum number of concurrent requests are in progress will wait
 // in a queue that is bounded by MaxQueueSize.
 type Concurrency struct {
-	// RPC is the name of the RPC to set concurrency limits for
-	RPC string `toml:"rpc" json:"rpc"`
 	// Adaptive determines the behavior of the concurrency limit. If set to true, the concurrency limit is dynamic
 	// and starts at InitialLimit, then adjusts within the range [MinLimit, MaxLimit] based on current resource
 	// usage. If set to false, the concurrency limit is static and is set to MaxPerRepo.
@@ -482,9 +490,6 @@ type Concurrency struct {
 	MaxLimit int `toml:"max_limit,omitempty" json:"max_limit,omitempty"`
 	// MinLimit is the mini adaptive concurrency limit.
 	MinLimit int `toml:"min_limit,omitempty" json:"min_limit,omitempty"`
-	// MaxPerRepo is the maximum number of concurrent calls for a given repository. This config is used only
-	// if Adaptive is false.
-	MaxPerRepo int `toml:"max_per_repo" json:"max_per_repo"`
 	// MaxQueueSize is the maximum number of requests in the queue waiting to be picked up
 	// after which subsequent requests will return with an error.
 	MaxQueueSize int `toml:"max_queue_size" json:"max_queue_size"`
@@ -494,17 +499,17 @@ type Concurrency struct {
 }
 
 // Validate runs validation on all fields and compose all found errors.
-func (c Concurrency) Validate() error {
+func (r RPCConcurrency) Validate() error {
 	errs := cfgerror.New().
-		Append(cfgerror.Comparable(c.MaxPerRepo).GreaterOrEqual(0), "max_per_repo").
-		Append(cfgerror.Comparable(c.MaxQueueSize).GreaterOrEqual(0), "max_queue_size").
-		Append(cfgerror.Comparable(c.MaxQueueWait.Duration()).GreaterOrEqual(0), "max_queue_wait")
+		Append(cfgerror.Comparable(r.MaxPerRepo).GreaterOrEqual(0), "max_per_repo").
+		Append(cfgerror.Comparable(r.MaxQueueSize).GreaterOrEqual(0), "max_queue_size").
+		Append(cfgerror.Comparable(r.MaxQueueWait.Duration()).GreaterOrEqual(0), "max_queue_wait")
 
-	if c.Adaptive {
+	if r.Adaptive {
 		errs = errs.
-			Append(cfgerror.Comparable(c.MinLimit).GreaterThan(0), "min_limit").
-			Append(cfgerror.Comparable(c.MaxLimit).GreaterOrEqual(c.InitialLimit), "max_limit").
-			Append(cfgerror.Comparable(c.InitialLimit).GreaterOrEqual(c.MinLimit), "initial_limit")
+			Append(cfgerror.Comparable(r.MinLimit).GreaterThan(0), "min_limit").
+			Append(cfgerror.Comparable(r.MaxLimit).GreaterOrEqual(r.InitialLimit), "max_limit").
+			Append(cfgerror.Comparable(r.InitialLimit).GreaterOrEqual(r.MinLimit), "initial_limit")
 	}
 	return errs.AsError()
 }

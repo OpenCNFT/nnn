@@ -38,7 +38,7 @@ func TestWithConcurrencyLimiters(t *testing.T) {
 	t.Parallel()
 	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		cfg := config.Cfg{
-			Concurrency: []config.Concurrency{
+			Concurrency: []config.RPCConcurrency{
 				{
 					RPC:        "/grpc.testing.TestService/UnaryCall",
 					MaxPerRepo: 1,
@@ -48,11 +48,13 @@ func TestWithConcurrencyLimiters(t *testing.T) {
 					MaxPerRepo: 99,
 				},
 				{
-					RPC:          "/grpc.testing.TestService/AnotherUnaryCall",
-					Adaptive:     true,
-					MinLimit:     5,
-					InitialLimit: 10,
-					MaxLimit:     15,
+					RPC: "/grpc.testing.TestService/AnotherUnaryCall",
+					Concurrency: config.Concurrency{
+						Adaptive:     true,
+						MinLimit:     5,
+						InitialLimit: 10,
+						MaxLimit:     15,
+					},
 				},
 			},
 		}
@@ -87,7 +89,7 @@ func TestUnaryLimitHandler(t *testing.T) {
 		}
 
 		cfg := config.Cfg{
-			Concurrency: []config.Concurrency{
+			Concurrency: []config.RPCConcurrency{
 				{RPC: "/grpc.testing.TestService/UnaryCall", MaxPerRepo: 2},
 			},
 		}
@@ -167,8 +169,14 @@ func testUnaryLimitHandlerQueueStrategy(b *testing.B, ctx context.Context, numRe
 	}
 
 	cfg := config.Cfg{
-		Concurrency: []config.Concurrency{
-			{RPC: "/grpc.testing.TestService/UnaryCall", MaxPerRepo: 50, MaxQueueSize: 100},
+		Concurrency: []config.RPCConcurrency{
+			{
+				RPC:        "/grpc.testing.TestService/UnaryCall",
+				MaxPerRepo: 50,
+				Concurrency: config.Concurrency{
+					MaxQueueSize: 100,
+				},
+			},
 		},
 	}
 
@@ -214,25 +222,27 @@ func TestUnaryLimitHandler_queueing(t *testing.T) {
 	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		t.Run("simple timeout", func(t *testing.T) {
 			cfg := config.Cfg{
-				Concurrency: []config.Concurrency{
+				Concurrency: []config.RPCConcurrency{
 					{
-						RPC:          "/grpc.testing.TestService/UnaryCall",
-						MaxPerRepo:   1,
-						MaxQueueSize: 1,
-						// This test setups two requests:
-						// - The first one is eligible. It enters the handler and blocks the queue.
-						// - The second request is blocked until timeout.
-						// Both of them shares this timeout. Internally, the limiter creates a context
-						// deadline to reject timed out requests. If it's set too low, there's a tiny
-						// possibility that the context reaches the deadline when the limiter checks the
-						// request. Thus, setting a reasonable timeout here and adding some retry
-						// attempts below make the test stable.
-						// Another approach is to implement a hooking mechanism that allows us to
-						// override context deadline setup. However, that approach exposes the internal
-						// implementation of the limiter. It also adds unnecessarily logics.
-						// Congiuring the timeout is more straight-forward and close to the expected
-						// behavior.
-						MaxQueueWait: duration.Duration(100 * time.Millisecond),
+						RPC:        "/grpc.testing.TestService/UnaryCall",
+						MaxPerRepo: 1,
+						Concurrency: config.Concurrency{
+							MaxQueueSize: 1,
+							// This test setups two requests:
+							// - The first one is eligible. It enters the handler and blocks the queue.
+							// - The second request is blocked until timeout.
+							// Both of them shares this timeout. Internally, the limiter creates a context
+							// deadline to reject timed out requests. If it's set too low, there's a tiny
+							// possibility that the context reaches the deadline when the limiter checks the
+							// request. Thus, setting a reasonable timeout here and adding some retry
+							// attempts below make the test stable.
+							// Another approach is to implement a hooking mechanism that allows us to
+							// override context deadline setup. However, that approach exposes the internal
+							// implementation of the limiter. It also adds unnecessarily logics.
+							// Congiuring the timeout is more straight-forward and close to the expected
+							// behavior.
+							MaxQueueWait: duration.Duration(100 * time.Millisecond),
+						},
 					},
 				},
 			}
@@ -288,7 +298,7 @@ func TestUnaryLimitHandler_queueing(t *testing.T) {
 
 		t.Run("unlimited queueing", func(t *testing.T) {
 			cfg := config.Cfg{
-				Concurrency: []config.Concurrency{
+				Concurrency: []config.RPCConcurrency{
 					// Due to a bug queueing wait times used to leak into subsequent
 					// concurrency configuration in case they didn't explicitly set up
 					// the queueing wait time. We thus set up two limits here: one dummy
@@ -296,9 +306,11 @@ func TestUnaryLimitHandler_queueing(t *testing.T) {
 					// that has no wait limit. We of course expect that the actual
 					// config should not have any maximum queueing time.
 					{
-						RPC:          "dummy",
-						MaxPerRepo:   1,
-						MaxQueueWait: duration.Duration(1 * time.Nanosecond),
+						RPC:        "dummy",
+						MaxPerRepo: 1,
+						Concurrency: config.Concurrency{
+							MaxQueueWait: duration.Duration(1 * time.Nanosecond),
+						},
 					},
 					{
 						RPC:        "/grpc.testing.TestService/UnaryCall",
@@ -564,11 +576,13 @@ func TestStreamLimitHandler(t *testing.T) {
 
 				maxQueueSize := 1
 				cfg := config.Cfg{
-					Concurrency: []config.Concurrency{
+					Concurrency: []config.RPCConcurrency{
 						{
-							RPC:          tc.fullname,
-							MaxPerRepo:   tc.maxConcurrency,
-							MaxQueueSize: maxQueueSize,
+							RPC:        tc.fullname,
+							MaxPerRepo: tc.maxConcurrency,
+							Concurrency: config.Concurrency{
+								MaxQueueSize: maxQueueSize,
+							},
 						},
 					},
 				}
@@ -619,8 +633,14 @@ func TestStreamLimitHandler_error(t *testing.T) {
 		s.blockCh = make(chan struct{})
 
 		cfg := config.Cfg{
-			Concurrency: []config.Concurrency{
-				{RPC: "/grpc.testing.TestService/FullDuplexCall", MaxPerRepo: 1, MaxQueueSize: 1},
+			Concurrency: []config.RPCConcurrency{
+				{
+					RPC:        "/grpc.testing.TestService/FullDuplexCall",
+					MaxPerRepo: 1,
+					Concurrency: config.Concurrency{
+						MaxQueueSize: 1,
+					},
+				},
 			},
 		}
 
@@ -755,8 +775,14 @@ func TestConcurrencyLimitHandlerMetrics(t *testing.T) {
 
 		methodName := "/grpc.testing.TestService/UnaryCall"
 		cfg := config.Cfg{
-			Concurrency: []config.Concurrency{
-				{RPC: methodName, MaxPerRepo: 1, MaxQueueSize: 1},
+			Concurrency: []config.RPCConcurrency{
+				{
+					RPC:        methodName,
+					MaxPerRepo: 1,
+					Concurrency: config.Concurrency{
+						MaxQueueSize: 1,
+					},
+				},
 			},
 		}
 

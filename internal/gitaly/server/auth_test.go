@@ -362,7 +362,7 @@ func TestAuthBeforeLimit(t *testing.T) {
 	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx netctx.Context) {
 		cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
 			Auth: auth.Config{Token: "abc123"},
-			Concurrency: []config.Concurrency{{
+			Concurrency: []config.RPCConcurrency{{
 				RPC:        "/gitaly.OperationService/UserCreateTag",
 				MaxPerRepo: 1,
 			}},
