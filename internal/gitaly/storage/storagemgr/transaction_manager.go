@@ -901,6 +901,30 @@ type LogManager interface {
 	GetTransactionPath(lsn storage.LSN) string
 }
 
+// LogReplicator is the interface of a log replicator that is passed to a TransactionManager. The
+// LogReplicator may replicate the input log entry to other nodes in the cluster.
+type LogReplicator interface {
+	CommittedLSN() storage.LSN
+	Replicate(storageName string, partitionID storage.PartitionID, lsn storage.LSN, entry *gitalypb.LogEntry, entryPath string, objectDependencies map[git.ObjectID]struct{}) error
+}
+
+type noopLogReplicator struct {
+	manager      *TransactionManager
+	committedLSN storage.LSN
+}
+
+func (r *noopLogReplicator) CommittedLSN() storage.LSN {
+	return r.committedLSN
+}
+
+func (r *noopLogReplicator) Replicate(_ string, _ storage.PartitionID, lsn storage.LSN, logEntry *gitalypb.LogEntry, logEntryPath string, objectDependencies map[git.ObjectID]struct{}) error {
+	if err := r.manager.appendLogEntry(objectDependencies, logEntry, logEntryPath); err != nil {
+		return fmt.Errorf("appending log entry: %w", err)
+	}
+	r.committedLSN = lsn
+	return nil
+}
+
 // AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
 // for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
 // completed transaction.
@@ -1070,6 +1094,8 @@ type TransactionManager struct {
 	consumer LogConsumer
 	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
 	consumerPos *consumerPosition
+	// replicator...
+	replicator LogReplicator
 	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
 	acknowledgedQueue chan struct{}
 
@@ -1131,6 +1157,7 @@ func NewTransactionManager(
 		metrics:              metrics,
 		consumer:             consumer,
 		consumerPos:          consumerPos,
+		replicator:           nil,
 		acknowledgedQueue:    make(chan struct{}, 1),
 
 		testHooks: testHooks{
@@ -2206,7 +2233,7 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 
 		logEntry.Operations = transaction.walEntry.Operations()
 
-		return mgr.appendLogEntry(transaction.objectDependencies, logEntry, transaction.walFilesPath())
+		return mgr.commitLogEntry(transaction.objectDependencies, logEntry, transaction.walFilesPath())
 	}(); err != nil {
 		transaction.result <- err
 		return nil
@@ -2413,6 +2440,13 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		}
 		if mgr.appendedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
 			return fmt.Errorf("parse appended LSN: %w", err)
+		}
+	}
+
+	if mgr.replicator == nil {
+		mgr.replicator = &noopLogReplicator{
+			manager:      mgr,
+			committedLSN: mgr.appendedLSN,
 		}
 	}
 
@@ -3254,6 +3288,13 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 		return fmt.Errorf("commit: %w", err)
 	}
 
+	return nil
+}
+
+func (mgr *TransactionManager) commitLogEntry(objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
+	if err := mgr.replicator.Replicate(mgr.storageName, mgr.partitionID, mgr.appendedLSN+1, logEntry, logEntryPath, objectDependencies); err != nil {
+		return fmt.Errorf("replicating log entry: %w", err)
+	}
 	return nil
 }
 
