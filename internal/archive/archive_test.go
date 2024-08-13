@@ -1,18 +1,17 @@
 package archive
 
 import (
+	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
 
 func TestWriteTarball(t *testing.T) {
@@ -47,15 +46,13 @@ func TestWriteTarball(t *testing.T) {
 	writeFile(t, filepath.Join(srcDir, "nested4/stub.txt"), []byte("symlinked"))
 	// link to the folder above
 	require.NoError(t, os.Symlink(filepath.Join(srcDir, "nested4"), filepath.Join(srcDir, "link.to.nested4")))
+	require.NoError(t, os.Symlink("nested4", filepath.Join(srcDir, "relative.link.to.nested4")))
 
-	tarPath := filepath.Join(tempDir, "out.tar")
-	archFile, err := os.Create(tarPath)
-	require.NoError(t, err)
-	defer func() { _ = archFile.Close() }()
-
-	err = writeTarball(
+	var archFile bytes.Buffer
+	err := WriteTarball(
 		ctx,
-		archFile,
+		testhelper.NewLogger(t),
+		&archFile,
 		srcDir,
 		"a.txt",
 		strings.Repeat("b", 150)+".txt",
@@ -63,27 +60,47 @@ func TestWriteTarball(t *testing.T) {
 		"nested2/nested/nested/nested/nested/d.txt",
 		"link.to.target.txt",
 		"link.to.nested4",
+		"relative.link.to.nested4",
 	)
 	require.NoError(t, err)
-	require.NoError(t, archFile.Close())
 
-	cfg := testcfg.Build(t)
-
-	dstDir := filepath.Join(tempDir, "dst")
-	require.NoError(t, os.Mkdir(dstDir, mode.Directory))
-	output, err := exec.Command("tar", "-xf", tarPath, "-C", dstDir).CombinedOutput()
-	require.NoErrorf(t, err, "%s", output)
-	diff := gittest.ExecOpts(t, cfg, gittest.ExecConfig{ExpectedExitCode: 1}, "diff", "--no-index", "--name-only", "--exit-code", dstDir, srcDir)
-	expected := strings.Join(
-		[]string{
-			filepath.Join(srcDir, "excluded.txt"),
-			filepath.Join(srcDir, "nested2/nested/nested/c.txt"),
-			filepath.Join(srcDir, "nested3/target.txt"),
-			filepath.Join(srcDir, "nested4/stub.txt\n"),
+	expected := testhelper.DirectoryState{
+		"a.txt": {
+			Mode:    TarFileMode,
+			Content: []byte("a"),
 		},
-		"\n",
-	)
-	require.Equal(t, expected, string(diff))
+		"nested1/": {
+			Mode: TarFileMode | ExecuteMode | fs.ModeDir,
+		},
+		"link.to.nested4": {
+			Mode:    TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Content: filepath.Join(srcDir, "nested4"),
+		},
+		"relative.link.to.nested4": {
+			Mode:    TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Content: "nested4",
+		},
+		"link.to.target.txt": {
+			Mode:    TarFileMode | ExecuteMode | fs.ModeSymlink,
+			Content: filepath.Join(srcDir, "nested3/target.txt"),
+		},
+		"nested2/nested/nested/nested/nested/d.txt": {
+			Mode:    TarFileMode,
+			Content: []byte("d"),
+		},
+	}
+	expected[strings.Repeat("b", 150)+".txt"] = testhelper.DirectoryEntry{
+		Mode:    TarFileMode,
+		Content: []byte("b"),
+	}
+	for i := 0; i < readDirEntriesPageSize+1; i++ {
+		expected[fmt.Sprintf("nested1/%d.txt", i)] = testhelper.DirectoryEntry{
+			Mode:    TarFileMode,
+			Content: []byte{byte(i)},
+		}
+	}
+
+	testhelper.RequireTarState(t, &archFile, expected)
 }
 
 func writeFile(tb testing.TB, path string, data []byte) {

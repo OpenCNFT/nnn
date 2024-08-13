@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
@@ -337,12 +339,12 @@ func TestLogEntryArchiver(t *testing.T) {
 
 				for _, lsn := range manager.acknowledged {
 					tarPath := filepath.Join(partitionPath(archivePath, info.storageName, info.partitionID), lsn.String()+".tar")
-					archive, err := os.Open(tarPath)
+					tar, err := os.Open(tarPath)
 					require.NoError(t, err)
-					testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
-						lsn.String() + "/":                          {Mode: mode.Directory},
-						filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
-						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+					testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+						lsn.String() + "/":                          {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+						filepath.Join(lsn.String(), "LSN"):          {Mode: archive.TarFileMode, Content: []byte(lsn.String())},
+						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 					})
 				}
 			}
@@ -442,13 +444,13 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.NoError(t, os.MkdirAll(partitionDir, mode.Directory))
 
 	tarPath := filepath.Join(partitionPath(archivePath, info.storageName, info.partitionID), lsn.String()) + ".tar"
-	archive, err := os.Open(tarPath)
+	tar, err := os.Open(tarPath)
 	require.NoError(t, err)
 
-	testhelper.RequireTarState(t, archive, testhelper.DirectoryState{
-		lsn.String() + "/":                          {Mode: mode.Directory},
-		filepath.Join(lsn.String(), "LSN"):          {Mode: mode.File, Content: []byte(lsn.String())},
-		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: mode.File, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsn.String() + "/":                          {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		filepath.Join(lsn.String(), "LSN"):          {Mode: archive.TarFileMode, Content: []byte(lsn.String())},
+		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 	})
 
 	require.NoError(t, testutil.CollectAndCompare(
