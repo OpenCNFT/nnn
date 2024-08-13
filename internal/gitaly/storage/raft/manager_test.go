@@ -317,6 +317,7 @@ func TestManager_Start(t *testing.T) {
 	})
 
 	t.Run("re-bootstrap a bootstrapped cluster", func(t *testing.T) {
+		testhelper.SkipQuarantinedTest(t, "https://gitlab.com/gitlab-org/gitaly/-/issues/6244")
 		t.Parallel()
 
 		cluster := newTestRaftCluster(t, 3, withNodeStarter(startManager(t)))
@@ -360,6 +361,7 @@ func TestManager_Start(t *testing.T) {
 	})
 
 	t.Run("restart nodes of a bootstrapped cluster", func(t *testing.T) {
+		testhelper.SkipQuarantinedTest(t, "https://gitlab.com/gitlab-org/gitaly/-/issues/6244")
 		t.Parallel()
 
 		cluster := newTestRaftCluster(t, 3, withNodeStarter(startManager(t)))
@@ -436,6 +438,7 @@ func TestManager_Start(t *testing.T) {
 	})
 
 	t.Run("change replication factors of storages after restart", func(t *testing.T) {
+		testhelper.SkipQuarantinedTest(t, "https://gitlab.com/gitlab-org/gitaly/-/issues/6244")
 		t.Parallel()
 
 		cluster := newTestRaftCluster(t, 3, withNodeStarter(startManager(t)), withRaftClusterConfig(func(cfg config.Raft) config.Raft {
