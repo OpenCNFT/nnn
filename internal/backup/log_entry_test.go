@@ -32,6 +32,7 @@ type mockLogManager struct {
 	finalLSN      storage.LSN
 	entryRootPath string
 	finishFunc    func()
+	finishCount   int
 
 	sync.Mutex
 }
@@ -67,7 +68,25 @@ func (lm *mockLogManager) AcknowledgeTransaction(_ storagemgr.LogConsumer, lsn s
 		lm.SendNotification()
 	}
 
-	if lsn == lm.finalLSN && len(lm.notifications) == 0 {
+	// It's possible that the archiver acknowledges a LSN more than once. When the LogEntryArchiver
+	// processes a notification, it sets the current state's high water mark = notification's high
+	// water mark and notifies another goroutine for processing. The processing goroutine processes
+	// log entries sequentially from the current nextLSN -> high watermark. After each iteration, it
+	// acknowledges the corresponding log entry. If the next notification contains the same high
+	// watermark as the prior, there's a chance the processing goroutine already handles all log
+	// entries. It then re-acknowledges the high watermark and skips the notification.
+	//
+	// For example:
+	// - Ingest notification [3, 5]
+	// - Process 3, ack 3 -> nextLSN = 4
+	// - Process 4, ack 4 -> nextLSN = 5
+	// - Process 5, ack 5 -> nextLSN = 6
+	// - Ingest notification [4, 5] -> re-ack 5
+	//
+	// As a result, we allow at most finishCount calls because of redundant acknowledgement. The
+	// exceeding calls could be ignored.
+	if lsn == lm.finalLSN && len(lm.notifications) == 0 && lm.finishCount > 0 {
+		lm.finishCount--
 		lm.finishFunc()
 	}
 }
@@ -273,7 +292,6 @@ func TestLogEntryArchiver(t *testing.T) {
 
 			archiver := NewLogEntryArchiver(logger, archiveSink, tc.workerCount, accessor)
 			archiver.Run()
-			defer archiver.Close()
 
 			const storageName = "default"
 
@@ -284,6 +302,12 @@ func TestLogEntryArchiver(t *testing.T) {
 					partitionID: partitionID,
 				}
 
+				waitCount := tc.waitCount
+				if waitCount == 0 {
+					waitCount = 1
+				}
+				wg.Add(waitCount)
+
 				manager := &mockLogManager{
 					partitionInfo: info,
 					entryRootPath: entryRootPath,
@@ -291,6 +315,7 @@ func TestLogEntryArchiver(t *testing.T) {
 					notifications: tc.notifications,
 					finalLSN:      tc.finalLSN,
 					finishFunc:    wg.Done,
+					finishCount:   waitCount,
 				}
 				managers[info] = manager
 
@@ -299,12 +324,6 @@ func TestLogEntryArchiver(t *testing.T) {
 				accessor.Unlock()
 
 				partitionID := partitionID
-
-				waitCount := tc.waitCount
-				if waitCount == 0 {
-					waitCount = 1
-				}
-				wg.Add(waitCount)
 
 				// Send partitions in parallel to mimic real usage.
 				go func() {
@@ -326,6 +345,7 @@ func TestLogEntryArchiver(t *testing.T) {
 			}
 
 			wg.Wait()
+			archiver.Close()
 
 			cmpDir := testhelper.TempDir(t)
 			require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), mode.Directory))
@@ -350,7 +370,11 @@ func TestLogEntryArchiver(t *testing.T) {
 			}
 
 			if tc.expectedLogMessage != "" {
-				require.Equal(t, tc.expectedLogMessage, hook.LastEntry().Message)
+				var logs []string
+				for _, entry := range hook.AllEntries() {
+					logs = append(logs, entry.Message)
+				}
+				require.Contains(t, logs, tc.expectedLogMessage)
 			}
 
 			require.NoError(t, testutil.CollectAndCompare(
@@ -411,8 +435,9 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 				highWaterMark: 1,
 			},
 		},
-		finalLSN:   1,
-		finishFunc: wg.Done,
+		finalLSN:    1,
+		finishFunc:  wg.Done,
+		finishCount: 1,
 	}
 
 	accessor.Lock()

@@ -98,8 +98,10 @@ type LogEntryArchiver struct {
 	notificationCh chan struct{}
 	// workCh is the channel used to signal that the archiver should try to process more jobs.
 	workCh chan struct{}
-	// doneCh is the channel used to signal that the LogEntryArchiver should exit.
-	doneCh chan struct{}
+	// closingCh is the channel used to signal that the LogEntryArchiver should exit.
+	closingCh chan struct{}
+	// closedCh is the channel used to wait for the archiver to completely stop.
+	closedCh chan struct{}
 
 	// notifications is the list of log notifications to ingest. notificationsMutex must be held when accessing it.
 	notifications *list.List
@@ -144,7 +146,8 @@ func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, 
 		partitionMgr:     partitionMgr,
 		notificationCh:   make(chan struct{}, 1),
 		workCh:           make(chan struct{}, 1),
-		doneCh:           make(chan struct{}),
+		closingCh:        make(chan struct{}),
+		closedCh:         make(chan struct{}),
 		notifications:    list.New(),
 		partitionStates:  make(map[partitionInfo]*partitionState),
 		activePartitions: make(map[partitionInfo]struct{}),
@@ -222,12 +225,15 @@ func (la *LogEntryArchiver) Run() {
 
 // Close stops the LogEntryArchiver, causing Run to return.
 func (la *LogEntryArchiver) Close() {
-	close(la.doneCh)
+	close(la.closingCh)
+	<-la.closedCh
 }
 
 // main is the main loop of the LogEntryArchiver. New notifications are ingested, jobs
 // are sent to workers, and the result of jobs are received.
 func (la *LogEntryArchiver) main(ctx context.Context, sendCh, recvCh chan *logEntry) {
+	defer close(la.closedCh)
+
 	for {
 		// Triggering sendEntries via workCh may not process all entries if there
 		// are more active partitions than workers or more than one entry to process
@@ -242,7 +248,7 @@ func (la *LogEntryArchiver) main(ctx context.Context, sendCh, recvCh chan *logEn
 			la.ingestNotifications(ctx)
 		case entry := <-recvCh:
 			la.receiveEntry(ctx, entry)
-		case <-la.doneCh:
+		case <-la.closingCh:
 			return
 		}
 	}
@@ -493,7 +499,7 @@ func (la *LogEntryArchiver) backoff() {
 	ticker.Reset()
 
 	select {
-	case <-la.doneCh:
+	case <-la.closingCh:
 		ticker.Stop()
 	case <-ticker.C():
 	}
