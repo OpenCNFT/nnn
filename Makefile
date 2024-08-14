@@ -142,6 +142,7 @@ GIT_VERSION ?=
 # version is added, be sure to update GIT_PACKED_EXECUTABLES, the *-bundled-git targets,
 # and add new targets under the "# These targets build specific releases of Git." section.
 GIT_VERSION_2_45 ?= v2.45.2.gl1
+GIT_VERSION_2_46 ?= v2.46.0
 #
 # OVERRIDE_GIT_VERSION allows you to specify a custom semver value to be reported by the
 # `git --version` command. This affects bundled and non-bundled Git, and can be used whenever
@@ -220,8 +221,9 @@ BUILD_GEM_OPTIONS ?=
 BUILD_GEM_NAME ?= gitaly
 
 # Git binaries that are eventually embedded into the Gitaly binary.
-GIT_PACKED_EXECUTABLES       = $(addprefix ${BUILD_DIR}/bin/gitaly-, \
-									$(addsuffix -v2.45, ${GIT_EXECUTABLES}))
+GIT_PACKED_EXECUTABLES       = $(addprefix ${BUILD_DIR}/bin/gitaly-, $(addsuffix -v2.45, ${GIT_EXECUTABLES})) \
+							   $(addprefix ${BUILD_DIR}/bin/gitaly-, $(addsuffix -v2.46, ${GIT_EXECUTABLES}))
+
 
 # All executables provided by Gitaly.
 GITALY_EXECUTABLES           = $(addprefix ${BUILD_DIR}/bin/,$(notdir $(shell find ${SOURCE_DIR}/cmd -mindepth 1 -maxdepth 1 -type d -print)))
@@ -310,14 +312,16 @@ install: build
 
 .PHONY: build-bundled-git
 ## Build bundled Git binaries.
-build-bundled-git: build-bundled-git-v2.45
+build-bundled-git: build-bundled-git-v2.45 build-bundled-git-v2.46
 build-bundled-git-v2.45: $(patsubst %,${BUILD_DIR}/bin/gitaly-%-v2.45,${GIT_EXECUTABLES})
+build-bundled-git-v2.46: $(patsubst %,${BUILD_DIR}/bin/gitaly-%-v2.46,${GIT_EXECUTABLES})
 
 .PHONY: install-bundled-git
 ## Install bundled Git binaries. The target directory can be modified by
 ## setting PREFIX and DESTDIR.
-install-bundled-git: install-bundled-git-v2.45
+install-bundled-git: install-bundled-git-v2.45 install-bundled-git-v2.46
 install-bundled-git-v2.45: $(patsubst %,${INSTALL_DEST_DIR}/gitaly-%-v2.45,${GIT_EXECUTABLES})
+install-bundled-git-v2.46: $(patsubst %,${INSTALL_DEST_DIR}/gitaly-%-v2.46,${GIT_EXECUTABLES})
 
 ifdef WITH_BUNDLED_GIT
 build: build-bundled-git
@@ -578,6 +582,10 @@ ${DEPENDENCY_DIR}/git-distribution/git: ${DEPENDENCY_DIR}/git-distribution/Makef
 # These targets build specific releases of Git.
 ${BUILD_DIR}/bin/gitaly-%-v2.45: override GIT_VERSION = ${GIT_VERSION_2_45}
 ${BUILD_DIR}/bin/gitaly-%-v2.45: ${DEPENDENCY_DIR}/git-v2.45/% | ${BUILD_DIR}/bin
+	${Q}install $< $@
+
+${BUILD_DIR}/bin/gitaly-%-v2.46: override GIT_VERSION = ${GIT_VERSION_2_46}
+${BUILD_DIR}/bin/gitaly-%-v2.46: ${DEPENDENCY_DIR}/git-v2.46/% | ${BUILD_DIR}/bin
 	${Q}install $< $@
 
 ${BUILD_DIR}/bin/%: ${BUILD_DIR}/intermediate/% | ${BUILD_DIR}/bin
