@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -31,8 +32,7 @@ type mockLogManager struct {
 	acknowledged  []storage.LSN
 	finalLSN      storage.LSN
 	entryRootPath string
-	finishFunc    func()
-
+	finishFunc    func(finalLSN storage.LSN, notifications []notification)
 	sync.Mutex
 }
 
@@ -68,7 +68,7 @@ func (lm *mockLogManager) AcknowledgeTransaction(_ storagemgr.LogConsumer, lsn s
 	}
 
 	if lsn == lm.finalLSN && len(lm.notifications) == 0 {
-		lm.finishFunc()
+		lm.finishFunc(lm.finalLSN, lm.notifications)
 	}
 }
 
@@ -290,7 +290,12 @@ func TestLogEntryArchiver(t *testing.T) {
 					archiver:      archiver,
 					notifications: tc.notifications,
 					finalLSN:      tc.finalLSN,
-					finishFunc:    wg.Done,
+					finishFunc: func(finalLSN storage.LSN, notifications []notification) {
+						fmt.Println(runtime.StartTrace())
+						fmt.Printf("finalLSN: %q\n", finalLSN)
+						fmt.Printf("notifications: %v\n", notifications)
+						wg.Done()
+					},
 				}
 				managers[info] = manager
 
@@ -411,8 +416,13 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 				highWaterMark: 1,
 			},
 		},
-		finalLSN:   1,
-		finishFunc: wg.Done,
+		finalLSN: 1,
+		finishFunc: func(finalLSN storage.LSN, notifications []notification) {
+			fmt.Println(runtime.StartTrace())
+			fmt.Printf("finalLSN: %q\n", finalLSN)
+			fmt.Printf("notifications: %v\n", notifications)
+			wg.Done()
+		},
 	}
 
 	accessor.Lock()
