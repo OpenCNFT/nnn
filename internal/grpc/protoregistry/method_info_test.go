@@ -406,6 +406,52 @@ func TestFindFieldsByExtension(t *testing.T) {
 	}
 }
 
+func TestMethodInfo_Partition(t *testing.T) {
+	t.Parallel()
+
+	testPartitionID := uint64(1)
+
+	testcases := []struct {
+		desc              string
+		svc               string
+		method            string
+		pbMsg             proto.Message
+		expectPartitionID uint64
+		expectErr         error
+	}{
+		{
+			desc:   "valid request",
+			svc:    "PartitionService",
+			method: "BackupPartition",
+			pbMsg: &gitalypb.BackupPartitionRequest{
+				StorageName: "default",
+				PartitionId: testPartitionID,
+			},
+			expectPartitionID: testPartitionID,
+		},
+		{
+			desc:      "target partition id is 0",
+			svc:       "PartitionService",
+			method:    "BackupPartition",
+			pbMsg:     &gitalypb.BackupPartitionRequest{},
+			expectErr: fmt.Errorf("target partition field not found"),
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			info, err := GitalyProtoPreregistered.LookupMethod(formatFullMethodName("gitaly", tc.svc, tc.method))
+			require.NoError(t, err)
+
+			t.Run("Partition", func(t *testing.T) {
+				partition, err := info.Partition(tc.pbMsg)
+				require.Equal(t, tc.expectErr, err)
+				require.Equal(t, tc.expectPartitionID, partition)
+			})
+		})
+	}
+}
+
 func BenchmarkMethodInfo(b *testing.B) {
 	for _, bc := range []struct {
 		desc        string

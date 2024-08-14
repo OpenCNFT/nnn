@@ -87,6 +87,15 @@ func (m mockObjectPoolService) LinkRepositoryToObjectPool(ctx context.Context, r
 	return m.linkRepositoryToObjectPoolFunc(ctx, req)
 }
 
+type mockPartitionService struct {
+	backupPartitionFunc func(context.Context, *gitalypb.BackupPartitionRequest) (*gitalypb.BackupPartitionResponse, error)
+	gitalypb.UnimplementedPartitionServiceServer
+}
+
+func (m mockPartitionService) BackupPartition(ctx context.Context, req *gitalypb.BackupPartitionRequest) (*gitalypb.BackupPartitionResponse, error) {
+	return m.backupPartitionFunc(ctx, req)
+}
+
 func TestMiddleware_transactional(t *testing.T) {
 	if !testhelper.IsWALEnabled() {
 		t.Skip(`
@@ -443,6 +452,49 @@ messages and behavior by erroring out the requests before they even hit this int
 			},
 			expectHandlerInvoked: true,
 		},
+		{
+			desc: "successful partition scoped rpc",
+			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
+				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+					StorageName: "default",
+					PartitionId: 1,
+				})
+				require.NoError(t, err)
+				testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
+			},
+			expectHandlerInvoked: true,
+		},
+		{
+			desc: "partition scoped rpc with missing storage name",
+			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
+				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+					PartitionId: 1,
+				})
+				require.ErrorContains(t, err, "extract target storage: target storage field not found")
+				require.Nil(t, resp)
+			},
+		},
+		{
+			desc: "partition scoped rpc with wrong storage name",
+			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
+				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+					StorageName: "fake",
+					PartitionId: 1,
+				})
+				require.ErrorContains(t, err, `begin transaction: unknown storage: "fake"`)
+				require.Nil(t, resp)
+			},
+		},
+		{
+			desc: "partition scoped rpc with missing partition id",
+			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
+				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+					StorageName: "default",
+				})
+				require.ErrorContains(t, err, "extract target partition: target partition field not found")
+				require.Nil(t, resp)
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			cfg := testcfg.Build(t)
@@ -469,32 +521,34 @@ messages and behavior by erroring out the requests before they even hit this int
 			handlerInvoked := false
 			var transactionID storage.TransactionID
 
-			assertHandler := func(ctx context.Context, shouldBeQuarantined bool, repo *gitalypb.Repository) {
+			assertHandler := func(ctx context.Context, shouldBeQuarantined bool, repo *gitalypb.Repository, isPartitionScoped bool) {
 				handlerInvoked = true
 
-				// The repositories should be equal except for the relative path which
-				// has been pointed to the snapshot.
-				expectedRepo := validRepository()
-				actualRepo := repo
+				if !isPartitionScoped {
+					// The repositories should be equal except for the relative path which
+					// has been pointed to the snapshot.
+					expectedRepo := validRepository()
+					actualRepo := repo
 
-				// When run in a transaction, the relative path will be pointed to the snapshot.
-				assert.NotEqual(t, expectedRepo.RelativePath, repo.RelativePath)
-				expectedRepo.RelativePath = ""
-				actualRepo.RelativePath = ""
+					// When run in a transaction, the relative path will be pointed to the snapshot.
+					assert.NotEqual(t, expectedRepo.RelativePath, repo.RelativePath)
+					expectedRepo.RelativePath = ""
+					actualRepo.RelativePath = ""
 
-				if shouldBeQuarantined {
-					// Mutators should have quarantine directory configured.
-					assert.NotEmpty(t, actualRepo.GitObjectDirectory)
-					actualRepo.GitObjectDirectory = ""
-					assert.NotEmpty(t, actualRepo.GitAlternateObjectDirectories)
-					actualRepo.GitAlternateObjectDirectories = nil
-				} else {
-					// Accessors should not have a quarantine directory configured.
-					assert.Empty(t, actualRepo.GitObjectDirectory)
-					assert.Empty(t, actualRepo.GitAlternateObjectDirectories)
+					if shouldBeQuarantined {
+						// Mutators should have quarantine directory configured.
+						assert.NotEmpty(t, actualRepo.GitObjectDirectory)
+						actualRepo.GitObjectDirectory = ""
+						assert.NotEmpty(t, actualRepo.GitAlternateObjectDirectories)
+						actualRepo.GitAlternateObjectDirectories = nil
+					} else {
+						// Accessors should not have a quarantine directory configured.
+						assert.Empty(t, actualRepo.GitObjectDirectory)
+						assert.Empty(t, actualRepo.GitAlternateObjectDirectories)
+					}
+
+					testhelper.ProtoEqual(t, expectedRepo, actualRepo)
 				}
-
-				testhelper.ProtoEqual(t, expectedRepo, actualRepo)
 
 				// The transaction ID should be included in the context.
 				transactionID = storage.ExtractTransactionID(ctx)
@@ -520,31 +574,31 @@ messages and behavior by erroring out the requests before they even hit this int
 			serverAddress := testserver.RunGitalyServer(t, cfg, func(server *grpc.Server, deps *service.Dependencies) {
 				gitalypb.RegisterObjectPoolServiceServer(server, mockObjectPoolService{
 					createObjectPoolFunc: func(ctx context.Context, req *gitalypb.CreateObjectPoolRequest) (*gitalypb.CreateObjectPoolResponse, error) {
-						assertHandler(ctx, true, req.GetObjectPool().GetRepository())
+						assertHandler(ctx, true, req.GetObjectPool().GetRepository(), false)
 						tc.assertAdditionalRepository(t, ctx, req.GetOrigin())
 						return &gitalypb.CreateObjectPoolResponse{}, tc.handlerError
 					},
 					linkRepositoryToObjectPoolFunc: func(ctx context.Context, req *gitalypb.LinkRepositoryToObjectPoolRequest) (*gitalypb.LinkRepositoryToObjectPoolResponse, error) {
-						assertHandler(ctx, true, req.GetRepository())
+						assertHandler(ctx, true, req.GetRepository(), false)
 						tc.assertAdditionalRepository(t, ctx, req.GetObjectPool().GetRepository())
 						return &gitalypb.LinkRepositoryToObjectPoolResponse{}, tc.handlerError
 					},
 				})
 				gitalypb.RegisterRepositoryServiceServer(server, mockRepositoryService{
 					createForkFunc: func(ctx context.Context, req *gitalypb.CreateForkRequest) (*gitalypb.CreateForkResponse, error) {
-						assertHandler(ctx, false, req.GetRepository())
+						assertHandler(ctx, false, req.GetRepository(), false)
 						tc.assertAdditionalRepository(t, ctx, req.GetSourceRepository())
 						return &gitalypb.CreateForkResponse{}, tc.handlerError
 					},
 					objectFormatFunc: func(ctx context.Context, req *gitalypb.ObjectFormatRequest) (*gitalypb.ObjectFormatResponse, error) {
-						assertHandler(ctx, false, req.GetRepository())
+						assertHandler(ctx, false, req.GetRepository(), false)
 						return &gitalypb.ObjectFormatResponse{}, tc.handlerError
 					},
 					setCustomHooksFunc: func(stream gitalypb.RepositoryService_SetCustomHooksServer) error {
 						req, err := stream.Recv()
 						assert.NoError(t, err)
 
-						assertHandler(stream.Context(), true, req.GetRepository())
+						assertHandler(stream.Context(), true, req.GetRepository(), false)
 
 						resp, err := stream.Recv()
 						assert.Nil(t, resp)
@@ -552,16 +606,22 @@ messages and behavior by erroring out the requests before they even hit this int
 						return nil
 					},
 					getCustomHooksFunc: func(req *gitalypb.GetCustomHooksRequest, stream gitalypb.RepositoryService_GetCustomHooksServer) error {
-						assertHandler(stream.Context(), false, req.GetRepository())
+						assertHandler(stream.Context(), false, req.GetRepository(), false)
 						return tc.handlerError
 					},
 					removeRepositoryFunc: func(ctx context.Context, req *gitalypb.RemoveRepositoryRequest) (*gitalypb.RemoveRepositoryResponse, error) {
-						assertHandler(ctx, true, req.GetRepository())
+						assertHandler(ctx, true, req.GetRepository(), false)
 						return &gitalypb.RemoveRepositoryResponse{}, tc.handlerError
 					},
 					optimizeRepositoryFunc: func(ctx context.Context, req *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error) {
-						assertHandler(ctx, true, req.GetRepository())
+						assertHandler(ctx, true, req.GetRepository(), false)
 						return &gitalypb.OptimizeRepositoryResponse{}, nil
+					},
+				})
+				gitalypb.RegisterPartitionServiceServer(server, mockPartitionService{
+					backupPartitionFunc: func(ctx context.Context, bpr *gitalypb.BackupPartitionRequest) (*gitalypb.BackupPartitionResponse, error) {
+						assertHandler(ctx, false, nil, true)
+						return &gitalypb.BackupPartitionResponse{}, nil
 					},
 				})
 			},

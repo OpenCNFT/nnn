@@ -231,10 +231,43 @@ func nonTransactionalRequest(ctx context.Context, firstMessage proto.Message) tr
 // be invoked with. In addition, it returns a function that must be called with the error returned from the handler to either commit or rollback the
 // transaction. The returned values are valid even if the request should not run transactionally.
 func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (_ transactionalizedRequest, returnedErr error) {
-	if methodInfo.Scope != protoregistry.ScopeRepository {
+	switch methodInfo.Scope {
+	case protoregistry.ScopeRepository:
+		return beginTransactionForRepository(ctx, logger, txRegistry, mgr, locator, methodInfo, req)
+	case protoregistry.ScopePartition:
+		return beginTransactionForPartition(ctx, logger, txRegistry, mgr, methodInfo, req)
+	default:
 		return nonTransactionalRequest(ctx, req), nil
 	}
+}
 
+func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
+	targetStorage, err := methodInfo.Storage(req)
+	if err != nil {
+		return transactionalizedRequest{}, fmt.Errorf("extract target storage: %w", err)
+	}
+
+	targetPartition, err := methodInfo.Partition(req)
+	if err != nil {
+		return transactionalizedRequest{}, fmt.Errorf("extract target partition: %w", err)
+	}
+
+	return beginTransaction(
+		ctx,
+		logger,
+		txRegistry,
+		mgr,
+		methodInfo,
+		req,
+		targetStorage,
+		storage.PartitionID(targetPartition),
+		TransactionOptions{
+			ReadOnly: methodInfo.Operation == protoregistry.OpAccessor,
+		},
+	)
+}
+
+func beginTransactionForRepository(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
 	targetRepo, err := methodInfo.TargetRepo(req)
 	if err != nil {
 		if errors.Is(err, protoregistry.ErrRepositoryFieldNotFound) {
@@ -338,8 +371,6 @@ func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry 
 		return transactionalizedRequest{}, ErrRepositoriesInDifferentStorages
 	}
 
-	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.transactionalizeRequest", nil)
-
 	// Begin fails when attempting to access a repository that doesn't exist and doesn't have a partition
 	// assignment yet. Repository creating RPCs are an exception and are allowed to create the partition
 	// assignment so the transaction can begin, and the repository can be created. The partition assignments
@@ -350,24 +381,41 @@ func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry 
 	// See issue: https://gitlab.com/gitlab-org/gitaly/-/issues/5957
 	_, isRepositoryCreation := repositoryCreatingRPCs[methodInfo.FullMethodName()]
 
-	tx, err := mgr.Begin(ctx, targetRepo.StorageName, 0, TransactionOptions{
-		ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
-		RelativePath:          targetRepo.RelativePath,
-		AlternateRelativePath: alternateRelativePath,
-		AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,
-		ForceExclusiveSnapshot:                    forceExclusiveSnapshot[methodInfo.FullMethodName()],
-	})
+	return beginTransaction(
+		ctx,
+		logger,
+		txRegistry,
+		mgr,
+		methodInfo,
+		req,
+		targetRepo.StorageName,
+		0,
+		TransactionOptions{
+			ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
+			RelativePath:          targetRepo.RelativePath,
+			AlternateRelativePath: alternateRelativePath,
+			AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,
+			ForceExclusiveSnapshot:                    forceExclusiveSnapshot[methodInfo.FullMethodName()],
+		},
+	)
+}
+
+func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, methodInfo protoregistry.MethodInfo, req proto.Message, storageName string, partitionID storage.PartitionID, transactionOptions TransactionOptions) (_ transactionalizedRequest, returnedErr error) {
+	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.transactionalizeRequest", nil)
+
+	tx, err := mgr.Begin(ctx, storageName, partitionID, transactionOptions)
 	if err != nil {
 		var relativePath relativePathNotFoundError
 		if errors.As(err, &relativePath) {
 			// The partition assigner does not have the storage available and returns thus just an error with the
 			// relative path. Convert the error to the usual repository not found error that the RPCs are returning
 			// to conform to the API.
-			return transactionalizedRequest{}, storage.NewRepositoryNotFoundError(targetRepo.StorageName, string(relativePath))
+			return transactionalizedRequest{}, storage.NewRepositoryNotFoundError(storageName, string(relativePath))
 		}
 
 		return transactionalizedRequest{}, fmt.Errorf("begin transaction: %w", err)
 	}
+
 	ctx = storagectx.ContextWithTransaction(ctx, tx)
 
 	txID := txRegistry.register(tx.Transaction)
@@ -444,6 +492,10 @@ func restoreSnapshotRelativePath(ctx context.Context, methodInfo protoregistry.M
 }
 
 func rewriteRequest(tx *finalizableTransaction, methodInfo protoregistry.MethodInfo, req proto.Message) (proto.Message, error) {
+	if methodInfo.Scope != protoregistry.ScopeRepository {
+		return req, nil
+	}
+
 	rewrittenReq, targetRepo, err := rewritableRequest(methodInfo, req)
 	if err != nil {
 		return nil, fmt.Errorf("rewritable request: %w", err)

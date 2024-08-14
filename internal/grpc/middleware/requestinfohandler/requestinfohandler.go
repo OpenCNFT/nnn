@@ -124,6 +124,8 @@ func newRequestInfo(ctx context.Context, fullMethod, grpcMethodType string) *Req
 			scope = "repository"
 		case protoregistry.ScopeStorage:
 			scope = "storage"
+		case protoregistry.ScopePartition:
+			scope = "partition"
 		default:
 			scope = unknownValue
 		}
@@ -190,6 +192,7 @@ func (i *RequestInfo) extractRequestInfo(request any) {
 					i.Repository = targetRepo
 				}
 			case protoregistry.ScopeStorage:
+			case protoregistry.ScopePartition:
 				if storage, err := mi.Storage(reqMsg); err == nil {
 					i.storageName = storage
 				}
