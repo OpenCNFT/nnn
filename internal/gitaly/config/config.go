@@ -466,6 +466,12 @@ type Logging struct {
 	Sentry
 }
 
+// BundleGenerationConcurrency defines concurrency for bundle generation.
+type BundleGenerationConcurrency struct {
+	Concurrency
+	MaxConcurrency int `toml:"max_concurrency" json:"max_concurrency"`
+}
+
 // RPCConcurrency defines Concurrency for RPCs
 type RPCConcurrency struct {
 	Concurrency
@@ -623,11 +629,19 @@ func (bc BackupConfig) Validate() error {
 	return errs.AsError()
 }
 
+// BundleAutogeneration configures the setting for autogeneration of bundles for
+// bundle-uri
+type BundleAutogeneration struct {
+	Enabled     bool                        `toml:"enabled,omitempty" json:"enabled,omitempty"`
+	Concurrency BundleGenerationConcurrency `toml:"concurrency,omitempty" json:"concurrency,omitempty"`
+}
+
 // BundleURIConfig configures use of Bundle-URI
 type BundleURIConfig struct {
 	// GoCloudURL is the blob storage GoCloud URL that will be used to store
 	// Git bundles for Bundle-URI use.
-	GoCloudURL string `toml:"go_cloud_url,omitempty" json:"go_cloud_url,omitempty"`
+	GoCloudURL     string               `toml:"go_cloud_url,omitempty" json:"go_cloud_url,omitempty"`
+	AutoGeneration BundleAutogeneration `toml:"auto_generation,omitempty" json:"auto_generation,omitempty"`
 }
 
 // Validate runs validation on all fields and returns any errors found.
