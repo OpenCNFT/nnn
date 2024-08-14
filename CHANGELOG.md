@@ -1,5 +1,19 @@
 # Gitaly changelog
 
+## 17.3.0 (2024-08-14)
+
+### Added (2 changes)
+
+- [server: Add ServerSignature RPC](gitlab-org/gitaly@12a17e444eeda14d3653fbba38810cb9dff4e393) ([merge request](gitlab-org/gitaly!7112))
+- [git: Embed bundled Git binaries](gitlab-org/gitaly@846ab63710b2990fe764c64b32ab00f287bb1e3a) ([merge request](gitlab-org/gitaly!7035))
+
+### Fixed (4 changes)
+
+- [Fix incremental backups](gitlab-org/gitaly@c6a6c3bff5694f65277a68014a2bfcb5c9602eca) by @skel2007 ([merge request](gitlab-org/gitaly!7125))
+- [gitalybackup: Do not consider pool repos dangling on restore](gitlab-org/gitaly@37552827044b27980372977c078d36ed5b6cbb33) ([merge request](gitlab-org/gitaly!7146))
+- [Ensure page token is for the same tree](gitlab-org/gitaly@dc09bfc081125d97059358376a9960cea42f1dbb) ([merge request](gitlab-org/gitaly!7121))
+- [objectpool: Return already exists gRPC code from CreateObjectPool](gitlab-org/gitaly@cc8e1ca1f419dc3d976ee63917c6a518ff54df65) ([merge request](gitlab-org/gitaly!7104))
+
 ## 17.2.2 (2024-08-06)
 
 ### Fixed (1 change)
