@@ -128,7 +128,7 @@ GIT_EXECUTABLES += git-http-backend
 ## tags, branches, and commit ids.
 GIT_VERSION ?=
 ## The Git version used for bundled Git v2.45.
-GIT_VERSION_2_45 ?= v2.45.2
+GIT_VERSION_2_45 ?= v2.45.2.gl1
 
 ## Override the Git version with a custom version if specified. If set to empty
 ## we do not add the version file and instead use the Git version as specified i
