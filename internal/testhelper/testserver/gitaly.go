@@ -291,6 +291,7 @@ type gitalyServerDeps struct {
 	transactionRegistry *storagemgr.TransactionRegistry
 	procReceiveRegistry *hook.ProcReceiveRegistry
 	inProgressTracker   service.InProgressTracker
+	bundleGenerationMgr *bundleuri.BundleGenerationManager
 }
 
 func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *service.Dependencies {
@@ -444,6 +445,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		BundleURISink:       gsd.bundleURISink,
 		ProcReceiveRegistry: gsd.procReceiveRegistry,
 		InProgressTracker:   gsd.inProgressTracker,
+		BundleGenerationMgr: gsd.bundleGenerationMgr,
 	}
 }
 
@@ -577,6 +579,14 @@ func WithBundleURISink(sink *bundleuri.Sink) GitalyServerOpt {
 func WithInProgressTracker(tracker service.InProgressTracker) GitalyServerOpt {
 	return func(deps gitalyServerDeps) gitalyServerDeps {
 		deps.inProgressTracker = tracker
+		return deps
+	}
+}
+
+// WithBundleGenerationManager sets the bundleuri.Sink that will be used for Gitaly services
+func WithBundleGenerationManager(mgr *bundleuri.BundleGenerationManager) GitalyServerOpt {
+	return func(deps gitalyServerDeps) gitalyServerDeps {
+		deps.bundleGenerationMgr = mgr
 		return deps
 	}
 }
