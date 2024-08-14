@@ -60,7 +60,8 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 			Mode: info.Mode(),
 		}
 
-		if entry.Type().IsRegular() {
+		switch {
+		case entry.Type().IsRegular():
 			content, err := os.ReadFile(path)
 			require.NoError(tb, err)
 
@@ -76,6 +77,11 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 					break
 				}
 			}
+		case entry.Type()&fs.ModeSymlink != 0:
+			link, err := os.Readlink(path)
+			require.NoError(tb, err)
+
+			actualEntry.Content = link
 		}
 
 		actual[actualName] = actualEntry
