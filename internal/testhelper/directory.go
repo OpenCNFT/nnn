@@ -46,11 +46,11 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 		}
 		require.NoError(tb, err)
 
-		trimmedPath := strings.TrimPrefix(path, rootDirectory)
-		if trimmedPath == "" {
+		actualName := strings.TrimPrefix(path, rootDirectory)
+		if actualName == "" {
 			// Store the walked directory itself as "/". Less confusing than having it be
 			// an empty string.
-			trimmedPath = string(os.PathSeparator)
+			actualName = string(os.PathSeparator)
 		}
 
 		info, err := entry.Info()
@@ -67,18 +67,18 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 			actualEntry.Content = content
 			// Find prefect match or glob matching (/wal/1/pack*.pack, for example).
 			for pattern, expectedEntry := range expected {
-				matched, err := filepath.Match(pattern, trimmedPath)
+				matched, err := filepath.Match(pattern, actualName)
 				if err == nil && matched {
 					if expectedEntry.ParseContent != nil {
 						actualEntry.Content = expectedEntry.ParseContent(tb, path, content)
 					}
-					actual[pattern] = actualEntry
-					return nil
+					actualName = pattern
+					break
 				}
 			}
 		}
 
-		actual[trimmedPath] = actualEntry
+		actual[actualName] = actualEntry
 		return nil
 	}))
 
@@ -100,7 +100,6 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 
 	actual := DirectoryState{}
 	tr := tar.NewReader(tarball)
-tarReader:
 	for {
 		header, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -128,8 +127,8 @@ tarReader:
 					if expectedEntry.ParseContent != nil {
 						actualEntry.Content = expectedEntry.ParseContent(tb, header.Name, content)
 					}
-					actual[pattern] = actualEntry
-					continue tarReader
+					actualName = pattern
+					break
 				}
 			}
 		case tar.TypeLink, tar.TypeSymlink:
