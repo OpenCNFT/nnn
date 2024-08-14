@@ -300,6 +300,8 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	// Enable SymrefUpdates
 	symrefUpdateEnabled, _ := env.GetBool("GITALY_TEST_ENABLE_SYMREF_UPDATE", false)
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.SymrefUpdate, symrefUpdateEnabled)
+	// Randomly enable either Git version 2.45 or 2.46.
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.GitV246, rnd.Int()%2 == 0)
 
 	for _, opt := range opts {
 		ctx = opt(ctx)
