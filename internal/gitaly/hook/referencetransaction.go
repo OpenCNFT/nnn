@@ -150,9 +150,9 @@ func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUp
 
 		reference := git.ReferenceName(components[2])
 
-		if reference.String() == "HEAD" {
-			defaultBranchUpdated = true
-		} else if !strings.HasPrefix(reference.String(), "refs/") {
+		// We only track updates made in the 'refs/' directory.
+		// An exception to this is when HEAD is updated.
+		if !strings.HasPrefix(reference.String(), "refs/") && reference.String() != "HEAD" {
 			continue
 		}
 
@@ -176,6 +176,15 @@ func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUp
 			if err != nil {
 				return nil, defaultBranchUpdated, fmt.Errorf("parse new: %w", err)
 			}
+		}
+
+		// If the reference that HEAD is pointing to gets updated, reference-transaction will
+		// print an output for HEAD. But we should only care for when HEAD itself is updated.
+		//
+		// TODO: This can be removed once the bug in Git itself is fixed
+		// https://gitlab.com/gitlab-org/git/-/issues/348
+		if reference.String() == "HEAD" && update.NewTarget != "" {
+			defaultBranchUpdated = true
 		}
 
 		// Only capture default branch changes and ignore all other symbolic reference updates.
