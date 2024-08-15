@@ -1,12 +1,13 @@
 package objectpool
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -17,15 +18,6 @@ import (
 
 func TestDelete(t *testing.T) {
 	t.Parallel()
-
-	ctx := testhelper.Context(t)
-	cfg, repoProto, _, _, client := setup(t, ctx)
-	repo := localrepo.NewTestRepo(t, cfg, repoProto)
-
-	repositoryClient := gitalypb.NewRepositoryServiceClient(extractConn(client))
-
-	poolProto, _, _ := createObjectPool(t, ctx, cfg, repoProto)
-	validPoolPath := poolProto.GetRepository().GetRelativePath()
 
 	errWithTransactions := func() error {
 		// With WAL enabled, the transaction fails to begin leading to a different error message. However if Praefect
@@ -38,85 +30,180 @@ func TestDelete(t *testing.T) {
 		return errInvalidPoolDir
 	}
 
-	for _, tc := range []struct {
-		desc         string
-		noPool       bool
-		relativePath string
+	type setupData struct {
+		request      *gitalypb.DeleteObjectPoolRequest
 		expectedErr  error
+		expectExists bool
+	}
+
+	for _, tc := range []struct {
+		desc  string
+		setup func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData
 	}{
 		{
-			desc:   "no pool in request fails",
-			noPool: true,
-			expectedErr: testhelper.GitalyOrPraefect(
-				structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet),
-				structerr.NewInvalidArgument("no object pool repository"),
-			),
+			desc: "no pool in request fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{
+						ObjectPool: nil,
+					},
+					expectedErr: testhelper.GitalyOrPraefect(
+						structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet),
+						structerr.NewInvalidArgument("no object pool repository"),
+					),
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "deleting outside pools directory fails",
-			relativePath: ".",
-			expectedErr:  errWithTransactions(),
+			desc: "deleting outside pools directory fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: ".",
+						},
+					}},
+					expectedErr:  errWithTransactions(),
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "deleting pools directory fails",
-			relativePath: "@pools",
-			expectedErr:  errWithTransactions(),
+			desc: "deleting pools directory fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: "@pools",
+						},
+					}},
+					expectedErr:  errWithTransactions(),
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "deleting first level subdirectory fails",
-			relativePath: "@pools/ab",
-			expectedErr:  errInvalidPoolDir,
+			desc: "deleting first level subdirectory fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: "@pools/ab",
+						},
+					}},
+					expectedErr:  errInvalidPoolDir,
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "deleting second level subdirectory fails",
-			relativePath: "@pools/ab/cd",
-			expectedErr:  errInvalidPoolDir,
+			desc: "deleting second level subdirectory fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: "@pools/ab/cd",
+						},
+					}},
+					expectedErr:  errInvalidPoolDir,
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "deleting pool subdirectory fails",
-			relativePath: filepath.Join(validPoolPath, "objects"),
-			expectedErr:  errWithTransactions(),
+			desc: "deleting pool subdirectory fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				validPoolPath := poolRepo.GetRelativePath()
+
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: filepath.Join(validPoolPath, "objects"),
+						},
+					}},
+					expectedErr:  errWithTransactions(),
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "path traversing fails",
-			relativePath: validPoolPath + "/../../../../..",
-			expectedErr: testhelper.GitalyOrPraefect(
-				testhelper.WithInterceptedMetadata(
-					structerr.NewInvalidArgument("%w", storage.ErrRelativePathEscapesRoot),
-					"relative_path", validPoolPath+"/../../../../..",
-				),
-				errInvalidPoolDir,
-			),
+			desc: "path traversing fails",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				validPoolPath := poolRepo.GetRelativePath()
+
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: validPoolPath + "/../../../../..",
+						},
+					}},
+					expectedErr: testhelper.GitalyOrPraefect(
+						testhelper.WithInterceptedMetadata(
+							structerr.NewInvalidArgument("%w", storage.ErrRelativePathEscapesRoot),
+							"relative_path", validPoolPath+"/../../../../..",
+						),
+						errInvalidPoolDir,
+					),
+					expectExists: true,
+				}
+			},
 		},
 		{
-			desc:         "deleting pool succeeds",
-			relativePath: validPoolPath,
+			desc: "deleting pool succeeds",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				validPoolPath := poolRepo.GetRelativePath()
+
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: validPoolPath,
+						},
+					}},
+				}
+			},
 		},
 		{
-			desc:         "deleting non-existent pool succeeds",
-			relativePath: gittest.NewObjectPoolName(t),
+			desc: "deleting non-existent pool succeeds",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				return setupData{
+					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
+						Repository: &gitalypb.Repository{
+							StorageName:  poolRepo.GetStorageName(),
+							RelativePath: gittest.NewObjectPoolName(t),
+						},
+					}},
+					expectExists: true,
+				}
+			},
 		},
 	} {
+		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
-			request := &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
-				Repository: &gitalypb.Repository{
-					StorageName:  repo.GetStorageName(),
-					RelativePath: tc.relativePath,
-				},
-			}}
+			t.Parallel()
 
-			if tc.noPool {
-				request.ObjectPool = nil
-			}
+			ctx := testhelper.Context(t)
+			cfg, repoProto, _, _, client := setup(t, ctx)
+			poolProto, _, _ := createObjectPool(t, ctx, cfg, repoProto)
+			data := tc.setup(t, ctx, cfg, poolProto.GetRepository())
 
-			_, err := client.DeleteObjectPool(ctx, request)
-			testhelper.RequireGrpcError(t, tc.expectedErr, err)
+			repositoryClient := gitalypb.NewRepositoryServiceClient(extractConn(client))
+
+			_, err := client.DeleteObjectPool(ctx, data.request)
+			testhelper.RequireGrpcError(t, data.expectedErr, err)
 
 			response, err := repositoryClient.RepositoryExists(ctx, &gitalypb.RepositoryExistsRequest{
 				Repository: poolProto.GetRepository(),
 			})
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedErr != nil, response.GetExists())
+			require.Equal(t, data.expectExists, response.GetExists())
 		})
 	}
 }
