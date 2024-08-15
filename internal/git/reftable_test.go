@@ -53,8 +53,8 @@ func TestParseReftable(t *testing.T) {
 	require.Equal(t, 4, n)
 
 	type setupData struct {
-		repoPath string
-		updates  git.ReferenceUpdates
+		repoPath   string
+		references []git.Reference
 	}
 
 	for _, tc := range []struct {
@@ -73,9 +73,16 @@ func TestParseReftable(t *testing.T) {
 
 				return setupData{
 					repoPath: repoPath,
-					updates: git.ReferenceUpdates{
-						"HEAD":            {NewTarget: "refs/heads/main"},
-						"refs/heads/main": {NewOID: mainCommit},
+					references: []git.Reference{
+						{
+							Name:       "HEAD",
+							Target:     "refs/heads/main",
+							IsSymbolic: true,
+						},
+						{
+							Name:   "refs/heads/main",
+							Target: mainCommit.String(),
+						},
 					},
 				}
 			},
@@ -94,10 +101,20 @@ func TestParseReftable(t *testing.T) {
 
 				return setupData{
 					repoPath: repoPath,
-					updates: git.ReferenceUpdates{
-						"HEAD":             {NewTarget: "refs/heads/main"},
-						"refs/heads/main":  {NewOID: mainCommit},
-						"refs/tags/v2.0.0": {NewOID: annotatedTag},
+					references: []git.Reference{
+						{
+							Name:       "HEAD",
+							Target:     "refs/heads/main",
+							IsSymbolic: true,
+						},
+						{
+							Name:   "refs/heads/main",
+							Target: mainCommit.String(),
+						},
+						{
+							Name:   "refs/tags/v2.0.0",
+							Target: annotatedTag.String(),
+						},
 					},
 				}
 			},
@@ -114,10 +131,20 @@ func TestParseReftable(t *testing.T) {
 
 				return setupData{
 					repoPath: repoPath,
-					updates: git.ReferenceUpdates{
-						"HEAD":            {NewTarget: "refs/heads/main"},
-						"refs/heads/main": {NewOID: mainCommit},
-						"ROOTREF":         {NewOID: rootRefCommit},
+					references: []git.Reference{
+						{
+							Name:       "HEAD",
+							Target:     "refs/heads/main",
+							IsSymbolic: true,
+						},
+						{
+							Name:   "ROOTREF",
+							Target: rootRefCommit.String(),
+						},
+						{
+							Name:   "refs/heads/main",
+							Target: mainCommit.String(),
+						},
 					},
 				}
 			},
@@ -134,10 +161,20 @@ func TestParseReftable(t *testing.T) {
 
 				return setupData{
 					repoPath: repoPath,
-					updates: git.ReferenceUpdates{
-						"HEAD":              {NewTarget: "refs/heads/main"},
-						"refs/heads/main":   {NewOID: mainCommit},
-						"refs/heads/master": {NewOID: masterCommit},
+					references: []git.Reference{
+						{
+							Name:       "HEAD",
+							Target:     "refs/heads/main",
+							IsSymbolic: true,
+						},
+						{
+							Name:   "refs/heads/main",
+							Target: mainCommit.String(),
+						},
+						{
+							Name:   "refs/heads/master",
+							Target: masterCommit.String(),
+						},
 					},
 				}
 			},
@@ -154,10 +191,20 @@ func TestParseReftable(t *testing.T) {
 
 				return setupData{
 					repoPath: repoPath,
-					updates: git.ReferenceUpdates{
-						"HEAD":              {NewTarget: "refs/heads/main"},
-						"refs/heads/main":   {NewOID: mainCommit},
-						"refs/heads/master": {NewOID: masterCommit},
+					references: []git.Reference{
+						{
+							Name:       "HEAD",
+							Target:     "refs/heads/main",
+							IsSymbolic: true,
+						},
+						{
+							Name:   "refs/heads/main",
+							Target: mainCommit.String(),
+						},
+						{
+							Name:   "refs/heads/master",
+							Target: masterCommit.String(),
+						},
 					},
 				}
 			},
@@ -169,20 +216,25 @@ func TestParseReftable(t *testing.T) {
 					SkipCreationViaService: true,
 				})
 
-				updates := make(map[git.ReferenceName]git.ReferenceUpdate)
+				var references []git.Reference
 
-				updates["HEAD"] = git.ReferenceUpdate{NewTarget: "refs/heads/main"}
+				references = append(references, git.Reference{
+					Name:       "HEAD",
+					Target:     "refs/heads/main",
+					IsSymbolic: true,
+				})
 
-				for i := 0; i < 200; i++ {
-					branch := fmt.Sprintf("branch%d", i)
-					updates[git.ReferenceName(fmt.Sprintf("refs/heads/%s", branch))] = git.ReferenceUpdate{
-						NewOID: gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(branch)),
-					}
+				for i := 0; i < 100; i++ {
+					branch := fmt.Sprintf("branch%02d", i)
+					references = append(references, git.Reference{
+						Name:   git.ReferenceName(fmt.Sprintf("refs/heads/%s", branch)),
+						Target: gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(branch)).String(),
+					})
 				}
 
 				return setupData{
-					repoPath: repoPath,
-					updates:  updates,
+					repoPath:   repoPath,
+					references: references,
 				}
 			},
 		},
@@ -210,15 +262,10 @@ func TestParseReftable(t *testing.T) {
 			table, err := git.NewReftable(buf)
 			require.NoError(t, err)
 
-			u, err := table.IterateRefs()
+			references, err := table.IterateRefs()
 			require.NoError(t, err)
 
-			require.Equal(t, len(setup.updates), len(u))
-			for ref, expectedUpdate := range setup.updates {
-				update, ok := u[ref]
-				require.True(t, ok)
-				require.Equal(t, expectedUpdate, update)
-			}
+			require.Equal(t, setup.references, references)
 		})
 	}
 }
