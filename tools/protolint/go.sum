@@ -56,8 +56,8 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/yoheimuta/go-protoparser/v4 v4.11.0 h1:zhP3R1bzopFKOco4YouXR7X126ggQX3nQ12OcW958CA=
 github.com/yoheimuta/go-protoparser/v4 v4.11.0/go.mod h1:AHNNnSWnb0UoL4QgHPiOAg2BniQceFscPI5X/BZNHl8=
-github.com/yoheimuta/protolint v0.50.4 h1:6sa8Ffa4g7xt7DjsEqg8TPr2s67Dy3aSeZuWHD114H4=
-github.com/yoheimuta/protolint v0.50.4/go.mod h1:kMfzRmxlWEvjvwUI04hxPhLVixFWizAZw4iMXuonCk0=
+github.com/yoheimuta/protolint v0.50.5 h1:s2nf65bYUiK6difk3ua+T7UY5N2NCUU7s/hZdN2tH14=
+github.com/yoheimuta/protolint v0.50.5/go.mod h1:kMfzRmxlWEvjvwUI04hxPhLVixFWizAZw4iMXuonCk0=
 golang.org/x/net v0.25.0 h1:d/OCCoBEUq33pjydKrGQhw7IlUPI2Oylr+8qLx49kac=
 golang.org/x/net v0.25.0/go.mod h1:JkAGAh7GEvH74S6FOH42FLoXpXbE/aqXSrIQjXgsiwM=
 golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
