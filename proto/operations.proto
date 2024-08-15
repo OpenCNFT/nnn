@@ -567,6 +567,19 @@ message OperationBranchUpdate {
   bool branch_created = 3;
 }
 
+// UserFFBranchError is an error returned by the UserFFBranch RPC in some specific well
+// defined error cases.
+message UserFFBranchError {
+  oneof error {
+    // custom_hook is set if any custom hook which was running as part of this RPC call
+    // has returned a non-zero exit code.
+    CustomHookError custom_hook = 1;
+    // reference_update is set if the RPC failed because updating the reference to the new
+    // object ID has failed.
+    ReferenceUpdateError reference_update = 2;
+  }
+}
+
 // UserFFBranchRequest is a request for the UserFFBranch RPC.
 message UserFFBranchRequest {
   // repository is the repository for which to perform the fast-forward merge.
