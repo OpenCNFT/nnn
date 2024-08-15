@@ -43,6 +43,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		Stderr:  &stderr,
 		Force:   req.Force,
 		Prune:   !req.NoPrune,
+		Depth:   req.Depth,
 		Tags:    localrepo.FetchOptsTagsAll,
 		Verbose: true,
 		// Transactions are disabled during fetch operation because no references are updated when

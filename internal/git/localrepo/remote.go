@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"strconv"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -62,6 +63,8 @@ type FetchOpts struct {
 	Stderr io.Writer
 	// DisableTransactions will disable the reference-transaction hook and atomic transactions.
 	DisableTransactions bool
+	// depth specifies the depth of the fetch operation
+	Depth *int32
 }
 
 // FetchFailedError indicates that the fetch has failed.
@@ -213,6 +216,10 @@ func (opts FetchOpts) buildFlags() []git.Option {
 
 	if opts.Porcelain {
 		flags = append(flags, git.Flag{Name: "--porcelain"})
+	}
+
+	if opts.Depth != nil {
+		flags = append(flags, git.ValueFlag{Name: "--depth", Value: strconv.Itoa(int(*opts.Depth))})
 	}
 
 	// Even if we ask Git to not print any output and to force-update branches it will still

@@ -961,6 +961,8 @@ type FetchRemoteRequest struct {
 	// check_tags_changed defined whether to check if any tags were modified,
 	// returning the result in the tags_changed field of FetchRemoteResponse.
 	CheckTagsChanged bool `protobuf:"varint,11,opt,name=check_tags_changed,json=checkTagsChanged,proto3" json:"check_tags_changed,omitempty"`
+	  // depth specifies the depth of the fetch operation.
+  Depth *int32 `protobuf:"varint,12,opt,name=depth,json=depth,proto3" json:"depth,omitempty"`
 }
 
 func (x *FetchRemoteRequest) Reset() {
@@ -1056,6 +1058,13 @@ func (x *FetchRemoteRequest) GetCheckTagsChanged() bool {
 		return x.CheckTagsChanged
 	}
 	return false
+}
+
+func (x *FetchRemoteRequest) GetDepth() *int32 {
+	if x != nil {
+		return x.Depth
+	}
+	return nil
 }
 
 // FetchRemoteResponse is a response for the FetchRemote RPC.
