@@ -59,6 +59,8 @@ type Sink interface {
 	// SignedURL returns a URL that can be used to GET the blob for the duration
 	// specified in expiry.
 	SignedURL(ctx context.Context, relativePath string, expiry time.Duration) (string, error)
+	// Exists returns true if a blob exists at relativePath.
+	Exists(ctx context.Context, relativePath string) (bool, error)
 }
 
 // Backup represents all the information needed to restore a backup for a repository
