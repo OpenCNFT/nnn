@@ -189,6 +189,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	beganRun := time.Now()
+
 	bootstrapSpan, ctx := tracing.StartSpan(ctx, "gitaly-bootstrap", nil)
 	defer bootstrapSpan.Finish()
 
@@ -645,6 +647,9 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		return fmt.Errorf("unable to start the bootstrap: %w", err)
 	}
 	bootstrapSpan.Finish()
+	// There are a few goroutines running async tasks that may still be in progress (i.e. preloading the license
+	// database), but this is a close enough indication of startup latency.
+	logger.WithField("duration_ms", time.Since(beganRun).Milliseconds()).Info("Started Gitaly")
 
 	if !cfg.DailyMaintenance.IsDisabled() {
 		shutdownWorkers, err := maintenance.StartWorkers(
