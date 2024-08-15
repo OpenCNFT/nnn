@@ -2,7 +2,9 @@ package objectpool
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,11 +75,13 @@ func TestDelete(t *testing.T) {
 		{
 			desc: "deleting pools directory fails",
 			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				splitPath := strings.Split(poolRepo.GetRelativePath(), string(os.PathSeparator))
+
 				return setupData{
 					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
 						Repository: &gitalypb.Repository{
 							StorageName:  poolRepo.GetStorageName(),
-							RelativePath: "@pools",
+							RelativePath: splitPath[0],
 						},
 					}},
 					expectedErr:  errWithTransactions(),
@@ -88,14 +92,16 @@ func TestDelete(t *testing.T) {
 		{
 			desc: "deleting first level subdirectory fails",
 			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				splitPath := strings.Split(poolRepo.GetRelativePath(), string(os.PathSeparator))
+
 				return setupData{
 					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
 						Repository: &gitalypb.Repository{
 							StorageName:  poolRepo.GetStorageName(),
-							RelativePath: "@pools/ab",
+							RelativePath: filepath.Join(splitPath[:2]...),
 						},
 					}},
-					expectedErr:  errInvalidPoolDir,
+					expectedErr:  errWithTransactions(),
 					expectExists: true,
 				}
 			},
@@ -103,14 +109,16 @@ func TestDelete(t *testing.T) {
 		{
 			desc: "deleting second level subdirectory fails",
 			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, poolRepo *gitalypb.Repository) setupData {
+				splitPath := strings.Split(poolRepo.GetRelativePath(), string(os.PathSeparator))
+
 				return setupData{
 					request: &gitalypb.DeleteObjectPoolRequest{ObjectPool: &gitalypb.ObjectPool{
 						Repository: &gitalypb.Repository{
 							StorageName:  poolRepo.GetStorageName(),
-							RelativePath: "@pools/ab/cd",
+							RelativePath: filepath.Join(splitPath[:3]...),
 						},
 					}},
-					expectedErr:  errInvalidPoolDir,
+					expectedErr:  errWithTransactions(),
 					expectExists: true,
 				}
 			},
