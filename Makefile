@@ -123,23 +123,37 @@ GIT_EXECUTABLES += git
 GIT_EXECUTABLES += git-remote-http
 GIT_EXECUTABLES += git-http-backend
 
-## The version of Git to build and test Gitaly with when not used
-## WITH_BUNDLED_GIT=YesPlease. Can be set to an arbitrary Git revision with
-## tags, branches, and commit ids.
+# == Git version configuration ==
+#
+# By default, Git binaries are compiled and then embedded inside of the Gitaly binary. They
+# are then unpacked at runtime and executed as normal. This is known as "bundled Git", and
+# is done so we maintain end-to-end control of the specific version of Git we execute at
+# runtime. Multiple versions of Git can be bundled simultaneously and their usage can be
+# feature-flagged.
+#
+# The variables below control how Git is compiled.
+#
+# GIT_VERSION allows a non-bundled version of Git to be used. This is defined by the nightly
+# tests which exercise the `next` and `master` branches, but can also serve as an override to
+# test Gitaly against any arbitrary revision in the Git source.
 GIT_VERSION ?=
-## The Git version used for bundled Git v2.45.
+#
+# GIT_VERSION_x_xx defines versions for each instance of bundled Git we ship. When a new
+# version is added, be sure to update GIT_PACKED_EXECUTABLES, the *-bundled-git targets,
+# and add new targets under the "# These targets build specific releases of Git." section.
 GIT_VERSION_2_45 ?= v2.45.2.gl1
-
-## Override the Git version with a custom version if specified. If set to empty
-## we do not add the version file and instead use the Git version as specified i
-## the Git sources. This is useful to build upon Git features which aren't yet
-## part of a release or a version that cannot be parsed by Gitaly (custom refs).
+#
+# OVERRIDE_GIT_VERSION allows you to specify a custom semver value to be reported by the
+# `git --version` command. This affects bundled and non-bundled Git, and can be used whenever
+# whenever the GIT_VERSION* variables are set to a revision that is not a semver value. It
+# can also be left blank, and Git will compute the version during its own build.
 OVERRIDE_GIT_VERSION ?= ${GIT_VERSION}
 
-# The default version is used in case the caller does not set the variable or
-# if it is either set to the empty string or "default".
 ifeq (${GIT_VERSION:default=},)
+	# GIT_VERSION should be overridden to the default version of bundled Git. This is only
+	# necessary until https://gitlab.com/gitlab-org/gitaly/-/issues/6195 is complete.
     override GIT_VERSION := ${GIT_VERSION_2_45}
+    # When GIT_VERSION is not explicitly set, we default to bundled Git.
 	export WITH_BUNDLED_GIT = YesPlease
 else
     # Support both vX.Y.Z and X.Y.Z version patterns, since callers across GitLab
@@ -561,6 +575,7 @@ ${DEPENDENCY_DIR}/git-distribution/git: ${DEPENDENCY_DIR}/git-distribution/Makef
 	${Q}env -u PROFILE -u MAKEFLAGS -u GIT_VERSION ${MAKE} -C "$(<D)" -j$(shell nproc) prefix=${GIT_PREFIX} ${GIT_BUILD_OPTIONS}
 	${Q}touch $@
 
+# These targets build specific releases of Git.
 ${BUILD_DIR}/bin/gitaly-%-v2.45: override GIT_VERSION = ${GIT_VERSION_2_45}
 ${BUILD_DIR}/bin/gitaly-%-v2.45: ${DEPENDENCY_DIR}/git-v2.45/% | ${BUILD_DIR}/bin
 	${Q}install $< $@
