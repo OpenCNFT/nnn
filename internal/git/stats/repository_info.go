@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -291,14 +290,10 @@ func ReferencesInfoForRepository(ctx context.Context, repo *localrepo.Repo) (Ref
 				Size: uint64(reftableStat.Size()),
 			}
 
-			matches := git.ReftableTableNameRegex.FindAllStringSubmatch(reftableName, -1)
-			if len(matches) != 1 || len(matches[0]) != 3 {
-				return ReferencesInfo{}, fmt.Errorf("reftable name %q malformed", reftableName)
+			rt.UpdateIndexMin, rt.UpdateIndexMax, err = git.ParseReftableName(reftableName)
+			if err != nil {
+				return ReferencesInfo{}, fmt.Errorf("parse reftable name: %w", err)
 			}
-
-			// Skip error checking due to regexp matching above.
-			rt.UpdateIndexMin, _ = strconv.ParseUint(matches[0][1], 10, 0)
-			rt.UpdateIndexMax, _ = strconv.ParseUint(matches[0][2], 10, 0)
 
 			info.ReftableTables = append(info.ReftableTables, rt)
 		}
