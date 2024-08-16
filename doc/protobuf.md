@@ -311,6 +311,7 @@ indicate what is being modified:
 
 - Server-scoped RPCs modify server-wide resources.
 - Storage-scoped RPCs modify data in a specific storage.
+- Partition-scoped RPCs modify data in a specific partition.
 - Repository-scoped RPCs modify data in a specific repository.
 
 To declare the scope, mutators must contain one of the following lines:
@@ -318,6 +319,9 @@ To declare the scope, mutators must contain one of the following lines:
 - `option(op_type).scope = SERVER;`
 - `option(op_type).scope = STORAGE;`: The associated request must have a field
   tagged with `[(storage)=true]` that indicates the storage's name.
+- `option(op_type).scope = PARTITION;`: The associated request must have both a 
+  field tagged with `[(storage)=true]` and a field tagged with 
+  `[(partition)=true]` that indicates the partition's location.
 - `option(op_type).scope = REPOSITORY;`: This is the default scoped and thus
   doesn't need to be explicitly declared. The associated request must have a
   field tagged with `[(target_repository)=true]` that indicates the repository's

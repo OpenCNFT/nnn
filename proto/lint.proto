@@ -26,6 +26,8 @@ message OperationMsg {
     REPOSITORY = 0; // protolint:disable:this ENUM_FIELD_NAMES_PREFIX ENUM_FIELD_NAMES_ZERO_VALUE_END_WITH
     // STORAGE ...
     STORAGE = 2; // protolint:disable:this ENUM_FIELD_NAMES_PREFIX
+    // PARTITION ...
+    PARTITION = 3; // protolint:disable:this ENUM_FIELD_NAMES_PREFIX
 
     reserved 1;
     reserved "SERVER";
@@ -38,6 +40,7 @@ message OperationMsg {
   //   - REPOSITORY: scoped to only a single repo
   //   - SERVER: affects the entire server and potentially all repos
   //   - STORAGE: scoped to a specific storage location and all repos within
+  //   - PARTITION: scoped to a specific partition and all repos within
   Scope scope_level = 2;
 }
 
@@ -67,4 +70,6 @@ extend google.protobuf.FieldOptions {
   bool target_repository = 91235;
   // additional_repository is used to mark additional repository.
   bool additional_repository = 91236;
+  // partition_id is used to mark field containing id of affected partition.
+  bool partition_id = 91237; // Random high number..
 }

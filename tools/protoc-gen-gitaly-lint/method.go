@@ -26,6 +26,8 @@ func (ml methodLinter) validateAccessor() error {
 		return ml.ensureValidRepoScope()
 	case gitalypb.OperationMsg_STORAGE:
 		return ml.ensureValidStorageScope()
+	case gitalypb.OperationMsg_PARTITION:
+		return ml.ensureValidPartitionScope()
 	}
 
 	return nil
@@ -42,6 +44,9 @@ func (ml methodLinter) validateMutator() error {
 
 	case gitalypb.OperationMsg_STORAGE:
 		return ml.ensureValidStorageScope()
+
+	case gitalypb.OperationMsg_PARTITION:
+		return ml.ensureValidPartitionScope()
 
 	default:
 		return fmt.Errorf("unknown operation scope level %d", scope)
@@ -65,14 +70,35 @@ func (ml methodLinter) ensureValidStorageScope() error {
 		return err
 	}
 
+	if err := ml.ensureValidPartition(0); err != nil {
+		return err
+	}
+
 	return ml.ensureValidStorage(1)
 }
 
 func (ml methodLinter) ensureValidRepoScope() error {
-	if err := ml.ensureValidTargetRepository(1); err != nil {
+	if err := ml.ensureValidPartition(0); err != nil {
 		return err
 	}
-	return ml.ensureValidStorage(0)
+
+	if err := ml.ensureValidStorage(0); err != nil {
+		return err
+	}
+
+	return ml.ensureValidTargetRepository(1)
+}
+
+func (ml methodLinter) ensureValidPartitionScope() error {
+	if err := ml.ensureValidTargetRepository(0); err != nil {
+		return err
+	}
+
+	if err := ml.ensureValidStorage(1); err != nil {
+		return err
+	}
+
+	return ml.ensureValidPartition(1)
 }
 
 func (ml methodLinter) ensureValidStorage(expected int) error {
@@ -134,6 +160,38 @@ func (ml methodLinter) ensureValidTargetRepository(expected int) error {
 
 	if len(storageFields) != expected {
 		return fmt.Errorf("unexpected count of target_repository fields %d, expected %d, found target_repository label at: %v", len(storageFields), expected, storageFields)
+	}
+
+	return nil
+}
+
+func (ml methodLinter) ensureValidPartition(expected int) error {
+	topLevelMsgs, err := ml.getTopLevelMsgs()
+	if err != nil {
+		return err
+	}
+
+	reqMsgName, err := lastName(ml.methodDesc.GetInputType())
+	if err != nil {
+		return err
+	}
+
+	msgT := topLevelMsgs[reqMsgName]
+
+	m := matcher{
+		match:        protoutil.GetPartitionIDExtension,
+		subMatch:     nil,
+		expectedType: "",
+		topLevelMsgs: topLevelMsgs,
+	}
+
+	partitionFields, err := m.findMatchingFields(reqMsgName, msgT)
+	if err != nil {
+		return err
+	}
+
+	if len(partitionFields) != expected {
+		return fmt.Errorf("unexpected count of partition field %d, expected %d, found partition label at: %v", len(partitionFields), expected, partitionFields)
 	}
 
 	return nil

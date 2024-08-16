@@ -68,6 +68,11 @@ message RequestWithNestedRepoNotFlagged {
   Header header = 1 [(gitaly.target_repository) = true];
 }
 
+message RequestWithPartition {
+  string storage_name = 1 [(gitaly.storage) = true];
+  uint64 partition_id = 2 [(gitaly.partition_id) = true];
+}
+
 service InterceptedWithOperationType {
   option (gitaly.intercepted) = true;
 
@@ -155,6 +160,42 @@ service InvalidService {
   rpc InvalidMethod14(RequestWithMultipleNestedStorage) returns (InvalidMethodResponse) {
     option (gitaly.op_type) = {
       op: MUTATOR
+      scope_level: STORAGE
+    };
+  }
+
+  // should fail if storage isn't specified for partition scoped RPC
+  rpc InvalidMethod15(InvalidMethodRequest) returns (InvalidMethodResponse) {
+    option (gitaly.op_type) = {
+      op: ACCESSOR
+      scope_level: PARTITION
+    };
+  }
+  // should fail if target repo is specified for partition scoped RPC
+  rpc InvalidMethod16(InvalidMethodRequestWithRepo) returns (InvalidMethodResponse) {
+    option (gitaly.op_type) = {
+      op: ACCESSOR
+      scope_level: PARTITION
+    };
+  }
+  // should fail if partition id isn't specified for partition scoped RPC
+  rpc InvalidMethod17(RequestWithStorage) returns (InvalidMethodResponse) {
+    option (gitaly.op_type) = {
+      op: ACCESSOR
+      scope_level: PARTITION
+    };
+  }
+    // should fail if partition is specified for repository scoped RPC
+  rpc InvalidMethod18(RequestWithPartition) returns (InvalidMethodResponse) {
+    option (gitaly.op_type) = {
+      op: ACCESSOR
+      scope_level: REPOSITORY
+    };
+  }
+  // should fail if partition is specified for storage scoped RPC
+  rpc InvalidMethod19(RequestWithPartition) returns (InvalidMethodResponse) {
+    option (gitaly.op_type) = {
+      op: ACCESSOR
       scope_level: STORAGE
     };
   }

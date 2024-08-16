@@ -41,6 +41,11 @@ func GetStorageExtension(m *descriptorpb.FieldDescriptorProto) (bool, error) {
 	return getBoolExtension(m.GetOptions(), gitalypb.E_Storage)
 }
 
+// GetPartitionIDExtension gets the partition id extension from a field descriptor
+func GetPartitionIDExtension(m *descriptorpb.FieldDescriptorProto) (bool, error) {
+	return getBoolExtension(m.GetOptions(), gitalypb.E_PartitionId)
+}
+
 // GetTargetRepositoryExtension gets the target_repository extension from a field descriptor
 func GetTargetRepositoryExtension(m *descriptorpb.FieldDescriptorProto) (bool, error) {
 	return getBoolExtension(m.GetOptions(), gitalypb.E_TargetRepository)
