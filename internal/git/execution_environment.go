@@ -22,6 +22,12 @@ var (
 	// binary.
 	BundledGitConstructors = []BundledGitEnvironmentConstructor{
 		{
+			Suffix: "-v2.46",
+			FeatureFlags: []featureflag.FeatureFlag{
+				featureflag.GitV246,
+			},
+		},
+		{
 			Suffix: "-v2.45",
 		},
 	}
