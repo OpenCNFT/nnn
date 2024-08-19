@@ -267,6 +267,38 @@ func testObjectReaderObject(t *testing.T, ctx context.Context) {
 			require.Contains(t, string(data), "Scrooge McDuck <scrooge@mcduck.com>")
 		}
 	})
+
+	t.Run("read existing object with mailmap disabled", func(t *testing.T) {
+		mailmapContents := "A U Thor <author@example.com> Scrooge McDuck <scrooge@mcduck.com>"
+
+		commitID := gittest.WriteCommit(t, cfg, repoPath,
+			gittest.WithTreeEntries(
+				gittest.TreeEntry{Path: ".mailmap", Mode: "100644", Content: mailmapContents},
+			),
+			gittest.WithBranch("main"),
+		)
+
+		commitContents := gittest.Exec(t, cfg, "-C", repoPath, "cat-file", "-p", commitID.String())
+
+		// We disable usage of mailmap, irrelevant of the feature flag status.
+		reader, err := newObjectReader(ctx, newRepoExecutor(t, cfg, repoProto), nil, WithoutMailmap())
+		require.NoError(t, err)
+
+		object, err := reader.Object(ctx, "refs/heads/main")
+		require.NoError(t, err)
+
+		data, err := io.ReadAll(object)
+		require.NoError(t, err)
+		require.Equal(t, commitContents, data)
+
+		// We're keeping this 'if' statement to show that even if the feature flag
+		// is enabled, since we've explicitly disabled mailmap, the result is the same.
+		if featureflag.MailmapOptions.IsEnabled(ctx) {
+			require.Contains(t, string(data), "Scrooge McDuck <scrooge@mcduck.com>")
+		} else {
+			require.Contains(t, string(data), "Scrooge McDuck <scrooge@mcduck.com>")
+		}
+	})
 }
 
 func TestObjectReader_queue(t *testing.T) {

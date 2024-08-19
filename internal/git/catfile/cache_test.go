@@ -184,10 +184,10 @@ func TestCache_autoExpiry(t *testing.T) {
 	// Add a process that has expired already.
 	key0 := mustCreateKey(t, "0", repo)
 	value0, cancel := mustCreateCacheable(t, cfg, repo)
-	c.objectContentReaders.Add(key0, value0, time.Now().Add(-time.Millisecond), cancel)
-	requireProcessesValid(t, &c.objectContentReaders)
+	c.objectReaders.Add(key0, value0, time.Now().Add(-time.Millisecond), cancel)
+	requireProcessesValid(t, &c.objectReaders)
 
-	require.Contains(t, keys(t, &c.objectContentReaders), key0, "key should still be in map")
+	require.Contains(t, keys(t, &c.objectReaders), key0, "key should still be in map")
 	require.False(t, value0.isClosed(), "value should not have been closed")
 
 	// We need to tick thrice to get deterministic results: the first tick is discarded before
@@ -198,7 +198,7 @@ func TestCache_autoExpiry(t *testing.T) {
 	monitorTicker.Tick()
 	monitorTicker.Tick()
 
-	require.Empty(t, keys(t, &c.objectContentReaders), "key should no longer be in map")
+	require.Empty(t, keys(t, &c.objectReaders), "key should no longer be in map")
 	require.True(t, value0.isClosed(), "value should be closed after eviction")
 }
 
@@ -228,7 +228,7 @@ func TestCache_ObjectReader(t *testing.T) {
 		cancel()
 
 		require.True(t, reader.isClosed())
-		require.Empty(t, keys(t, &cache.objectContentReaders))
+		require.Empty(t, keys(t, &cache.objectReaders))
 	})
 
 	t.Run("cacheable", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestCache_ObjectReader(t *testing.T) {
 		// Cancel the process such that it will be considered for return to the cache.
 		cancel()
 
-		require.Empty(t, keys(t, &cache.objectContentReaders))
+		require.Empty(t, keys(t, &cache.objectReaders))
 
 		// The process should be killed now, so reading the object must fail.
 		_, err = io.ReadAll(object)
@@ -300,11 +300,11 @@ func TestCache_ObjectReader(t *testing.T) {
 		// Cancel the process such that it will be considered for return to the cache.
 		cancel()
 
-		require.Empty(t, keys(t, &cache.objectContentReaders))
+		require.Empty(t, keys(t, &cache.objectReaders))
 	})
 }
 
-func TestCache_ObjectInfoReader(t *testing.T) {
+func TestCache_ObjectReaderWithoutMailmap(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
@@ -324,13 +324,13 @@ func TestCache_ObjectInfoReader(t *testing.T) {
 		// The context doesn't carry a session ID and is thus uncacheable.
 		// The process should never get returned to the cache and must be
 		// killed on context cancellation.
-		reader, cancel, err := cache.ObjectInfoReader(ctx, repoExecutor)
+		reader, cancel, err := cache.ObjectReaderWithoutMailmap(ctx, repoExecutor)
 		require.NoError(t, err)
 
 		cancel()
 
 		require.True(t, reader.isClosed())
-		require.Empty(t, keys(t, &cache.objectInfoReaders))
+		require.Empty(t, keys(t, &cache.objectReadersWithoutMailmap))
 	})
 
 	t.Run("cacheable", func(t *testing.T) {
@@ -341,13 +341,14 @@ func TestCache_ObjectInfoReader(t *testing.T) {
 			metadata.Pairs(SessionIDField, "1"),
 		)
 
-		reader, cancel, err := cache.ObjectInfoReader(ctx, repoExecutor)
+		reader, cancel, err := cache.ObjectReaderWithoutMailmap(ctx, repoExecutor)
 		require.NoError(t, err)
 
-		// Cancel the process such it will be considered for return to the cache.
+		// Cancel the context such that the process will be considered for return to the
+		// cache and wait for the cache to collect it.
 		cancel()
 
-		allKeys := keys(t, &cache.objectReaders)
+		allKeys := keys(t, &cache.objectReadersWithoutMailmap)
 		require.Equal(t, []key{{
 			sessionID:   "1",
 			repoStorage: repo.GetStorageName(),
@@ -355,8 +356,33 @@ func TestCache_ObjectInfoReader(t *testing.T) {
 		}}, allKeys)
 
 		// Assert that we can still read from the cached process.
-		_, err = reader.Info(ctx, "refs/heads/main")
+		_, err = reader.Object(ctx, "refs/heads/main")
 		require.NoError(t, err)
+	})
+
+	t.Run("dirty process does not get cached", func(t *testing.T) {
+		defer cache.Evict()
+
+		ctx := testhelper.MergeIncomingMetadata(ctx,
+			metadata.Pairs(SessionIDField, "1"),
+		)
+
+		reader, cancel, err := cache.ObjectReaderWithoutMailmap(ctx, repoExecutor)
+		require.NoError(t, err)
+
+		// While we request object data, we do not consume it at all. The reader is thus
+		// dirty and cannot be reused and shouldn't be returned to the cache.
+		object, err := reader.Object(ctx, "refs/heads/main")
+		require.NoError(t, err)
+
+		// Cancel the process such that it will be considered for return to the cache.
+		cancel()
+
+		require.Empty(t, keys(t, &cache.objectReadersWithoutMailmap))
+
+		// The process should be killed now, so reading the object must fail.
+		_, err = io.ReadAll(object)
+		require.True(t, errors.Is(err, os.ErrClosed))
 	})
 
 	t.Run("closed process does not get cached", func(t *testing.T) {
@@ -366,7 +392,7 @@ func TestCache_ObjectInfoReader(t *testing.T) {
 			metadata.Pairs(SessionIDField, "1"),
 		)
 
-		reader, cancel, err := cache.ObjectInfoReader(ctx, repoExecutor)
+		reader, cancel, err := cache.ObjectReaderWithoutMailmap(ctx, repoExecutor)
 		require.NoError(t, err)
 
 		// Closed processes naturally cannot be reused anymore and thus shouldn't ever get
@@ -376,7 +402,7 @@ func TestCache_ObjectInfoReader(t *testing.T) {
 		// Cancel the process such that it will be considered for return to the cache.
 		cancel()
 
-		require.Empty(t, keys(t, &cache.objectInfoReaders))
+		require.Empty(t, keys(t, &cache.objectReadersWithoutMailmap))
 	})
 }
 

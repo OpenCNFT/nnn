@@ -35,6 +35,8 @@ type Cache interface {
 	// ObjectReader either creates a new object reader or returns a cached one for the given
 	// repository.
 	ObjectReader(context.Context, git.RepositoryExecutor) (ObjectContentReader, func(), error)
+	// ObjectReaderWithoutMailmap is similar to ObjectReader but with mailmap disabled.
+	ObjectReaderWithoutMailmap(context.Context, git.RepositoryExecutor) (ObjectContentReader, func(), error)
 	// ObjectInfoReader either creates a new object info reader or returns a cached one for the
 	// given repository.
 	ObjectInfoReader(context.Context, git.RepositoryExecutor) (ObjectInfoReader, func(), error)
@@ -59,9 +61,8 @@ type ProcessCache struct {
 	monitorTicker helper.Ticker
 	monitorDone   chan interface{}
 
-	objectReaders        processes
-	objectContentReaders processes
-	objectInfoReaders    processes
+	objectReaders               processes
+	objectReadersWithoutMailmap processes
 
 	catfileCacheCounter     *prometheus.CounterVec
 	currentCatfileProcesses prometheus.Gauge
@@ -82,13 +83,10 @@ func newCache(ttl time.Duration, maxLen int, monitorTicker helper.Ticker) *Proce
 
 	processCache := &ProcessCache{
 		ttl: ttl,
-		objectContentReaders: processes{
-			maxLen: maxLen,
-		},
-		objectInfoReaders: processes{
-			maxLen: maxLen,
-		},
 		objectReaders: processes{
+			maxLen: maxLen,
+		},
+		objectReadersWithoutMailmap: processes{
 			maxLen: maxLen,
 		},
 		catfileCacheCounter: prometheus.NewCounterVec(
@@ -152,9 +150,8 @@ func (c *ProcessCache) monitor() {
 	for {
 		select {
 		case <-c.monitorTicker.C():
-			c.objectContentReaders.EnforceTTL(time.Now())
-			c.objectInfoReaders.EnforceTTL(time.Now())
 			c.objectReaders.EnforceTTL(time.Now())
+			c.objectReadersWithoutMailmap.EnforceTTL(time.Now())
 			c.monitorTicker.Reset()
 		case <-c.monitorDone:
 			close(c.monitorDone)
@@ -174,15 +171,20 @@ func (c *ProcessCache) Stop() {
 	c.Evict()
 }
 
-// ObjectReader creates a new ObjectReader process for the given repository.
-func (c *ProcessCache) ObjectReader(ctx context.Context, repo git.RepositoryExecutor) (ObjectContentReader, func(), error) {
+func (c *ProcessCache) objectReaderRaw(ctx context.Context, repo git.RepositoryExecutor, withoutMailmap bool) (ObjectContentReader, func(), error) {
 	var cached cacheable
 	var err error
 	var cancel func()
 
-	cached, cancel, err = c.getOrCreateProcess(ctx, repo, &c.objectReaders, func(ctx context.Context) (cacheable, error) {
-		return newObjectReader(ctx, repo, c.catfileLookupCounter)
-	}, "catfile.ObjectReader")
+	if withoutMailmap {
+		cached, cancel, err = c.getOrCreateProcess(ctx, repo, &c.objectReadersWithoutMailmap, func(ctx context.Context) (cacheable, error) {
+			return newObjectReader(ctx, repo, c.catfileLookupCounter, WithoutMailmap())
+		}, "catfile.ObjectReaderWithoutMailmap")
+	} else {
+		cached, cancel, err = c.getOrCreateProcess(ctx, repo, &c.objectReaders, func(ctx context.Context) (cacheable, error) {
+			return newObjectReader(ctx, repo, c.catfileLookupCounter)
+		}, "catfile.ObjectReader")
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -193,6 +195,16 @@ func (c *ProcessCache) ObjectReader(ctx context.Context, repo git.RepositoryExec
 	}
 
 	return objectReader, cancel, nil
+}
+
+// ObjectReader creates a new ObjectReader process for the given repository.
+func (c *ProcessCache) ObjectReader(ctx context.Context, repo git.RepositoryExecutor) (ObjectContentReader, func(), error) {
+	return c.objectReaderRaw(ctx, repo, false)
+}
+
+// ObjectReaderWithoutMailmap creates a new ObjectReader but without 'mailmap' support.
+func (c *ProcessCache) ObjectReaderWithoutMailmap(ctx context.Context, repo git.RepositoryExecutor) (ObjectContentReader, func(), error) {
+	return c.objectReaderRaw(ctx, repo, true)
 }
 
 // ObjectInfoReader creates a new ObjectInfoReader process for the given repository.
@@ -316,16 +328,14 @@ func (c *ProcessCache) getOrCreateProcess(
 }
 
 func (c *ProcessCache) reportCacheMembers() {
-	c.catfileCacheMembers.WithLabelValues("object_content_reader").Set(float64(c.objectContentReaders.EntryCount()))
-	c.catfileCacheMembers.WithLabelValues("object_info_reader").Set(float64(c.objectInfoReaders.EntryCount()))
 	c.catfileCacheMembers.WithLabelValues("object_reader").Set(float64(c.objectReaders.EntryCount()))
+	c.catfileCacheMembers.WithLabelValues("object_reader_without_mailmap").Set(float64(c.objectReadersWithoutMailmap.EntryCount()))
 }
 
 // Evict evicts all cached processes from the cache.
 func (c *ProcessCache) Evict() {
-	c.objectContentReaders.Evict()
-	c.objectInfoReaders.Evict()
 	c.objectReaders.Evict()
+	c.objectReadersWithoutMailmap.Evict()
 }
 
 func (c *ProcessCache) returnToCache(p *processes, cacheKey key, value cacheable, cancel func()) {
