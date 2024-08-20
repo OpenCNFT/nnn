@@ -299,16 +299,9 @@ install: build
 build-bundled-git: build-bundled-git-v2.45
 build-bundled-git-v2.45: $(patsubst %,${BUILD_DIR}/bin/gitaly-%-v2.45,${GIT_EXECUTABLES})
 
-.PHONY: install-bundled-git
-## Install bundled Git binaries. The target directory can be modified by
-## setting PREFIX and DESTDIR.
-install-bundled-git: install-bundled-git-v2.45
-install-bundled-git-v2.45: $(patsubst %,${INSTALL_DEST_DIR}/gitaly-%-v2.45,${GIT_EXECUTABLES})
-
 ifdef WITH_BUNDLED_GIT
 build: build-bundled-git
 prepare-tests: build-bundled-git
-install: install-bundled-git
 
 else
 prepare-tests: ${DEPENDENCY_DIR}/git-distribution/git
