@@ -3,6 +3,7 @@ package testhelper
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 )
 
@@ -272,4 +274,140 @@ func TestCreateFS(t *testing.T) {
 		"/shared-dir/shared-file":         {Mode: mode.File, Content: []byte("shared-file")},
 		"/root-file":                      {Mode: mode.File, Content: []byte("root-file")},
 	})
+}
+
+func TestContainsTarState(t *testing.T) {
+	ctx := context.Background()
+	logger := NewLogger(t)
+
+	setupTestDir := func(t *testing.T, files map[string]string) string {
+		t.Helper()
+
+		dir := TempDir(t)
+		for path, content := range files {
+			fullPath := filepath.Join(dir, path)
+			require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), archive.TarFileMode|archive.ExecuteMode|fs.ModeDir))
+			require.NoError(t, os.WriteFile(fullPath, []byte(content), archive.TarFileMode))
+		}
+
+		return dir
+	}
+
+	testCases := []struct {
+		desc          string
+		files         map[string]string
+		expectedState DirectoryState
+		expectErr     bool
+	}{
+		{
+			desc:          "empty tarball",
+			files:         nil,
+			expectedState: DirectoryState{},
+		},
+		{
+			desc: "tarball with single file",
+			files: map[string]string{
+				"file.txt": "content",
+			},
+			expectedState: DirectoryState{
+				"file.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content"),
+				},
+			},
+		},
+		{
+			desc: "tarball with multiple files",
+			files: map[string]string{
+				"file1.txt":     "content1",
+				"file2.txt":     "content2",
+				"dir/file3.txt": "content3",
+			},
+			expectedState: DirectoryState{
+				"file1.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content1"),
+				},
+				"file2.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content2"),
+				},
+				"dir/file3.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content3"),
+				},
+			},
+		},
+		{
+			desc: "tarball with subset of files",
+			files: map[string]string{
+				"file1.txt": "content1",
+				"file2.txt": "content2",
+			},
+			expectedState: DirectoryState{
+				"file1.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content1"),
+				},
+			},
+		},
+		{
+			desc: "tarball missing expected file",
+			files: map[string]string{
+				"file1.txt": "content1",
+			},
+			expectedState: DirectoryState{
+				"file1.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content1"),
+				},
+				"file2.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("content2"),
+				},
+			},
+			expectErr: true,
+		},
+		{
+			desc: "tarball with different content",
+			files: map[string]string{
+				"file1.txt": "foo",
+				"file2.txt": "oof",
+			},
+			expectedState: DirectoryState{
+				"file1.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("foo"),
+				},
+				"file2.txt": DirectoryEntry{
+					Mode:    archive.TarFileMode,
+					Content: []byte("bar"),
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
+
+			dir := setupTestDir(t, tc.files)
+
+			var buf bytes.Buffer
+			require.NoError(t, archive.WriteTarball(ctx, logger, &buf, dir, "."))
+
+			recordedTB := &tbRecorder{tb: t}
+			ContainsTarState(recordedTB, &buf, tc.expectedState)
+
+			if tc.expectErr {
+				require.NotEmpty(t, recordedTB.errorMessage)
+				require.True(t, recordedTB.failNow)
+			} else {
+				require.Empty(t, recordedTB.errorMessage)
+				require.False(t, recordedTB.failNow)
+			}
+		})
+	}
 }

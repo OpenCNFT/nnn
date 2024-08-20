@@ -104,6 +104,30 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) {
 	tb.Helper()
 
+	expected, actual := getTarState(tb, tarball, expected)
+
+	ProtoEqual(tb, expected, actual)
+}
+
+// ContainsTarState asserts that the provided tarball contains the expected contents.
+func ContainsTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) {
+	tb.Helper()
+
+	expected, actual := getTarState(tb, tarball, expected)
+
+	actualFiltered := make(DirectoryState, len(expected))
+	for e := range expected {
+		if actualContent, ok := actual[e]; ok {
+			actualFiltered[e] = actualContent
+		}
+	}
+
+	ProtoEqual(tb, expected, actualFiltered)
+}
+
+func getTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) (DirectoryState, DirectoryState) {
+	tb.Helper()
+
 	actual := DirectoryState{}
 	tr := tar.NewReader(tarball)
 	for {
@@ -153,7 +177,7 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 		expectedCopy[key] = value
 	}
 
-	ProtoEqual(tb, expectedCopy, actual)
+	return expectedCopy, actual
 }
 
 // MustCreateCustomHooksTar creates a temporary custom hooks tar archive on disk
