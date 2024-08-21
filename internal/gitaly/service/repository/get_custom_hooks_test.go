@@ -73,7 +73,7 @@ func TestGetCustomHooks_successful(t *testing.T) {
 
 			reader := tc.streamReader(t, ctx, repo, client)
 			expected := testhelper.DirectoryState{
-				"custom_hooks/": {
+				"custom_hooks": {
 					Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir,
 				},
 			}
