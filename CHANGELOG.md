@@ -1,5 +1,9 @@
 # Gitaly changelog
 
+## 17.3.1 (2024-08-20)
+
+No changes.
+
 ## 17.3.0 (2024-08-14)
 
 ### Added (2 changes)
@@ -13,6 +17,14 @@
 - [gitalybackup: Do not consider pool repos dangling on restore](gitlab-org/gitaly@37552827044b27980372977c078d36ed5b6cbb33) ([merge request](gitlab-org/gitaly!7146))
 - [Ensure page token is for the same tree](gitlab-org/gitaly@dc09bfc081125d97059358376a9960cea42f1dbb) ([merge request](gitlab-org/gitaly!7121))
 - [objectpool: Return already exists gRPC code from CreateObjectPool](gitlab-org/gitaly@cc8e1ca1f419dc3d976ee63917c6a518ff54df65) ([merge request](gitlab-org/gitaly!7104))
+
+## 17.2.4 (2024-08-21)
+
+No changes.
+
+## 17.2.3 (2024-08-20)
+
+No changes.
 
 ## 17.2.2 (2024-08-06)
 
@@ -34,6 +46,14 @@ No changes.
 
 - [Ensure page token is for the same tree](gitlab-org/gitaly@1ab723e39f5b7921e2ec7343fb2c0e55a7b45954) ([merge request](gitlab-org/gitaly!7068))
 - [git: Allow reading the attributes for 'git-merge-tree(1)'](gitlab-org/gitaly@2635c20f5a062507aee3282f87df797193e1c1aa) ([merge request](gitlab-org/gitaly!7066))
+
+## 17.1.6 (2024-08-21)
+
+No changes.
+
+## 17.1.5 (2024-08-20)
+
+No changes.
 
 ## 17.1.4 (2024-08-06)
 
