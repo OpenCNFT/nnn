@@ -142,7 +142,8 @@ doesn't seem to test a realistic scenario.`)
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
@@ -186,7 +187,8 @@ doesn't seem to test a realistic scenario.`)
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
@@ -273,7 +275,8 @@ doesn't seem to test a realistic scenario.`)
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{
@@ -338,7 +341,8 @@ doesn't seem to test a realistic scenario.`)
 					append([]string{"refs/", "refs/heads", "reftable/", "reftable/tables.list"}, reftableFiles(t, repoPath)...),
 				) {
 					m := archive.TarFileMode
-					if strings.HasSuffix(ref, "/") {
+					ref, isDir := strings.CutSuffix(ref, "/")
+					if isDir {
 						m |= archive.ExecuteMode | fs.ModeDir
 					}
 					expected[ref] = testhelper.DirectoryEntry{

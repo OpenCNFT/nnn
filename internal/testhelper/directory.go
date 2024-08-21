@@ -46,11 +46,11 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 		}
 		require.NoError(tb, err)
 
-		trimmedPath := strings.TrimPrefix(path, rootDirectory)
-		if trimmedPath == "" {
+		actualName := strings.TrimPrefix(path, rootDirectory)
+		if actualName == "" {
 			// Store the walked directory itself as "/". Less confusing than having it be
 			// an empty string.
-			trimmedPath = string(os.PathSeparator)
+			actualName = string(os.PathSeparator)
 		}
 
 		info, err := entry.Info()
@@ -60,25 +60,31 @@ func RequireDirectoryState(tb testing.TB, rootDirectory, relativeDirectory strin
 			Mode: info.Mode(),
 		}
 
-		if entry.Type().IsRegular() {
+		switch {
+		case entry.Type().IsRegular():
 			content, err := os.ReadFile(path)
 			require.NoError(tb, err)
 
 			actualEntry.Content = content
 			// Find prefect match or glob matching (/wal/1/pack*.pack, for example).
 			for pattern, expectedEntry := range expected {
-				matched, err := filepath.Match(pattern, trimmedPath)
+				matched, err := filepath.Match(pattern, actualName)
 				if err == nil && matched {
 					if expectedEntry.ParseContent != nil {
 						actualEntry.Content = expectedEntry.ParseContent(tb, path, content)
 					}
-					actual[pattern] = actualEntry
-					return nil
+					actualName = pattern
+					break
 				}
 			}
+		case entry.Type()&fs.ModeSymlink != 0:
+			link, err := os.Readlink(path)
+			require.NoError(tb, err)
+
+			actualEntry.Content = link
 		}
 
-		actual[trimmedPath] = actualEntry
+		actual[actualName] = actualEntry
 		return nil
 	}))
 
@@ -100,7 +106,6 @@ func RequireTarState(tb testing.TB, tarball io.Reader, expected DirectoryState) 
 
 	actual := DirectoryState{}
 	tr := tar.NewReader(tarball)
-tarReader:
 	for {
 		header, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -111,8 +116,11 @@ tarReader:
 		actualEntry := DirectoryEntry{
 			Mode: header.FileInfo().Mode(),
 		}
+		actualName := header.Name
 
 		switch header.Typeflag {
+		case tar.TypeDir:
+			actualName = strings.TrimSuffix(actualName, string(os.PathSeparator))
 		case tar.TypeReg:
 			content, err := io.ReadAll(tr)
 			require.NoError(tb, err)
@@ -125,19 +133,15 @@ tarReader:
 					if expectedEntry.ParseContent != nil {
 						actualEntry.Content = expectedEntry.ParseContent(tb, header.Name, content)
 					}
-					actual[pattern] = actualEntry
-					continue tarReader
+					actualName = pattern
+					break
 				}
 			}
 		case tar.TypeLink, tar.TypeSymlink:
 			actualEntry.Content = header.Linkname
 		}
 
-		actual[header.Name] = actualEntry
-	}
-
-	if expected == nil {
-		expected = DirectoryState{}
+		actual[actualName] = actualEntry
 	}
 
 	// Functions are never equal unless they are nil, see https://pkg.go.dev/reflect#DeepEqual.

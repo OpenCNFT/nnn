@@ -362,7 +362,7 @@ func TestLogEntryArchiver(t *testing.T) {
 					tar, err := os.Open(tarPath)
 					require.NoError(t, err)
 					testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
-						lsn.String() + "/":                          {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+						lsn.String():                                {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 						filepath.Join(lsn.String(), "LSN"):          {Mode: archive.TarFileMode, Content: []byte(lsn.String())},
 						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 					})
@@ -473,7 +473,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.NoError(t, err)
 
 	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
-		lsn.String() + "/":                          {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		lsn.String():                                {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 		filepath.Join(lsn.String(), "LSN"):          {Mode: archive.TarFileMode, Content: []byte(lsn.String())},
 		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 	})

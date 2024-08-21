@@ -126,7 +126,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: &bytes.Buffer{},
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/": {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				"custom_hooks": {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 			},
 		},
 		{
@@ -141,7 +141,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				"custom_hooks":             {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 				"custom_hooks/pre-commit":  {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-commit content")},
 				"custom_hooks/pre-push":    {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-push content")},
 				"custom_hooks/pre-receive": {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-receive content")},
@@ -165,7 +165,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			},
 			hooks: testhelper.MustCreateCustomHooksTar(t),
 			expectedState: testhelper.DirectoryState{
-				"custom_hooks/":            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				"custom_hooks":             {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 				"custom_hooks/pre-commit":  {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-commit content")},
 				"custom_hooks/pre-push":    {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-push content")},
 				"custom_hooks/pre-receive": {Mode: archive.TarFileMode | archive.ExecuteMode, Content: []byte("pre-receive content")},
