@@ -132,7 +132,9 @@ workflow:
     # Create the build directory for the unprivileged user that we're running
     # tests as. This is required because the source directory itself is owned
     # by `root`.
-    - install --directory --owner=${TEST_UID} --group=${TEST_UID} _build
+    - mkdir -p _build
+    - go mod download -modcacherw
+    - chown -R ${TEST_UID}:${TEST_UID} _build
     # But the actual tests should run unprivileged. This assures that we pay
     # proper attention to permission bits and that we don't modify the source
     # directory.
@@ -206,7 +208,9 @@ build:
     - go version
     # Build the binaries as unprivileged user so that we can reuse the cache
     # for our "test" targets, which also run unprivileged.
-    - install --directory --owner=${TEST_UID} --group=${TEST_UID} _build
+    - mkdir -p _build
+    - go mod download -modcacherw
+    - chown -R ${TEST_UID}:${TEST_UID} _build
     - setpriv --reuid=${TEST_UID} --regid=${TEST_UID} --clear-groups --no-new-privs make build $(test "${GIT_VERSION}" = default && echo build-bundled-git || echo build-git)
     - go run ./tools/test-boot ${TEST_BOOT_ARGS}
   parallel:
