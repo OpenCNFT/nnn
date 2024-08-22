@@ -6,7 +6,7 @@ stages:
   - qa
 
 default:
-  image: registry.gitlab.com/gitlab-org/gitlab-build-images/debian-${DEBIAN_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.36
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images/debian-${DEBIAN_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.45
   tags:
     - saas-linux-large-amd64
   interruptible: true
@@ -16,7 +16,7 @@ default:
   git_default: "default"
   git_minimum: "v2.45.0"
   go_default: "1.22"
-  go_supported: [ "1.21", "1.22" ]
+  go_supported: ["1.21", "1.22", "1.23"]
   macos: "macos-12-xcode-14"
   pgbouncer: "1.17.0"
   postgres_default: "12-alpine"
@@ -333,7 +333,7 @@ test:sha256:
 
 test:fips:
   <<: *test_definition
-  image: registry.gitlab.com/gitlab-org/gitlab-build-images/ubi-${UBI_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.36
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images/ubi-${UBI_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.45
   tags:
     - fips
   cache:
