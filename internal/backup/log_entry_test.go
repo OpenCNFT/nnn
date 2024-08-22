@@ -13,7 +13,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
@@ -377,10 +376,7 @@ func TestLogEntryArchiver(t *testing.T) {
 				require.Contains(t, logs, tc.expectedLogMessage)
 			}
 
-			require.NoError(t, testutil.CollectAndCompare(
-				archiver.backupCounter,
-				buildMetrics(t, tc.expectedBackupCount, 0),
-				"gitaly_wal_backup_count"))
+			testhelper.RequirePromMetrics(t, archiver.backupCounter, buildMetrics(t, tc.expectedBackupCount, 0))
 		})
 	}
 }
@@ -478,10 +474,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
 	})
 
-	require.NoError(t, testutil.CollectAndCompare(
-		archiver.backupCounter,
-		buildMetrics(t, 1, 1),
-		"gitaly_wal_backup_count"))
+	testhelper.RequirePromMetrics(t, archiver.backupCounter, buildMetrics(t, 1, 1))
 }
 
 func partitionPath(root string, storageName string, partitionID storage.PartitionID) string {
@@ -501,7 +494,7 @@ func createEntryDir(t *testing.T, entryRootPath string, storageName string, part
 	})
 }
 
-func buildMetrics(t *testing.T, successCt, failCt int) *strings.Reader {
+func buildMetrics(t *testing.T, successCt, failCt int) string {
 	t.Helper()
 
 	var builder strings.Builder
@@ -520,5 +513,5 @@ func buildMetrics(t *testing.T, successCt, failCt int) *strings.Reader {
 		require.NoError(t, err)
 	}
 
-	return strings.NewReader(builder.String())
+	return builder.String()
 }

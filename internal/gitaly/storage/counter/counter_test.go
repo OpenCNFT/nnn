@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -131,8 +130,7 @@ func TestCountStorages(t *testing.T) {
 
 			storages := nameToPath(cfg.Storages)
 
-			require.NoError(t, testutil.CollectAndCompare(
-				c, buildMetrics(t, tc.expectedMetrics(storages)), "gitaly_total_repositories_count"))
+			testhelper.RequirePromMetrics(t, c, buildMetrics(t, tc.expectedMetrics(storages)))
 		})
 	}
 }
@@ -243,13 +241,12 @@ func TestCounter(t *testing.T) {
 			c.suppressMetric.Store(tc.suppress)
 			tc.setup(t, c)
 
-			require.NoError(t, testutil.CollectAndCompare(
-				c, buildMetrics(t, tc.expectedMetrics), "gitaly_total_repositories_count"))
+			testhelper.RequirePromMetrics(t, c, buildMetrics(t, tc.expectedMetrics))
 		})
 	}
 }
 
-func buildMetrics(t *testing.T, metrics []metric) *strings.Reader {
+func buildMetrics(t *testing.T, metrics []metric) string {
 	t.Helper()
 
 	var builder strings.Builder
@@ -263,5 +260,5 @@ func buildMetrics(t *testing.T, metrics []metric) *strings.Reader {
 			item.path, item.prefix, item.count))
 		require.NoError(t, err)
 	}
-	return strings.NewReader(builder.String())
+	return builder.String()
 }

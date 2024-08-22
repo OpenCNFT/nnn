@@ -1,11 +1,9 @@
 package trace2hooks
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trace2"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -381,13 +379,7 @@ gitaly_pack_objects_stages_seconds_count{stage="write-pack-file"} 2
 			err := exporter.Handle(ctx, tc.inputTrace)
 			require.NoError(t, err)
 
-			require.NoError(
-				t,
-				testutil.CollectAndCompare(
-					exporter,
-					bytes.NewBufferString(tc.expectedMetrics),
-				),
-			)
+			testhelper.RequirePromMetrics(t, exporter, tc.expectedMetrics)
 
 			customFields := log.CustomFieldsFromContext(ctx)
 			require.NotNil(t, customFields)

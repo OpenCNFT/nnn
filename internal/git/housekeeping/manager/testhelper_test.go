@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
@@ -163,7 +162,7 @@ func requireCleanStaleDataMetrics(t *testing.T, m *RepositoryManager, metrics cl
 		require.NoError(t, err)
 	}
 
-	require.NoError(t, testutil.CollectAndCompare(m, strings.NewReader(builder.String()), "gitaly_housekeeping_pruned_files_total"))
+	testhelper.RequirePromMetrics(t, m, builder.String())
 }
 
 func requireReferenceLockCleanupMetrics(t *testing.T, m *RepositoryManager, metrics cleanStaleDataMetrics) {
@@ -183,7 +182,7 @@ func requireReferenceLockCleanupMetrics(t *testing.T, m *RepositoryManager, metr
 		require.NoError(t, err)
 	}
 
-	require.NoError(t, testutil.CollectAndCompare(m, strings.NewReader(builder.String()), "gitaly_housekeeping_pruned_files_total"))
+	testhelper.RequirePromMetrics(t, m, builder.String())
 }
 
 type entry interface {

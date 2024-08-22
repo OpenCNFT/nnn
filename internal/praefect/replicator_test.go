@@ -3,13 +3,11 @@ package praefect
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -192,11 +190,12 @@ func TestReplMgr_ProcessBacklog(t *testing.T) {
 
 	require.Equal(t, mockReplicationLatencyHistogramVec.LabelsCalled(), [][]string{{"update"}})
 	require.Equal(t, mockReplicationDelayHistogramVec.LabelsCalled(), [][]string{{"update"}})
-	require.NoError(t, testutil.CollectAndCompare(replMgr, strings.NewReader(`
+
+	testhelper.RequirePromMetrics(t, replMgr, `
 # HELP gitaly_praefect_replication_jobs Number of replication jobs in flight.
 # TYPE gitaly_praefect_replication_jobs gauge
 gitaly_praefect_replication_jobs{change_type="update",gitaly_storage="backup",virtual_storage="virtual"} 0
-`)))
+`)
 }
 
 func TestDefaultReplicator_Replicate(t *testing.T) {

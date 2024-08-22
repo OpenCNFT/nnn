@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
@@ -1114,9 +1113,7 @@ func TestOptimizeRepository(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				require.NoError(t, testutil.CollectAndCompare(
-					manager.metrics.TasksTotal, &buf, "gitaly_housekeeping_tasks_total",
-				))
+				testhelper.RequirePromMetrics(t, manager.metrics.TasksTotal, buf.String())
 
 				path, err := setup.repo.Path(ctx)
 				require.NoError(t, err)

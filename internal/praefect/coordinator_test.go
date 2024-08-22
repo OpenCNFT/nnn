@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cache"
@@ -2858,7 +2856,7 @@ func TestGetUpdatedAndOutdatedSecondaries(t *testing.T) {
 				expectedMetrics += fmt.Sprintf("stub{reason=\"%s\"} %d\n", metric, value)
 			}
 
-			require.NoError(t, testutil.CollectAndCompare(metric, strings.NewReader(expectedMetrics)))
+			testhelper.RequirePromMetrics(t, metric, expectedMetrics)
 		})
 	}
 }

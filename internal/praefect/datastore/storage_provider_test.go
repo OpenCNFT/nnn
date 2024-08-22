@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,12 +40,11 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		require.ElementsMatch(t, []string{"g1", "g2", "g3"}, storages.Values())
 		require.Equal(t, "replica-path", replicaPath)
 
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="unknown"} 1
-		`))
-		require.NoError(t, err)
+		`)
 	})
 
 	t.Run("miss -> populate -> hit", func(t *testing.T) {
@@ -66,13 +63,12 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		require.ElementsMatch(t, []string{"g1", "g2", "g3"}, storages.Values())
 		require.Equal(t, "replica-path", replicaPath)
 
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="populate",virtual_storage="vs"} 1
-		`))
-		require.NoError(t, err)
+		`)
 
 		// populated cache should return cached value
 		replicaPath, storages, err = cache.GetConsistentStorages(ctx, "vs", "/repo/path")
@@ -80,14 +76,13 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		require.ElementsMatch(t, []string{"g1", "g2", "g3"}, storages.Values())
 		require.Equal(t, "replica-path", replicaPath)
 
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="populate",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="hit",virtual_storage="vs"} 1
-		`))
-		require.NoError(t, err)
+		`)
 	})
 
 	t.Run("repository store returns an error", func(t *testing.T) {
@@ -103,12 +98,11 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		require.Equal(t, ErrRepositoryNotFound, err)
 
 		// "populate" metric is not set as there was an error and we don't want this result to be cached
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="vs"} 1
-		`))
-		require.NoError(t, err)
+		`)
 	})
 
 	t.Run("cache is disabled after handling invalid payload", func(t *testing.T) {
@@ -164,14 +158,13 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		}, logEntries[0].Data)
 		assert.Equal(t, logrus.ErrorLevel, logEntries[0].Level)
 
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="evict",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="vs"} 4
 			gitaly_praefect_uptodate_storages_cache_access_total{type="populate",virtual_storage="vs"} 1
-		`))
-		require.NoError(t, err)
+		`)
 	})
 
 	t.Run("cache invalidation evicts cached entries", func(t *testing.T) {
@@ -214,15 +207,14 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		require.ElementsMatch(t, []string{"g1", "g2"}, path2Storages2.Values())
 		require.Equal(t, "replica-path-2", replicaPath)
 
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="evict",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="hit",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="vs"} 3
 			gitaly_praefect_uptodate_storages_cache_access_total{type="populate",virtual_storage="vs"} 3
-		`))
-		require.NoError(t, err)
+		`)
 	})
 
 	t.Run("disconnect event disables cache", func(t *testing.T) {
@@ -250,14 +242,13 @@ func TestCachingStorageProvider_GetSyncedNodes(t *testing.T) {
 		require.ElementsMatch(t, []string{"g1", "g2", "g3"}, storages2.Values())
 		require.Equal(t, "replica-path", replicaPath)
 
-		err = testutil.CollectAndCompare(cache, strings.NewReader(`
+		testhelper.RequirePromMetrics(t, cache, `
 			# HELP gitaly_praefect_uptodate_storages_cache_access_total Total number of cache access operations during defining of up to date storages for reads distribution (per virtual storage)
 			# TYPE gitaly_praefect_uptodate_storages_cache_access_total counter
 			gitaly_praefect_uptodate_storages_cache_access_total{type="evict",virtual_storage="vs"} 1
 			gitaly_praefect_uptodate_storages_cache_access_total{type="miss",virtual_storage="vs"} 2
 			gitaly_praefect_uptodate_storages_cache_access_total{type="populate",virtual_storage="vs"} 1
-		`))
-		require.NoError(t, err)
+		`)
 	})
 
 	t.Run("concurrent access", func(t *testing.T) {

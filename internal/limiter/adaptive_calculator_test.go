@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
@@ -587,11 +586,7 @@ gitaly_concurrency_limiting_watcher_errors_total{watcher="testWatcher2"} 5
 					metrics = strings.Replace(metrics, fmt.Sprintf("{%s}", l.Name()), fmt.Sprintf("%d", l.Current()), -1)
 				}
 				assertLogs(t, tc.expectedLogs, hook.AllEntries())
-				require.NoError(t, testutil.CollectAndCompare(calculator, strings.NewReader(metrics),
-					"gitaly_concurrency_limiting_current_limit",
-					"gitaly_concurrency_limiting_backoff_events_total",
-					"gitaly_concurrency_limiting_watcher_errors_total",
-				))
+				testhelper.RequirePromMetrics(t, calculator, metrics)
 			})
 		}
 	})

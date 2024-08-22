@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 
 	"github.com/dgraph-io/badger/v4"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
@@ -1132,7 +1130,7 @@ func TestPartitionManager(t *testing.T) {
 
 					partitionManager.Close()
 				case assertMetrics:
-					require.NoError(t, testutil.CollectAndCompare(partitionManager, strings.NewReader(fmt.Sprintf(`
+					testhelper.RequirePromMetrics(t, partitionManager, fmt.Sprintf(`
 # HELP gitaly_partitions_started_total Number of partitions started.
 # TYPE gitaly_partitions_started_total counter
 gitaly_partitions_started_total{storage="default"} %d
@@ -1146,9 +1144,6 @@ gitaly_partitions_stopped_total{storage="other-storage"} %d
 						step.otherStorage.partitionsStartedTotal,
 						step.defaultStorage.partitionsStoppedTotal,
 						step.otherStorage.partitionsStoppedTotal,
-					)),
-						"gitaly_partitions_started_total",
-						"gitaly_partitions_stopped_total",
 					))
 				}
 			}
