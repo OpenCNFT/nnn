@@ -8,9 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -568,26 +565,6 @@ func TestListConflictFiles(t *testing.T) {
 				data := setupData{
 					client:  client,
 					request: request,
-				}
-
-				if !featureflag.SetAttrTreeConfig.IsEnabled(ctx) {
-					version, err := gittest.NewCommandFactory(t, cfg).GitVersion(ctx)
-					require.NoError(t, err)
-
-					if version.GreaterOrEqual(git.NewRCVersion(2, 46, 0, 0)) {
-						data.expectedFiles = []*conflictFile{
-							{
-								Header: &gitalypb.ConflictFileHeader{
-									CommitOid:    ourCommitID.String(),
-									OurPath:      []byte("a"),
-									TheirPath:    []byte("a"),
-									AncestorPath: []byte("a"),
-									OurMode:      int32(0o100644),
-								},
-								Content: []byte("- A test change\n- Update readme\n<<<<<<< a\n- Fire the chef!\n=======\n- Add to somechanges file\n>>>>>>> a\n"),
-							},
-						}
-					}
 				}
 
 				return data
