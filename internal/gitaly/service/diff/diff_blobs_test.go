@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -180,16 +178,6 @@ func TestDiffBlobs(t *testing.T) {
 						Status:      gitalypb.DiffBlobsResponse_STATUS_END_OF_PATCH,
 						Binary:      true,
 					},
-				}
-
-				if !featureflag.SetAttrTreeConfig.IsEnabled(ctx) {
-					version, err := gittest.NewCommandFactory(t, cfg).GitVersion(ctx)
-					require.NoError(t, err)
-
-					if version.GreaterOrEqual(git.NewRCVersion(2, 46, 0, 0)) {
-						expectedResponse[0].Binary = false
-						expectedResponse[0].Patch = []byte("@@ -1 +1 @@\n-foo\n+bar\n")
-					}
 				}
 
 				return setupData{

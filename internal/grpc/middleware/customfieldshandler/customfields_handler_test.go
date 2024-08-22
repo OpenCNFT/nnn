@@ -9,7 +9,6 @@ import (
 
 	grpcmwlogrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -102,7 +101,7 @@ func TestInterceptor(t *testing.T) {
 				require.NoError(t, err)
 			},
 			expectedLogData: map[string]interface{}{
-				"command.count": testhelper.EnabledOrDisabledFlag(ctx, featureflag.SetAttrTreeConfig, 3, 2),
+				"command.count": 3,
 			},
 		},
 		{
@@ -122,7 +121,7 @@ func TestInterceptor(t *testing.T) {
 				}
 			},
 			expectedLogData: map[string]interface{}{
-				"command.count": testhelper.EnabledOrDisabledFlag(ctx, featureflag.SetAttrTreeConfig, 2, 1),
+				"command.count": 2,
 			},
 		},
 	}

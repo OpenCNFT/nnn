@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
@@ -273,11 +271,6 @@ func TestExecCommandFactory_gitConfiguration(t *testing.T) {
 
 			cfg.Git.Config = setup.config
 
-			// Randomly enable SetAttrTreeConfig feature flag
-			now := time.Now()
-			rnd := rand.New(rand.NewSource(now.Unix() + int64(now.Nanosecond())))
-			ctx = featureflag.OutgoingCtxWithFeatureFlag(ctx, featureflag.SetAttrTreeConfig, rnd.Int()%2 == 0)
-
 			commandFactory, cleanup, err := git.NewExecCommandFactory(cfg, testhelper.SharedLogger(t))
 			require.NoError(t, err)
 			defer cleanup()
@@ -292,11 +285,7 @@ func TestExecCommandFactory_gitConfiguration(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, cmd.Wait())
 
-			if featureflag.SetAttrTreeConfig.IsEnabled(ctx) {
-				// if SetTreeInAttrTreeConfig is enabled, we expect attr.tree = EmptyTreeHash
-				// in git config command
-				setup.expectedConfig = append(setup.expectedConfig, fmt.Sprintf("attr.tree=%s", git.ObjectHashSHA1.EmptyTreeOID.String()))
-			}
+			setup.expectedConfig = append(setup.expectedConfig, fmt.Sprintf("attr.tree=%s", git.ObjectHashSHA1.EmptyTreeOID.String()))
 
 			require.ElementsMatch(t, setup.expectedConfig, strings.Split(text.ChompBytes(stdout.Bytes()), "\n"))
 		})
@@ -685,10 +674,7 @@ func TestExecCommandFactory_config(t *testing.T) {
 		)
 	}
 
-	if featureflag.SetAttrTreeConfig.IsEnabled(ctx) {
-		// We force SHA1 here, since we've removed the default config above.
-		expectedEnv = append(expectedEnv, fmt.Sprintf("attr.tree=%s", git.ObjectHashSHA1.EmptyTreeOID))
-	}
+	expectedEnv = append(expectedEnv, fmt.Sprintf("attr.tree=%s", git.ObjectHashSHA1.EmptyTreeOID))
 
 	gitCmdFactory := gittest.NewCommandFactory(t, cfg)
 
