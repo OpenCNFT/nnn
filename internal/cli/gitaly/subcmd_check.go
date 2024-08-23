@@ -48,7 +48,9 @@ func checkAction(ctx *cli.Context) error {
 
 	// Since this subcommand invokes a Git command, we need to unpack the bundled Git binaries
 	// from the Gitaly binary.
-	if err := gitaly.UnpackAuxiliaryBinaries(cfg.RuntimeDir); err != nil {
+	if err := gitaly.UnpackAuxiliaryBinaries(cfg.RuntimeDir, func(string) bool {
+		return true
+	}); err != nil {
 		return fmt.Errorf("unpack auxiliary binaries: %w", err)
 	}
 
