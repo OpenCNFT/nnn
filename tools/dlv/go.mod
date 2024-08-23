@@ -1,6 +1,6 @@
 module gitlab.com/gitlab-org/gitaly/tools/dlv
 
-go 1.21
+go 1.22
 
 require github.com/go-delve/delve v1.23.0
 

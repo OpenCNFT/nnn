@@ -1,6 +1,6 @@
 module gitlab.com/gitlab-org/gitaly/tools/vulncheck
 
-go 1.21
+go 1.22
 
 require golang.org/x/vuln v1.1.3
 

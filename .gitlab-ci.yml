@@ -16,7 +16,7 @@ default:
   git_default: "default"
   git_minimum: "v2.45.0"
   go_default: "1.22"
-  go_supported: ["1.21", "1.22", "1.23"]
+  go_supported: ["1.22", "1.23"]
   macos: "macos-12-xcode-14"
   pgbouncer: "1.17.0"
   postgres_default: "12-alpine"

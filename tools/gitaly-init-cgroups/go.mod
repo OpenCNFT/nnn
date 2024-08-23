@@ -1,6 +1,6 @@
 module gitlab.com/gitlab-org/gitaly/tools/gitaly-init-cgroups
 
-go 1.21
+go 1.22
 
 require (
 	github.com/containerd/cgroups/v3 v3.0.3
