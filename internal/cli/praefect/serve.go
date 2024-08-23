@@ -516,7 +516,7 @@ func server(
 					RepositoriesInBatch: int(conf.RepositoriesCleanup.RepositoriesInBatch),
 				}
 				repoCleaner := repocleaner.NewRunner(cfg, logger, healthChecker, nodeSet.Connections(), storageSync, storageSync, repocleaner.NewLogWarnAction(logger))
-				if err := repoCleaner.Run(ctx, helper.NewTimerTicker(conf.RepositoriesCleanup.CheckInterval.Duration())); err != nil && !errors.Is(context.Canceled, err) {
+				if err := repoCleaner.Run(ctx, helper.NewTimerTicker(conf.RepositoriesCleanup.CheckInterval.Duration())); err != nil && !errors.Is(err, context.Canceled) {
 					logger.WithError(err).Error("repository cleaner finished execution")
 				} else {
 					logger.Info("repository cleaner finished execution")
