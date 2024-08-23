@@ -3,6 +3,7 @@ package backup_test
 import (
 	"io"
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testserver"
-	"golang.org/x/exp/slices"
 )
 
 func removeHeadReference(refs []git.Reference) []git.Reference {
