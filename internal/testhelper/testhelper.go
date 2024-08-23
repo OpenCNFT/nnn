@@ -84,7 +84,7 @@ func IsPraefectEnabled() bool {
 // of the Gitaly.
 func SkipWithPraefect(tb testing.TB, reason string) {
 	if IsPraefectEnabled() {
-		tb.Skipf(reason)
+		tb.Skip(reason)
 	}
 }
 

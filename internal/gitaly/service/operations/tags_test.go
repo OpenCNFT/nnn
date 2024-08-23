@@ -220,7 +220,7 @@ func TestUserDeleteTag(t *testing.T) {
 						ExpectedOldOid: "io",
 					},
 					expectedError: testhelper.WithInterceptedMetadata(
-						structerr.NewInvalidArgument(fmt.Sprintf(`invalid expected old object ID: invalid object ID: "io", expected length %v, got 2`, gittest.DefaultObjectHash.EncodedLen())),
+						structerr.NewInvalidArgument(`invalid expected old object ID: invalid object ID: "io", expected length %v, got 2`, gittest.DefaultObjectHash.EncodedLen()),
 						"old_object_id", "io"),
 
 					expectedTags: []string{"europa"},

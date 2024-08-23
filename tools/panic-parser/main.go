@@ -51,7 +51,7 @@ func main() {
 			printIt = true
 		}
 		if inBacktrace {
-			fmt.Printf(line.Output)
+			fmt.Print(line.Output)
 		}
 	}
 	if printIt {

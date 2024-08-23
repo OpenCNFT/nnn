@@ -161,7 +161,7 @@ func TestUserDeleteBranch(t *testing.T) {
 					},
 					repoPath: repoPath,
 					expectedErr: testhelper.WithInterceptedMetadata(
-						structerr.NewInvalidArgument(fmt.Sprintf("invalid expected old object ID: invalid object ID: \"foobar\", expected length %v, got 6", gittest.DefaultObjectHash.EncodedLen())),
+						structerr.NewInvalidArgument("invalid expected old object ID: invalid object ID: \"foobar\", expected length %v, got 6", gittest.DefaultObjectHash.EncodedLen()),
 						"old_object_id", "foobar"),
 					expectedRefs: []string{"master", branchName},
 				}
@@ -458,7 +458,7 @@ func TestUserDeleteBranch_transaction(t *testing.T) {
 	require.NoError(t, err)
 	ctx = metadata.IncomingToOutgoing(ctx)
 
-	client := newMuxedOperationClient(t, ctx, fmt.Sprintf("unix://"+cfg.InternalSocketPath()), cfg.Auth.Token,
+	client := newMuxedOperationClient(t, ctx, "unix://"+cfg.InternalSocketPath(), cfg.Auth.Token,
 		backchannel.NewClientHandshaker(
 			testhelper.SharedLogger(t),
 			func() backchannel.Server {
@@ -702,7 +702,7 @@ func TestBranchHookOutput(t *testing.T) {
 
 				// Assert the message separately as it references the hook path which may change and fail the equality check.
 				require.Regexp(t, fmt.Sprintf(`^rpc error: code = PermissionDenied desc = deletion denied by custom hooks: running %s hooks: %s$`, hookTestCase.hookName, testCase.expectedErrorRegexp), err)
-				testhelper.RequireGrpcError(t, structerr.NewPermissionDenied(statusWithoutMessage.Message).WithDetail(
+				testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("%s", statusWithoutMessage.Message).WithDetail(
 					&gitalypb.UserDeleteBranchError{
 						Error: &gitalypb.UserDeleteBranchError_CustomHook{
 							CustomHook: &gitalypb.CustomHookError{

@@ -2,7 +2,6 @@ package operations
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -241,7 +240,7 @@ func testUserFFBranch(t *testing.T, ctx context.Context) {
 						ExpectedOldOid: "foobar",
 					},
 					expectedErr: testhelper.WithInterceptedMetadata(
-						structerr.NewInvalidArgument(fmt.Sprintf(`invalid expected old object ID: invalid object ID: "foobar", expected length %v, got 6`, gittest.DefaultObjectHash.EncodedLen())),
+						structerr.NewInvalidArgument(`invalid expected old object ID: invalid object ID: "foobar", expected length %v, got 6`, gittest.DefaultObjectHash.EncodedLen()),
 						"old_object_id", "foobar"),
 				}
 			},

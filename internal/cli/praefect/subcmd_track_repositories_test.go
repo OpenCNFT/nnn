@@ -172,7 +172,7 @@ func TestTrackRepositoriesSubcommand(t *testing.T) {
 						AuthoritativeStorage: authoritativeStorage,
 					})
 					require.NoError(t, err)
-					_, err = fmt.Fprintf(input, string(repoEntry)+"\n")
+					_, err = fmt.Fprintf(input, "%s\n", repoEntry)
 					require.NoError(t, err)
 				}
 				require.NoError(t, input.Close())

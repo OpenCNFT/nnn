@@ -143,7 +143,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		// compatibility but returns the error and stderr otherwise. Once the Ruby
 		// implementation is removed, this should probably be dropped.
 		if bytes.HasPrefix(stdout.Bytes(), []byte("Patch failed at")) {
-			return structerr.NewFailedPrecondition(stdout.String())
+			return structerr.NewFailedPrecondition("%s", stdout.String())
 		}
 
 		return fmt.Errorf("apply patch: %w, stderr: %q", err, &stderr)

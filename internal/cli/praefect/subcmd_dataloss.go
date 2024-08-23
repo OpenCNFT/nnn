@@ -176,7 +176,7 @@ func datalossAction(ctx *cli.Context) error {
 				msg = "All repositories are fully available on all assigned storages!"
 			}
 
-			indentPrintln(ctx.App.Writer, 1, msg)
+			indentPrintln(ctx.App.Writer, 1, "%s", msg)
 			continue
 		}
 	}

@@ -167,7 +167,7 @@ func TestRestoreRepository(t *testing.T) {
 					errorMessage = "repository not set"
 				}
 
-				return structerr.NewInvalidArgument(errorMessage)
+				return structerr.NewInvalidArgument("%s", errorMessage)
 			}(),
 		},
 		{
