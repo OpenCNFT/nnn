@@ -6,7 +6,7 @@ stages:
   - qa
 
 default:
-  image: registry.gitlab.com/gitlab-org/gitlab-build-images/debian-${DEBIAN_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.36
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images/debian-${DEBIAN_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.45
   tags:
     - saas-linux-large-amd64
   interruptible: true
@@ -16,7 +16,7 @@ default:
   git_default: "default"
   git_minimum: "v2.45.0"
   go_default: "1.22"
-  go_supported: [ "1.21", "1.22" ]
+  go_supported: ["1.21", "1.22", "1.23"]
   macos: "macos-12-xcode-14"
   pgbouncer: "1.17.0"
   postgres_default: "12-alpine"
@@ -132,7 +132,9 @@ workflow:
     # Create the build directory for the unprivileged user that we're running
     # tests as. This is required because the source directory itself is owned
     # by `root`.
-    - install --directory --owner=${TEST_UID} --group=${TEST_UID} _build
+    - mkdir -p _build
+    - go mod download -modcacherw
+    - chown -R ${TEST_UID}:${TEST_UID} _build
     # But the actual tests should run unprivileged. This assures that we pay
     # proper attention to permission bits and that we don't modify the source
     # directory.
@@ -164,25 +166,25 @@ workflow:
     expire_in: 1 week
 
 .rules_run_on_merge: &rules_run_on_merge
-    # We only execute these rules in the main Gitaly repository. This is
-    # because jobs which run conditionally when being merged may depend on
-    # specific runners that aren't available in any other repository.
-    - if: $CI_PROJECT_PATH != "gitlab-org/gitaly"
-      when: manual
-      allow_failure: true
-    # Automatically run the job when the default branch is changing, e.g. due
-    # to a direct push.
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    # Automatically run the job when a merge request gets queued for merge.
-    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-    # Otherwise, allow for manually scheduling the job in the context of a
-    # merge request.
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-      allow_failure: true
-    # Manual pipeline run outside of merge requests, such as when setting
-    # custom CI variables via the Pipelines page.
-    - if: $FORCE_GITALY_CI
+  # We only execute these rules in the main Gitaly repository. This is
+  # because jobs which run conditionally when being merged may depend on
+  # specific runners that aren't available in any other repository.
+  - if: $CI_PROJECT_PATH != "gitlab-org/gitaly"
+    when: manual
+    allow_failure: true
+  # Automatically run the job when the default branch is changing, e.g. due
+  # to a direct push.
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  # Automatically run the job when a merge request gets queued for merge.
+  - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
+  # Otherwise, allow for manually scheduling the job in the context of a
+  # merge request.
+  - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    when: manual
+    allow_failure: true
+  # Manual pipeline run outside of merge requests, such as when setting
+  # custom CI variables via the Pipelines page.
+  - if: $FORCE_GITALY_CI
 
 .rules_run_strictly_on_default_branch: &rules_run_strictly_on_default_branch
   - if: $CI_PROJECT_PATH != "gitlab-org/gitaly"
@@ -206,14 +208,16 @@ build:
     - go version
     # Build the binaries as unprivileged user so that we can reuse the cache
     # for our "test" targets, which also run unprivileged.
-    - install --directory --owner=${TEST_UID} --group=${TEST_UID} _build
+    - mkdir -p _build
+    - go mod download -modcacherw
+    - chown -R ${TEST_UID}:${TEST_UID} _build
     - setpriv --reuid=${TEST_UID} --regid=${TEST_UID} --clear-groups --no-new-privs make build $(test "${GIT_VERSION}" = default && echo build-bundled-git || echo build-git)
     - go run ./tools/test-boot ${TEST_BOOT_ARGS}
   parallel:
     matrix:
       - GO_VERSION: !reference [.versions, go_supported]
         TEST_BOOT_ARGS: "--bundled-git"
-      - GIT_VERSION: !reference [.versions, git_minimum ]
+      - GIT_VERSION: !reference [.versions, git_minimum]
 
 build:binaries:
   needs: []
@@ -228,8 +232,8 @@ build:binaries:
     - cd _build && sha256sum bin/* | tee checksums.sha256.txt
   artifacts:
     paths:
-    - _build/checksums.sha256.txt
-    - _build/bin/
+      - _build/checksums.sha256.txt
+      - _build/bin/
     name: "${CI_JOB_NAME}:go-${GO_VERSION}-git-${GIT_VERSION}"
     expire_in: 6 months
   parallel:
@@ -246,7 +250,8 @@ test:
       # using bundled Git binaries.
       - GO_VERSION: !reference [.versions, go_supported]
         TEST_TARGET: test
-      - TEST_TARGET: [ test-with-praefect, race-go, test-wal, test-with-praefect-wal]
+      - TEST_TARGET:
+          [test-with-praefect, race-go, test-wal, test-with-praefect-wal]
       # We also verify that things work as expected with a non-bundled Git
       # version matching our minimum required Git version.
       - TEST_TARGET: test
@@ -256,7 +261,7 @@ test:
       # version. Furthermore, please make sure to update the minimum required
       # version in `datastore.CheckPostgresVersion()`.
       - POSTGRES_VERSION: !reference [.versions, postgres_minimum]
-        TEST_TARGET: [ test, test-with-praefect ]
+        TEST_TARGET: [test, test-with-praefect]
 
 test:pgbouncer:
   <<: *test_definition
@@ -305,8 +310,8 @@ test:nightly:
     OVERRIDE_GIT_VERSION: ""
   parallel:
     matrix:
-      - GIT_VERSION: [ "master", "next" ]
-        TEST_TARGET: [ test, test-with-praefect ]
+      - GIT_VERSION: ["master", "next"]
+        TEST_TARGET: [test, test-with-praefect]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       allow_failure: false
@@ -324,12 +329,13 @@ test:sha256:
   <<: *test_definition
   parallel:
     matrix:
-      - TEST_TARGET: [ test, test-with-praefect, test-wal, test-with-praefect-wal ]
+      - TEST_TARGET:
+          [test, test-with-praefect, test-wal, test-with-praefect-wal]
         TEST_WITH_SHA256: "YesPlease"
 
 test:fips:
   <<: *test_definition
-  image: registry.gitlab.com/gitlab-org/gitlab-build-images/ubi-${UBI_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.36
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images/ubi-${UBI_VERSION}-golang-${GO_VERSION}-rust-${RUST_VERSION}:git-2.45
   tags:
     - fips
   cache:
@@ -347,7 +353,7 @@ test:fips:
     - test "$(cat /proc/sys/crypto/fips_enabled)" = "1" || (echo "System is not running in FIPS mode" && exit 1)
   parallel:
     matrix:
-      - TEST_TARGET: [ test, test-with-praefect ]
+      - TEST_TARGET: [test, test-with-praefect]
         FIPS_MODE: "YesPlease"
         GO_VERSION: !reference [.versions, go_supported]
   rules:
@@ -540,7 +546,7 @@ start-rails-specs:
     branch: "gitaly-ci-jobs-$CI_PIPELINE_IID" # Using $RAILS_BRANCH_FOR_JOB directly fails
     strategy: depend
   inherit:
-    variables: false  # Otherwise variables will be messed up
+    variables: false # Otherwise variables will be messed up
   variables: &rails-specs-vars
     GITALY_TEST: "true"
     ENABLE_RSPEC: "true"
@@ -549,23 +555,22 @@ start-rails-specs:
     ENABLE_RSPEC_SYSTEM: "true"
 
 rails-specs:
-  << : *rails-specs-common
+  <<: *rails-specs-common
   trigger:
-    << : *rails-specs-trigger
+    <<: *rails-specs-trigger
     project: gitlab-org/gitlab
   variables:
-    << : *rails-specs-vars
+    <<: *rails-specs-vars
   rules:
     - if: $CI_MERGE_REQUEST_PROJECT_PATH == 'gitlab-org/gitaly' && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
 
-
 rails-specs-security:
-  << : *rails-specs-common
+  <<: *rails-specs-common
   trigger:
-    << : *rails-specs-trigger
+    <<: *rails-specs-trigger
     project: gitlab-org/security/gitlab
   variables:
-    << : *rails-specs-vars
+    <<: *rails-specs-vars
     GITALY_REPO_URL: "https://gitlab-bot:$GITALY_REPO_DEPLOY_TOKEN@gitlab.com/gitlab-org/security/gitaly.git"
   rules:
     - if: $CI_MERGE_REQUEST_PROJECT_PATH == 'gitlab-org/security/gitaly' && $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
@@ -600,13 +605,13 @@ rails-specs-security-cleanup:
 .cleanup-rails-spec-test-env-common: &cleanup-rails-spec-test-env-common
   stage: qa
   before_script:
-     - apt update
-     - apt install -y jq
+    - apt update
+    - apt install -y jq
   script:
-     - GITLAB_PROJECT_ID="$([ $CI_MERGE_REQUEST_PROJECT_PATH == 'gitlab-org/security/gitaly' ] && echo 15642544 || echo 278964)"
-     - |
-       ENV_ID=$(curl -s --request GET --header "PRIVATE-TOKEN: $GITALY_PROJECT_TOKEN" "https://gitlab.com/api/v4/projects/$GITLAB_PROJECT_ID/environments" --data-urlencode "name=merge-requests/$RAILS_BRANCH_FOR_JOB" | jq '.[0].id')
-       curl --fail -s --request DELETE --header "PRIVATE-TOKEN: $GITALY_PROJECT_TOKEN" "https://gitlab.com/api/v4/projects/$GITLAB_PROJECT_ID/environments/$ENV_ID"
+    - GITLAB_PROJECT_ID="$([ $CI_MERGE_REQUEST_PROJECT_PATH == 'gitlab-org/security/gitaly' ] && echo 15642544 || echo 278964)"
+    - |
+      ENV_ID=$(curl -s --request GET --header "PRIVATE-TOKEN: $GITALY_PROJECT_TOKEN" "https://gitlab.com/api/v4/projects/$GITLAB_PROJECT_ID/environments" --data-urlencode "name=merge-requests/$RAILS_BRANCH_FOR_JOB" | jq '.[0].id')
+      curl --fail -s --request DELETE --header "PRIVATE-TOKEN: $GITALY_PROJECT_TOKEN" "https://gitlab.com/api/v4/projects/$GITLAB_PROJECT_ID/environments/$ENV_ID"
 
 cleanup-rails-spec-test-env:
   <<: *cleanup-rails-spec-test-env-common
