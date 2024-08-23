@@ -619,6 +619,35 @@ func TestDiffBlobs(t *testing.T) {
 			},
 		},
 		{
+			desc: "empty file added",
+			setup: func() setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				// Gitaly rewrites NULL OIDs to an empty blob ID. This allows addition/deletion
+				// diffs to be generated through git-diff(1). If the added/deleted blob is also
+				// empty, there is no diff according to Git because the pre-image and post-image
+				// are identical.
+				blobID1 := gittest.DefaultObjectHash.ZeroOID
+				blobID2 := gittest.WriteBlob(t, cfg, repoPath, []byte(""))
+
+				return setupData{
+					request: &gitalypb.DiffBlobsRequest{
+						Repository: repoProto,
+						BlobPairs: []*gitalypb.DiffBlobsRequest_BlobPair{
+							{
+								LeftBlob:  []byte(blobID1),
+								RightBlob: []byte(blobID2),
+							},
+						},
+					},
+					// The diff parser currently relies on the "raw" output to parse diffs. If the
+					// pre-image and post-image blob revision match, there is no output and the
+					// diff parser is unable to handle the expected empty diff. This is a bug.
+					expectedErr: structerr.NewInternal("generating diff: diff parser finished unexpectedly"),
+				}
+			},
+		},
+		{
 			desc: "empty blob",
 			setup: func() setupData {
 				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
