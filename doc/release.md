@@ -2,6 +2,12 @@
 
 This document describes how changes to Gitaly are deployed into production on `www.gitlab.com`.
 
+You can find the current Gitaly release status in:
+
+- The [`#gitaly-deployments`](https://gitlab.enterprise.slack.com/archives/C07HEF3CATG) Slack channel. This is updated by the [GitLab for Slack app](https://gitlab.com/gitlab-org/gitaly/-/settings/integrations/gitlab_slack_application/edit) whenever a branch is deployed to a new environment.
+- The [Gitaly Version Tracker](https://dashboards.gitlab.net/d/hFbkl9Iik/gitaly-version-tracker?orgId=1) Grafana dashboard, which shows the currently deployed versions of Gitaly across environments.
+- The [Gitaly startup logs](https://log.gprd.gitlab.net/app/r/s/AGkgv) in Kibana, as the version is logged when Gitaly boots.
+
 ```mermaid
 sequenceDiagram
   autonumber
