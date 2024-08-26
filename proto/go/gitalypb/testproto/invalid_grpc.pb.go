@@ -137,6 +137,11 @@ const (
 	InvalidService_InvalidMethod11_FullMethodName                           = "/testproto.InvalidService/InvalidMethod11"
 	InvalidService_InvalidMethod13_FullMethodName                           = "/testproto.InvalidService/InvalidMethod13"
 	InvalidService_InvalidMethod14_FullMethodName                           = "/testproto.InvalidService/InvalidMethod14"
+	InvalidService_InvalidMethod15_FullMethodName                           = "/testproto.InvalidService/InvalidMethod15"
+	InvalidService_InvalidMethod16_FullMethodName                           = "/testproto.InvalidService/InvalidMethod16"
+	InvalidService_InvalidMethod17_FullMethodName                           = "/testproto.InvalidService/InvalidMethod17"
+	InvalidService_InvalidMethod18_FullMethodName                           = "/testproto.InvalidService/InvalidMethod18"
+	InvalidService_InvalidMethod19_FullMethodName                           = "/testproto.InvalidService/InvalidMethod19"
 	InvalidService_MaintenanceWithMissingRepository_FullMethodName          = "/testproto.InvalidService/MaintenanceWithMissingRepository"
 	InvalidService_MaintenanceWithUnflaggedRepository_FullMethodName        = "/testproto.InvalidService/MaintenanceWithUnflaggedRepository"
 	InvalidService_MaintenanceWithWrongNestedRepositoryType_FullMethodName  = "/testproto.InvalidService/MaintenanceWithWrongNestedRepositoryType"
@@ -177,6 +182,16 @@ type InvalidServiceClient interface {
 	InvalidMethod13(ctx context.Context, in *InvalidTargetType, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
 	// should fail if multiple storage is specified for storage scoped RPC
 	InvalidMethod14(ctx context.Context, in *RequestWithMultipleNestedStorage, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
+	// should fail if storage isn't specified for partition scoped RPC
+	InvalidMethod15(ctx context.Context, in *InvalidMethodRequest, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
+	// should fail if target repo is specified for partition scoped RPC
+	InvalidMethod16(ctx context.Context, in *InvalidMethodRequestWithRepo, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
+	// should fail if partition id isn't specified for partition scoped RPC
+	InvalidMethod17(ctx context.Context, in *RequestWithStorage, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
+	// should fail if partition is specified for repository scoped RPC
+	InvalidMethod18(ctx context.Context, in *RequestWithPartition, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
+	// should fail if partition is specified for storage scoped RPC
+	InvalidMethod19(ctx context.Context, in *RequestWithPartition, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
 	MaintenanceWithMissingRepository(ctx context.Context, in *InvalidMethodRequest, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
 	MaintenanceWithUnflaggedRepository(ctx context.Context, in *RequestWithNestedRepoNotFlagged, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
 	MaintenanceWithWrongNestedRepositoryType(ctx context.Context, in *RequestWithWrongTypeRepository, opts ...grpc.CallOption) (*InvalidMethodResponse, error)
@@ -325,6 +340,56 @@ func (c *invalidServiceClient) InvalidMethod14(ctx context.Context, in *RequestW
 	return out, nil
 }
 
+func (c *invalidServiceClient) InvalidMethod15(ctx context.Context, in *InvalidMethodRequest, opts ...grpc.CallOption) (*InvalidMethodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvalidMethodResponse)
+	err := c.cc.Invoke(ctx, InvalidService_InvalidMethod15_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *invalidServiceClient) InvalidMethod16(ctx context.Context, in *InvalidMethodRequestWithRepo, opts ...grpc.CallOption) (*InvalidMethodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvalidMethodResponse)
+	err := c.cc.Invoke(ctx, InvalidService_InvalidMethod16_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *invalidServiceClient) InvalidMethod17(ctx context.Context, in *RequestWithStorage, opts ...grpc.CallOption) (*InvalidMethodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvalidMethodResponse)
+	err := c.cc.Invoke(ctx, InvalidService_InvalidMethod17_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *invalidServiceClient) InvalidMethod18(ctx context.Context, in *RequestWithPartition, opts ...grpc.CallOption) (*InvalidMethodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvalidMethodResponse)
+	err := c.cc.Invoke(ctx, InvalidService_InvalidMethod18_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *invalidServiceClient) InvalidMethod19(ctx context.Context, in *RequestWithPartition, opts ...grpc.CallOption) (*InvalidMethodResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvalidMethodResponse)
+	err := c.cc.Invoke(ctx, InvalidService_InvalidMethod19_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *invalidServiceClient) MaintenanceWithMissingRepository(ctx context.Context, in *InvalidMethodRequest, opts ...grpc.CallOption) (*InvalidMethodResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InvalidMethodResponse)
@@ -435,6 +500,16 @@ type InvalidServiceServer interface {
 	InvalidMethod13(context.Context, *InvalidTargetType) (*InvalidMethodResponse, error)
 	// should fail if multiple storage is specified for storage scoped RPC
 	InvalidMethod14(context.Context, *RequestWithMultipleNestedStorage) (*InvalidMethodResponse, error)
+	// should fail if storage isn't specified for partition scoped RPC
+	InvalidMethod15(context.Context, *InvalidMethodRequest) (*InvalidMethodResponse, error)
+	// should fail if target repo is specified for partition scoped RPC
+	InvalidMethod16(context.Context, *InvalidMethodRequestWithRepo) (*InvalidMethodResponse, error)
+	// should fail if partition id isn't specified for partition scoped RPC
+	InvalidMethod17(context.Context, *RequestWithStorage) (*InvalidMethodResponse, error)
+	// should fail if partition is specified for repository scoped RPC
+	InvalidMethod18(context.Context, *RequestWithPartition) (*InvalidMethodResponse, error)
+	// should fail if partition is specified for storage scoped RPC
+	InvalidMethod19(context.Context, *RequestWithPartition) (*InvalidMethodResponse, error)
 	MaintenanceWithMissingRepository(context.Context, *InvalidMethodRequest) (*InvalidMethodResponse, error)
 	MaintenanceWithUnflaggedRepository(context.Context, *RequestWithNestedRepoNotFlagged) (*InvalidMethodResponse, error)
 	MaintenanceWithWrongNestedRepositoryType(context.Context, *RequestWithWrongTypeRepository) (*InvalidMethodResponse, error)
@@ -491,6 +566,21 @@ func (UnimplementedInvalidServiceServer) InvalidMethod13(context.Context, *Inval
 }
 func (UnimplementedInvalidServiceServer) InvalidMethod14(context.Context, *RequestWithMultipleNestedStorage) (*InvalidMethodResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InvalidMethod14 not implemented")
+}
+func (UnimplementedInvalidServiceServer) InvalidMethod15(context.Context, *InvalidMethodRequest) (*InvalidMethodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InvalidMethod15 not implemented")
+}
+func (UnimplementedInvalidServiceServer) InvalidMethod16(context.Context, *InvalidMethodRequestWithRepo) (*InvalidMethodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InvalidMethod16 not implemented")
+}
+func (UnimplementedInvalidServiceServer) InvalidMethod17(context.Context, *RequestWithStorage) (*InvalidMethodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InvalidMethod17 not implemented")
+}
+func (UnimplementedInvalidServiceServer) InvalidMethod18(context.Context, *RequestWithPartition) (*InvalidMethodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InvalidMethod18 not implemented")
+}
+func (UnimplementedInvalidServiceServer) InvalidMethod19(context.Context, *RequestWithPartition) (*InvalidMethodResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InvalidMethod19 not implemented")
 }
 func (UnimplementedInvalidServiceServer) MaintenanceWithMissingRepository(context.Context, *InvalidMethodRequest) (*InvalidMethodResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MaintenanceWithMissingRepository not implemented")
@@ -771,6 +861,96 @@ func _InvalidService_InvalidMethod14_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InvalidService_InvalidMethod15_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvalidMethodRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvalidServiceServer).InvalidMethod15(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InvalidService_InvalidMethod15_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvalidServiceServer).InvalidMethod15(ctx, req.(*InvalidMethodRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InvalidService_InvalidMethod16_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvalidMethodRequestWithRepo)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvalidServiceServer).InvalidMethod16(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InvalidService_InvalidMethod16_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvalidServiceServer).InvalidMethod16(ctx, req.(*InvalidMethodRequestWithRepo))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InvalidService_InvalidMethod17_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestWithStorage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvalidServiceServer).InvalidMethod17(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InvalidService_InvalidMethod17_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvalidServiceServer).InvalidMethod17(ctx, req.(*RequestWithStorage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InvalidService_InvalidMethod18_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestWithPartition)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvalidServiceServer).InvalidMethod18(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InvalidService_InvalidMethod18_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvalidServiceServer).InvalidMethod18(ctx, req.(*RequestWithPartition))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InvalidService_InvalidMethod19_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestWithPartition)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InvalidServiceServer).InvalidMethod19(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InvalidService_InvalidMethod19_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InvalidServiceServer).InvalidMethod19(ctx, req.(*RequestWithPartition))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InvalidService_MaintenanceWithMissingRepository_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InvalidMethodRequest)
 	if err := dec(in); err != nil {
@@ -973,6 +1153,26 @@ var InvalidService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InvalidMethod14",
 			Handler:    _InvalidService_InvalidMethod14_Handler,
+		},
+		{
+			MethodName: "InvalidMethod15",
+			Handler:    _InvalidService_InvalidMethod15_Handler,
+		},
+		{
+			MethodName: "InvalidMethod16",
+			Handler:    _InvalidService_InvalidMethod16_Handler,
+		},
+		{
+			MethodName: "InvalidMethod17",
+			Handler:    _InvalidService_InvalidMethod17_Handler,
+		},
+		{
+			MethodName: "InvalidMethod18",
+			Handler:    _InvalidService_InvalidMethod18_Handler,
+		},
+		{
+			MethodName: "InvalidMethod19",
+			Handler:    _InvalidService_InvalidMethod19_Handler,
 		},
 		{
 			MethodName: "MaintenanceWithMissingRepository",

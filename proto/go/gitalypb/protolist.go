@@ -19,6 +19,7 @@ var GitalyProtos = []string{
 	"objectpool.proto",
 	"operations.proto",
 	"packfile.proto",
+	"partition.proto",
 	"praefect.proto",
 	"ref.proto",
 	"remote.proto",

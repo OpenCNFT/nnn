@@ -41,6 +41,8 @@ const (
 	ScopeRepository
 	// ScopeStorage indicates an RPC is scoped to an entire storage location
 	ScopeStorage
+	// ScopePartition indicates an RPC is scoped to an entire partition
+	ScopePartition
 )
 
 func (s Scope) String() string {
@@ -49,6 +51,8 @@ func (s Scope) String() string {
 		return "storage"
 	case ScopeRepository:
 		return "repository"
+	case ScopePartition:
+		return "partition"
 	default:
 		return fmt.Sprintf("N/A: %d", s)
 	}
@@ -57,6 +61,7 @@ func (s Scope) String() string {
 var protoScope = map[gitalypb.OperationMsg_Scope]Scope{
 	gitalypb.OperationMsg_REPOSITORY: ScopeRepository,
 	gitalypb.OperationMsg_STORAGE:    ScopeStorage,
+	gitalypb.OperationMsg_PARTITION:  ScopePartition,
 }
 
 // MethodInfo contains metadata about the RPC method. Refer to documentation
@@ -188,6 +193,39 @@ func (mi MethodInfo) getStorageField(msg proto.Message) (valueField, error) {
 
 	if field.desc.Kind() != protoreflect.StringKind {
 		return valueField{}, fmt.Errorf("expected string, got %s", field.desc.Kind().String())
+	}
+
+	return field, nil
+}
+
+// Partition returns the partition id for a protobuf message if it exists
+func (mi MethodInfo) Partition(msg proto.Message) (uint64, error) {
+	field, err := mi.getPartitionField(msg)
+	if err != nil {
+		return 0, err
+	}
+
+	return field.value.Uint(), nil
+}
+
+func (mi MethodInfo) getPartitionField(msg proto.Message) (valueField, error) {
+	if mi.requestName != string(proto.MessageName(msg)) {
+		return valueField{}, fmt.Errorf(
+			"proto message %s does not match expected RPC request message %s",
+			proto.MessageName(msg), mi.requestName,
+		)
+	}
+
+	field, err := findFieldByExtension(msg, gitalypb.E_PartitionId)
+	if err != nil {
+		if errors.Is(err, errFieldNotFound) {
+			return valueField{}, fmt.Errorf("target partition field not found")
+		}
+		return valueField{}, err
+	}
+
+	if field.desc.Kind() != protoreflect.Uint64Kind {
+		return valueField{}, fmt.Errorf("expected uint64, got %s", field.desc.Kind().String())
 	}
 
 	return field, nil

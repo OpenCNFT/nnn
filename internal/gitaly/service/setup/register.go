@@ -16,6 +16,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/internalgitaly"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/operations"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/ref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/remote"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/repository"
@@ -73,6 +74,7 @@ func RegisterAll(srv *grpc.Server, deps *service.Dependencies) {
 	gitalypb.RegisterObjectPoolServiceServer(srv, objectpool.NewServer(deps))
 	gitalypb.RegisterHookServiceServer(srv, hook.NewServer(deps))
 	gitalypb.RegisterInternalGitalyServer(srv, internalgitaly.NewServer(deps))
+	gitalypb.RegisterPartitionServiceServer(srv, partition.NewServer(deps))
 
 	healthpb.RegisterHealthServer(srv, auth.UnauthenticatedHealthService{HealthServer: health.NewServer()})
 	reflection.Register(srv)

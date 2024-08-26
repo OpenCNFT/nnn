@@ -146,3 +146,9 @@ func (s *StorageServiceSink) SignedURL(ctx context.Context, relativePath string,
 
 	return signed, err
 }
+
+// Exists is a wrapper around the underlying bucket and returns true if a blob exists at key,
+// false if it does not exist, or an error.
+func (s *StorageServiceSink) Exists(ctx context.Context, relativePath string) (bool, error) {
+	return s.bucket.Exists(ctx, relativePath)
+}
