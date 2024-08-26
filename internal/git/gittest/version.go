@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -49,7 +50,7 @@ func IfSymrefUpdateSupported[T any](tb testing.TB, ctx context.Context, cfg conf
 	actual, err := cmdFactory.GitVersion(ctx)
 	require.NoError(tb, err)
 
-	if actual.SupportSymrefUpdates() {
+	if actual.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
 		return yes
 	}
 

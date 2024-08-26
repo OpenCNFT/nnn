@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
@@ -173,7 +174,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		updater, err := updateref.New(ctx, repo)
 		require.NoError(t, err)
 
-		if version.SupportSymrefUpdates() {
+		if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
 			require.NoError(t, updater.Start())
 			require.NoError(t, updater.UpdateSymbolicReference(version, "HEAD", "refs/heads/temp"))
 			require.NoError(t, updater.Prepare())
@@ -263,7 +264,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		version, vErr := repo.GitVersion(ctx)
 		require.NoError(t, vErr)
 
-		if version.SupportSymrefUpdates() {
+		if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
 			var sErr structerr.Error
 			require.ErrorAs(t, err, &sErr)
 			require.Equal(t, "error executing git hook\nfatal: ref updates aborted by hook\n", sErr.Metadata()["stderr"])
