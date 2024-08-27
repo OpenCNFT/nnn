@@ -55,6 +55,7 @@ variables:
   # users.
   TEST_UID: 9999
   RAILS_BRANCH_FOR_JOB: "gitaly-ci-jobs-$CI_PIPELINE_IID"
+  GITLAB_ADVANCED_SAST_ENABLED: "true"
 
 include:
   - template: Jobs/SAST.latest.gitlab-ci.yml
@@ -463,6 +464,12 @@ dbschema:
     when: on_failure
 
 semgrep-sast:
+  needs: []
+  stage: analyze
+  cache:
+    - *cache_go_configuration
+
+gitlab-advanced-sast:
   needs: []
   stage: analyze
   cache:
