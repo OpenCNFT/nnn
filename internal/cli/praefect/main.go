@@ -16,11 +16,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"slices"
 
 	"github.com/urfave/cli/v2"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/praefect/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/version"
-	"golang.org/x/exp/slices"
 )
 
 func init() {

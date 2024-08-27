@@ -236,12 +236,14 @@ func TestPreReceive_APIErrors(t *testing.T) {
 					res.Header().Set("Content-Type", "application/json")
 					res.WriteHeader(http.StatusUnauthorized)
 				}),
+			preReceiveHandler:  func(http.ResponseWriter, *http.Request) {},
 			expectedExitStatus: 1,
 			expectedStderr:     "GitLab: Internal API error (401)",
 		},
 		{
 			desc:               "allowed rejects",
 			allowedHandler:     allowedHandler(t, false),
+			preReceiveHandler:  func(http.ResponseWriter, *http.Request) {},
 			expectedExitStatus: 1,
 			expectedStderr:     "GitLab: not allowed",
 		},
@@ -420,6 +422,7 @@ func TestPreReceiveHook_Primary(t *testing.T) {
 			desc:               "primary checks for permissions",
 			primary:            true,
 			allowedHandler:     allowedHandler(t, false),
+			preReceiveHandler:  func(http.ResponseWriter, *http.Request) {},
 			expectedExitStatus: 1,
 			expectedStderr:     "GitLab: not allowed",
 			expectedVotes:      []transaction.PhasedVote{},
@@ -428,6 +431,7 @@ func TestPreReceiveHook_Primary(t *testing.T) {
 			desc:               "secondary checks for permissions",
 			primary:            false,
 			allowedHandler:     allowedHandler(t, false),
+			preReceiveHandler:  func(http.ResponseWriter, *http.Request) {},
 			expectedExitStatus: 0,
 			expectedVotes:      []transaction.PhasedVote{synchronizedVote("pre-receive")},
 		},
