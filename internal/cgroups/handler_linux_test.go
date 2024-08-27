@@ -14,8 +14,6 @@ import (
 	"testing"
 
 	cgrps "github.com/containerd/cgroups/v3"
-	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/cgroups"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
@@ -492,13 +490,11 @@ gitaly_cgroup_procs_total{path="%s",subsystem="memory"} 1
 
 					repoCgroupPath := filepath.Join(manager1.currentProcessCgroup(), "repos-0")
 
-					var expected *strings.Reader
 					if version == 1 {
-						expected = strings.NewReader(strings.ReplaceAll(tt.expectV1, "%s", repoCgroupPath))
+						testhelper.RequirePromMetrics(t, manager1, strings.ReplaceAll(tt.expectV1, "%s", repoCgroupPath))
 					} else {
-						expected = strings.NewReader(strings.ReplaceAll(tt.expectV2, "%s", repoCgroupPath))
+						testhelper.RequirePromMetrics(t, manager1, strings.ReplaceAll(tt.expectV2, "%s", repoCgroupPath))
 					}
-					assert.NoError(t, testutil.CollectAndCompare(manager1, expected))
 				})
 			}
 		})

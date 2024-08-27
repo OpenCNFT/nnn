@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	gitalyconfig "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -699,7 +697,7 @@ func TestVerifier(t *testing.T) {
 				require.Equal(t, step.expectedReplicas, getAllReplicas(t, ctx, db))
 			}
 
-			require.NoError(t, testutil.CollectAndCompare(verifier, strings.NewReader(fmt.Sprintf(`
+			testhelper.RequirePromMetrics(t, verifier, fmt.Sprintf(`
 # HELP gitaly_praefect_stale_verification_leases_released_total Number of stale verification leases released.
 # TYPE gitaly_praefect_stale_verification_leases_released_total counter
 gitaly_praefect_stale_verification_leases_released_total 0
@@ -732,7 +730,7 @@ gitaly_praefect_verification_jobs_dequeued_total{storage="gitaly-2",virtual_stor
 				tc.dequeuedJobsTotal["virtual-storage"][gitaly1],
 				tc.dequeuedJobsTotal["virtual-storage"][gitaly2],
 				tc.dequeuedJobsTotal["virtual-storage"][gitaly3],
-			))))
+			))
 		})
 	}
 }
@@ -849,9 +847,9 @@ func TestVerifier_runExpiredLeaseReleaser(t *testing.T) {
 	require.Equal(t, map[string]map[string]map[string]struct{}{
 		"virtual-storage-1": {"relative-path-1": {"expired-lease-1": {}, "expired-lease-2": {}, "expired-lease-3": {}}},
 	}, actualReleased)
-	require.NoError(t, testutil.CollectAndCompare(verifier, strings.NewReader(`
+	testhelper.RequirePromMetrics(t, verifier, `
 # HELP gitaly_praefect_stale_verification_leases_released_total Number of stale verification leases released.
 # TYPE gitaly_praefect_stale_verification_leases_released_total counter
 gitaly_praefect_stale_verification_leases_released_total 3
-	`)))
+	`)
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
@@ -215,12 +214,12 @@ func TestResilientListener_Listen(t *testing.T) {
 	require.Equal(t, "listening was interrupted", entries[0].Message)
 	require.Equal(t, []string{channel}, entries[0].Data["channels"])
 
-	require.NoError(t, testutil.CollectAndCompare(lis, strings.NewReader(`
+	testhelper.RequirePromMetrics(t, lis, `
 		# HELP gitaly_praefect_notifications_reconnects_total Counts amount of reconnects to listen for notification from PostgreSQL
 		# TYPE gitaly_praefect_notifications_reconnects_total counter
 		gitaly_praefect_notifications_reconnects_total{state="connected"} 2
 		gitaly_praefect_notifications_reconnects_total{state="disconnected"} 2
-	`)))
+	`)
 }
 
 func waitFor(t *testing.T, c <-chan struct{}) {

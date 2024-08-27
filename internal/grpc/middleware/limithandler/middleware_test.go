@@ -1,7 +1,6 @@
 package limithandler_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	promtest "github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
@@ -823,10 +821,7 @@ func TestConcurrencyLimitHandlerMetrics(t *testing.T) {
 					# TYPE gitaly_requests_dropped_total counter
 					gitaly_requests_dropped_total{grpc_method="UnaryCall",grpc_service="grpc.testing.TestService",reason="max_size",system="gitaly"} 9
 `
-		assert.NoError(t, promtest.CollectAndCompare(lh, bytes.NewBufferString(expectedMetrics),
-			"gitaly_concurrency_limiting_queued",
-			"gitaly_requests_dropped_total",
-			"gitaly_concurrency_limiting_in_progress"))
+		testhelper.RequirePromMetrics(t, lh, expectedMetrics)
 
 		close(s.blockCh)
 		<-s.reqArrivedCh
@@ -891,8 +886,7 @@ func TestRateLimitHandler(t *testing.T) {
 # TYPE gitaly_requests_dropped_total counter
 gitaly_requests_dropped_total{grpc_method="UnaryCall",grpc_service="grpc.testing.TestService",reason="rate",system="gitaly"} 10
 `
-		assert.NoError(t, promtest.CollectAndCompare(lh, bytes.NewBufferString(expectedMetrics),
-			"gitaly_requests_dropped_total"))
+		testhelper.RequirePromMetrics(t, lh, expectedMetrics)
 
 		wg.Wait()
 	})
@@ -916,8 +910,7 @@ gitaly_requests_dropped_total{grpc_method="UnaryCall",grpc_service="grpc.testing
 # TYPE gitaly_requests_dropped_total counter
 gitaly_requests_dropped_total{grpc_method="UnaryCall",grpc_service="grpc.testing.TestService",reason="rate",system="gitaly"} 0
 `
-		assert.NoError(t, promtest.CollectAndCompare(lh, bytes.NewBufferString(expectedMetrics),
-			"gitaly_requests_dropped_total"))
+		testhelper.RequirePromMetrics(t, lh, expectedMetrics)
 	})
 }
 

@@ -1,12 +1,10 @@
 package limiter
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	promconfig "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -92,14 +90,7 @@ in_progress{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 1
 queued{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 1
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			rpcMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"in_progress",
-			"queued",
-			"dropped",
-			"acquiring_seconds",
-		))
+		testhelper.RequirePromMetrics(t, rpcMonitor, expectedMetrics)
 
 		stats := log.CustomFieldsFromContext(ctx)
 		require.NotNil(t, stats)
@@ -123,12 +114,7 @@ in_progress{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 0
 queued{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 0
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			rpcMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"in_progress",
-			"queued",
-		))
+		testhelper.RequirePromMetrics(t, rpcMonitor, expectedMetrics)
 	})
 
 	t.Run("request is dropped after queueing", func(t *testing.T) {
@@ -165,15 +151,7 @@ in_progress{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 0
 queued{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 1
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			rpcMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"in_progress",
-			"queued",
-			"dropped",
-			"acquiring_seconds",
-		))
-
+		testhelper.RequirePromMetrics(t, rpcMonitor, expectedMetrics)
 		stats := log.CustomFieldsFromContext(ctx)
 		require.NotNil(t, stats)
 		require.Equal(t, log.Fields{
@@ -218,14 +196,7 @@ in_progress{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 0
 queued{grpc_method="unknown",grpc_service="unknown",system="gitaly"} 0
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			rpcMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"in_progress",
-			"queued",
-			"dropped",
-			"acquiring_seconds",
-		))
+		testhelper.RequirePromMetrics(t, rpcMonitor, expectedMetrics)
 
 		stats := log.CustomFieldsFromContext(ctx)
 		require.NotNil(t, stats)
@@ -274,14 +245,7 @@ gitaly_pack_objects_in_progress 1
 gitaly_pack_objects_queued 1
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			packObjectsConcurrencyMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"gitaly_pack_objects_acquiring_seconds",
-			"gitaly_pack_objects_in_progress",
-			"gitaly_pack_objects_queued",
-			"gitaly_pack_objects_dropped_total",
-		))
+		testhelper.RequirePromMetrics(t, packObjectsConcurrencyMonitor, expectedMetrics)
 
 		stats := log.CustomFieldsFromContext(ctx)
 		require.NotNil(t, stats)
@@ -305,12 +269,7 @@ gitaly_pack_objects_in_progress 0
 gitaly_pack_objects_queued 0
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			packObjectsConcurrencyMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"gitaly_pack_objects_in_progress",
-			"gitaly_pack_objects_queued",
-		))
+		testhelper.RequirePromMetrics(t, packObjectsConcurrencyMonitor, expectedMetrics)
 	})
 
 	t.Run("request is dropped after queueing", func(t *testing.T) {
@@ -349,14 +308,7 @@ gitaly_pack_objects_in_progress 0
 gitaly_pack_objects_queued 1
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			packObjectsConcurrencyMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"gitaly_pack_objects_acquiring_seconds",
-			"gitaly_pack_objects_in_progress",
-			"gitaly_pack_objects_queued",
-			"gitaly_pack_objects_dropped_total",
-		))
+		testhelper.RequirePromMetrics(t, packObjectsConcurrencyMonitor, expectedMetrics)
 
 		stats := log.CustomFieldsFromContext(ctx)
 		require.NotNil(t, stats)
@@ -405,14 +357,7 @@ gitaly_pack_objects_in_progress 0
 gitaly_pack_objects_queued 0
 
 `
-		require.NoError(t, testutil.CollectAndCompare(
-			packObjectsConcurrencyMonitor,
-			bytes.NewBufferString(expectedMetrics),
-			"gitaly_pack_objects_acquiring_seconds",
-			"gitaly_pack_objects_in_progress",
-			"gitaly_pack_objects_queued",
-			"gitaly_pack_objects_dropped_total",
-		))
+		testhelper.RequirePromMetrics(t, packObjectsConcurrencyMonitor, expectedMetrics)
 
 		stats := log.CustomFieldsFromContext(ctx)
 		require.NotNil(t, stats)

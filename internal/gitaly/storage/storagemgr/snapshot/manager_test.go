@@ -5,11 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"testing/fstest"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -370,7 +368,7 @@ func TestManager(t *testing.T) {
 
 			tc.run(t, mgr)
 
-			require.NoError(t, testutil.CollectAndCompare(metrics, strings.NewReader(fmt.Sprintf(`
+			testhelper.RequirePromMetrics(t, metrics, fmt.Sprintf(`
 # HELP gitaly_exclusive_snapshots_created_total Number of created exclusive snapshots.
 # TYPE gitaly_exclusive_snapshots_created_total counter
 gitaly_exclusive_snapshots_created_total{storage="storage-name"} %d
@@ -392,7 +390,7 @@ gitaly_shared_snapshots_destroyed_total{storage="storage-name"} %d
 				tc.expectedMetrics.createdSharedSnapshotCounter,
 				tc.expectedMetrics.reusedSharedSnapshotCounter,
 				tc.expectedMetrics.destroyedSharedSnapshotCounter,
-			))))
+			))
 
 			// All snapshots should have been cleaned up.
 			testhelper.RequireDirectoryState(t, workingDir, "", testhelper.DirectoryState{

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/praefect/config"
@@ -65,7 +64,7 @@ func verifyCounterMetrics(t *testing.T, manager *transactions.Manager, expected 
 		expectedMetric.WriteString(fmt.Sprintf("gitaly_praefect_transactions_total{action=\"%s\"} %d\n", metric.name, metric.value))
 	}
 
-	require.NoError(t, testutil.CollectAndCompare(manager, &expectedMetric, "gitaly_praefect_transactions_total"))
+	testhelper.RequirePromMetrics(t, manager, expectedMetric.String())
 }
 
 func TestTransactionSucceeds(t *testing.T) {

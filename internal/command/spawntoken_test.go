@@ -3,12 +3,10 @@ package command
 import (
 	"fmt"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -103,19 +101,19 @@ func TestGetSpawnToken_CommandStats(t *testing.T) {
 	}()
 
 	<-waitSecondStarted
-	expected := strings.NewReader(`
+	expected := `
 # HELP gitaly_spawn_token_waiting_length The current length of the queue waiting for spawn tokens
 # TYPE gitaly_spawn_token_waiting_length gauge
 gitaly_spawn_token_waiting_length 1
 
-	`)
+	`
 	// Even after the second goroutine starts, there is a small possibility for the metric collection to run before
 	// the second goroutine lines up for the token. There is no way to get a precise signal when the second
 	// goroutine is waiting. Hence, the only solution is to poll for the metric until it changes. If something goes
 	// wrong with the metrics or the second goroutine never starts (unlikely) or the metric never changes, the loop
 	// exits with a timeout error. We expect the loop exits immediately in most cases.
 	for {
-		if err := testutil.CollectAndCompare(manager, expected, "gitaly_spawn_token_waiting_length"); err == nil {
+		if err := testhelper.ComparePromMetrics(t, manager, expected, "gitaly_spawn_token_waiting_length"); err == nil {
 			break
 		}
 
@@ -127,39 +125,33 @@ gitaly_spawn_token_waiting_length 1
 	<-waitSecondAcquire
 
 	// As the second goroutine finishes waiting, the queue length goes back to 0
-	expected = strings.NewReader(`
+	expected = `
 # HELP gitaly_spawn_token_waiting_length The current length of the queue waiting for spawn tokens
 # TYPE gitaly_spawn_token_waiting_length gauge
 gitaly_spawn_token_waiting_length 0
 
-`)
-	require.NoError(t, testutil.CollectAndCompare(manager, expected,
-		"gitaly_spawn_token_waiting_length",
-	))
+`
+	testhelper.RequirePromMetrics(t, manager, expected, "gitaly_spawn_token_waiting_length")
 
 	// Wait until for the second gorutine to put back the token
 	close(waitSecondPut)
-	expected = strings.NewReader(`
-# HELP gitaly_spawn_forking_time_seconds Histogram of time waiting for spawn tokens
-# TYPE gitaly_spawn_forking_time_seconds histogram
-gitaly_spawn_forking_time_seconds_count 2
-# HELP gitaly_spawn_timeouts_total Number of process spawn timeouts
+	expected = `# HELP gitaly_spawn_timeouts_total Number of process spawn timeouts
 # TYPE gitaly_spawn_timeouts_total counter
 gitaly_spawn_timeouts_total 0
-# HELP gitaly_spawn_waiting_time_seconds Histogram of time waiting for spawn tokens
-# TYPE gitaly_spawn_waiting_time_seconds histogram
-gitaly_spawn_waiting_time_seconds_count 2
 # HELP gitaly_spawn_token_waiting_length The current length of the queue waiting for spawn tokens
 # TYPE gitaly_spawn_token_waiting_length gauge
 gitaly_spawn_token_waiting_length 0
 
-`)
-	require.NoError(t, testutil.CollectAndCompare(manager, expected,
+`
+	testhelper.RequireHistogramSampleCounts(t, manager, map[string]int{
+		"gitaly_spawn_forking_time_seconds": 2,
+		"gitaly_spawn_waiting_time_seconds": 2,
+	})
+	testhelper.RequirePromMetrics(
+		t, manager, expected,
 		"gitaly_spawn_timeouts_total",
-		"gitaly_spawn_forking_time_seconds_count",
-		"gitaly_spawn_waiting_time_seconds_count",
 		"gitaly_spawn_token_waiting_length",
-	))
+	)
 
 	customFields := log.CustomFieldsFromContext(ctx)
 	require.NotNil(t, customFields)
@@ -198,25 +190,21 @@ func TestGetSpawnToken_CommandStats_timeout(t *testing.T) {
 	require.NotContains(t, logrusFields, "command.spawn_token_fork_ms")
 	require.Equal(t, logrusFields["command.spawn_token_error"], "spawn token timeout")
 
-	expected := strings.NewReader(`
-# HELP gitaly_spawn_forking_time_seconds Histogram of time waiting for spawn tokens
-# TYPE gitaly_spawn_forking_time_seconds histogram
-gitaly_spawn_forking_time_seconds_count 1
-# HELP gitaly_spawn_timeouts_total Number of process spawn timeouts
+	expected := `# HELP gitaly_spawn_timeouts_total Number of process spawn timeouts
 # TYPE gitaly_spawn_timeouts_total counter
 gitaly_spawn_timeouts_total 1
-# HELP gitaly_spawn_waiting_time_seconds Histogram of time waiting for spawn tokens
-# TYPE gitaly_spawn_waiting_time_seconds histogram
-gitaly_spawn_waiting_time_seconds_count 1
 # HELP gitaly_spawn_token_waiting_length The current length of the queue waiting for spawn tokens
 # TYPE gitaly_spawn_token_waiting_length gauge
 gitaly_spawn_token_waiting_length 0
 
-`)
-	require.NoError(t, testutil.CollectAndCompare(manager, expected,
+`
+	testhelper.RequireHistogramSampleCounts(t, manager, map[string]int{
+		"gitaly_spawn_forking_time_seconds": 0,
+		"gitaly_spawn_waiting_time_seconds": 1,
+	})
+	testhelper.RequirePromMetrics(
+		t, manager, expected,
 		"gitaly_spawn_timeouts_total",
-		"gitaly_spawn_forking_time_seconds_count",
-		"gitaly_spawn_waiting_time_seconds_count",
 		"gitaly_spawn_token_waiting_length",
-	))
+	)
 }
