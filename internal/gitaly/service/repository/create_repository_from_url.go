@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -20,9 +21,14 @@ func (s *server) cloneFromURLCommand(
 	repoURL, resolvedAddress, repositoryFullPath, authorizationToken string, mirror bool,
 	opts ...git.CmdOpt,
 ) (*command.Command, error) {
+	refFormat := git.ReferenceBackendFiles.Name
+	if featureflag.NewRepoReftableBackend.IsEnabled(ctx) {
+		refFormat = git.ReferenceBackendReftables.Name
+	}
+
 	cloneFlags := []git.Option{
 		git.Flag{Name: "--quiet"},
-		git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
+		git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 	}
 
 	if mirror {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
@@ -57,6 +58,11 @@ func Create(
 		return nil, fmt.Errorf("detecting source repo object hash: %w", err)
 	}
 
+	refFormat := git.ReferenceBackendFiles.Name
+	if featureflag.NewRepoReftableBackend.IsEnabled(ctx) {
+		refFormat = git.ReferenceBackendReftables.Name
+	}
+
 	var stderr bytes.Buffer
 	cmd, err := gitCmdFactory.NewWithoutRepo(ctx,
 		git.Command{
@@ -65,7 +71,7 @@ func Create(
 				git.Flag{Name: "--quiet"},
 				git.Flag{Name: "--bare"},
 				git.Flag{Name: "--local"},
-				git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
+				git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 			},
 			Args: []string{sourceRepoPath, objectPoolPath},
 		},
