@@ -1,8 +1,10 @@
 module gitlab.com/gitlab-org/gitaly/tools/gofumpt
 
-go 1.21
+go 1.22
 
-require mvdan.cc/gofumpt v0.6.0
+toolchain go1.22.6
+
+require mvdan.cc/gofumpt v0.7.0
 
 require (
 	github.com/google/go-cmp v0.6.0 // indirect
