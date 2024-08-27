@@ -6,6 +6,10 @@ While this can be started at any time, team members should complete their onboar
 
 **This is not a test, it's an interactive learning guide.** It's quite normal and expected to ask for help and to discuss different approaches.
 
+## Setup
+
+- [ ] Set the title to `Gitaly Team production training: <your name here>`
+
 ## Links
 
 Skim/read through these, and use them as references.
@@ -20,7 +24,7 @@ Please help correct, clarify, or otherwise improve any documentation you find la
 
 Please edit this section like a workbook, adding not just the answer but also how you got there.
 
-- [ ] Find a [senior team member](https://handbook.gitlab.com/handbook/engineering/infrastructure/core-platform/systems/gitaly/) to review and discuss this work, and tag them here.
+- [ ] Find a [senior team member](https://handbook.gitlab.com/handbook/engineering/infrastructure/core-platform/systems/gitaly/) to review and discuss this work, and assign them here.
 
 ### Statistics
 
@@ -45,7 +49,7 @@ Please edit this section like a workbook, adding not just the answer but also ho
 
 ### Git Operations
 
-- [ ] Scenario: clones are "slow"
+- [ ] Scenario: clones are "slow". [HINT](https://log.gprd.gitlab.net/app/r/s/zoX53)
   - [ ] How much memory was consumed for clones (http or ssh) for the gitlab-org/gitlab repository in the past hour?
   - [ ] How much CPU was consumed for all clones (http or ssh) for the gitlab-org/gitlab repository in the past hour?
   - [ ] How slow are the slowest clones taking on the gitlab-org/gitlab repository the past day?
@@ -73,7 +77,7 @@ Link: [Gitaly Customer Issues](https://gitlab.com/gitlab-org/gitaly/-/issues/?so
 
 ## Finally
 
-- [ ] Add yourself to the oncall rotation by raising a MR. Set manager and reviewer buddy as reviewers.
+- [ ] Add yourself to the [oncall rotation](https://ops.gitlab.net/gitlab-com/gl-infra/config-mgmt/-/blob/main/environments/pagerduty/gitaly_locals.tf?ref_type=heads) by raising a MR. Set manager and reviewer buddy as reviewers.
 
 /confidential
 /assign me
