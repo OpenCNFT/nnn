@@ -73,7 +73,7 @@ Link: [Gitaly Customer Issues](https://gitlab.com/gitlab-org/gitaly/-/issues/?so
 
 ## Finally
 
-- [ ] Add yourself to the oncall rotation by raising a MR. Set manager and reviewer buddy as reviewers.
+- [ ] Add yourself to the oncall rotation by raising a MR [here](https://ops.gitlab.net/gitlab-com/gl-infra/config-mgmt/-/blob/main/environments/pagerduty/gitaly_locals.tf?ref_type=heads). Set manager and reviewer buddy as reviewers.
 
 /confidential
 /assign me
