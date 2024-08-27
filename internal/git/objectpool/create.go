@@ -65,6 +65,7 @@ func Create(
 				git.Flag{Name: "--quiet"},
 				git.Flag{Name: "--bare"},
 				git.Flag{Name: "--local"},
+				git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
 			},
 			Args: []string{sourceRepoPath, objectPoolPath},
 		},

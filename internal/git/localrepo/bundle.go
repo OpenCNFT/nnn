@@ -93,6 +93,7 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 			Flags: []git.Option{
 				git.Flag{Name: "--quiet"},
 				git.Flag{Name: "--mirror"},
+				git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
 			},
 			Args: []string{bundlePath, repoPath},
 		},

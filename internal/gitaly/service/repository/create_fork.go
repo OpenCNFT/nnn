@@ -41,6 +41,7 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 		flags := []git.Option{
 			git.Flag{Name: "--bare"},
 			git.Flag{Name: "--quiet"},
+			git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
 		}
 
 		if req.GetRevision() != nil {

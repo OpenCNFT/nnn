@@ -117,6 +117,7 @@ func Create(
 			Flags: append([]git.Option{
 				git.Flag{Name: "--bare"},
 				git.Flag{Name: "--quiet"},
+				git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
 			}, cfg.gitOptions...),
 			Args: []string{newRepoDir.Path()},
 		}, git.WithStderr(stderr))

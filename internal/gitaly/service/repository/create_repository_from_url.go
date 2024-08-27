@@ -22,6 +22,7 @@ func (s *server) cloneFromURLCommand(
 ) (*command.Command, error) {
 	cloneFlags := []git.Option{
 		git.Flag{Name: "--quiet"},
+		git.Flag{Name: fmt.Sprintf("--ref-format=%s", git.ReferenceBackendFiles.Name)},
 	}
 
 	if mirror {
