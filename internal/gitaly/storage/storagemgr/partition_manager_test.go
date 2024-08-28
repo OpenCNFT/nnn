@@ -418,6 +418,7 @@ func TestPartitionManager(t *testing.T) {
 						metrics := newMetrics(cfg.Prometheus)
 						return stoppedTransactionManager{
 							transactionManager: NewTransactionManager(
+								ctx,
 								testPartitionID,
 								logger,
 								storageMgr.database,
@@ -470,6 +471,7 @@ func TestPartitionManager(t *testing.T) {
 					) transactionManager {
 						metrics := newMetrics(cfg.Prometheus)
 						txMgr := NewTransactionManager(
+							ctx,
 							testPartitionID,
 							logger,
 							storageMgr.database,

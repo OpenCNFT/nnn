@@ -1092,6 +1092,7 @@ type testHooks struct {
 
 // NewTransactionManager returns a new TransactionManager for the given repository.
 func NewTransactionManager(
+	ctx context.Context,
 	ptnID storage.PartitionID,
 	logger log.Logger,
 	db keyvalue.Transactioner,
@@ -1104,7 +1105,7 @@ func NewTransactionManager(
 	metrics transactionManagerMetrics,
 	consumer LogConsumer,
 ) *TransactionManager {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
 	consumerPos := &consumerPosition{}
 
