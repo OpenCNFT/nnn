@@ -248,7 +248,7 @@ func (t *reftable) IterateRefs() ([]Reference, error) {
 
 		// If we run out of ref blocks, we can stop the iteration.
 		if t.src[blockStart+headerOffset] != 'r' {
-			return nil, nil
+			return allRefs, nil
 		}
 
 		references, err := t.parseRefBlock(headerOffset, blockStart, blockEnd)
