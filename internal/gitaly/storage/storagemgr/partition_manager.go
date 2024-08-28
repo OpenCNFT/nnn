@@ -299,6 +299,7 @@ func NewPartitionManager(
 		absoluteStateDir, stagingDir string,
 	) transactionManager {
 		return NewTransactionManager(
+			ctx,
 			partitionID,
 			logger,
 			keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),

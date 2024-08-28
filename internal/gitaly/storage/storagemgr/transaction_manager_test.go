@@ -2464,7 +2464,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 
 				// Valid partition IDs are >=1.
 				testPartitionID := storage.PartitionID(i + 1)
-				manager := NewTransactionManager(testPartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, cmdFactory, repositoryFactory, newTransactionManagerMetrics(m.housekeeping, m.snapshot.Scope(storageName)), nil)
+				manager := NewTransactionManager(ctx, testPartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, cmdFactory, repositoryFactory, newTransactionManagerMetrics(m.housekeeping, m.snapshot.Scope(storageName)), nil)
 
 				managers = append(managers, manager)
 

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
@@ -1092,6 +1093,7 @@ type testHooks struct {
 
 // NewTransactionManager returns a new TransactionManager for the given repository.
 func NewTransactionManager(
+	ctx context.Context,
 	ptnID storage.PartitionID,
 	logger log.Logger,
 	db keyvalue.Transactioner,
@@ -1104,7 +1106,7 @@ func NewTransactionManager(
 	metrics transactionManagerMetrics,
 	consumer LogConsumer,
 ) *TransactionManager {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
 	consumerPos := &consumerPosition{}
 
@@ -2681,9 +2683,9 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
 	for referenceName, update := range transaction.flattenReferenceTransactions() {
 		if err := func() error {
-			// When using the reftable backend we also want to handle default branch updates
-			// here, for the files backend default branch updates are handled manually.
-			if refBackend == git.ReferenceBackendReftables && referenceName.String() == "HEAD" {
+			// When using the symref-update in git-update-ref(1), we will handle
+			// changes to the default branch too.
+			if featureflag.SymrefUpdate.IsEnabled(ctx) && referenceName.String() == "HEAD" {
 				return nil
 			}
 
