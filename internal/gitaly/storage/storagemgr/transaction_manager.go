@@ -2681,9 +2681,9 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
 	for referenceName, update := range transaction.flattenReferenceTransactions() {
 		if err := func() error {
-			// When using the reftable backend we also want to handle default branch updates
-			// here, for the files backend default branch updates are handled manually.
-			if refBackend == git.ReferenceBackendReftables && referenceName.String() == "HEAD" {
+			// When using the symref-update in git-update-ref(1), we will handle
+			// changes to the default branch too.
+			if referenceName.String() == "HEAD" {
 				return nil
 			}
 
