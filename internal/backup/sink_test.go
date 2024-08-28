@@ -11,7 +11,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -37,7 +37,7 @@ func TestResolveSink(t *testing.T) {
 	var (
 		azureBucket    *container.Client
 		gcsBucket      *storage.Client
-		s3Bucket       *s3.S3
+		s3Bucket       *s3.Client
 		fileblobBucket os.FileInfo
 	)
 
