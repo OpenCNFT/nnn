@@ -2680,24 +2680,14 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 
 	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
 	for referenceName, update := range transaction.flattenReferenceTransactions() {
-		if err := func() error {
-			// When using the reftable backend we also want to handle default branch updates
-			// here, for the files backend default branch updates are handled manually.
-			if refBackend == git.ReferenceBackendReftables && referenceName.String() == "HEAD" {
-				return nil
-			}
-
-			// Transactions should only stage references with valid names as otherwise Git would already
-			// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
-			// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
-			// check that all references modified are within the refs directory.
-			if !strings.HasPrefix(referenceName.String(), "refs/") {
-				return InvalidReferenceFormatError{ReferenceName: referenceName}
-			}
-
-			return nil
-		}(); err != nil {
-			return nil, err
+		// Transactions should only stage references with valid names as otherwise Git would already
+		// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
+		// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
+		// check that all references modified are within the refs directory.
+		//
+		// HEAD is a special case and refers to a default branch update.
+		if !strings.HasPrefix(referenceName.String(), "refs/") && referenceName != "HEAD" {
+			return nil, InvalidReferenceFormatError{ReferenceName: referenceName}
 		}
 
 		actualOldTip, err := stagingRepositoryWithQuarantine.ResolveRevision(ctx, referenceName.Revision())
@@ -3231,7 +3221,7 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 	}
 
 	for _, change := range changes {
-		if len(change.NewTarget) > 0 {
+		if version.SupportSymrefUpdates() && len(change.NewTarget) > 0 {
 			if err := updater.UpdateSymbolicReference(
 				version,
 				git.ReferenceName(change.ReferenceName),

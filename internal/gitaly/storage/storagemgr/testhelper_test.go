@@ -19,6 +19,7 @@ import (
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
@@ -32,6 +33,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -1235,13 +1237,16 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				if step.DefaultBranchUpdate != nil {
 					transaction.MarkDefaultBranchUpdated()
 
-					if testhelper.IsReftableEnabled() {
+					version, err := repo.GitVersion(ctx)
+					require.NoError(t, err)
+
+					if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
 						transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
 							"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
 						})
 					}
 
-					require.NoError(t, rewrittenRepo.SetDefaultBranch(ctx, nil, step.DefaultBranchUpdate.Reference))
+					require.NoError(t, rewrittenRepo.SetDefaultBranch(storagectx.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
 				}
 
 				if step.CustomHooksUpdate != nil {
