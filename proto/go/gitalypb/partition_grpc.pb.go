@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	PartitionService_BackupPartition_FullMethodName = "/gitaly.PartitionService/BackupPartition"
+	PartitionService_ListPartitions_FullMethodName  = "/gitaly.PartitionService/ListPartitions"
 )
 
 // PartitionServiceClient is the client API for PartitionService service.
@@ -31,6 +32,8 @@ type PartitionServiceClient interface {
 	// BackupPartition backs up an entire partition and saves it to
 	// the configured backup sink (filesystem or object storage).
 	BackupPartition(ctx context.Context, in *BackupPartitionRequest, opts ...grpc.CallOption) (*BackupPartitionResponse, error)
+	// ListPartitions lists partitions present in the storage.
+	ListPartitions(ctx context.Context, in *ListPartitionsRequest, opts ...grpc.CallOption) (*ListPartitionsResponse, error)
 }
 
 type partitionServiceClient struct {
@@ -51,6 +54,16 @@ func (c *partitionServiceClient) BackupPartition(ctx context.Context, in *Backup
 	return out, nil
 }
 
+func (c *partitionServiceClient) ListPartitions(ctx context.Context, in *ListPartitionsRequest, opts ...grpc.CallOption) (*ListPartitionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPartitionsResponse)
+	err := c.cc.Invoke(ctx, PartitionService_ListPartitions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PartitionServiceServer is the server API for PartitionService service.
 // All implementations must embed UnimplementedPartitionServiceServer
 // for forward compatibility.
@@ -60,6 +73,8 @@ type PartitionServiceServer interface {
 	// BackupPartition backs up an entire partition and saves it to
 	// the configured backup sink (filesystem or object storage).
 	BackupPartition(context.Context, *BackupPartitionRequest) (*BackupPartitionResponse, error)
+	// ListPartitions lists partitions present in the storage.
+	ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error)
 	mustEmbedUnimplementedPartitionServiceServer()
 }
 
@@ -72,6 +87,9 @@ type UnimplementedPartitionServiceServer struct{}
 
 func (UnimplementedPartitionServiceServer) BackupPartition(context.Context, *BackupPartitionRequest) (*BackupPartitionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BackupPartition not implemented")
+}
+func (UnimplementedPartitionServiceServer) ListPartitions(context.Context, *ListPartitionsRequest) (*ListPartitionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListPartitions not implemented")
 }
 func (UnimplementedPartitionServiceServer) mustEmbedUnimplementedPartitionServiceServer() {}
 func (UnimplementedPartitionServiceServer) testEmbeddedByValue()                          {}
@@ -112,6 +130,24 @@ func _PartitionService_BackupPartition_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PartitionService_ListPartitions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPartitionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PartitionServiceServer).ListPartitions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PartitionService_ListPartitions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PartitionServiceServer).ListPartitions(ctx, req.(*ListPartitionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PartitionService_ServiceDesc is the grpc.ServiceDesc for PartitionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -122,6 +158,10 @@ var PartitionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BackupPartition",
 			Handler:    _PartitionService_BackupPartition_Handler,
+		},
+		{
+			MethodName: "ListPartitions",
+			Handler:    _PartitionService_ListPartitions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
