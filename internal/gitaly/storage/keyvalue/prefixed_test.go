@@ -72,9 +72,10 @@ func TestPrefixedTransactioner(t *testing.T) {
 		t.Run(methodTC.desc, func(t *testing.T) {
 			t.Run("NewIterator", func(t *testing.T) {
 				for _, tc := range []struct {
-					desc          string
-					db            Transactioner
-					expectedState KeyValueState
+					desc              string
+					db                Transactioner
+					expectedState     KeyValueState
+					expectedSeekValue []byte
 				}{
 					{
 						desc: "unprefixed",
@@ -90,6 +91,7 @@ func TestPrefixedTransactioner(t *testing.T) {
 							"prefix-2/key-2": "value-8",
 							"prefix-2/key-3": "value-9",
 						},
+						expectedSeekValue: []byte("value-2"),
 					},
 					{
 						desc: "prefix-1",
@@ -99,6 +101,7 @@ func TestPrefixedTransactioner(t *testing.T) {
 							"key-2": "value-5",
 							"key-3": "value-6",
 						},
+						expectedSeekValue: []byte("value-5"),
 					},
 					{
 						desc: "prefix-2",
@@ -108,6 +111,7 @@ func TestPrefixedTransactioner(t *testing.T) {
 							"key-2": "value-8",
 							"key-3": "value-9",
 						},
+						expectedSeekValue: []byte("value-8"),
 					},
 				} {
 					t.Run(tc.desc, func(t *testing.T) {
@@ -116,6 +120,14 @@ func TestPrefixedTransactioner(t *testing.T) {
 							defer iterator.Close()
 
 							RequireIterator(t, iterator, tc.expectedState)
+
+							iterator.Seek([]byte("key-2"))
+							require.True(t, iterator.Valid())
+							require.Equal(t, iterator.Item().Key(), []byte("key-2"))
+							require.NoError(t, iterator.Item().Value(func(value []byte) error {
+								require.Equal(t, tc.expectedSeekValue, value)
+								return nil
+							}))
 						})
 					})
 				}

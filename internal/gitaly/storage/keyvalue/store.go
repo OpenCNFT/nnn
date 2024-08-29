@@ -16,6 +16,7 @@ type Iterator interface {
 	Item() Item
 	Valid() bool
 	Close()
+	Seek(key []byte)
 }
 
 // IteratorOptions are subset of badger.IteratorOptions. Refer to Badger's documentation for details.

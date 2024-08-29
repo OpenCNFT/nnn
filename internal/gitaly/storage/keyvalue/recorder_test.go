@@ -51,10 +51,42 @@ func TestRecordingReadWriter(t *testing.T) {
 		"prefix-2/key-2": "prefix-2/value-2",
 	})
 
+	unprefixedIterator.Seek([]byte("key-2"))
+	require.True(t, unprefixedIterator.Valid())
+	require.Equal(t, unprefixedIterator.Item().Key(), []byte("key-2"))
+	require.NoError(t, unprefixedIterator.Item().Value(func(value []byte) error {
+		require.Equal(t, []byte("value-2"), value)
+		return nil
+	}))
+
+	// Non-existent keys that are seeked are not added to the read set. The iterator's
+	// prefix is already recorded which covers the conflicts on reading this key and it
+	// being created concurrently.
+	// This will result in invalid iterator since there are no other keys greater than seeked.
+	unprefixedIterator.Seek([]byte("seek-non-existent-key"))
+	require.False(t, unprefixedIterator.Valid())
+	// This will result in valid iterator since seek will go the the next key greater than seeked.
+	unprefixedIterator.Seek([]byte("non-existent-key"))
+	require.True(t, unprefixedIterator.Valid())
+	require.Equal(t, unprefixedIterator.Item().Key(), []byte("prefix-1/key-1"))
+
 	// Iterated keys should become part of the read set and the prefix should also
 	// be recorded.
 	prefixedIterator := rw.NewIterator(IteratorOptions{Prefix: []byte("prefix-2/")})
 	defer prefixedIterator.Close()
+
+	prefixedIterator.Seek([]byte("prefix-2/key-2"))
+	require.True(t, prefixedIterator.Valid())
+	require.Equal(t, prefixedIterator.Item().Key(), []byte("prefix-2/key-2"))
+	require.NoError(t, prefixedIterator.Item().Value(func(value []byte) error {
+		require.Equal(t, []byte("prefix-2/value-2"), value)
+		return nil
+	}))
+
+	// Using wrong key during seek will seek to next key greater than seeked.
+	prefixedIterator.Seek([]byte("prefix-1/key-2"))
+	require.True(t, prefixedIterator.Valid())
+	require.Equal(t, prefixedIterator.Item().Key(), []byte("prefix-2/key-1"))
 
 	RequireIterator(t, prefixedIterator, KeyValueState{
 		"prefix-2/key-1": "prefix-2/value-1",
