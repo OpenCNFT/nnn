@@ -1,10 +1,11 @@
 package ref
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/lines"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -15,7 +16,7 @@ func (s *server) FindLocalBranches(in *gitalypb.FindLocalBranchesRequest, stream
 		return structerr.NewInvalidArgument("%w", err)
 	}
 	if err := s.findLocalBranches(in, stream); err != nil {
-		return structerr.NewInternal("%w", err)
+		return err
 	}
 
 	return nil
@@ -27,7 +28,7 @@ func (s *server) findLocalBranches(in *gitalypb.FindLocalBranchesRequest, stream
 
 	objectReader, cancel, err := s.catfileCache.ObjectReader(ctx, repo)
 	if err != nil {
-		return fmt.Errorf("creating object reader: %w", err)
+		return structerr.NewInternal("creating object reader: %w", err)
 	}
 	defer cancel()
 
@@ -40,7 +41,11 @@ func (s *server) findLocalBranches(in *gitalypb.FindLocalBranchesRequest, stream
 	}
 
 	if err := s.findRefs(ctx, writer, repo, []string{"refs/heads"}, opts); err != nil {
-		return fmt.Errorf("finding refs: %w", err)
+		if errors.Is(err, lines.ErrInvalidPageToken) {
+			return structerr.NewInvalidArgument("invalid page token: %w", err)
+		}
+
+		return structerr.NewInternal("finding refs: %w", err)
 	}
 
 	return nil
