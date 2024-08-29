@@ -2,6 +2,7 @@ package storagemgr
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,21 +48,25 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 		"refs/tags/v2.0.0":    annotatedTag.OID,
 	}
 
-	assertPackRefsMetrics := AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+	// For the reftable backend, there is no apply stage for pack-refs.
+	assertPackRefsMetrics := gittest.FilesOrReftables(AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 		"housekeeping_task=total,stage=prepare":     1,
 		"housekeeping_task=total,stage=verify":      1,
 		"housekeeping_task=total,stage=apply":       1,
 		"housekeeping_task=pack-refs,stage=prepare": 1,
 		"housekeeping_task=pack-refs,stage=verify":  1,
 		"housekeeping_task=pack-refs,stage=apply":   1,
-	}}
+	}}, AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+		"housekeeping_task=total,stage=prepare":     1,
+		"housekeeping_task=total,stage=verify":      1,
+		"housekeeping_task=total,stage=apply":       1,
+		"housekeeping_task=pack-refs,stage=prepare": 1,
+		"housekeeping_task=pack-refs,stage=verify":  1,
+	}})
 
 	return []transactionTestCase{
 		{
-			desc: "run pack-refs on a repository without packed-refs",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "run pack-refs on a repository without packed-refs",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -95,7 +100,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
+						References: gittest.FilesOrReftables(&ReferencesState{
 							FilesBackend: &FilesBackendState{
 								PackedReferences: map[git.ReferenceName]git.ObjectID{
 									"refs/heads/branch-1": setup.Commits.Second.OID,
@@ -111,16 +116,66 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 									"refs/heads/main": setup.Commits.Second.OID,
 								},
 							},
+						}, &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 5,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/tags/v1.0.0",
+												Target: lightweightTag.String(),
+											},
+										},
+									},
+									{
+										MinIndex: 6,
+										MaxIndex: 6,
+										References: []git.Reference{
+											{
+												Name:   "refs/tags/v2.0.0",
+												Target: annotatedTag.OID.String(),
+											},
+										},
+									},
+									{
+										MinIndex: 7,
+										MaxIndex: 7,
+										References: []git.Reference{
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.Second.OID.String(),
+											},
+										},
+									},
+								},
+							},
 						},
+						),
 					},
 				},
 			},
 		},
 		{
-			desc: "run pack-refs on a repository with an existing packed-refs",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "run pack-refs on a repository with an existing packed-refs",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{
@@ -174,28 +229,77 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1": setup.Commits.Second.OID,
-									"refs/heads/branch-2": setup.Commits.Third.OID,
-									"refs/heads/branch-3": setup.Commits.Diverging.OID,
-									"refs/heads/main":     setup.Commits.Second.OID,
-									"refs/tags/v1.0.0":    lightweightTag,
-									"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+										"refs/heads/branch-2": setup.Commits.Third.OID,
+										"refs/heads/branch-3": setup.Commits.Diverging.OID,
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":    lightweightTag,
+										"refs/tags/v2.0.0":    annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
 								},
-								LooseReferences: map[git.ReferenceName]git.ObjectID{},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 6,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 7,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-3",
+													Target: setup.Commits.Diverging.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
 		},
 		{
-			desc: "run pack-refs, all refs outside refs/heads and refs/tags are packed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "run pack-refs, all refs outside refs/heads and refs/tags are packed",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -231,30 +335,77 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1":       setup.Commits.Second.OID,
-									"refs/heads/branch-2":       setup.Commits.Third.OID,
-									"refs/heads/main":           setup.Commits.First.OID,
-									"refs/keep-around/1":        setup.Commits.First.OID,
-									"refs/merge-requests/1":     setup.Commits.Second.OID,
-									"refs/tags/v1.0.0":          lightweightTag,
-									"refs/tags/v2.0.0":          annotatedTag.OID,
-									"refs/very/deep/nested/ref": setup.Commits.Third.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1":       setup.Commits.Second.OID,
+										"refs/heads/branch-2":       setup.Commits.Third.OID,
+										"refs/heads/main":           setup.Commits.First.OID,
+										"refs/keep-around/1":        setup.Commits.First.OID,
+										"refs/merge-requests/1":     setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":          lightweightTag,
+										"refs/tags/v2.0.0":          annotatedTag.OID,
+										"refs/very/deep/nested/ref": setup.Commits.Third.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
 								},
-								LooseReferences: map[git.ReferenceName]git.ObjectID{},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/keep-around/1",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/merge-requests/1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+												{
+													Name:   "refs/very/deep/nested/ref",
+													Target: setup.Commits.Third.OID.String(),
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
 		},
 		{
-			desc: "concurrent ref creation before pack-refs task is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "concurrent ref creation before pack-refs task is committed",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -262,40 +413,56 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 					RelativePaths: []string{setup.RelativePath},
 				},
-				RunPackRefs{
+				// The existing refs in the setup are created outside the transaction
+				// manager and would already be compacted. So we create another ref here,
+				// so that the auto-compaction for reftable actually takes place.
+				Commit{
 					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
 				},
 				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RunPackRefs{
 					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
-					TransactionID: 2,
+					TransactionID: 3,
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-3": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Diverging.OID},
 						"refs/keep-around/1":  {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
-					TransactionID: 1,
+					TransactionID: 2,
 				},
 				assertPackRefsMetrics,
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
+						References: gittest.FilesOrReftables(&ReferencesState{
 							FilesBackend: &FilesBackendState{
 								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1": setup.Commits.Second.OID,
-									"refs/heads/branch-2": setup.Commits.Third.OID,
-									"refs/heads/main":     setup.Commits.First.OID,
-									"refs/tags/v1.0.0":    lightweightTag,
-									"refs/tags/v2.0.0":    annotatedTag.OID,
+									"refs/heads/branch-1":   setup.Commits.Second.OID,
+									"refs/heads/branch-2":   setup.Commits.Third.OID,
+									"refs/heads/main":       setup.Commits.First.OID,
+									"refs/heads/new-branch": setup.Commits.First.OID,
+									"refs/tags/v1.0.0":      lightweightTag,
+									"refs/tags/v2.0.0":      annotatedTag.OID,
 								},
 								LooseReferences: map[git.ReferenceName]git.ObjectID{
 									// Although ref creation commits beforehand, pack-refs
@@ -305,16 +472,68 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 									"refs/keep-around/1":  setup.Commits.First.OID,
 								},
 							},
+						}, &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 7,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/heads/new-branch",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/tags/v1.0.0",
+												Target: lightweightTag.String(),
+											},
+											{
+												Name:   "refs/tags/v2.0.0",
+												Target: annotatedTag.OID.String(),
+											},
+										},
+									},
+									{
+										MinIndex: 8,
+										MaxIndex: 8,
+										References: []git.Reference{
+											{
+												Name:   "refs/heads/branch-3",
+												Target: setup.Commits.Diverging.OID.String(),
+											},
+											{
+												Name:   "refs/keep-around/1",
+												Target: setup.Commits.First.OID.String(),
+											},
+										},
+									},
+								},
+							},
 						},
+						),
 					},
 				},
 			},
 		},
 		{
-			desc: "concurrent ref creation after pack-refs task is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "concurrent ref creation after pack-refs task is committed",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -322,18 +541,33 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 					RelativePaths: []string{setup.RelativePath},
 				},
-				RunPackRefs{
+				// The existing refs in the setup are created outside the transaction
+				// manager and would already be compacted. So we create another ref here,
+				// so that the auto-compaction for reftable actually takes place.
+				Commit{
 					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
 				},
 				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RunPackRefs{
 					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
-					TransactionID: 1,
+					TransactionID: 2,
 				},
 				Commit{
-					TransactionID: 2,
+					TransactionID: 3,
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-3": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.Diverging.OID},
 						"refs/keep-around/1":  {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
@@ -343,19 +577,20 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
+						References: gittest.FilesOrReftables(&ReferencesState{
 							FilesBackend: &FilesBackendState{
 								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1": setup.Commits.Second.OID,
-									"refs/heads/branch-2": setup.Commits.Third.OID,
-									"refs/heads/main":     setup.Commits.First.OID,
-									"refs/tags/v1.0.0":    lightweightTag,
-									"refs/tags/v2.0.0":    annotatedTag.OID,
+									"refs/heads/branch-1":   setup.Commits.Second.OID,
+									"refs/heads/branch-2":   setup.Commits.Third.OID,
+									"refs/heads/main":       setup.Commits.First.OID,
+									"refs/heads/new-branch": setup.Commits.First.OID,
+									"refs/tags/v1.0.0":      lightweightTag,
+									"refs/tags/v2.0.0":      annotatedTag.OID,
 								},
 								LooseReferences: map[git.ReferenceName]git.ObjectID{
 									// pack-refs task is unaware of these new refs. It keeps
@@ -364,78 +599,68 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 									"refs/keep-around/1":  setup.Commits.First.OID,
 								},
 							},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "concurrent ref updates before pack-refs task is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
-			customSetup: customSetup,
-			steps: steps{
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				RunPackRefs{
-					TransactionID: 1,
-				},
-				Begin{
-					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					TransactionID: 2,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
-						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
-						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
-						"refs/tags/v1.0.0":    {OldOID: setup.Commits.Diverging.OID, NewOID: setup.Commits.First.OID},
-					},
-				},
-				Commit{
-					TransactionID: 1,
-				},
-				assertPackRefsMetrics,
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-				},
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1": setup.Commits.Second.OID, // Outdated
-									"refs/heads/branch-2": setup.Commits.Third.OID,  // Outdated
-									"refs/heads/main":     setup.Commits.First.OID,  // Outdated
-									"refs/tags/v1.0.0":    lightweightTag,           // Outdated
-									"refs/tags/v2.0.0":    annotatedTag.OID,         // Still up-to-date
-								},
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									// Updated refs shadow the ones in the packed-refs file.
-									"refs/heads/main":     setup.Commits.Second.OID,
-									"refs/heads/branch-1": setup.Commits.Third.OID,
-									"refs/heads/branch-2": setup.Commits.Diverging.OID,
-									"refs/tags/v1.0.0":    setup.Commits.First.OID,
+						}, &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 7,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/heads/new-branch",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/tags/v1.0.0",
+												Target: lightweightTag.String(),
+											},
+											{
+												Name:   "refs/tags/v2.0.0",
+												Target: annotatedTag.OID.String(),
+											},
+										},
+									},
+									{
+										MinIndex: 8,
+										MaxIndex: 8,
+										References: []git.Reference{
+											{
+												Name:   "refs/heads/branch-3",
+												Target: setup.Commits.Diverging.OID.String(),
+											},
+											{
+												Name:   "refs/keep-around/1",
+												Target: setup.Commits.First.OID.String(),
+											},
+										},
+									},
 								},
 							},
 						},
+						),
 					},
 				},
 			},
 		},
 		{
-			desc: "concurrent ref updates after pack-refs task is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "concurrent ref updates before pack-refs task is committed",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -443,140 +668,22 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 					RelativePaths: []string{setup.RelativePath},
 				},
-				RunPackRefs{
-					TransactionID: 1,
-				},
-				Begin{
-					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
-				},
+				// The existing refs in the setup are created outside the transaction
+				// manager and would already be compacted. So we create another ref here,
+				// so that the auto-compaction for reftable actually takes place.
 				Commit{
 					TransactionID: 1,
-				},
-				Commit{
-					TransactionID: 2,
 					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
-						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
-						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
-						"refs/tags/v1.0.0":    {OldOID: setup.Commits.Diverging.OID, NewOID: setup.Commits.First.OID},
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
-				assertPackRefsMetrics,
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-				},
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1": setup.Commits.Second.OID, // Outdated
-									"refs/heads/branch-2": setup.Commits.Third.OID,  // Outdated
-									"refs/heads/main":     setup.Commits.First.OID,  // Outdated
-									"refs/tags/v1.0.0":    lightweightTag,           // Outdated
-									"refs/tags/v2.0.0":    annotatedTag.OID,
-								},
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/main":     setup.Commits.Second.OID,
-									"refs/heads/branch-1": setup.Commits.Third.OID,
-									"refs/heads/branch-2": setup.Commits.Diverging.OID,
-									"refs/tags/v1.0.0":    setup.Commits.First.OID,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "concurrent ref deletion before pack-refs is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
-			customSetup: customSetup,
-			steps: steps{
-				StartManager{},
 				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{setup.RelativePath},
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
 				},
 				RunPackRefs{
-					TransactionID: 1,
-				},
-				Begin{
 					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					TransactionID: 2,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
-						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
-					},
-				},
-				Commit{
-					TransactionID: 1,
-					ExpectedError: errPackRefsConflictRefDeletion,
-				},
-				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
-					"housekeeping_task=total,stage=prepare":     1,
-					"housekeeping_task=total,stage=verify":      1,
-					"housekeeping_task=pack-refs,stage=prepare": 1,
-					"housekeeping_task=pack-refs,stage=verify":  1,
-				}},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-				},
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								// Empty packed-refs. It means the pack-refs task is not
-								// executed.
-								PackedReferences: nil,
-								// Deleted refs went away.
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-2": setup.Commits.Third.OID,
-									"refs/heads/main":     setup.Commits.First.OID,
-									"refs/tags/v2.0.0":    annotatedTag.OID,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "concurrent ref deletion before pack-refs is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
-			customSetup: customSetup,
-			steps: steps{
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Begin{
-					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				RunPackRefs{
-					TransactionID: 1,
-				},
-				Commit{
-					TransactionID: 2,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
-					},
 				},
 				Begin{
 					TransactionID:       3,
@@ -585,44 +692,389 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
+						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
+						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
+						"refs/tags/v1.0.0":    {OldOID: setup.Commits.Diverging.OID, NewOID: setup.Commits.First.OID},
+					},
 				},
 				Commit{
-					TransactionID: 1,
-					ExpectedError: errPackRefsConflictRefDeletion,
+					TransactionID: 2,
 				},
-				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+				assertPackRefsMetrics,
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1":   setup.Commits.Second.OID, // Outdated
+										"refs/heads/branch-2":   setup.Commits.Third.OID,  // Outdated
+										"refs/heads/main":       setup.Commits.First.OID,  // Outdated
+										"refs/heads/new-branch": setup.Commits.First.OID,  // Still up-to-date
+										"refs/tags/v1.0.0":      lightweightTag,           // Outdated
+										"refs/tags/v2.0.0":      annotatedTag.OID,         // Still up-to-date
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										// Updated refs shadow the ones in the packed-refs file.
+										"refs/heads/main":     setup.Commits.Second.OID,
+										"refs/heads/branch-1": setup.Commits.Third.OID,
+										"refs/heads/branch-2": setup.Commits.Diverging.OID,
+										"refs/tags/v1.0.0":    setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/heads/new-branch",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 8,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Diverging.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						),
+					},
+				},
+			},
+		},
+		{
+			desc:        "concurrent ref updates after pack-refs task is committed",
+			customSetup: customSetup,
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				// The existing refs in the setup are created outside the transaction
+				// manager and would already be compacted. So we create another ref here,
+				// so that the auto-compaction for reftable actually takes place.
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RunPackRefs{
+					TransactionID: 2,
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				Commit{
+					TransactionID: 2,
+				},
+				Commit{
+					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main":     {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
+						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
+						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
+						"refs/tags/v1.0.0":    {OldOID: setup.Commits.Diverging.OID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				assertPackRefsMetrics,
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: gittest.FilesOrReftables(&ReferencesState{
+							FilesBackend: &FilesBackendState{
+								PackedReferences: map[git.ReferenceName]git.ObjectID{
+									"refs/heads/branch-1":   setup.Commits.Second.OID, // Outdated
+									"refs/heads/branch-2":   setup.Commits.Third.OID,  // Outdated
+									"refs/heads/main":       setup.Commits.First.OID,  // Outdated
+									"refs/heads/new-branch": setup.Commits.First.OID,  // Still up-to-date
+									"refs/tags/v1.0.0":      lightweightTag,           // Outdated
+									"refs/tags/v2.0.0":      annotatedTag.OID,         // Still up-to-date
+								},
+								LooseReferences: map[git.ReferenceName]git.ObjectID{
+									"refs/heads/main":     setup.Commits.Second.OID,
+									"refs/heads/branch-1": setup.Commits.Third.OID,
+									"refs/heads/branch-2": setup.Commits.Diverging.OID,
+									"refs/tags/v1.0.0":    setup.Commits.First.OID,
+								},
+							},
+						}, &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 7,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/heads/new-branch",
+												Target: setup.Commits.First.OID.String(),
+											},
+											{
+												Name:   "refs/tags/v1.0.0",
+												Target: lightweightTag.String(),
+											},
+											{
+												Name:   "refs/tags/v2.0.0",
+												Target: annotatedTag.OID.String(),
+											},
+										},
+									},
+									{
+										MinIndex: 8,
+										MaxIndex: 8,
+										References: []git.Reference{
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Diverging.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/tags/v1.0.0",
+												Target: setup.Commits.First.OID.String(),
+											},
+										},
+									},
+								},
+							},
+						},
+						),
+					},
+				},
+			},
+		},
+		{
+			desc:        "concurrent ref deletion before pack-refs is committed",
+			customSetup: customSetup,
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				// The existing refs in the setup are created outside the transaction
+				// manager and would already be compacted. So we create another ref here,
+				// so that the auto-compaction for reftable actually takes place.
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RunPackRefs{
+					TransactionID: 2,
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				Commit{
+					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
+						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
+					},
+				},
+				Commit{
+					TransactionID: 2,
+					// Reftables would allow this operation, since it is just a new table
+					// being added.
+					ExpectedError: gittest.FilesOrReftables(errPackRefsConflictRefDeletion, nil),
+				},
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     1,
 					"housekeeping_task=total,stage=verify":      1,
 					"housekeeping_task=pack-refs,stage=prepare": 1,
 					"housekeeping_task=pack-refs,stage=verify":  1,
-				}},
+				}, map[string]int{
+					"housekeeping_task=total,stage=prepare":     1,
+					"housekeeping_task=total,stage=verify":      1,
+					"housekeeping_task=total,stage=apply":       1,
+					"housekeeping_task=pack-refs,stage=prepare": 1,
+					"housekeeping_task=pack-refs,stage=verify":  1,
+				})},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): gittest.FilesOrReftables(storage.LSN(2).ToProto(), storage.LSN(3).ToProto()),
 				},
 				Repositories: RepositoryStates{
-					relativePath: {
+					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1": setup.Commits.Second.OID,
-									"refs/heads/branch-2": setup.Commits.Third.OID,
-									"refs/tags/v1.0.0":    lightweightTag,
-									"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									// Empty packed-refs. It means the pack-refs task is not
+									// executed.
+									PackedReferences: nil,
+									// Deleted refs went away.
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-2":   setup.Commits.Third.OID,
+										"refs/heads/main":       setup.Commits.First.OID,
+										"refs/heads/new-branch": setup.Commits.First.OID,
+										"refs/tags/v2.0.0":      annotatedTag.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/heads/new-branch",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 8,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.ObjectHash.ZeroOID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: setup.ObjectHash.ZeroOID.String(),
+												},
+											},
+										},
+									},
 								},
 							},
-						},
+						),
 					},
 				},
 			},
 		},
 		{
 			desc: "concurrent ref deletion in other repository of a pool",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
 			steps: steps{
 				RemoveRepository{},
 				StartManager{},
@@ -700,14 +1152,34 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 							setup.Commits.First.OID,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
+						References: gittest.FilesOrReftables(&ReferencesState{
 							FilesBackend: &FilesBackendState{
 								PackedReferences: map[git.ReferenceName]git.ObjectID{
 									"refs/heads/main": setup.Commits.First.OID,
 								},
 								LooseReferences: map[git.ReferenceName]git.ObjectID{},
 							},
-						},
+						}, &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 2,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											},
+										},
+									},
+								},
+							},
+						}),
 					},
 					"member": {
 						Objects: []git.ObjectID{
@@ -720,10 +1192,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 		},
 		{
-			desc: "concurrent ref deletion after pack-refs is committed",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "concurrent ref deletion after pack-refs is committed",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -731,18 +1200,33 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 					RelativePaths: []string{setup.RelativePath},
 				},
-				RunPackRefs{
+				// The existing refs in the setup are created outside the transaction
+				// manager and would already be compacted. So we create another ref here,
+				// so that the auto-compaction for reftable actually takes place.
+				Commit{
 					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
 				},
 				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RunPackRefs{
 					TransactionID: 2,
-					RelativePaths: []string{setup.RelativePath},
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
 				},
 				Commit{
-					TransactionID: 1,
+					TransactionID: 2,
 				},
 				Commit{
-					TransactionID: 2,
+					TransactionID: 3,
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
 						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
@@ -752,21 +1236,78 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-2": setup.Commits.Third.OID,
-									"refs/heads/main":     setup.Commits.First.OID,
-									"refs/tags/v2.0.0":    annotatedTag.OID,
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-2":   setup.Commits.Third.OID,
+										"refs/heads/main":       setup.Commits.First.OID,
+										"refs/heads/new-branch": setup.Commits.First.OID,
+										"refs/tags/v2.0.0":      annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
 								},
-								LooseReferences: map[git.ReferenceName]git.ObjectID{},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/heads/new-branch",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 8,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.ObjectHash.ZeroOID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: setup.ObjectHash.ZeroOID.String(),
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
@@ -774,7 +1315,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 		{
 			desc: "empty directories are pruned after interrupted log application",
 			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
+				testhelper.SkipWithReftable(t, "we don't deal with directories for reftable")
 			},
 			steps: steps{
 				StartManager{},
@@ -991,10 +1532,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 		},
 		{
-			desc: "housekeeping transaction runs concurrently with another housekeeping transaction",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "housekeeping transaction runs concurrently with another housekeeping transaction",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -1019,14 +1557,20 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 2,
 					ExpectedError: errHousekeepingConflictConcurrent,
 				},
-				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
 					"housekeeping_task=total,stage=apply":       1,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  1,
 					"housekeeping_task=pack-refs,stage=apply":   1,
-				}},
+				}, map[string]int{
+					"housekeeping_task=total,stage=prepare":     2,
+					"housekeeping_task=total,stage=verify":      2,
+					"housekeeping_task=total,stage=apply":       1,
+					"housekeeping_task=pack-refs,stage=prepare": 2,
+					"housekeeping_task=pack-refs,stage=verify":  1,
+				})},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
@@ -1035,21 +1579,62 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: defaultReferences,
-								LooseReferences:  map[git.ReferenceName]git.ObjectID{},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: defaultReferences,
+									LooseReferences:  map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 5,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 6,
+											MaxIndex: 6,
+											References: []git.Reference{
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
 		},
 		{
 			desc: "housekeeping transaction runs after another housekeeping transaction in other repository of a pool",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
 			steps: steps{
 				RemoveRepository{},
 				StartManager{},
@@ -1101,14 +1686,20 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Commit{
 					TransactionID: 4,
 				},
-				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
 					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
 					"housekeeping_task=pack-refs,stage=apply":   2,
-				}},
+				}, map[string]int{
+					"housekeeping_task=total,stage=prepare":     2,
+					"housekeeping_task=total,stage=verify":      2,
+					"housekeeping_task=total,stage=apply":       2,
+					"housekeeping_task=pack-refs,stage=prepare": 2,
+					"housekeeping_task=pack-refs,stage=verify":  2,
+				})},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
@@ -1123,14 +1714,35 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 							setup.Commits.First.OID,
 						},
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
+						References: gittest.FilesOrReftables(&ReferencesState{
 							FilesBackend: &FilesBackendState{
 								PackedReferences: map[git.ReferenceName]git.ObjectID{
 									"refs/heads/main": setup.Commits.First.OID,
 								},
 								LooseReferences: map[git.ReferenceName]git.ObjectID{},
 							},
+						}, &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 2,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											},
+										},
+									},
+								},
+							},
 						},
+						),
 					},
 					"member": {
 						Objects: []git.ObjectID{
@@ -1143,10 +1755,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 		},
 		{
-			desc: "housekeeping transaction runs after another housekeeping transaction",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "housekeeping transaction runs after another housekeeping transaction",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -1154,11 +1763,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 					TransactionID: 1,
 					RelativePaths: []string{setup.RelativePath},
 				},
-				RunPackRefs{
-					TransactionID: 1,
-				},
 				Commit{
 					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/new-branch": {OldOID: gittest.DefaultObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
 				},
 				Begin{
 					TransactionID:       2,
@@ -1171,37 +1780,116 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Commit{
 					TransactionID: 2,
 				},
-				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				Commit{
+					TransactionID: 3,
+					// We need to modify a bunch of references so that auto-compaction
+					// is actually triggered the second time too (for reftables).
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main":       {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
+						"refs/heads/new-branch": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
+						"refs/heads/branch-1":   {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
+						"refs/heads/branch-2":   {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Second.OID},
+					},
+				},
+				Begin{
+					TransactionID:       4,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 3,
+				},
+				RunPackRefs{
+					TransactionID: 4,
+				},
+				Commit{
+					TransactionID: 4,
+				},
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
 					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
 					"housekeeping_task=pack-refs,stage=apply":   2,
-				}},
+				}, map[string]int{
+					"housekeeping_task=total,stage=prepare":     2,
+					"housekeeping_task=total,stage=verify":      2,
+					"housekeeping_task=total,stage=apply":       2,
+					"housekeeping_task=pack-refs,stage=prepare": 2,
+					"housekeeping_task=pack-refs,stage=verify":  2,
+				})},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(4).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								PackedReferences: defaultReferences,
-								LooseReferences:  map[git.ReferenceName]git.ObjectID{},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1":   setup.Commits.Third.OID,
+										"refs/heads/branch-2":   setup.Commits.Second.OID,
+										"refs/heads/main":       setup.Commits.Second.OID,
+										"refs/heads/new-branch": setup.Commits.Second.OID,
+										"refs/tags/v1.0.0":      lightweightTag,
+										"refs/tags/v2.0.0":      annotatedTag.OID,
+									},
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/new-branch",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 					},
 				},
 			},
 		},
 		{
-			desc: "housekeeping transaction runs concurrently with a repository deletion",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
+			desc:        "housekeeping transaction runs concurrently with a repository deletion",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -1249,12 +1937,789 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				Repositories: RepositoryStates{
 					relativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+									},
+								},
+							},
+						),
+						Objects: []git.ObjectID{},
+					},
+				},
+			},
+		},
+		{
+			desc:        "existing tables are not compacted when adding refs",
+			customSetup: customSetup,
+			skip: func(t *testing.T) {
+				if !testhelper.IsReftableEnabled() {
+					t.Skip("test is reftable specific")
+				}
+			},
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
+					},
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RepositoryAssertion{
+					TransactionID: 2,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 5,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 6,
+											MaxIndex: 6,
+											References: []git.Reference{
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										// We can note that the new reference added in the prev
+										// transaction was added as a new table.
+										{
+											MinIndex: 7,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
+									},
+								},
 							},
 						},
-						Objects: []git.ObjectID{},
+					},
+				},
+				RunPackRefs{
+					TransactionID: 2,
+				},
+				Commit{
+					TransactionID: 2,
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				RepositoryAssertion{
+					TransactionID: 3,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								// Here we can see that the tables are now compacted.
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Commit{
+					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
+						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Second.OID},
+						"refs/heads/main":     {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
+					},
+				},
+				Begin{
+					TransactionID:       4,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 3,
+				},
+				RepositoryAssertion{
+					TransactionID: 4,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 8,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.Third.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				RunPackRefs{
+					TransactionID: 4,
+				},
+				Commit{
+					TransactionID: 4,
+				},
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): map[string]int{
+					"housekeeping_task=total,stage=prepare":     2,
+					"housekeeping_task=total,stage=verify":      2,
+					"housekeeping_task=total,stage=apply":       2,
+					"housekeeping_task=pack-refs,stage=prepare": 2,
+					"housekeeping_task=pack-refs,stage=verify":  2,
+				}},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(4).ToProto(),
+				},
+				Repositories: RepositoryStates{
+					relativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: &ReferencesState{
+							// Here we can see that the tables are the same as the before
+							// the last repack, this is because they were already in
+							// geometric progression, so no compaction took place.
+							ReftableBackend: &ReftableBackendState{
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 7,
+										References: []git.Reference{
+											{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											},
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/tags/v1.0.0",
+												Target: lightweightTag.String(),
+											},
+											{
+												Name:   "refs/tags/v2.0.0",
+												Target: annotatedTag.OID.String(),
+											},
+										},
+									},
+									{
+										MinIndex: 8,
+										MaxIndex: 8,
+										References: []git.Reference{
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Second.OID.String(),
+											},
+											{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.Third.OID.String(),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:        "already compacted tables are not re-compacted",
+			customSetup: customSetup,
+			skip: func(t *testing.T) {
+				if !testhelper.IsReftableEnabled() {
+					t.Skip("test is reftable specific")
+				}
+			},
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: func() git.ReferenceUpdates {
+						m := make(git.ReferenceUpdates)
+						for i := 0; i < 20; i++ {
+							m[git.ReferenceName(fmt.Sprintf("refs/heads/new-branch-%02d", i))] = git.ReferenceUpdate{OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID}
+						}
+						return m
+					}(),
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				RepositoryAssertion{
+					TransactionID: 2,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 5,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+												{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 6,
+											MaxIndex: 6,
+											References: []git.Reference{
+												{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												},
+											},
+										},
+										// We can note that the new references added in the prev
+										// transaction were added as a new tables.
+										{
+											MinIndex: 7,
+											MaxIndex: 7,
+											References: func() (list []git.Reference) {
+												for i := 0; i < 20; i++ {
+													list = append(list, git.Reference{
+														Name:   git.ReferenceName(fmt.Sprintf("refs/heads/new-branch-%02d", i)),
+														Target: setup.Commits.First.OID.String(),
+													})
+												}
+												return list
+											}(),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				RunPackRefs{
+					TransactionID: 2,
+				},
+				Commit{
+					TransactionID: 2,
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				RepositoryAssertion{
+					TransactionID: 3,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								// Here we can see that the tables are now compacted.
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: func() (list []git.Reference) {
+												list = append(list, git.Reference{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												}, git.Reference{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												}, git.Reference{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												}, git.Reference{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												})
+
+												for i := 0; i < 20; i++ {
+													list = append(list, git.Reference{
+														Name:   git.ReferenceName(fmt.Sprintf("refs/heads/new-branch-%02d", i)),
+														Target: setup.Commits.First.OID.String(),
+													})
+												}
+
+												list = append(list, git.Reference{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												}, git.Reference{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												})
+
+												return list
+											}(),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Commit{
+					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
+					},
+				},
+				Begin{
+					TransactionID:       4,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 3,
+				},
+				RepositoryAssertion{
+					TransactionID: 4,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: func() (list []git.Reference) {
+												list = append(list, git.Reference{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												}, git.Reference{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												}, git.Reference{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												}, git.Reference{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												})
+
+												for i := 0; i < 20; i++ {
+													list = append(list, git.Reference{
+														Name:   git.ReferenceName(fmt.Sprintf("refs/heads/new-branch-%02d", i)),
+														Target: setup.Commits.First.OID.String(),
+													})
+												}
+
+												list = append(list, git.Reference{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												}, git.Reference{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												})
+
+												return list
+											}(),
+										},
+										{
+											MinIndex: 8,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Third.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Commit{
+					TransactionID: 4,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Second.OID},
+					},
+				},
+				Begin{
+					TransactionID:       5,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 4,
+				},
+				RepositoryAssertion{
+					TransactionID: 5,
+					Repositories: RepositoryStates{
+						setup.RelativePath: RepositoryState{
+							DefaultBranch: "refs/heads/main",
+							Objects: []git.ObjectID{
+								gittest.DefaultObjectHash.EmptyTreeOID,
+								setup.Commits.First.OID,
+								setup.Commits.Second.OID,
+								setup.Commits.Third.OID,
+								setup.Commits.Diverging.OID,
+								annotatedTag.OID,
+							},
+							References: &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 7,
+											References: func() (list []git.Reference) {
+												list = append(list, git.Reference{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												}, git.Reference{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												}, git.Reference{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Third.OID.String(),
+												}, git.Reference{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												})
+
+												for i := 0; i < 20; i++ {
+													list = append(list, git.Reference{
+														Name:   git.ReferenceName(fmt.Sprintf("refs/heads/new-branch-%02d", i)),
+														Target: setup.Commits.First.OID.String(),
+													})
+												}
+
+												list = append(list, git.Reference{
+													Name:   "refs/tags/v1.0.0",
+													Target: lightweightTag.String(),
+												}, git.Reference{
+													Name:   "refs/tags/v2.0.0",
+													Target: annotatedTag.OID.String(),
+												})
+
+												return list
+											}(),
+										},
+										{
+											MinIndex: 8,
+											MaxIndex: 8,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Third.OID.String(),
+												},
+											},
+										},
+										// Now we have one more table with single ref. If we run compaction
+										// the last two tables should be merged. But the first table
+										// should stay as is.
+										{
+											MinIndex: 9,
+											MaxIndex: 9,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-2",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				RunPackRefs{
+					TransactionID: 5,
+				},
+				Commit{
+					TransactionID: 5,
+				},
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): map[string]int{
+					"housekeeping_task=total,stage=prepare":     2,
+					"housekeeping_task=total,stage=verify":      2,
+					"housekeeping_task=total,stage=apply":       2,
+					"housekeeping_task=pack-refs,stage=prepare": 2,
+					"housekeeping_task=pack-refs,stage=verify":  2,
+				}},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(5).ToProto(),
+				},
+				Repositories: RepositoryStates{
+					relativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: &ReferencesState{
+							ReftableBackend: &ReftableBackendState{
+								// We can see that the first table stays the same, while the last
+								// two were combined.
+								Tables: []ReftableTable{
+									{
+										MinIndex: 1,
+										MaxIndex: 7,
+										References: func() (list []git.Reference) {
+											list = append(list, git.Reference{
+												Name:       "HEAD",
+												Target:     "refs/heads/main",
+												IsSymbolic: true,
+											}, git.Reference{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Second.OID.String(),
+											}, git.Reference{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Third.OID.String(),
+											}, git.Reference{
+												Name:   "refs/heads/main",
+												Target: setup.Commits.First.OID.String(),
+											})
+
+											for i := 0; i < 20; i++ {
+												list = append(list, git.Reference{
+													Name:   git.ReferenceName(fmt.Sprintf("refs/heads/new-branch-%02d", i)),
+													Target: setup.Commits.First.OID.String(),
+												})
+											}
+
+											list = append(list, git.Reference{
+												Name:   "refs/tags/v1.0.0",
+												Target: lightweightTag.String(),
+											}, git.Reference{
+												Name:   "refs/tags/v2.0.0",
+												Target: annotatedTag.OID.String(),
+											})
+
+											return list
+										}(),
+									},
+									{
+										MinIndex: 8,
+										MaxIndex: 9,
+										References: []git.Reference{
+											{
+												Name:   "refs/heads/branch-1",
+												Target: setup.Commits.Third.OID.String(),
+											},
+											{
+												Name:   "refs/heads/branch-2",
+												Target: setup.Commits.Second.OID.String(),
+											},
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -1942,9 +3407,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 	return []transactionTestCase{
 		{
 			desc: "run repacking on an empty repository",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
 			steps: steps{
 				Prune{},
 				StartManager{},
@@ -1970,11 +3432,29 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							Packfiles: []*PackfileState{},
 						},
@@ -4287,9 +5767,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 		},
 		{
 			desc: "run repacking concurrently with other housekeeping task",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
 			steps: steps{
 				StartManager{
 					ModifyStorage: func(tb testing.TB, cfg config.Cfg, storagePath string) {
@@ -4321,7 +5798,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					TransactionID: 1,
 					ExpectedError: errHousekeepingConflictConcurrent,
 				},
-				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
+				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
 					"housekeeping_task=total,stage=apply":       1,
@@ -4329,7 +5806,14 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					"housekeeping_task=pack-refs,stage=verify":  1,
 					"housekeeping_task=pack-refs,stage=apply":   1,
 					"housekeeping_task=repack,stage=prepare":    1,
-				}},
+				}, map[string]int{
+					"housekeeping_task=total,stage=prepare":     2,
+					"housekeeping_task=total,stage=verify":      2,
+					"housekeeping_task=total,stage=apply":       1,
+					"housekeeping_task=pack-refs,stage=prepare": 1,
+					"housekeeping_task=pack-refs,stage=verify":  1,
+					"housekeeping_task=repack,stage=prepare":    1,
+				})},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
@@ -4474,9 +5958,6 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 		},
 		{
 			desc: "run writing commit graph on an empty repository",
-			skip: func(t *testing.T) {
-				testhelper.SkipWithReftable(t, "reftable doesn't work with WAL + housekeeping")
-			},
 			steps: steps{
 				Prune{},
 				StartManager{},
@@ -4502,11 +5983,29 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
-						References: &ReferencesState{
-							FilesBackend: &FilesBackendState{
-								LooseReferences: map[git.ReferenceName]git.ObjectID{},
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+									},
+								},
 							},
-						},
+						),
 						Packfiles: &PackfilesState{
 							CommitGraphs: &stats.CommitGraphInfo{
 								Exists:                 true,

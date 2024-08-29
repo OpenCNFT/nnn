@@ -269,3 +269,70 @@ func TestParseReftable(t *testing.T) {
 		})
 	}
 }
+
+func TestParseReftableName(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		desc             string
+		reftableName     string
+		expectedMinIndex uint64
+		expectedMaxIndex uint64
+		expectedErrorStr string
+	}{
+		{
+			desc:             "invalid table name",
+			reftableName:     "spy-from-files-backend.ref",
+			expectedErrorStr: "reftable name \"spy-from-files-backend.ref\" malformed",
+		},
+		{
+			desc:             "non hex values in min index",
+			reftableName:     "0xzz0000000001-0x00000000000a-b54f3b59.ref",
+			expectedErrorStr: "reftable name \"0xzz0000000001-0x00000000000a-b54f3b59.ref\" malformed",
+		},
+		{
+			desc:             "non hex values in max index",
+			reftableName:     "0x000000000001-0x0000000000za-b54f3b59.ref",
+			expectedErrorStr: "reftable name \"0x000000000001-0x0000000000za-b54f3b59.ref\" malformed",
+		},
+		{
+			desc:             "small values in table name",
+			reftableName:     "0x000000000001-0x000000000005-b54f3b59.ref",
+			expectedMinIndex: 1,
+			expectedMaxIndex: 5,
+		},
+		{
+			desc:             "medium values in table name",
+			reftableName:     "0x0000000000af-0x0000000000ee-b54f3b59.ref",
+			expectedMinIndex: 175,
+			expectedMaxIndex: 238,
+		},
+		{
+			desc:             "upper case hex in table name",
+			reftableName:     "0x0000000000DE-0x0000000000AD-b54f3b59.ref",
+			expectedMinIndex: 222,
+			expectedMaxIndex: 173,
+		},
+		{
+			desc:             "max values in table name",
+			reftableName:     "0xeeeeeeeeeeee-0xeeeeeeeeeeee-b54f3b59.ref",
+			expectedMinIndex: 262709978263278,
+			expectedMaxIndex: 262709978263278,
+		},
+	} {
+		tc := tc
+
+		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
+
+			min, max, err := git.ParseReftableName(tc.reftableName)
+			if tc.expectedErrorStr != "" {
+				require.EqualError(t, err, tc.expectedErrorStr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedMinIndex, min)
+			require.Equal(t, tc.expectedMaxIndex, max)
+		})
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -247,7 +248,7 @@ func (t *reftable) IterateRefs() ([]Reference, error) {
 
 		// If we run out of ref blocks, we can stop the iteration.
 		if t.src[blockStart+headerOffset] != 'r' {
-			return nil, nil
+			return allRefs, nil
 		}
 
 		references, err := t.parseRefBlock(headerOffset, blockStart, blockEnd)
@@ -353,4 +354,25 @@ func ReadReftablesList(repoPath string) ([]string, error) {
 	}
 
 	return list, nil
+}
+
+// ParseReftableName validates the reftable name and returns the
+// min and max index from the table name.
+func ParseReftableName(reftableName string) (uint64, uint64, error) {
+	matches := ReftableTableNameRegex.FindAllStringSubmatch(reftableName, -1)
+	if len(matches) != 1 || len(matches[0]) != 3 {
+		return 0, 0, fmt.Errorf("reftable name %q malformed", reftableName)
+	}
+
+	minIndex, err := strconv.ParseUint(matches[0][1], 16, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing min index: %w", err)
+	}
+
+	maxIndex, err := strconv.ParseUint(matches[0][2], 16, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing max index: %w", err)
+	}
+
+	return minIndex, maxIndex, nil
 }

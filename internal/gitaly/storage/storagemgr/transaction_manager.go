@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -161,6 +162,12 @@ type runPackRefs struct {
 	// PrunedRefs contain a list of references pruned by the `git-pack-refs` command. They are used
 	// for comparing to the ref list of the destination repository
 	PrunedRefs map[git.ReferenceName]struct{}
+	// reftablesBefore contains the data in 'tables.list' before the compaction. This is used to
+	// compare with the destination repositories 'tables.list'.
+	reftablesBefore []string
+	// reftablesAfter contains the data in 'tables.list' after the compaction. This is used for
+	// generating the combined 'tables.list' during verification.
+	reftablesAfter []string
 }
 
 // runRepack models repack housekeeping task. We support multiple repacking strategies. At this stage, the outside
@@ -1725,13 +1732,8 @@ func (mgr *TransactionManager) prepareHousekeeping(ctx context.Context, transact
 	return nil
 }
 
-// preparePackRefs runs git-pack-refs command against the snapshot repository. It collects the resulting packed-refs
-// file and the list of pruned references. Unfortunately, git-pack-refs doesn't output which refs are pruned. So, we
-// performed two ref walkings before and after running the command. The difference between the two walks is the list of
-// pruned refs. This workaround works but is not performant on large repositories with huge amount of loose references.
-// Smaller repositories or ones that run housekeeping frequent won't have this issue.
-// The work of adding pruned refs dump to `git-pack-refs` is tracked here:
-// https://gitlab.com/gitlab-org/git/-/issues/222
+// preparePackRefs runs pack refs on the repository after detecting
+// its reference backend type.
 func (mgr *TransactionManager) preparePackRefs(ctx context.Context, transaction *Transaction) error {
 	if transaction.runHousekeeping.packRefs == nil {
 		return nil
@@ -1743,6 +1745,105 @@ func (mgr *TransactionManager) preparePackRefs(ctx context.Context, transaction 
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "prepare")
 	defer finishTimer()
 
+	refBackend, err := transaction.snapshotRepository.ReferenceBackend(ctx)
+	if err != nil {
+		return fmt.Errorf("reference backend: %w", err)
+	}
+
+	if refBackend == git.ReferenceBackendReftables {
+		if err = mgr.preparePackRefsReftable(ctx, transaction); err != nil {
+			return fmt.Errorf("reftable backend: %w", err)
+		}
+		return nil
+	}
+
+	if err = mgr.preparePackRefsFiles(ctx, transaction); err != nil {
+		return fmt.Errorf("files backend: %w", err)
+	}
+	return nil
+}
+
+// preparePackRefsReftable is used to prepare compaction for reftables.
+//
+// The flow here is to find the delta of tables modified post compactions. We note the
+// list of tables which were deleted and which were added. In the verification stage,
+// we use this information to finally create the modified tables.list. Which is also
+// why we don't track 'tables.list' operation here.
+func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, transaction *Transaction) error {
+	runPackRefs := transaction.runHousekeeping.packRefs
+	repoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
+
+	tablesListPre, err := git.ReadReftablesList(repoPath)
+	if err != nil {
+		return fmt.Errorf("reading tables.list pre-compaction: %w", err)
+	}
+
+	// Execute git-pack-refs command. The command runs in the scope of the snapshot repository. Thus, we can
+	// let it prune the ref references without causing any impact to other concurrent transactions.
+	var stderr bytes.Buffer
+	if err := transaction.snapshotRepository.ExecAndWait(ctx, git.Command{
+		Name: "pack-refs",
+		// By using the '--auto' flag, we ensure that git uses the best heuristic
+		// for compaction. For reftables, it currently uses a geometric progression.
+		// This ensures we don't keep compacting unecessarily to a single file.
+		Flags: []git.Option{git.Flag{Name: "--auto"}},
+	}, git.WithStderr(&stderr)); err != nil {
+		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
+	}
+
+	tablesListPost, err := git.ReadReftablesList(repoPath)
+	if err != nil {
+		return fmt.Errorf("reading tables.list post-compaction: %w", err)
+	}
+
+	// If there are no changes after compaction, we don't need to log anything.
+	if slices.Equal(tablesListPre, tablesListPost) {
+		return nil
+	}
+
+	tablesPostMap := make(map[string]struct{})
+	for _, table := range tablesListPost {
+		tablesPostMap[table] = struct{}{}
+	}
+
+	for _, table := range tablesListPre {
+		if _, ok := tablesPostMap[table]; !ok {
+			// If the table no longer exists, we remove it.
+			transaction.walEntry.RecordDirectoryEntryRemoval(
+				filepath.Join(transaction.relativePath, "reftable", table),
+			)
+		} else {
+			// If the table exists post compaction too, remove it from the
+			// map, since we don't want to record an existing table.
+			delete(tablesPostMap, table)
+		}
+	}
+
+	for file := range tablesPostMap {
+		// The remaining tables in tableListPost are new tables
+		// which need to be recorded.
+		if err := transaction.walEntry.RecordFileCreation(
+			filepath.Join(repoPath, "reftable", file),
+			filepath.Join(transaction.relativePath, "reftable", file),
+		); err != nil {
+			return fmt.Errorf("creating new table: %w", err)
+		}
+	}
+
+	runPackRefs.reftablesAfter = tablesListPost
+	runPackRefs.reftablesBefore = tablesListPre
+
+	return nil
+}
+
+// preparePackRefsFiles runs git-pack-refs command against the snapshot repository. It collects the resulting packed-refs
+// file and the list of pruned references. Unfortunately, git-pack-refs doesn't output which refs are pruned. So, we
+// performed two ref walkings before and after running the command. The difference between the two walks is the list of
+// pruned refs. This workaround works but is not performant on large repositories with huge amount of loose references.
+// Smaller repositories or ones that run housekeeping frequent won't have this issue.
+// The work of adding pruned refs dump to `git-pack-refs` is tracked here:
+// https://gitlab.com/gitlab-org/git/-/issues/222
+func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transaction *Transaction) error {
 	runPackRefs := transaction.runHousekeeping.packRefs
 	repoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
 
@@ -3018,7 +3119,62 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 	}, nil
 }
 
-// verifyPackRefs verifies if the pack-refs housekeeping task can be logged. Ideally, we can just apply the packed-refs
+// verifyPackRefsReftable verifies if the compaction performed can be safely
+// applied to the repository.
+
+// We merge the tables.list generated by our compaction with the existing
+// repositories tables.list. Because there could have been new tables after
+// we performed compaction.
+func (mgr *TransactionManager) verifyPackRefsReftable(transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
+	tables := transaction.runHousekeeping.packRefs.reftablesAfter
+	if len(tables) < 1 {
+		return nil, nil
+	}
+
+	// The tables.list from the snapshot repository should be identical to that of the staging
+	// repository. However, concurrent writes might have occurred which wrote new tables to the
+	// staging repository. We shouldn't loose that data. So we merge the compacted tables.list
+	// with the newer tables from the staging repositories tables.list.
+	repoPath := mgr.getAbsolutePath(transaction.stagingRepository.GetRelativePath())
+	newTableList, err := git.ReadReftablesList(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading tables.list: %w", err)
+	}
+
+	snapshotRepoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
+
+	// tables.list is hard-linked from the repository to the snapshot, we shouldn't
+	// directly write to it as we'd modify the original. So let's remove the
+	// hard-linked file.
+	if err = os.Remove(filepath.Join(snapshotRepoPath, "reftable", "tables.list")); err != nil {
+		return nil, fmt.Errorf("removing tables.list: %w", err)
+	}
+
+	// We need to merge the tables.list of snapshotRepo with the latest from stagingRepo.
+	tablesBefore := transaction.runHousekeeping.packRefs.reftablesBefore
+	finalTableList := append(tables, newTableList[len(tablesBefore):]...)
+
+	// Write the updated tables.list so we can add the required operations.
+	if err := os.WriteFile(
+		filepath.Join(snapshotRepoPath, "reftable", "tables.list"),
+		[]byte(strings.Join(finalTableList, "\n")),
+		mode.File,
+	); err != nil {
+		return nil, fmt.Errorf("writing tables.list: %w", err)
+	}
+
+	// Add operation to update the tables.list.
+	if err := transaction.walEntry.RecordFileUpdate(
+		transaction.snapshot.Root(),
+		filepath.Join(transaction.relativePath, "reftable", "tables.list"),
+	); err != nil {
+		return nil, fmt.Errorf("updating tables.list: %w", err)
+	}
+
+	return nil, nil
+}
+
+// verifyPackRefsFiles verifies if the pack-refs housekeeping task can be logged. Ideally, we can just apply the packed-refs
 // file and prune the loose references. Unfortunately, there could be a ref modification between the time the pack-refs
 // command runs and the time this transaction is logged. Thus, we need to verify if the transaction conflicts with the
 // current state of the repository.
@@ -3035,17 +3191,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 //
 // In theory, if there is any reference deletion, it can be removed from the packed-refs file. However, it requires
 // parsing and regenerating the packed-refs file. So, let's settle down with a conflict error at this point.
-func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
-	if transaction.runHousekeeping.packRefs == nil {
-		return nil, nil
-	}
-
-	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.verifyPackRefs", nil)
-	defer span.Finish()
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "verify")
-	defer finishTimer()
-
+func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
 	objectHash, err := transaction.stagingRepository.ObjectHash(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("object hash: %w", err)
@@ -3083,6 +3229,39 @@ func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *
 	return &gitalypb.LogEntry_Housekeeping_PackRefs{
 		PrunedRefs: prunedRefs,
 	}, nil
+}
+
+// verifyPackRefs verifies if the git-pack-refs(1) can be applied without any conflicts.
+// It calls the reference backend specific function to handle the core logic.
+func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_PackRefs, error) {
+	if transaction.runHousekeeping.packRefs == nil {
+		return nil, nil
+	}
+
+	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.verifyPackRefs", nil)
+	defer span.Finish()
+
+	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "verify")
+	defer finishTimer()
+
+	refBackend, err := transaction.stagingRepository.ReferenceBackend(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reference backend: %w", err)
+	}
+
+	if refBackend == git.ReferenceBackendReftables {
+		packRefs, err := mgr.verifyPackRefsReftable(transaction)
+		if err != nil {
+			return nil, fmt.Errorf("reftable backend: %w", err)
+		}
+		return packRefs, nil
+	}
+
+	packRefs, err := mgr.verifyPackRefsFiles(ctx, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("files backend: %w", err)
+	}
+	return packRefs, nil
 }
 
 // verifyRepacking checks the object repacking operations for conflicts.
@@ -3433,6 +3612,8 @@ func (mgr *TransactionManager) applyHousekeeping(ctx context.Context, lsn storag
 }
 
 func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
+	// For reftables, pack-refs is done via transaction operations, and we keep
+	// this nil. So we'd exit early too.
 	if logEntry.Housekeeping.PackRefs == nil {
 		return nil
 	}

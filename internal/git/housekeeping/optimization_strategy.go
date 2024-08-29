@@ -309,8 +309,16 @@ func (s HeuristicalOptimizationStrategy) ShouldPruneObjects(context.Context) (bo
 // packed again.
 func (s HeuristicalOptimizationStrategy) ShouldRepackReferences(context.Context) bool {
 	// If there aren't any loose refs then there is nothing we need to do.
-	if s.info.References.LooseReferencesCount == 0 {
+	// For reftables, if there is a single reftable, then there is no auto-compaction
+	// needed.
+	if s.info.References.LooseReferencesCount == 0 && len(s.info.References.ReftableTables) <= 1 {
 		return false
+	}
+
+	// For reftables, always try to compact. Here we simply rely on Git, since it considers
+	// heuristics to see if compaction is needed and only compacts if it's needed.
+	if len(s.info.References.ReftableTables) > 1 {
+		return true
 	}
 
 	// Packing loose references into the packed-refs file scales with the number of references

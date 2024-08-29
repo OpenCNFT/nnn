@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -374,12 +373,7 @@ func collectReftableReferencesState(
 		data, err := os.ReadFile(filepath.Join(repoPath, "reftable", tableName))
 		require.NoError(tb, err)
 
-		matches := git.ReftableTableNameRegex.FindAllStringSubmatch(tableName, -1)
-		require.Equal(tb, 1, len(matches))
-		require.Equal(tb, 3, len(matches[0]))
-		table.MinIndex, err = strconv.ParseUint(matches[0][1], 10, 0)
-		require.NoError(tb, err)
-		table.MaxIndex, err = strconv.ParseUint(matches[0][2], 10, 0)
+		table.MinIndex, table.MaxIndex, err = git.ParseReftableName(tableName)
 		require.NoError(tb, err)
 
 		reftable, err := git.NewReftable(data)

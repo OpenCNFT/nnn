@@ -52,13 +52,13 @@ var (
 	}
 
 	// ReftableTableNameRegex is a regex for matching reftable names
-	// e.g. 0x000000000001-0x000000000008-b54f3b59.ref would result in the following submatches:
+	// e.g. 0x000000000001-0x00000000000a-b54f3b59.ref would result in the following submatches:
 	//	- 000000000001 (UpdateIndexMin)
-	//	- 000000000008 (UpdateIndexMax)
+	//	- 00000000000a (UpdateIndexMax)
 	//
 	// See the reftable documentation at https://www.git-scm.com/docs/reftable#_layout for more
 	// information.
-	ReftableTableNameRegex = regexp.MustCompile("0x([0-9]{12})-0x([0-9]{12})-[0-9a-zA-Z]{8}.ref")
+	ReftableTableNameRegex = regexp.MustCompile("0x([[:xdigit:]]{12})-0x([[:xdigit:]]{12})-[0-9a-zA-Z]{8}.ref")
 )
 
 type updateRefErrorRegexs struct {

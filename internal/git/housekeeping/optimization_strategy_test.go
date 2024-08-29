@@ -561,6 +561,51 @@ func TestHeuristicalOptimizationStrategy_ShouldPruneObjects(t *testing.T) {
 	}
 }
 
+func TestHeuristicalOptimizationStrategy_ShouldRepackReftables(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+
+	for _, tc := range []struct {
+		desc              string
+		info              stats.RepositoryInfo
+		expectedRepacking bool
+	}{
+		{
+			desc: "single reftable doesn't require repacking",
+			info: stats.RepositoryInfo{
+				References: stats.ReferencesInfo{
+					ReftableTables: []stats.ReftableTable{
+						{Size: 100},
+					},
+				},
+			},
+			expectedRepacking: false,
+		},
+		{
+			desc: "multiple similar tables require repacking",
+			info: stats.RepositoryInfo{
+				References: stats.ReferencesInfo{
+					ReftableTables: []stats.ReftableTable{
+						{Size: 100},
+						{Size: 100},
+					},
+				},
+			},
+			expectedRepacking: true,
+		},
+	} {
+		tc := tc
+
+		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
+
+			strategy := HeuristicalOptimizationStrategy{info: tc.info}
+			require.Equal(t, tc.expectedRepacking, strategy.ShouldRepackReferences(ctx))
+		})
+	}
+}
+
 func TestHeuristicalOptimizationStrategy_ShouldRepackReferences(t *testing.T) {
 	t.Parallel()
 
