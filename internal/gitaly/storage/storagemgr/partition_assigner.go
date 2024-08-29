@@ -18,7 +18,11 @@ import (
 // repositories that are in different partitions.
 var ErrRepositoriesAreInDifferentPartitions = errors.New("repositories are in different partitions")
 
-const prefixPartitionAssignment = "partition_assignment/"
+const (
+	prefixPartitionAssignment = "partition_assignment/"
+	prefixPartition           = "p/"
+)
+
 const (
 	// invalidPartitionID is an invalid partition ID.
 	invalidPartitionID = 0
