@@ -69,11 +69,6 @@ GITALY_VERSION    := $(shell ${GIT} describe --match v* 2>/dev/null | sed 's/^v/
 GO_LDFLAGS        := -X ${GITALY_PACKAGE}/internal/version.version=${GITALY_VERSION}
 SERVER_BUILD_TAGS := tracer_static,tracer_static_jaeger,tracer_static_stackdriver,continuous_profiler_stackdriver
 
-# Temporary GNU build ID used as a placeholder value so that we can replace it
-# with our own one after binaries have been built. This is the ASCII encoding
-# of the string "TEMP_GITALY_BUILD_ID".
-TEMPORARY_BUILD_ID := 54454D505F474954414C595F4255494C445F4944
-
 ## FIPS_MODE controls whether to build Gitaly and dependencies in FIPS mode.
 ## Set this to a non-empty value to enable it.
 FIPS_MODE ?=
@@ -588,39 +583,18 @@ ${BUILD_DIR}/bin/gitaly-%-v2.46: override GIT_VERSION = ${GIT_VERSION_2_46}
 ${BUILD_DIR}/bin/gitaly-%-v2.46: ${DEPENDENCY_DIR}/git-v2.46/% | ${BUILD_DIR}/bin
 	${Q}install $< $@
 
-${BUILD_DIR}/bin/%: ${BUILD_DIR}/intermediate/% | ${BUILD_DIR}/bin
-	@ # To compute a unique and deterministic value for GNU build-id, we use an
-	@ # intermediate binary which has a fixed build ID of "TEMP_GITALY_BUILD_ID",
-	@ # which we replace with a deterministic build ID derived from the Go build ID.
-	@ # If we cannot extract a Go build-id, we punt and fallback to using a random 32-byte hex string.
-	@ # This fallback is unique but non-deterministic, making it sufficient to avoid generating the
-	@ # GNU build-id from the empty string and causing guaranteed collisions.
-	${Q}GO_BUILD_ID=$$(go tool buildid "$<" || openssl rand -hex 32) && \
-	GNU_BUILD_ID=$$(echo $$GO_BUILD_ID | sha1sum | cut -d' ' -f1) && \
-	if test "${OS}" = "Linux"; then \
-		go run "${SOURCE_DIR}"/tools/replace-buildid \
-			-input "$<" -input-build-id "${TEMPORARY_BUILD_ID}" \
-			-output "$@" -output-build-id "$$GNU_BUILD_ID"; \
-	else \
-		install "$<" "$@"; \
-	fi
-
 # clear-go-build-cache-if-needed cleans the Go build cache if it exceeds the maximum size as
 # configured in GOCACHE_MAX_SIZE_KB.
 .PHONY: clear-go-build-cache-if-needed
 clear-go-build-cache-if-needed:
 	${Q}if [ -d ${GOCACHE} ] && [ $$(du -sk ${GOCACHE} | cut -f 1) -gt ${GOCACHE_MAX_SIZE_KB} ]; then go clean --cache; fi
 
-${BUILD_DIR}/intermediate/gitaly:            build-bundled-git
-${BUILD_DIR}/intermediate/gitaly:            GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
-${BUILD_DIR}/intermediate/gitaly:            ${GITALY_PACKED_EXECUTABLES} ${GIT_PACKED_EXECUTABLES}
-${BUILD_DIR}/intermediate/praefect:          GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
-${BUILD_DIR}/intermediate/%:                 clear-go-build-cache-if-needed .FORCE
-	@ # We're building intermediate binaries first which contain a fixed build ID
-	@ # of "TEMP_GITALY_BUILD_ID". In the final binary we replace this build ID with
-	@ # the computed build ID for this binary.
-	@ # We cd to SOURCE_DIR to avoid corner cases where workdir may be a symlink
-	${Q}cd ${SOURCE_DIR} && go build -o "$@" -ldflags '-B 0x${TEMPORARY_BUILD_ID} ${GO_LDFLAGS}' -tags "${GO_BUILD_TAGS}" $(addprefix ${SOURCE_DIR}/cmd/,$(@F))
+${BUILD_DIR}/bin/gitaly:   build-bundled-git
+${BUILD_DIR}/bin/gitaly:   GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
+${BUILD_DIR}/bin/gitaly:   ${GITALY_PACKED_EXECUTABLES} ${GIT_PACKED_EXECUTABLES}
+${BUILD_DIR}/bin/praefect: GO_BUILD_TAGS = ${SERVER_BUILD_TAGS}
+${GITALY_EXECUTABLES}: ${BUILD_DIR}/bin/%: clear-go-build-cache-if-needed .FORCE
+	${Q}cd ${SOURCE_DIR} && go build -o "$@" -ldflags '-B gobuildid ${GO_LDFLAGS}' -tags "${GO_BUILD_TAGS}" $(addprefix ${SOURCE_DIR}/cmd/,$(@F))
 
 # This is a build hack to avoid excessive rebuilding of targets. Instead of
 # depending on the Makefile, we start to depend on tool versions as defined in
