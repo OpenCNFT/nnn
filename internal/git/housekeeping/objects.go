@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/offloading"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -39,7 +41,7 @@ func ValidateRepacking(cfg config.RepackObjectsConfig) (bool, error) {
 		}
 	case config.RepackObjectsStrategyGeometric:
 		isFullRepack = false
-	case config.RepackObjectsStrategyFullWithCruft, config.RepackObjectsStrategyFullWithUnreachable:
+	case config.RepackObjectsStrategyFullWithCruft, config.RepackObjectsStrategyFullWithUnreachable, config.RepackObjectsStrategyOffloading:
 		isFullRepack = true
 	default:
 		return false, structerr.NewInvalidArgument("invalid strategy: %q", cfg.Strategy)
@@ -132,6 +134,23 @@ func RepackObjects(ctx context.Context, repo *localrepo.Repo, cfg config.RepackO
 		return PerformFullRepackingWithUnreachable(ctx, repo, cfg)
 	case config.RepackObjectsStrategyGeometric:
 		return PerformGeometricRepacking(ctx, repo, cfg)
+	case config.RepackObjectsStrategyOffloading:
+		// TODO [mark] POC of offloading large objects (OLO)
+		offloadingMgr, err := offloading.NewOffloadingManager(ctx, repo)
+		if err != nil {
+			return err
+		}
+		options := offloadingMgr.BlobFilterOptions()
+		if err := offloadingMgr.UploadObjects(); err != nil {
+			//log.Error
+			return err
+		}
+		if err := PerformRepack(ctx, repo, cfg, options...); err != nil {
+			return err
+		}
+		if err := offloadingMgr.CreatePromisorFile(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -258,6 +277,12 @@ func PerformGeometricRepacking(ctx context.Context, repo *localrepo.Repo, cfg co
 func PerformRepack(ctx context.Context, repo *localrepo.Repo, cfg config.RepackObjectsConfig, opts ...git.Option) error {
 	if cfg.WriteMultiPackIndex {
 		opts = append(opts, git.Flag{Name: "--write-midx"})
+	}
+
+	// TODO [mark] POC of offloading large objects (OLO)
+	shouldOffloadDryRun := os.Getenv("OFFLOADING_DRY_RUN")
+	if shouldOffloadDryRun != "false" { // it is dry run
+		return nil
 	}
 
 	var stderr strings.Builder

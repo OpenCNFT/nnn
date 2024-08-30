@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
@@ -382,6 +383,17 @@ func (s EagerOptimizationStrategy) ShouldRepackObjects(ctx context.Context) (boo
 	// loose objects. This is inefficient as these objects cannot be deltified and thus take up
 	// more space. Instead, we ask git-repack(1) to append unreachable objects to the newly
 	// created packfile.
+
+	// TODO [mark] POC of offloading large objects (OLO)
+	shouldOffload := os.Getenv("OFFLOADING_POC_ENABLED")
+	if shouldOffload == "true" {
+		cfg.Strategy = config.RepackObjectsStrategyOffloading
+		cfg.FilterBlobs = config.FilterBlobActionStartFilteringAll
+		cfg.WriteBitmap = false
+		cfg.WriteMultiPackIndex = false
+		return true, cfg
+	}
+
 	if !s.info.IsObjectPool {
 		cfg.Strategy = config.RepackObjectsStrategyFullWithCruft
 		cfg.CruftExpireBefore = s.expireBefore

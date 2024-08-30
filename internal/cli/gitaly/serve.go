@@ -118,7 +118,7 @@ func serveAction(ctx *cli.Context) error {
 		logger.Warn("Authentication is enabled but not enforced because transitioning=true. Gitaly will accept unauthenticated requests.")
 	}
 
-	logger.WithField("version", version.GetVersion()).Info("Starting Gitaly")
+	logger.WithField("version", version.GetVersion()).Info("Starting Gitaly: POC OLO with Eric")
 	fips.Check()
 
 	if err := run(ctx, cfg, logger); err != nil {

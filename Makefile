@@ -67,6 +67,7 @@ GOLANGCI_LINT_CONFIG  ?= ${SOURCE_DIR}/.golangci.yml
 GITALY_PACKAGE    := $(shell go list -m 2>/dev/null || echo unknown)
 GITALY_VERSION    := $(shell ${GIT} describe --match v* 2>/dev/null | sed 's/^v//' || cat ${SOURCE_DIR}/VERSION 2>/dev/null || echo unknown)
 GO_LDFLAGS        := -X ${GITALY_PACKAGE}/internal/version.version=${GITALY_VERSION}
+GO_GCFLAGS        ?=
 SERVER_BUILD_TAGS := tracer_static,tracer_static_jaeger,tracer_static_stackdriver,continuous_profiler_stackdriver
 
 # Temporary GNU build ID used as a placeholder value so that we can replace it
@@ -620,7 +621,17 @@ ${BUILD_DIR}/intermediate/%:                 clear-go-build-cache-if-needed .FOR
 	@ # of "TEMP_GITALY_BUILD_ID". In the final binary we replace this build ID with
 	@ # the computed build ID for this binary.
 	@ # We cd to SOURCE_DIR to avoid corner cases where workdir may be a symlink
+	@ # ${Q}cd ${SOURCE_DIR} && go build -o "$@" -gcflags '${GO_GCFLAGS}'  -ldflags '-B 0x${TEMPORARY_BUILD_ID} ${GO_LDFLAGS}' -tags "${GO_BUILD_TAGS}" $(addprefix ${SOURCE_DIR}/cmd/,$(@F))
+
+ifdef GO_GCFLAGS
+	${Q}echo "Buiding $@ with -gcflags '${GO_GCFLAGS}'"
+	${Q}cd ${SOURCE_DIR} && go build -o "$@" -gcflags '${GO_GCFLAGS}'  -ldflags '-B 0x${TEMPORARY_BUILD_ID} ${GO_LDFLAGS}' -tags "${GO_BUILD_TAGS}" $(addprefix ${SOURCE_DIR}/cmd/,$(@F))
+else
+	@ # We're writing the version into the "version" file in Git's own source
+	@ # directory. If it exists, Git's Makefile will pick it up and use it as
+	@ # the version instead of auto-detecting via git-describe(1).
 	${Q}cd ${SOURCE_DIR} && go build -o "$@" -ldflags '-B 0x${TEMPORARY_BUILD_ID} ${GO_LDFLAGS}' -tags "${GO_BUILD_TAGS}" $(addprefix ${SOURCE_DIR}/cmd/,$(@F))
+endif
 
 # This is a build hack to avoid excessive rebuilding of targets. Instead of
 # depending on the Makefile, we start to depend on tool versions as defined in
