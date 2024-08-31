@@ -151,3 +151,15 @@ type TransactionOptions struct {
 	// path is provided.
 	KVOnly bool
 }
+
+// Storage is the interface of a storage.
+type Storage interface {
+	// Begin begins a transaction against a partition.
+	Begin(context.Context, PartitionID, TransactionOptions) (Transaction, error)
+}
+
+// Node is the interface of a node. Each Node may have zero or more storages.
+type Node interface {
+	// GetStorage retrieves a handle to a Storage by its name.
+	GetStorage(storageName string) (Storage, error)
+}
