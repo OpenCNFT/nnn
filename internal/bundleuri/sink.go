@@ -87,7 +87,7 @@ func (s Sink) Generate(ctx context.Context, repo *localrepo.Repo) (returnErr err
 		return fmt.Errorf("unexpected repository type %t", repo.Repository)
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 		origRepo := tx.OriginalRepository(repoProto)
 		bundlePath = s.relativePath(origRepo, defaultBundle)
 	})
@@ -125,7 +125,7 @@ func (s Sink) SignedURL(ctx context.Context, repo storage.Repository) (string, e
 		return "", fmt.Errorf("unexpected repository type %t", repo)
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 		origRepo := tx.OriginalRepository(repoProto)
 		relativePath = s.relativePath(origRepo, defaultBundle)
 	})

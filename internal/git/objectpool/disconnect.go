@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
@@ -250,7 +251,7 @@ func removeAlternatesIfOk(ctx context.Context, repo *localrepo.Repo, altFile, ba
 		return fmt.Errorf("committing vote for disconnecting alternate: %w", err)
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 		tx.MarkAlternateUpdated()
 	})
 

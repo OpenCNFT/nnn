@@ -199,7 +199,7 @@ func (s *Server) userSquash(ctx context.Context, req *gitalypb.UserSquashRequest
 		return "", structerr.NewAborted("committing vote on squashed commit: %w", err)
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 		// Only referenced objects get committed as part of a transaction. Since this
 		// RPC doesn't reference the object, we have to manually mark it to be included
 		// in the final committed pack.

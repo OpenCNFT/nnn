@@ -20,7 +20,7 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 
 	var root string
 	var lsn string
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 		root = tx.Root()
 		lsn = tx.SnapshotLSN().String()
 	})

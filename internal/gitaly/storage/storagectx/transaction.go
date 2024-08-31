@@ -4,46 +4,26 @@ import (
 	"context"
 	"errors"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	grpc_metadata "google.golang.org/grpc/metadata"
 )
-
-// Transaction is the interface of the storagemgr.Transaction accessible through the context.
-// See the details of that type for method documentation.
-type Transaction interface {
-	MarkDefaultBranchUpdated()
-	DeleteRepository()
-	MarkCustomHooksUpdated()
-	IncludeObject(git.ObjectID)
-	OriginalRepository(*gitalypb.Repository) *gitalypb.Repository
-	MarkAlternateUpdated()
-	PackRefs()
-	Repack(housekeepingcfg.RepackObjectsConfig)
-	WriteCommitGraphs(housekeepingcfg.WriteCommitGraphConfig)
-	SnapshotLSN() storage.LSN
-	Root() string
-	Commit(context.Context) error
-}
 
 type keyTransaction struct{}
 
 // ContextWithTransaction stores the transaction into the context.
-func ContextWithTransaction(ctx context.Context, tx Transaction) context.Context {
+func ContextWithTransaction(ctx context.Context, tx storage.Transaction) context.Context {
 	return context.WithValue(ctx, keyTransaction{}, tx)
 }
 
 // RunWithTransaction runs the callback with the transaction in the context. If there is
 // no transaction in the context, the callback is not ran.
-func RunWithTransaction(ctx context.Context, callback func(tx Transaction)) {
+func RunWithTransaction(ctx context.Context, callback func(tx storage.Transaction)) {
 	value := ctx.Value(keyTransaction{})
 	if value == nil {
 		return
 	}
 
-	callback(value.(Transaction))
+	callback(value.(storage.Transaction))
 }
 
 const keyPartitioningHint = "gitaly-partitioning-hint"

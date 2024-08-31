@@ -12,7 +12,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -26,15 +25,15 @@ import (
 )
 
 type mockTransactionRegistry struct {
-	getFunc func(storage.TransactionID) (hook.Transaction, error)
+	getFunc func(storage.TransactionID) (storage.Transaction, error)
 }
 
-func (m mockTransactionRegistry) Get(id storage.TransactionID) (hook.Transaction, error) {
+func (m mockTransactionRegistry) Get(id storage.TransactionID) (storage.Transaction, error) {
 	return m.getFunc(id)
 }
 
 type mockTransaction struct {
-	hook.Transaction
+	storage.Transaction
 	updateReferencesFunc         func(git.ReferenceUpdates)
 	recordInitialReferenceValues func(context.Context, map[git.ReferenceName]git.Reference) error
 	markDefaultBranchUpdated     func()
@@ -305,7 +304,7 @@ ref:refs/heads/main ref:refs/heads/branch-1 HEAD
 			var actualInitialValues map[git.ReferenceName]git.Reference
 			var defaultBranchUpdated bool
 			txRegistry := mockTransactionRegistry{
-				getFunc: func(storage.TransactionID) (hook.Transaction, error) {
+				getFunc: func(storage.TransactionID) (storage.Transaction, error) {
 					return mockTransaction{
 						updateReferencesFunc: func(updates git.ReferenceUpdates) {
 							actualReferenceUpdates = updates

@@ -6,45 +6,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	grpc_metadata "google.golang.org/grpc/metadata"
 )
 
-type nilTransaction struct {
-	// Embed an integer value as Go allows the address of empty structs to be the same.
-	// The test case asserts that the specific instance of a transaction is passed to the
-	// callback.
-	int //nolint:unused
-}
-
-func (nilTransaction) MarkDefaultBranchUpdated() {}
-
-func (nilTransaction) DeleteRepository() {}
-
-func (nilTransaction) IncludeObject(git.ObjectID) {}
-
-func (nilTransaction) MarkCustomHooksUpdated() {}
-
-func (nilTransaction) OriginalRepository(*gitalypb.Repository) *gitalypb.Repository {
-	panic("unexpected call")
-}
-
-func (nilTransaction) MarkAlternateUpdated() {}
-
-func (nilTransaction) PackRefs()                                                {}
-func (nilTransaction) Repack(housekeepingcfg.RepackObjectsConfig)               {}
-func (nilTransaction) WriteCommitGraphs(housekeepingcfg.WriteCommitGraphConfig) {}
-func (nilTransaction) AfterCommit(func(error))                                  {}
-func (nilTransaction) SnapshotLSN() storage.LSN                                 { return 0 }
-func (nilTransaction) Root() string                                             { return "" }
-func (nilTransaction) Commit(context.Context) error                             { return nil }
+type nilTransaction struct{ storage.Transaction }
 
 func TestContextWithTransaction(t *testing.T) {
 	t.Run("no transaction in context", func(t *testing.T) {
-		RunWithTransaction(context.Background(), func(tx Transaction) {
+		RunWithTransaction(context.Background(), func(tx storage.Transaction) {
 			t.Fatalf("callback should not be executed without transaction")
 		})
 	})
@@ -55,7 +25,7 @@ func TestContextWithTransaction(t *testing.T) {
 
 		RunWithTransaction(
 			ContextWithTransaction(context.Background(), expectedTX),
-			func(tx Transaction) {
+			func(tx storage.Transaction) {
 				require.Same(t, expectedTX, tx)
 				require.NotSame(t, tx, &nilTransaction{})
 				callbackRan = true

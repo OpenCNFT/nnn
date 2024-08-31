@@ -347,7 +347,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			},
 			assertAdditionalRepository: func(t *testing.T, ctx context.Context, actual *gitalypb.Repository) {
 				var originalRepo *gitalypb.Repository
-				storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+				storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 					originalRepo = tx.OriginalRepository(actual)
 				})
 
@@ -385,7 +385,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			},
 			assertAdditionalRepository: func(t *testing.T, ctx context.Context, actual *gitalypb.Repository) {
 				var originalRepo *gitalypb.Repository
-				storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+				storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 					originalRepo = tx.OriginalRepository(actual)
 				})
 
@@ -556,7 +556,7 @@ messages and behavior by erroring out the requests before they even hit this int
 
 				// The transaction itself should be included in the context.
 				transactionInContext := false
-				storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+				storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 					transactionInContext = true
 				})
 				assert.True(t, transactionInContext)

@@ -1248,7 +1248,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, pm)
 		manager.optimizeFunc = func(ctx context.Context, repo *localrepo.Repo, _ housekeeping.OptimizationStrategy) error {
 			relativePath := repo.GetRelativePath()
-			storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+			storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 				relativePath = tx.OriginalRepository(&gitalypb.Repository{
 					StorageName:  repo.GetStorageName(),
 					RelativePath: repo.GetRelativePath(),

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -119,7 +120,7 @@ func (o *ObjectPool) FetchFromOrigin(ctx context.Context, origin *localrepo.Repo
 	// manage the transaction itself so that two transactions can be committed in the right order.
 	originalPoolRepo := o.Repo
 	var commitErr error
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
 		originalPoolRepo = newLocalRepo(tx.OriginalRepository(&gitalypb.Repository{
 			StorageName:  origin.GetStorageName(),
 			RelativePath: origin.GetRelativePath(),
