@@ -75,6 +75,9 @@ const (
 	// TypePackObjects is a dedicated concurrency limiter for pack-objects. It uses request
 	// information (RemoteIP/Repository/User) as the limiting key.
 	TypePackObjects = "pack-objects"
+	// TypeBundleGeneration is a dedicated concurrency limiter for
+	// bundle-generation.
+	TypeBundleGeneration = "bundle-generation"
 )
 
 // ErrMaxQueueTime indicates a request has reached the maximum time allowed to wait in the

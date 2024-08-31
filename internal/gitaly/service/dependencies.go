@@ -48,6 +48,8 @@ type Dependencies struct {
 	BackupLocator       backup.Locator
 	BundleURISink       *bundleuri.Sink
 	ProcReceiveRegistry *gitalyhook.ProcReceiveRegistry
+	InProgressTracker   InProgressTracker
+	BundleGenerationMgr *bundleuri.BundleGenerationManager
 }
 
 // GetLogger returns the logger.
@@ -163,4 +165,14 @@ func (dc *Dependencies) GetBundleURISink() *bundleuri.Sink {
 // GetProcReceiveRegistry returns the ProcReceiveRegistry.
 func (dc *Dependencies) GetProcReceiveRegistry() *gitalyhook.ProcReceiveRegistry {
 	return dc.ProcReceiveRegistry
+}
+
+// GetInProgressTracker returns the ProcReceiveRegistry.
+func (dc *Dependencies) GetInProgressTracker() InProgressTracker {
+	return dc.InProgressTracker
+}
+
+// GetBundleGenerationManager returns the ProcReceiveRegistry.
+func (dc *Dependencies) GetBundleGenerationManager() *bundleuri.BundleGenerationManager {
+	return dc.BundleGenerationMgr
 }

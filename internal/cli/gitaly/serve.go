@@ -546,10 +546,44 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	}
 
 	var bundleURISink *bundleuri.Sink
+	var bundleGenerationMgr *bundleuri.BundleGenerationManager
 	if cfg.BundleURI.GoCloudURL != "" {
-		bundleURISink, err = bundleuri.NewSink(ctx, cfg.BundleURI.GoCloudURL)
+		bundleURISink, err = bundleuri.NewSink(
+			ctx,
+			cfg.BundleURI.GoCloudURL,
+		)
 		if err != nil {
 			return fmt.Errorf("create bundle-URI sink: %w", err)
+		}
+
+		if cfg.BundleURI.AutoGeneration.Enabled {
+			var bundleGenerationLimit *limiter.AdaptiveLimit
+			if cfg.BundleURI.AutoGeneration.Concurrency.Adaptive {
+				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{
+					Initial:       cfg.BundleURI.AutoGeneration.Concurrency.InitialLimit,
+					Max:           cfg.BundleURI.AutoGeneration.Concurrency.MaxLimit,
+					Min:           cfg.BundleURI.AutoGeneration.Concurrency.MinLimit,
+					BackoffFactor: limiter.DefaultBackoffFactor,
+				})
+			} else {
+				bundleGenerationLimit = limiter.NewAdaptiveLimit("bundleGeneration", limiter.AdaptiveSetting{Initial: cfg.BundleURI.AutoGeneration.Concurrency.MaxConcurrency})
+			}
+
+			bundleGenerationMonitor := limiter.NewPackObjectsConcurrencyMonitor(
+				cfg.Prometheus.GRPCLatencyBuckets,
+			)
+			bundleGenerationLimiter := limiter.NewConcurrencyLimiter(
+				bundleGenerationLimit,
+				cfg.BundleURI.AutoGeneration.Concurrency.MaxQueueSize,
+				cfg.BundleURI.AutoGeneration.Concurrency.MaxQueueWait.Duration(),
+				bundleGenerationMonitor,
+			)
+			prometheus.MustRegister(bundleGenerationMonitor)
+
+			bundleGenerationMgr = bundleuri.NewBundleGenerationManager(
+				bundleURISink,
+				bundleGenerationLimiter,
+			)
 		}
 	}
 
@@ -596,6 +630,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			BackupSink:          backupSink,
 			BackupLocator:       backupLocator,
 			BundleURISink:       bundleURISink,
+			BundleGenerationMgr: bundleGenerationMgr,
+			InProgressTracker:   service.NewInProgressTracker(),
 		})
 		b.RegisterStarter(starter.New(c, srv, logger))
 	}

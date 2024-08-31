@@ -6,14 +6,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus/ctxlogrus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+)
+
+const (
+	concurrentUploadPackThreshold = 5
+	bundleGenerationTimeout       = 24 * time.Hour
 )
 
 func (s *server) PostUploadPackWithSidechannel(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest) (*gitalypb.PostUploadPackWithSidechannelResponse, error) {
@@ -116,8 +127,75 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 
 	gitConfig = append(gitConfig, bundleuri.CapabilitiesGitConfig(ctx)...)
 
+	originalRepo := req.GetRepository()
+
+	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+		originalRepo = tx.OriginalRepository(req.GetRepository())
+	})
+
+	key := originalRepo.GetStorageName() + ":" + originalRepo.GetRelativePath()
+
 	uploadPackConfig, err := bundleuri.UploadPackGitConfig(ctx, s.bundleURISink, req.GetRepository())
 	if err != nil {
+		if errors.Is(err, bundleuri.ErrBundleNotFound) &&
+			featureflag.AutogenerateBundlesForBundleURI.IsEnabled(ctx) &&
+			s.generateBundles &&
+			s.inProgressTracker.GetInProgress(key) > concurrentUploadPackThreshold {
+
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), bundleGenerationTimeout)
+				defer cancel()
+
+				if s.partitionMgr != nil {
+					tx, err := s.partitionMgr.Begin(
+						ctx,
+						originalRepo.GetStorageName(),
+						0,
+						storagemgr.TransactionOptions{
+							ReadOnly:     true,
+							RelativePath: originalRepo.GetRelativePath(),
+						},
+					)
+					if err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("failed starting transaction")
+						return
+					}
+
+					if err := s.bundleGenerationMgr.Generate(ctx, localrepo.New(
+						s.logger,
+						s.locator,
+						s.gitCmdFactory,
+						s.catfileCache,
+						originalRepo)); err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("generate bundle")
+
+						if err := tx.Rollback(); err != nil {
+							ctxlogrus.Extract(ctx).WithError(err).Error("failed rolling back transaction")
+							return
+						}
+
+						return
+					}
+
+					if err := tx.Commit(ctx); err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("committing transaction")
+					}
+				} else {
+					if err := s.bundleGenerationMgr.Generate(ctx, localrepo.New(
+						s.logger,
+						s.locator,
+						s.gitCmdFactory,
+						s.catfileCache,
+						originalRepo,
+					)); err != nil {
+						ctxlogrus.Extract(ctx).WithError(err).Error("generate bundle")
+						return
+					}
+				}
+			}()
+		} else if !errors.Is(err, bundleuri.ErrSinkMissing) {
+			s.logger.WithError(err).ErrorContext(ctx, "failed configuring bundle-uri")
+		}
 	} else {
 		gitConfig = append(gitConfig, uploadPackConfig...)
 	}
@@ -129,6 +207,9 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 		git.WithConfig(gitConfig...),
 		git.WithPackObjectsHookEnv(req.GetRepository(), "http"),
 	}
+
+	s.inProgressTracker.IncrementInProgress(key)
+	defer s.inProgressTracker.DecrementInProgress(key)
 
 	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), git.Command{
 		Name:  "upload-pack",
@@ -158,5 +239,6 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 	}
 
 	s.logger.WithField("request_sha", fmt.Sprintf("%x", h.Sum(nil))).WithField("response_bytes", respBytes).InfoContext(ctx, "request details")
+
 	return nil, nil
 }

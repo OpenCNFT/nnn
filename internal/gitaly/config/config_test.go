@@ -1951,9 +1951,9 @@ func TestPackObjectsLimiting_Validate(t *testing.T) {
 func TestConcurrency_Validate(t *testing.T) {
 	t.Parallel()
 
-	require.NoError(t, Concurrency{MaxPerRepo: 0}.Validate())
-	require.NoError(t, Concurrency{MaxPerRepo: 1}.Validate())
-	require.NoError(t, Concurrency{MaxPerRepo: 100}.Validate())
+	require.NoError(t, RPCConcurrency{MaxPerRepo: 0}.Validate())
+	require.NoError(t, RPCConcurrency{MaxPerRepo: 1}.Validate())
+	require.NoError(t, RPCConcurrency{MaxPerRepo: 100}.Validate())
 	require.Equal(
 		t,
 		cfgerror.ValidationErrors{
@@ -1962,12 +1962,12 @@ func TestConcurrency_Validate(t *testing.T) {
 				"max_per_repo",
 			),
 		},
-		Concurrency{MaxPerRepo: -1}.Validate(),
+		RPCConcurrency{MaxPerRepo: -1}.Validate(),
 	)
 
-	require.NoError(t, Concurrency{Adaptive: true, InitialLimit: 1, MinLimit: 1, MaxLimit: 100}.Validate())
-	require.NoError(t, Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 1, MaxLimit: 100}.Validate())
-	require.NoError(t, Concurrency{Adaptive: true, InitialLimit: 100, MinLimit: 1, MaxLimit: 100}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 1, MinLimit: 1, MaxLimit: 100}}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 1, MaxLimit: 100}}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 100, MinLimit: 1, MaxLimit: 100}}.Validate())
 	require.Equal(
 		t,
 		cfgerror.ValidationErrors{
@@ -1976,7 +1976,7 @@ func TestConcurrency_Validate(t *testing.T) {
 				"min_limit",
 			),
 		},
-		Concurrency{Adaptive: true, InitialLimit: 0, MinLimit: 0, MaxLimit: 100}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 0, MinLimit: 0, MaxLimit: 100}}.Validate(),
 	)
 	require.Equal(
 		t,
@@ -1986,7 +1986,7 @@ func TestConcurrency_Validate(t *testing.T) {
 				"initial_limit",
 			),
 		},
-		Concurrency{Adaptive: true, InitialLimit: -1, MinLimit: 1, MaxLimit: 100}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: -1, MinLimit: 1, MaxLimit: 100}}.Validate(),
 	)
 	require.Equal(
 		t,
@@ -1996,7 +1996,7 @@ func TestConcurrency_Validate(t *testing.T) {
 				"initial_limit",
 			),
 		},
-		Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 11, MaxLimit: 100}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 11, MaxLimit: 100}}.Validate(),
 	)
 	require.Equal(
 		t,
@@ -2006,7 +2006,7 @@ func TestConcurrency_Validate(t *testing.T) {
 				"max_limit",
 			),
 		},
-		Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 5, MaxLimit: 3}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 5, MaxLimit: 3}}.Validate(),
 	)
 	require.Equal(
 		t,
@@ -2016,7 +2016,7 @@ func TestConcurrency_Validate(t *testing.T) {
 				"min_limit",
 			),
 		},
-		Concurrency{Adaptive: true, InitialLimit: 5, MinLimit: -1, MaxLimit: 99}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 5, MinLimit: -1, MaxLimit: 99}}.Validate(),
 	)
 	require.Equal(
 		t,
@@ -2026,12 +2026,12 @@ func TestConcurrency_Validate(t *testing.T) {
 				"max_limit",
 			),
 		},
-		Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 5, MaxLimit: -1}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{Adaptive: true, InitialLimit: 10, MinLimit: 5, MaxLimit: -1}}.Validate(),
 	)
 
-	require.NoError(t, Concurrency{MaxQueueSize: 0}.Validate())
-	require.NoError(t, Concurrency{MaxQueueSize: 1}.Validate())
-	require.NoError(t, Concurrency{MaxQueueSize: 100}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{MaxQueueSize: 0}}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{MaxQueueSize: 1}}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{MaxQueueSize: 100}}.Validate())
 	require.Equal(
 		t,
 		cfgerror.ValidationErrors{
@@ -2040,10 +2040,10 @@ func TestConcurrency_Validate(t *testing.T) {
 				"max_queue_size",
 			),
 		},
-		Concurrency{MaxQueueSize: -1}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{MaxQueueSize: -1}}.Validate(),
 	)
 
-	require.NoError(t, Concurrency{MaxQueueWait: duration.Duration(1)}.Validate())
+	require.NoError(t, RPCConcurrency{Concurrency: Concurrency{MaxQueueWait: duration.Duration(1)}}.Validate())
 	require.Equal(
 		t,
 		cfgerror.ValidationErrors{
@@ -2052,7 +2052,7 @@ func TestConcurrency_Validate(t *testing.T) {
 				"max_queue_wait",
 			),
 		},
-		Concurrency{MaxQueueWait: duration.Duration(-time.Minute)}.Validate(),
+		RPCConcurrency{Concurrency: Concurrency{MaxQueueWait: duration.Duration(-time.Minute)}}.Validate(),
 	)
 }
 
