@@ -87,9 +87,6 @@ type Transaction interface {
 	// value in the 'prepare' phase of the reference transaction hook before any changes are made without staging any updates
 	// before the 'committed' phase is reached. The recorded initial values are only used for the next UpdateReferences call.
 	RecordInitialReferenceValues(context.Context, map[git.ReferenceName]git.Reference) error
-	// IncludeObject includes the given object and its dependencies in the transaction's logged pack file even
-	// if the object is unreachable from the references.
-	IncludeObject(git.ObjectID)
 	// MarkDefaultBranchUpdated marks that the default branch has been updated. This is
 	// necessary for the changes to HEAD to be committed.
 	MarkDefaultBranchUpdated()

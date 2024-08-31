@@ -284,7 +284,6 @@ type Transaction struct {
 	customHooksUpdated       bool
 	repositoryCreation       *repositoryCreation
 	deleteRepository         bool
-	includedObjects          map[git.ObjectID]struct{}
 	runHousekeeping          *runHousekeeping
 	alternateUpdated         bool
 
@@ -569,8 +568,7 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 	if txn.runHousekeeping != nil && (txn.referenceUpdates != nil ||
 		txn.defaultBranchUpdated ||
 		txn.customHooksUpdated ||
-		txn.deleteRepository ||
-		txn.includedObjects != nil) {
+		txn.deleteRepository) {
 		return errHousekeepingConflictOtherUpdates
 	}
 
@@ -790,16 +788,6 @@ func (txn *Transaction) WriteCommitGraphs(config housekeepingcfg.WriteCommitGrap
 	txn.runHousekeeping.writeCommitGraphs = &writeCommitGraphs{
 		config: config,
 	}
-}
-
-// IncludeObject includes the given object and its dependencies in the transaction's logged pack file even
-// if the object is unreachable from the references.
-func (txn *Transaction) IncludeObject(oid git.ObjectID) {
-	if txn.includedObjects == nil {
-		txn.includedObjects = map[git.ObjectID]struct{}{}
-	}
-
-	txn.includedObjects[oid] = struct{}{}
 }
 
 // KV returns a handle to the key-value store snapshot of the transaction.
@@ -1437,18 +1425,16 @@ func (mgr *TransactionManager) setupStagingRepository(ctx context.Context, trans
 // prints the packs prefix in the format `pack <digest>`.
 var packPrefixRegexp = regexp.MustCompile(`^pack\t([0-9a-f]+)\n$`)
 
-// packObjects walks the objects in the quarantine directory starting from the new
-// reference tips introduced by the transaction and the explicitly included objects. All
-// objects in the quarantine directory that are encountered during the walk are included in
-// a packfile that gets committed with the transaction. All encountered objects that are missing
-// from the quarantine directory are considered the transaction's dependencies. The dependencies
-// are later verified to exist in the repository before committing the transaction, and they will
-// be guarded against concurrent pruning operations. The final pack is staged in the WAL directory
-// of the transaction ready for committing. The pack's index and reverse index is also included.
+// packObjects walks the objects in the quarantine directory and the new reference tips. All objects in
+// the quarantine directory that are encountered during the walk are included in a packfile that gets
+// committed with the transaction. All encountered objects that are missing from the quarantine directory
+// are considered the transaction's dependencies. The dependencies are later verified to exist in the
+// repository before committing the transaction, and they will be guarded against concurrent pruning
+// operations. The final pack is staged in the WAL directory of the transaction ready for committing.
+// The pack's index and reverse index is also included.
 //
-// Objects that were not reachable from the walk are not committed with the transaction. Objects
-// that already exist in the repository are included in the packfile if the client wrote them into
-// the quarantine directory.
+// Objects that already exist in the repository are included in the packfile if the client wrote them
+// into the quarantine directory.
 //
 // The packed objects are not yet checked for validity. See the following issue for more
 // details on this: https://gitlab.com/gitlab-org/gitaly/-/issues/5779
@@ -1518,7 +1504,7 @@ func (mgr *TransactionManager) packObjects(ctx context.Context, transaction *Tra
 		return fmt.Errorf("object hash: %w", err)
 	}
 
-	heads := make([]string, 0)
+	heads := make(map[git.ObjectID]struct{})
 	for _, referenceUpdates := range transaction.referenceUpdates {
 		for _, update := range referenceUpdates {
 			if !update.IsRegularUpdate() {
@@ -1531,12 +1517,17 @@ func (mgr *TransactionManager) packObjects(ctx context.Context, transaction *Tra
 				continue
 			}
 
-			heads = append(heads, update.NewOID.String())
+			heads[update.NewOID] = struct{}{}
 		}
 	}
 
-	for objectID := range transaction.includedObjects {
-		heads = append(heads, objectID.String())
+	quarantinedObjects, err := quarantineOnlySnapshotRepository.ListObjects(ctx)
+	if err != nil {
+		return fmt.Errorf("list objects: %w", err)
+	}
+
+	for _, oid := range quarantinedObjects {
+		heads[oid] = struct{}{}
 	}
 
 	if len(heads) == 0 {
@@ -1550,11 +1541,17 @@ func (mgr *TransactionManager) packObjects(ctx context.Context, transaction *Tra
 	group.Go(func() (returnedErr error) {
 		defer objectWalkWriter.CloseWithError(returnedErr)
 
-		// Walk the new reference tips and included objects in the quarantine directory. The reachable
-		// objects will be included in the transaction's logged packfile and the unreachable ones
-		// discarded, and missing objects regard as the transaction's dependencies.
+		// Walk the new reference tips and objects in the quarantine directory. All of the
+		// objects in the quarantine directory are included in the logged pack file, and missing
+		// objects during the walk are recorded as the transaction's dependencies.
 		if err := quarantineOnlySnapshotRepository.WalkObjects(ctx,
-			strings.NewReader(strings.Join(heads, "\n")),
+			strings.NewReader(strings.Join(func() []string {
+				oids := make([]string, 0, len(heads))
+				for oid := range heads {
+					oids = append(oids, oid.String())
+				}
+				return oids
+			}(), "\n")),
 			objectWalkWriter,
 		); err != nil {
 			return fmt.Errorf("walk objects: %w", err)

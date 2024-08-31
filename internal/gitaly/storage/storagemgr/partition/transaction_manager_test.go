@@ -958,8 +958,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{
 					TransactionID:    1,
-					QuarantinedPacks: [][]byte{setup.Commits.First.Pack},
-					IncludeObjects:   []git.ObjectID{setup.Commits.First.OID},
+					QuarantinedPacks: [][]byte{setup.Commits.First.Pack}, // This commit is not reachable
 				},
 				Begin{
 					TransactionID:       2,
@@ -1036,8 +1035,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{
 					TransactionID:    1,
-					QuarantinedPacks: [][]byte{setup.Commits.First.Pack},
-					IncludeObjects:   []git.ObjectID{setup.Commits.First.OID},
+					QuarantinedPacks: [][]byte{setup.Commits.First.Pack}, // This commit is not reachable
 				},
 				Begin{
 					TransactionID:       2,
@@ -1209,13 +1207,16 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
-						Objects: []git.ObjectID{},
+						Objects: []git.ObjectID{
+							setup.ObjectHash.EmptyTreeOID,
+							setup.Commits.First.OID,
+						},
 					},
 				},
 			},
 		},
 		{
-			desc: "transaction includes an unreachable object with dependencies",
+			desc: "transaction includes an unreachable object missing dependencies",
 			steps: steps{
 				Prune{},
 				StartManager{},
@@ -1224,24 +1225,17 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{
 					QuarantinedPacks: [][]byte{
-						setup.Commits.First.Pack,
-						setup.Commits.Second.Pack,
-						setup.Commits.Third.Pack,
+						setup.Commits.First.Pack, // This commit is not reachable
+						// Second commit missing
+						setup.Commits.Third.Pack, // This commit is not reachable
 					},
-					IncludeObjects: []git.ObjectID{setup.Commits.Second.OID},
+					ExpectedError: localrepo.InvalidObjectError(setup.Commits.Second.OID),
 				},
 			},
 			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
-						Objects: []git.ObjectID{
-							setup.ObjectHash.EmptyTreeOID,
-							setup.Commits.First.OID,
-							setup.Commits.Second.OID,
-						},
+						Objects: []git.ObjectID{},
 					},
 				},
 			},
@@ -1256,11 +1250,10 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{
 					QuarantinedPacks: [][]byte{
-						setup.Commits.First.Pack,
-						setup.Commits.Second.Pack,
-						setup.Commits.Diverging.Pack,
+						setup.Commits.First.Pack,     // This commit is not reachable
+						setup.Commits.Second.Pack,    // This commit is not reachable
+						setup.Commits.Diverging.Pack, // This commit is not reachable
 					},
-					IncludeObjects: []git.ObjectID{setup.Commits.Second.OID, setup.Commits.Diverging.OID},
 				},
 			},
 			expectedState: StateAssertion{
@@ -1275,30 +1268,6 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 							setup.Commits.Second.OID,
 							setup.Commits.Diverging.OID,
 						},
-					},
-				},
-			},
-		},
-		{
-			desc: "transaction includes a missing object",
-			steps: steps{
-				Prune{},
-				StartManager{},
-				Begin{
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					QuarantinedPacks: [][]byte{
-						setup.Commits.First.Pack,
-					},
-					IncludeObjects: []git.ObjectID{setup.Commits.Second.OID},
-					ExpectedError:  localrepo.InvalidObjectError(setup.Commits.Second.OID),
-				},
-			},
-			expectedState: StateAssertion{
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						Objects: []git.ObjectID{},
 					},
 				},
 			},
@@ -1341,6 +1310,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 						Objects: []git.ObjectID{
 							setup.ObjectHash.EmptyTreeOID,
 							setup.Commits.First.OID,
+							setup.Commits.Second.OID,
 						},
 					},
 				},

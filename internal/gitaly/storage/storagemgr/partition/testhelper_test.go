@@ -842,8 +842,6 @@ type Commit struct {
 	CreateRepository bool
 	// DeleteRepository deletes the repository on commit.
 	DeleteRepository bool
-	// IncludeObjects includes objects in the transaction's logged pack.
-	IncludeObjects []git.ObjectID
 	// UpdateAlternate updates the repository's alternate when set.
 	UpdateAlternate *alternateUpdate
 }
@@ -1265,10 +1263,6 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 
 				if step.DeleteRepository {
 					transaction.DeleteRepository()
-				}
-
-				for _, objectID := range step.IncludeObjects {
-					transaction.IncludeObject(objectID)
 				}
 			}
 
