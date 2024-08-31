@@ -1148,7 +1148,10 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				beginCtx = step.Context
 			}
 
-			transaction, err := transactionManager.Begin(beginCtx, step.RelativePaths, step.ReadOnly)
+			transaction, err := transactionManager.Begin(beginCtx, storage.BeginOptions{
+				Write:         !step.ReadOnly,
+				RelativePaths: step.RelativePaths,
+			})
 			require.ErrorIs(t, err, step.ExpectedError)
 			if err == nil {
 				require.Equalf(t, step.ExpectedSnapshotLSN, transaction.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")
@@ -1604,7 +1607,9 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 			// Begin a transaction to wait until the manager has applied all log entries currently
 			// committed. This ensures the disk state assertions run with all log entries fully applied
 			// to the repository.
-			tx, err := mgr.Begin(ctx, []string{"non-existent"}, false)
+			tx, err := mgr.Begin(ctx, storage.BeginOptions{
+				RelativePaths: []string{"non-existent"},
+			})
 			require.NoError(t, err)
 			require.NoError(t, tx.Rollback())
 

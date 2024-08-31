@@ -32,7 +32,7 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 // transactionManager is the interface of TransactionManager as used by PartitionManager. See the
 // TransactionManager's documentation for more details.
 type transactionManager interface {
-	Begin(context.Context, []string, bool, ...BeginOptions) (*Transaction, error)
+	Begin(context.Context, storage.BeginOptions) (*Transaction, error)
 	Run() error
 	Close()
 	isClosing() bool
@@ -410,7 +410,9 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		relativePaths = append(relativePaths, opts.AlternateRelativePath)
 	}
 
-	transaction, err := ptn.transactionManager.Begin(ctx, relativePaths, opts.ReadOnly, BeginOptions{
+	transaction, err := ptn.transactionManager.Begin(ctx, storage.BeginOptions{
+		Write:                  !opts.ReadOnly,
+		RelativePaths:          relativePaths,
 		ForceExclusiveSnapshot: opts.ForceExclusiveSnapshot,
 	})
 	if err != nil {
@@ -465,7 +467,10 @@ func (pm *PartitionManager) StorageKV(ctx context.Context, storageName string, r
 	}
 	defer storageMgr.finalizeTransaction(ptn)
 
-	transaction, err := ptn.transactionManager.Begin(ctx, []string{}, readOnly)
+	transaction, err := ptn.transactionManager.Begin(ctx, storage.BeginOptions{
+		Write:         !readOnly,
+		RelativePaths: []string{},
+	})
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}

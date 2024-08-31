@@ -85,3 +85,23 @@ type Transaction interface {
 	// OriginalRepository returns the repository as it was before rewriting it to point to the snapshot.
 	OriginalRepository(*gitalypb.Repository) *gitalypb.Repository
 }
+
+// BeginOptions are used to configure a transaction that is being started.
+type BeginOptions struct {
+	// Write indicates whether this is a write transaction. Transactions
+	// are read-only by default.
+	Write bool
+	// RelativePaths can be set to filter the relative paths that are included
+	// in the transaction's snapshot. When set, only the contained relative paths
+	// are included in the transaction's disk snapshot. If empty, nothing is
+	// included in the transactions disk snapshot. If nil, no filtering is done
+	// and the partition's full disk state is included in the snapshot.
+	//
+	// The first relative path is the target repository, and is the only repository
+	// that can be written into.
+	RelativePaths []string
+	// ForceExclusiveSnapshot forces the transaction to use an exclusive snapshot.
+	// This is a temporary workaround for some RPCs that do not work well with shared
+	// read-only snapshots yet.
+	ForceExclusiveSnapshot bool
+}
