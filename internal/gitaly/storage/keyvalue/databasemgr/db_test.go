@@ -1,4 +1,4 @@
-package keyvalue
+package databasemgr
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -16,7 +17,7 @@ import (
 )
 
 type dbWrapper struct {
-	Store
+	keyvalue.Store
 	close         func() error
 	runValueLogGC func(float64) error
 }
@@ -43,7 +44,7 @@ func TestNewDBManager(t *testing.T) {
 	})
 
 	t.Run("database opener error", func(t *testing.T) {
-		opener := func(log.Logger, string) (Store, error) {
+		opener := func(log.Logger, string) (keyvalue.Store, error) {
 			return nil, errors.New("database opener error")
 		}
 
@@ -56,7 +57,7 @@ func TestNewDBManager(t *testing.T) {
 	t.Run("successful initialization", func(t *testing.T) {
 		cfg := testcfg.Build(t, testcfg.WithStorages("first", "second"))
 
-		dbMgr, err := NewDBManager(cfg.Storages, NewBadgerStore, helper.NewNullTickerFactory(), logger)
+		dbMgr, err := NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 		require.NoError(t, err)
 		require.NotNil(t, dbMgr)
 
@@ -64,11 +65,11 @@ func TestNewDBManager(t *testing.T) {
 			db, err := dbMgr.GetDB(storage)
 			require.NoError(t, err)
 
-			require.NoError(t, db.Update(func(txn ReadWriter) error {
+			require.NoError(t, db.Update(func(txn keyvalue.ReadWriter) error {
 				require.NoError(t, txn.Set([]byte("key"), []byte(storage)))
 				return nil
 			}))
-			require.NoError(t, db.View(func(txn ReadWriter) error {
+			require.NoError(t, db.View(func(txn keyvalue.ReadWriter) error {
 				item, err := txn.Get([]byte("key"))
 				require.NoError(t, err)
 				require.NoError(t, item.Value(func(value []byte) error {
@@ -89,7 +90,7 @@ func TestNewDBManager(t *testing.T) {
 		logger := testhelper.NewLogger(t)
 
 		firstDBClosed := atomic.Bool{}
-		opener := DatabaseOpenerFunc(func(logger log.Logger, path string) (Store, error) {
+		opener := DatabaseOpenerFunc(func(logger log.Logger, path string) (keyvalue.Store, error) {
 			// Return a successful store for the first storage
 			if strings.Contains(path, "first") {
 				return dbWrapper{
@@ -117,7 +118,7 @@ func TestDBManager_GetDB(t *testing.T) {
 	cfg := testcfg.Build(t, testcfg.WithStorages("first", "second"))
 	logger := testhelper.NewLogger(t)
 
-	dbMgr, err := NewDBManager(cfg.Storages, NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	t.Cleanup(dbMgr.Close)
 
@@ -152,8 +153,8 @@ func TestDBManager_garbageCollection(t *testing.T) {
 
 	dbMgr, err := NewDBManager(
 		cfg.Storages,
-		func(logger log.Logger, path string) (Store, error) {
-			db, err := NewBadgerStore(logger, path)
+		func(logger log.Logger, path string) (keyvalue.Store, error) {
+			db, err := keyvalue.NewBadgerStore(logger, path)
 			return dbWrapper{
 				Store: db,
 				close: db.Close,

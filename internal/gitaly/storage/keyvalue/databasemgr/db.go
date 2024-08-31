@@ -1,4 +1,4 @@
-package keyvalue
+package databasemgr
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -21,7 +22,7 @@ import (
 const gcDiscardRatio = 0.5
 
 // DatabaseOpenerFunc is a function responsible for opening a database Store.
-type DatabaseOpenerFunc func(log.Logger, string) (Store, error)
+type DatabaseOpenerFunc func(log.Logger, string) (keyvalue.Store, error)
 
 // internalDirectoryPath returns the full path of Gitaly's internal data directory for the storage.
 func internalDirectoryPath(storagePath string) string {
@@ -36,7 +37,7 @@ func DatabaseDirectoryPath(storagePath string) string {
 // DBManager manages the life-cycles of per-storage databases. It provides methods to access the
 // databases as well as manages the garbage collection for each of them.
 type DBManager struct {
-	databases  map[string]Store
+	databases  map[string]keyvalue.Store
 	gcStoppers []func()
 	logger     log.Logger
 }
@@ -53,7 +54,7 @@ func NewDBManager(
 ) (dbMgr *DBManager, returnedErr error) {
 	logger = logger.WithField("component", "database")
 
-	databases := make(map[string]Store, len(configuredStorages))
+	databases := make(map[string]keyvalue.Store, len(configuredStorages))
 	var gcStoppers []func()
 
 	// If one of the DB could not be initialized, stops all GC goroutines of other successful DB.
@@ -83,7 +84,7 @@ func NewDBManager(
 
 		gcCtx, stopGC := context.WithCancel(context.Background())
 		gcStopped := make(chan struct{})
-		go func(db Store) {
+		go func(db keyvalue.Store) {
 			defer func() {
 				storageLogger.Info("value log garbage collection goroutine stopped")
 				close(gcStopped)
@@ -142,7 +143,7 @@ func NewDBManager(
 }
 
 // GetDB returns the database for the given storage.
-func (dbMgr *DBManager) GetDB(storage string) (Store, error) {
+func (dbMgr *DBManager) GetDB(storage string) (keyvalue.Store, error) {
 	if db, exist := dbMgr.databases[storage]; exist {
 		return db, nil
 	}
@@ -157,7 +158,7 @@ func (dbMgr *DBManager) Close() {
 	closeAllDBs(dbMgr.logger, dbMgr.gcStoppers, dbMgr.databases)
 }
 
-func closeAllDBs(logger log.Logger, gcStoppers []func(), databases map[string]Store) {
+func closeAllDBs(logger log.Logger, gcStoppers []func(), databases map[string]keyvalue.Store) {
 	for _, gcStopper := range gcStoppers {
 		gcStopper()
 	}

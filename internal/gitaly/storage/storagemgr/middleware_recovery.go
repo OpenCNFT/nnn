@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -19,7 +19,7 @@ import (
 // in the storage may be incomplete if they have pending WAL entries.
 func MayHavePendingWAL(storagePaths []string) (bool, error) {
 	for _, storagePath := range storagePaths {
-		if _, err := os.Stat(keyvalue.DatabaseDirectoryPath(storagePath)); err != nil {
+		if _, err := os.Stat(databasemgr.DatabaseDirectoryPath(storagePath)); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				// Database didn't exist.
 				continue
