@@ -1,6 +1,7 @@
 package localrepo
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -153,4 +154,52 @@ func (repo *Repo) UnpackObjects(ctx context.Context, packFile io.Reader) error {
 	}
 
 	return nil
+}
+
+func (repo *Repo) ListObjects(ctx context.Context) (_ []git.ObjectID, returnedErr error) {
+	stderr := &bytes.Buffer{}
+	cmd, err := repo.Exec(ctx,
+		gitcmd.Command{
+			Name: "cat-file",
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--batch-check=%(objectname)"},
+				gitcmd.Flag{Name: "--batch-all-objects"},
+				gitcmd.Flag{Name: "--buffer"},
+				gitcmd.Flag{Name: "--unordered"},
+			},
+		},
+		gitcmd.WithStderr(stderr),
+		gitcmd.WithSetupStdout(),
+	)
+	if err != nil {
+		return nil, structerr.New("cat-file: %w", err).WithMetadata("stderr", stderr.String())
+	}
+
+	defer func() {
+		if err := cmd.Wait(); err != nil {
+			returnedErr = errors.Join(err, fmt.Errorf("wait: %w", err))
+		}
+	}()
+
+	hash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("object hash: %w", err)
+	}
+
+	var oids []git.ObjectID
+	scanner := bufio.NewScanner(cmd)
+	for scanner.Scan() {
+		oid, err := hash.FromHex(scanner.Text())
+		if err != nil {
+			return nil, fmt.Errorf("from hex: %w", err)
+		}
+
+		oids = append(oids, oid)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan: %w", err)
+	}
+
+	return oids, nil
 }
