@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -502,7 +502,7 @@ func TestGetArchive_environment(t *testing.T) {
 
 	// Intercept commands to git-archive(1) to print the environment. Note that we continue to
 	// execute any other Git commands so that the command factory behaves as expected.
-	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 		return fmt.Sprintf(`#!/usr/bin/env bash
 		if [[ ! "$@" =~ "archive" ]]; then
 			exec %q "$@"

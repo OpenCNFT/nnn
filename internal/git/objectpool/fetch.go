@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
@@ -67,29 +68,29 @@ func (o *ObjectPool) FetchFromOrigin(ctx context.Context, origin *localrepo.Repo
 
 	var stderr bytes.Buffer
 	if err := o.Repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "fetch",
-			Flags: []git.Option{
-				git.Flag{Name: "--quiet"},
-				git.Flag{Name: "--atomic"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--atomic"},
 				// We already fetch tags via our refspec, so we don't
 				// want to fetch them a second time via Git's default
 				// tag refspec.
-				git.Flag{Name: "--no-tags"},
+				gitcmd.Flag{Name: "--no-tags"},
 				// We don't need FETCH_HEAD, and it can potentially be hundreds of
 				// megabytes when doing a mirror-sync of repos with huge numbers of
 				// references.
-				git.Flag{Name: "--no-write-fetch-head"},
+				gitcmd.Flag{Name: "--no-write-fetch-head"},
 				// Disable showing forced updates, which may take a considerable
 				// amount of time to compute. We don't display any output anyway,
 				// which makes this computation kind of moot.
-				git.Flag{Name: "--no-show-forced-updates"},
+				gitcmd.Flag{Name: "--no-show-forced-updates"},
 			},
 			Args: []string{originPath, objectPoolRefspec},
 		},
-		git.WithRefTxHook(o.Repo),
-		git.WithStderr(&stderr),
-		git.WithConfig(git.ConfigPair{
+		gitcmd.WithRefTxHook(o.Repo),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithConfig(gitcmd.ConfigPair{
 			// Git is so kind to point out that we asked it to not show forced updates
 			// by default, so we need to ask it not to do that.
 			Key: "advice.fetchShowForcedUpdates", Value: "false",
@@ -158,19 +159,19 @@ func (o *ObjectPool) pruneReferences(ctx context.Context, origin *localrepo.Repo
 	// Instead we ask for a dry-run, parse the output and queue up every reference into a
 	// git-update-ref(1) process. While ugly, it works around the performance issues.
 	prune, err := o.Repo.Exec(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:   "remote",
 			Action: "prune",
 			Args:   []string{"origin"},
-			Flags: []git.Option{
-				git.Flag{Name: "--dry-run"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--dry-run"},
 			},
 		},
-		git.WithConfig(git.ConfigPair{Key: "remote.origin.url", Value: originPath}),
-		git.WithConfig(git.ConfigPair{Key: "remote.origin.fetch", Value: objectPoolRefspec}),
+		gitcmd.WithConfig(gitcmd.ConfigPair{Key: "remote.origin.url", Value: originPath}),
+		gitcmd.WithConfig(gitcmd.ConfigPair{Key: "remote.origin.fetch", Value: objectPoolRefspec}),
 		// This is a dry-run, only, so we don't have to enable hooks.
-		git.WithDisabledHooks(),
-		git.WithSetupStdout(),
+		gitcmd.WithDisabledHooks(),
+		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {
 		return fmt.Errorf("spawning prune: %w", err)
@@ -280,12 +281,12 @@ const danglingObjectNamespace = "refs/dangling/"
 // assume that every object _is_ used.
 func (o *ObjectPool) rescueDanglingObjects(ctx context.Context) (returnedErr error) {
 	stderr := &bytes.Buffer{}
-	fsck, err := o.Repo.Exec(ctx, git.Command{
+	fsck, err := o.Repo.Exec(ctx, gitcmd.Command{
 		Name:  "fsck",
-		Flags: []git.Option{git.Flag{Name: "--connectivity-only"}, git.Flag{Name: "--dangling"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--connectivity-only"}, gitcmd.Flag{Name: "--dangling"}},
 	},
-		git.WithStderr(stderr),
-		git.WithSetupStdout(),
+		gitcmd.WithStderr(stderr),
+		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {
 		return err
@@ -361,11 +362,11 @@ func (o *ObjectPool) logStats(ctx context.Context, when string) error {
 	}
 	fields["repository_info"] = repoInfo
 
-	forEachRef, err := o.Repo.Exec(ctx, git.Command{
+	forEachRef, err := o.Repo.Exec(ctx, gitcmd.Command{
 		Name:  "for-each-ref",
-		Flags: []git.Option{git.Flag{Name: "--format=%(objecttype)%00%(refname)"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--format=%(objecttype)%00%(refname)"}},
 		Args:  []string{"refs/"},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return fmt.Errorf("spawning for-each-ref: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -30,7 +31,7 @@ func (s *server) DeleteRefs(ctx context.Context, in *gitalypb.DeleteRefsRequest)
 
 	updater, err := updateref.New(ctx, repo, updateref.WithNoDeref())
 	if err != nil {
-		if errors.Is(err, git.ErrInvalidArg) {
+		if errors.Is(err, gitcmd.ErrInvalidArg) {
 			return nil, structerr.NewInvalidArgument("%w", err)
 		}
 		return nil, structerr.NewInternal("%w", err)

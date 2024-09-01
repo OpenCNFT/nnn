@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -117,7 +118,7 @@ func getLSTreeEntries(parser *localrepo.Parser) (localrepo.Entries, error) {
 
 func newLSTreeParser(
 	ctx context.Context,
-	repo git.RepositoryExecutor,
+	repo gitcmd.RepositoryExecutor,
 	in *gitalypb.ListLastCommitsForTreeRequest,
 ) (*command.Command, *localrepo.Parser, error) {
 	path := string(in.GetPath())
@@ -130,13 +131,13 @@ func newLSTreeParser(
 		return nil, nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	opts := git.ConvertGlobalOptions(in.GetGlobalOptions())
-	cmd, err := repo.Exec(ctx, git.Command{
+	opts := gitcmd.ConvertGlobalOptions(in.GetGlobalOptions())
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:        "ls-tree",
-		Flags:       []git.Option{git.Flag{Name: "-z"}, git.Flag{Name: "--full-name"}},
+		Flags:       []gitcmd.Option{gitcmd.Flag{Name: "-z"}, gitcmd.Flag{Name: "--full-name"}},
 		Args:        []string{in.GetRevision()},
 		PostSepArgs: []string{path},
-	}, append(opts, git.WithSetupStdout())...)
+	}, append(opts, gitcmd.WithSetupStdout())...)
 	if err != nil {
 		return nil, nil, err
 	}

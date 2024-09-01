@@ -11,6 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitattributes"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitpipe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -190,9 +191,9 @@ func (inst *Instance) needsFullRecalculation(ctx context.Context, cachedID, comm
 		return true, nil
 	}
 
-	err := inst.repo.ExecAndWait(ctx, git.Command{
+	err := inst.repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:        "diff",
-		Flags:       []git.Option{git.Flag{Name: "--quiet"}},
+		Flags:       []gitcmd.Option{gitcmd.Flag{Name: "--quiet"}},
 		Args:        []string{fmt.Sprintf("%v..%v", cachedID, commitID)},
 		PostSepArgs: []string{".gitattributes"},
 	})

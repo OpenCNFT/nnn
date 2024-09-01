@@ -13,6 +13,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
@@ -26,7 +27,7 @@ import (
 )
 
 type createConfig struct {
-	gitOptions []git.Option
+	gitOptions []gitcmd.Option
 	skipInit   bool
 }
 
@@ -41,14 +42,14 @@ func WithBranchName(branch string) CreateOption {
 			return
 		}
 
-		cfg.gitOptions = append(cfg.gitOptions, git.ValueFlag{Name: "--initial-branch", Value: branch})
+		cfg.gitOptions = append(cfg.gitOptions, gitcmd.ValueFlag{Name: "--initial-branch", Value: branch})
 	}
 }
 
 // WithObjectHash overrides the default object hash of the created repository.
 func WithObjectHash(hash git.ObjectHash) CreateOption {
 	return func(cfg *createConfig) {
-		cfg.gitOptions = append(cfg.gitOptions, git.ValueFlag{Name: "--object-format", Value: hash.Format})
+		cfg.gitOptions = append(cfg.gitOptions, gitcmd.ValueFlag{Name: "--object-format", Value: hash.Format})
 	}
 }
 
@@ -69,7 +70,7 @@ func Create(
 	ctx context.Context,
 	logger log.Logger,
 	locator storage.Locator,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	txManager transaction.Manager,
 	repoCounter *counter.RepositoryCounter,
 	repository storage.Repository,
@@ -118,15 +119,15 @@ func Create(
 		}
 
 		stderr := &bytes.Buffer{}
-		cmd, err := gitCmdFactory.NewWithoutRepo(ctx, git.Command{
+		cmd, err := gitCmdFactory.NewWithoutRepo(ctx, gitcmd.Command{
 			Name: "init",
-			Flags: append([]git.Option{
-				git.Flag{Name: "--bare"},
-				git.Flag{Name: "--quiet"},
-				git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
+			Flags: append([]gitcmd.Option{
+				gitcmd.Flag{Name: "--bare"},
+				gitcmd.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 			}, cfg.gitOptions...),
 			Args: []string{newRepoDir.Path()},
-		}, git.WithStderr(stderr))
+		}, gitcmd.WithStderr(stderr))
 		if err != nil {
 			return fmt.Errorf("spawning git-init: %w", err)
 		}
@@ -146,7 +147,7 @@ func Create(
 		return err
 	}
 
-	refBackend, err := git.DetectReferenceBackend(ctx, gitCmdFactory, newRepo)
+	refBackend, err := gitcmd.DetectReferenceBackend(ctx, gitCmdFactory, newRepo)
 	if err != nil {
 		return fmt.Errorf("detecting reference backend: %w", err)
 	}
@@ -295,21 +296,21 @@ func writeRefs(
 	ctx context.Context,
 	w io.Writer,
 	repo *gitalypb.Repository,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 ) error {
 	stderr := &bytes.Buffer{}
 
 	// This doesn't consider dangling symrefs. This needs to be fixed in Git:
 	// https://gitlab.com/gitlab-org/git/-/issues/309
-	cmd, err := gitCmdFactory.New(ctx, repo, git.Command{
+	cmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name: "for-each-ref",
-		Flags: []git.Option{
-			git.Flag{Name: "--format=%(refname) %(objectname) %(symref)"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--format=%(refname) %(objectname) %(symref)"},
 			// This is currently broken as it also prints special refs:
 			// https://gitlab.com/gitlab-org/git/-/issues/303
-			git.Flag{Name: "--include-root-refs"},
+			gitcmd.Flag{Name: "--include-root-refs"},
 		},
-	}, git.WithStdout(w), git.WithStderr(stderr))
+	}, gitcmd.WithStdout(w), gitcmd.WithStderr(stderr))
 	if err != nil {
 		return fmt.Errorf("spawning show-ref: %w", err)
 	}

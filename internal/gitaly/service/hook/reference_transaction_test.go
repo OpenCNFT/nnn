@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -329,7 +330,7 @@ ref:refs/heads/main ref:refs/heads/branch-1 HEAD
 			if tc.noTransaction {
 				transactionID = 0
 			}
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
@@ -339,7 +340,7 @@ ref:refs/heads/main ref:refs/heads/branch-1 HEAD
 					Node:          "node-1",
 				},
 				nil,
-				git.ReferenceTransactionHook,
+				gitcmd.ReferenceTransactionHook,
 				featureflag.FromContext(ctx),
 				transactionID,
 			).Env()

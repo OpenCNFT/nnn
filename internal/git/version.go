@@ -59,16 +59,16 @@ func NewRCVersion(major, minor, patch, gl uint32) Version {
 	}
 }
 
-// parseVersionOutput parses output returned by git-version(1). It is expected to be in the format
+// ParseVersionOutput parses output returned by git-version(1). It is expected to be in the format
 // "git version 2.39.1.gl1".
-func parseVersionOutput(versionOutput []byte) (Version, error) {
+func ParseVersionOutput(versionOutput []byte) (Version, error) {
 	trimmedVersionOutput := string(bytes.Trim(versionOutput, " \n"))
 	versionString := strings.SplitN(trimmedVersionOutput, " ", 3)
 	if len(versionString) != 3 {
 		return Version{}, fmt.Errorf("invalid version format: %q", string(versionOutput))
 	}
 
-	version, err := parseVersion(versionString[2])
+	version, err := ParseVersion(versionString[2])
 	if err != nil {
 		return Version{}, fmt.Errorf("cannot parse git version: %w", err)
 	}
@@ -137,7 +137,8 @@ func (v Version) GreaterOrEqual(other Version) bool {
 	return !v.LessThan(other)
 }
 
-func parseVersion(versionStr string) (Version, error) {
+// ParseVersion parses a git version string.
+func ParseVersion(versionStr string) (Version, error) {
 	versionSplit := strings.SplitN(versionStr, ".", 4)
 	if len(versionSplit) < 3 {
 		return Version{}, fmt.Errorf("expected major.minor.patch in %q", versionStr)

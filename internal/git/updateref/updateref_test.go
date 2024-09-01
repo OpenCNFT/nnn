@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
@@ -779,7 +780,7 @@ func BenchmarkUpdater(b *testing.B) {
 		return git.ReferenceName(fmt.Sprintf("refs/heads/branch-%09d", id))
 	}
 
-	createReferences := func(tb testing.TB, repository git.RepositoryExecutor, referenceCount int, commitOID git.ObjectID) {
+	createReferences := func(tb testing.TB, repository gitcmd.RepositoryExecutor, referenceCount int, commitOID git.ObjectID) {
 		tb.Helper()
 
 		updater, err := New(ctx, repository)

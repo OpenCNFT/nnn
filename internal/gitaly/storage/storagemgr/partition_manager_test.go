@@ -11,8 +11,8 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -412,7 +412,7 @@ func TestPartitionManager(t *testing.T) {
 						logger log.Logger,
 						testPartitionID storage.PartitionID,
 						storageMgr *storageManager,
-						commandFactory git.CommandFactory,
+						commandFactory gitcmd.CommandFactory,
 						absoluteStateDir, stagingDir string,
 					) transactionManager {
 						metrics := newMetrics(cfg.Prometheus)
@@ -465,7 +465,7 @@ func TestPartitionManager(t *testing.T) {
 						logger log.Logger,
 						testPartitionID storage.PartitionID,
 						storageMgr *storageManager,
-						commandFactory git.CommandFactory,
+						commandFactory gitcmd.CommandFactory,
 						absoluteStateDir, stagingDir string,
 					) transactionManager {
 						metrics := newMetrics(cfg.Prometheus)

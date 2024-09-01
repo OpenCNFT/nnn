@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tempdir"
@@ -141,34 +142,34 @@ func (s *server) rewriteHistory(
 
 	var stderr strings.Builder
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "fetch",
-			Flags: []git.Option{
+			Flags: []gitcmd.Option{
 				// Delete any refs that were removed by filter-repo.
-				git.Flag{Name: "--prune"},
+				gitcmd.Flag{Name: "--prune"},
 				// The mirror refspec includes tags, don't fetch them again.
-				git.Flag{Name: "--no-tags"},
+				gitcmd.Flag{Name: "--no-tags"},
 				// New history will be disjoint from the original repo.
-				git.Flag{Name: "--force"},
+				gitcmd.Flag{Name: "--force"},
 				// Ensure we don't partially apply the rewritten history.
 				// We don't expect file / directory conflicts as all refs
 				// in the staging repo are from the original.
-				git.Flag{Name: "--atomic"},
+				gitcmd.Flag{Name: "--atomic"},
 				// We're going to have a lot of these, don't waste
 				// time displaying them.
-				git.Flag{Name: "--no-show-forced-updates"},
+				gitcmd.Flag{Name: "--no-show-forced-updates"},
 				// No need for FETCH_HEAD when mirroring.
-				git.Flag{Name: "--no-write-fetch-head"},
-				git.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--no-write-fetch-head"},
+				gitcmd.Flag{Name: "--quiet"},
 			},
 			Args: append(
 				[]string{"file://" + stagingRepoPath},
 				git.MirrorRefSpec,
 			),
 		},
-		git.WithRefTxHook(repo),
-		git.WithStderr(&stderr),
-		git.WithConfig(git.ConfigPair{
+		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithConfig(gitcmd.ConfigPair{
 			Key: "advice.fetchShowForcedUpdates", Value: "false",
 		}),
 	); err != nil {
@@ -187,14 +188,14 @@ func (s *server) initStagingRepo(ctx context.Context, repo *gitalypb.Repository,
 	}
 
 	var stderr strings.Builder
-	cmd, err := s.gitCmdFactory.NewWithoutRepo(ctx, git.Command{
+	cmd, err := s.gitCmdFactory.NewWithoutRepo(ctx, gitcmd.Command{
 		Name: "init",
-		Flags: []git.Option{
-			git.Flag{Name: "--bare"},
-			git.Flag{Name: "--quiet"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--bare"},
+			gitcmd.Flag{Name: "--quiet"},
 		},
 		Args: []string{stagingRepoDir.Path()},
-	}, git.WithStderr(&stderr))
+	}, gitcmd.WithStderr(&stderr))
 	if err != nil {
 		return nil, "", fmt.Errorf("spawning git-init: %w", err)
 	}
@@ -226,7 +227,7 @@ func (s *server) runFilterRepo(
 		return fmt.Errorf("create tempdir: %w", err)
 	}
 
-	flags := make([]git.Option, 0, 2)
+	flags := make([]gitcmd.Option, 0, 2)
 
 	if len(blobsToRemove) > 0 {
 		blobPath, err := writeArgFile("strip-blobs", tmpDir.Path(), []byte(strings.Join(blobsToRemove, "\n")))
@@ -234,7 +235,7 @@ func (s *server) runFilterRepo(
 			return err
 		}
 
-		flags = append(flags, git.Flag{Name: "--strip-blobs-with-ids=" + blobPath})
+		flags = append(flags, gitcmd.Flag{Name: "--strip-blobs-with-ids=" + blobPath})
 	}
 
 	if len(redactions) > 0 {
@@ -243,7 +244,7 @@ func (s *server) runFilterRepo(
 			return err
 		}
 
-		flags = append(flags, git.Flag{Name: "--replace-text=" + replacePath})
+		flags = append(flags, gitcmd.Flag{Name: "--replace-text=" + replacePath})
 	}
 
 	srcPath, err := srcRepo.Path(ctx)
@@ -261,29 +262,29 @@ func (s *server) runFilterRepo(
 	// write the updates directly to the original repository.
 	var stdout, stderr strings.Builder
 	cmd, err := s.gitCmdFactory.NewWithoutRepo(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "filter-repo",
-			Flags: append([]git.Option{
+			Flags: append([]gitcmd.Option{
 				// Repository to write filtered history into.
-				git.Flag{Name: "--target=" + stagingPath},
+				gitcmd.Flag{Name: "--target=" + stagingPath},
 				// Repository to read from.
-				git.Flag{Name: "--source=" + srcPath},
-				// git.Flag{Name: "--refs=refs/*"},
+				gitcmd.Flag{Name: "--source=" + srcPath},
+				// gitcmd.Flag{Name: "--refs=refs/*"},
 				// Prevent automatic cleanup tasks like deleting 'origin' and running git-gc(1).
-				git.Flag{Name: "--partial"},
+				gitcmd.Flag{Name: "--partial"},
 				// Bypass check that repository is not a fresh clone.
-				git.Flag{Name: "--force"},
+				gitcmd.Flag{Name: "--force"},
 				// filter-repo will by default create 'replace' refs for refs it rewrites, but Gitaly
 				// disables this feature. This option will update any existing user-created replace refs,
 				// while preventing the creation of new ones.
-				git.Flag{Name: "--replace-refs=update-no-add"},
+				gitcmd.Flag{Name: "--replace-refs=update-no-add"},
 				// Pass '--quiet' to child git processes.
-				git.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--quiet"},
 			}, flags...),
 		},
-		git.WithDisabledHooks(),
-		git.WithStdout(&stdout),
-		git.WithStderr(&stderr),
+		gitcmd.WithDisabledHooks(),
+		gitcmd.WithStdout(&stdout),
+		gitcmd.WithStderr(&stderr),
 	)
 	if err != nil {
 		return fmt.Errorf("spawning git-filter-repo: %w", err)
@@ -323,14 +324,14 @@ func writeArgFile(name string, dir string, input []byte) (string, error) {
 	return path, nil
 }
 
-func checksumRepo(ctx context.Context, cmdFactory git.CommandFactory, repo *localrepo.Repo) (string, error) {
+func checksumRepo(ctx context.Context, cmdFactory gitcmd.CommandFactory, repo *localrepo.Repo) (string, error) {
 	var stderr strings.Builder
-	cmd, err := cmdFactory.New(ctx, repo, git.Command{
+	cmd, err := cmdFactory.New(ctx, repo, gitcmd.Command{
 		Name: "show-ref",
-		Flags: []git.Option{
-			git.Flag{Name: "--head"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--head"},
 		},
-	}, git.WithSetupStdout(), git.WithStderr(&stderr))
+	}, gitcmd.WithSetupStdout(), gitcmd.WithStderr(&stderr))
 	if err != nil {
 		return "", fmt.Errorf("spawning git-show-ref: %w", err)
 	}

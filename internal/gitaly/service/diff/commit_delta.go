@@ -3,7 +3,7 @@ package diff
 import (
 	"fmt"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/diff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -34,13 +34,13 @@ func (s *server) CommitDelta(in *gitalypb.CommitDeltaRequest, stream gitalypb.Di
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	cmd := git.Command{
+	cmd := gitcmd.Command{
 		Name: "diff",
-		Flags: []git.Option{
-			git.Flag{Name: "--raw"},
-			git.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())},
-			git.Flag{Name: "--full-index"},
-			git.Flag{Name: "--find-renames"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--raw"},
+			gitcmd.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())},
+			gitcmd.Flag{Name: "--full-index"},
+			gitcmd.Flag{Name: "--find-renames"},
 		},
 		Args: []string{leftSha, rightSha},
 	}

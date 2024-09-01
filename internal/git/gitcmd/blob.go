@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
@@ -17,7 +18,7 @@ type WriteBlobConfig struct {
 }
 
 // WriteBlob writes a blob into the given repository.
-func WriteBlob(ctx context.Context, repoExecutor RepositoryExecutor, content io.Reader, cfg WriteBlobConfig) (ObjectID, error) {
+func WriteBlob(ctx context.Context, repoExecutor RepositoryExecutor, content io.Reader, cfg WriteBlobConfig) (git.ObjectID, error) {
 	options := []Option{
 		Flag{Name: "--stdin"},
 		Flag{Name: "-w"},

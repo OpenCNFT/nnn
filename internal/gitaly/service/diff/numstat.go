@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/diff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -18,11 +18,11 @@ func (s *server) DiffStats(in *gitalypb.DiffStatsRequest, stream gitalypb.DiffSe
 	}
 
 	var batch []*gitalypb.DiffStats
-	cmd, err := s.gitCmdFactory.New(stream.Context(), in.Repository, git.Command{
+	cmd, err := s.gitCmdFactory.New(stream.Context(), in.Repository, gitcmd.Command{
 		Name:  "diff",
-		Flags: []git.Option{git.Flag{Name: "--numstat"}, git.Flag{Name: "-z"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--numstat"}, gitcmd.Flag{Name: "-z"}},
 		Args:  []string{in.LeftCommitId, in.RightCommitId},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}

@@ -1,4 +1,4 @@
-package git_test
+package gitcmd_test
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -25,8 +25,8 @@ func TestWithRefHook(t *testing.T) {
 	})
 	gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("refs/heads/master"))
 
-	opt := git.WithRefTxHook(repo)
-	subCmd := git.Command{Name: "update-ref", Args: []string{"refs/heads/master", gittest.DefaultObjectHash.ZeroOID.String()}}
+	opt := gitcmd.WithRefTxHook(repo)
+	subCmd := gitcmd.Command{Name: "update-ref", Args: []string{"refs/heads/master", gittest.DefaultObjectHash.ZeroOID.String()}}
 
 	for _, tt := range []struct {
 		name string
@@ -35,7 +35,7 @@ func TestWithRefHook(t *testing.T) {
 		{
 			name: "NewCommand",
 			fn: func() (*command.Command, error) {
-				return gittest.NewCommandFactory(t, cfg, git.WithSkipHooks()).New(ctx, repo, subCmd, opt)
+				return gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()).New(ctx, repo, subCmd, opt)
 			},
 		},
 	} {
@@ -83,16 +83,16 @@ func TestWithPackObjectsHookEnv(t *testing.T) {
 	protocol := "protocol"
 	remoteIP := "1.2.3.4"
 
-	opt := git.WithPackObjectsHookEnv(repo, protocol)
-	subCmd := git.Command{Name: "upload-pack", Args: []string{"a/b/c"}}
+	opt := gitcmd.WithPackObjectsHookEnv(repo, protocol)
+	subCmd := gitcmd.Command{Name: "upload-pack", Args: []string{"a/b/c"}}
 
 	ctx = grpcmetadata.AppendToOutgoingContext(ctx, "user_id", userID, "username", username, "remote_ip", remoteIP)
 	ctx = metadata.OutgoingToIncoming(ctx)
 
-	cmd, err := gittest.NewCommandFactory(t, cfg, git.WithSkipHooks()).New(ctx, repo, subCmd, opt)
+	cmd, err := gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()).New(ctx, repo, subCmd, opt)
 	require.NoError(t, err)
 
-	payload, err := git.HooksPayloadFromEnv(cmd.Env())
+	payload, err := gitcmd.HooksPayloadFromEnv(cmd.Env())
 	require.NoError(t, err)
 
 	require.Equal(t, userID, payload.UserDetails.UserID)

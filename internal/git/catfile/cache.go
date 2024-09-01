@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
@@ -34,12 +34,12 @@ const (
 type Cache interface {
 	// ObjectReader either creates a new object reader or returns a cached one for the given
 	// repository.
-	ObjectReader(context.Context, git.RepositoryExecutor) (ObjectContentReader, func(), error)
+	ObjectReader(context.Context, gitcmd.RepositoryExecutor) (ObjectContentReader, func(), error)
 	// ObjectReaderWithoutMailmap is similar to ObjectReader but with mailmap disabled.
-	ObjectReaderWithoutMailmap(context.Context, git.RepositoryExecutor) (ObjectContentReader, func(), error)
+	ObjectReaderWithoutMailmap(context.Context, gitcmd.RepositoryExecutor) (ObjectContentReader, func(), error)
 	// ObjectInfoReader either creates a new object info reader or returns a cached one for the
 	// given repository.
-	ObjectInfoReader(context.Context, git.RepositoryExecutor) (ObjectInfoReader, func(), error)
+	ObjectInfoReader(context.Context, gitcmd.RepositoryExecutor) (ObjectInfoReader, func(), error)
 	// Evict evicts all cached processes from the cache.
 	Evict()
 }
@@ -171,7 +171,7 @@ func (c *ProcessCache) Stop() {
 	c.Evict()
 }
 
-func (c *ProcessCache) objectReaderRaw(ctx context.Context, repo git.RepositoryExecutor, withoutMailmap bool) (ObjectContentReader, func(), error) {
+func (c *ProcessCache) objectReaderRaw(ctx context.Context, repo gitcmd.RepositoryExecutor, withoutMailmap bool) (ObjectContentReader, func(), error) {
 	var cached cacheable
 	var err error
 	var cancel func()
@@ -198,17 +198,17 @@ func (c *ProcessCache) objectReaderRaw(ctx context.Context, repo git.RepositoryE
 }
 
 // ObjectReader creates a new ObjectReader process for the given repository.
-func (c *ProcessCache) ObjectReader(ctx context.Context, repo git.RepositoryExecutor) (ObjectContentReader, func(), error) {
+func (c *ProcessCache) ObjectReader(ctx context.Context, repo gitcmd.RepositoryExecutor) (ObjectContentReader, func(), error) {
 	return c.objectReaderRaw(ctx, repo, false)
 }
 
 // ObjectReaderWithoutMailmap creates a new ObjectReader but without 'mailmap' support.
-func (c *ProcessCache) ObjectReaderWithoutMailmap(ctx context.Context, repo git.RepositoryExecutor) (ObjectContentReader, func(), error) {
+func (c *ProcessCache) ObjectReaderWithoutMailmap(ctx context.Context, repo gitcmd.RepositoryExecutor) (ObjectContentReader, func(), error) {
 	return c.objectReaderRaw(ctx, repo, true)
 }
 
 // ObjectInfoReader creates a new ObjectInfoReader process for the given repository.
-func (c *ProcessCache) ObjectInfoReader(ctx context.Context, repo git.RepositoryExecutor) (ObjectInfoReader, func(), error) {
+func (c *ProcessCache) ObjectInfoReader(ctx context.Context, repo gitcmd.RepositoryExecutor) (ObjectInfoReader, func(), error) {
 	var cached cacheable
 	var err error
 	var cancel func()

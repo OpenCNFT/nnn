@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
@@ -387,7 +388,7 @@ func TestRepo_GetRemoteReferences(t *testing.T) {
 			remote: "inmemory",
 			opts: []GetRemoteReferencesOption{
 				WithPatterns(git.DefaultRef.String()),
-				WithConfig(git.ConfigPair{
+				WithConfig(gitcmd.ConfigPair{
 					Key:   "remote.inmemory.url",
 					Value: repoPath,
 				}),

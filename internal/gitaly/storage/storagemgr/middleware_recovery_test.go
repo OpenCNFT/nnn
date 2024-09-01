@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -47,7 +47,7 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 
 	logger := testhelper.SharedLogger(t)
 
-	cmdFactory, clean, err := git.NewExecCommandFactory(cfg, logger)
+	cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, logger)
 	require.NoError(t, err)
 	defer clean()
 

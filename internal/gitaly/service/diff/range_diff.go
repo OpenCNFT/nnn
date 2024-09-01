@@ -6,7 +6,7 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus/ctxlogrus"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/rangediff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -26,15 +26,15 @@ func (s *server) RangeDiff(in *gitalypb.RangeDiffRequest, stream gitalypb.DiffSe
 	ctx := stream.Context()
 	repo := s.localrepo(in.GetRepository())
 
-	flags := []git.Option{
-		git.Flag{Name: "--no-color"},
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "--no-color"},
 	}
 	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
 		return structerr.NewInternal("detecting object hash: %w", err)
 	}
 
-	flags = append(flags, git.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())})
+	flags = append(flags, gitcmd.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())})
 
 	var revisions []string
 
@@ -47,7 +47,7 @@ func (s *server) RangeDiff(in *gitalypb.RangeDiffRequest, stream gitalypb.DiffSe
 		revisions = append(revisions, spec.BaseWithRevisions.GetBase(), spec.BaseWithRevisions.GetRev1(), spec.BaseWithRevisions.GetRev2())
 	}
 
-	cmd := git.Command{
+	cmd := gitcmd.Command{
 		Name:  "range-diff",
 		Flags: flags,
 		Args:  revisions,
@@ -124,8 +124,8 @@ func validateRangeDiffRequest(ctx context.Context, locator storage.Locator, in *
 	return nil
 }
 
-func (s *server) eachRangeDiff(ctx context.Context, rpc string, repo *localrepo.Repo, subCmd git.Command, callback func(commitPair *rangediff.CommitPair) error) error {
-	cmd, err := repo.Exec(ctx, subCmd, git.WithSetupStdout())
+func (s *server) eachRangeDiff(ctx context.Context, rpc string, repo *localrepo.Repo, subCmd gitcmd.Command, callback func(commitPair *rangediff.CommitPair) error) error {
+	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}

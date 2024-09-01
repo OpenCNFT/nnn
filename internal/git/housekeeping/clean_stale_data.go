@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
@@ -172,13 +173,13 @@ func PruneEmptyConfigSections(ctx context.Context, repo *localrepo.Repo) (_ int,
 	var configOutputs []string
 	for _, path := range []string{configPath, configWriter.Path()} {
 		var configOutput bytes.Buffer
-		if err := repo.ExecAndWait(ctx, git.Command{
+		if err := repo.ExecAndWait(ctx, gitcmd.Command{
 			Name: "config",
-			Flags: []git.Option{
-				git.ValueFlag{Name: "-f", Value: path},
-				git.Flag{Name: "-l"},
+			Flags: []gitcmd.Option{
+				gitcmd.ValueFlag{Name: "-f", Value: path},
+				gitcmd.Flag{Name: "-l"},
 			},
-		}, git.WithStdout(&configOutput)); err != nil {
+		}, gitcmd.WithStdout(&configOutput)); err != nil {
 			return 0, fmt.Errorf("listing config: %w", err)
 		}
 

@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
@@ -78,21 +79,21 @@ func (repo *Repo) MergeTree(
 		option(&config)
 	}
 
-	flags := []git.Option{
-		git.Flag{Name: "-z"},
-		git.Flag{Name: "--write-tree"},
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "-z"},
+		gitcmd.Flag{Name: "--write-tree"},
 	}
 
 	if config.allowUnrelatedHistories {
-		flags = append(flags, git.Flag{Name: "--allow-unrelated-histories"})
+		flags = append(flags, gitcmd.Flag{Name: "--allow-unrelated-histories"})
 	}
 
 	if config.conflictingFileNamesOnly {
-		flags = append(flags, git.Flag{Name: "--name-only"})
+		flags = append(flags, gitcmd.Flag{Name: "--name-only"})
 	}
 
 	if config.mergeBase != "" {
-		flags = append(flags, git.ValueFlag{
+		flags = append(flags, gitcmd.ValueFlag{
 			Name:  "--merge-base",
 			Value: config.mergeBase.String(),
 		})
@@ -106,13 +107,13 @@ func (repo *Repo) MergeTree(
 	var stdout, stderr bytes.Buffer
 	err = repo.ExecAndWait(
 		ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "merge-tree",
 			Flags: flags,
 			Args:  []string{ours, theirs},
 		},
-		git.WithStderr(&stderr),
-		git.WithStdout(&stdout),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithStdout(&stdout),
 	)
 	if err != nil {
 		exitCode, success := command.ExitStatus(err)

@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trailerparser"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
@@ -66,12 +67,12 @@ func (s *server) FindCommits(req *gitalypb.FindCommitsRequest, stream gitalypb.C
 }
 
 func (s *server) findCommits(ctx context.Context, req *gitalypb.FindCommitsRequest, stream gitalypb.CommitService_FindCommitsServer) (err error) {
-	opts := git.ConvertGlobalOptions(req.GetGlobalOptions())
+	opts := gitcmd.ConvertGlobalOptions(req.GetGlobalOptions())
 	repo := s.localrepo(req.GetRepository())
 
 	var stderr bytes.Buffer
 	gitLogCmd := getLogCommandSubCmd(req)
-	logCmd, err := repo.Exec(ctx, gitLogCmd, append(opts, git.WithSetupStdout(), git.WithStderr(&stderr))...)
+	logCmd, err := repo.Exec(ctx, gitLogCmd, append(opts, gitcmd.WithSetupStdout(), gitcmd.WithStderr(&stderr))...)
 	if err != nil {
 		return fmt.Errorf("error when creating git log command: %w", err)
 	}
@@ -236,7 +237,7 @@ func streamCommits(getCommits *GetCommits, stream gitalypb.CommitService_FindCom
 	return chunker.Flush()
 }
 
-func getLogCommandSubCmd(req *gitalypb.FindCommitsRequest) git.Command {
+func getLogCommandSubCmd(req *gitalypb.FindCommitsRequest) gitcmd.Command {
 	logFormatOption := "--format=%H"
 	// To split the commits by '\x01' instead of '\n'
 	if req.GetIncludeShortstat() {
@@ -251,42 +252,42 @@ func getLogCommandSubCmd(req *gitalypb.FindCommitsRequest) git.Command {
 		logFormatOption += "%x02%D"
 	}
 
-	subCmd := git.Command{Name: "log", Flags: []git.Option{git.Flag{Name: logFormatOption}}}
+	subCmd := gitcmd.Command{Name: "log", Flags: []gitcmd.Option{gitcmd.Flag{Name: logFormatOption}}}
 
 	//  We will perform the offset in Go because --follow doesn't play well with --skip.
 	//  See: https://gitlab.com/gitlab-org/gitlab-ce/issues/3574#note_3040520
 	if req.GetOffset() > 0 && !calculateOffsetManually(req) {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--skip=%d", req.GetOffset())})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--skip=%d", req.GetOffset())})
 	}
 	limit := req.GetLimit()
 	if calculateOffsetManually(req) {
 		limit += req.GetOffset()
 	}
-	subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--max-count=%d", limit)})
+	subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--max-count=%d", limit)})
 
 	if req.GetFollow() && len(req.GetPaths()) > 0 {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--follow"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--follow"})
 	}
 	if req.GetAuthor() != nil {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--author=%s", string(req.GetAuthor()))})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--author=%s", string(req.GetAuthor()))})
 	}
 	if req.GetSkipMerges() {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--no-merges"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--no-merges"})
 	}
 	if req.GetBefore() != nil {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--before=%s", req.GetBefore().String())})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--before=%s", req.GetBefore().String())})
 	}
 	if req.GetAfter() != nil {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--after=%s", req.GetAfter().String())})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--after=%s", req.GetAfter().String())})
 	}
 	if req.GetAll() {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--all"}, git.Flag{Name: "--reverse"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--all"}, gitcmd.Flag{Name: "--reverse"})
 	}
 	if req.GetRevision() != nil {
 		subCmd.Args = []string{string(req.GetRevision())}
 	}
 	if req.GetFirstParent() {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--first-parent"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--first-parent"})
 	}
 	if len(req.GetPaths()) > 0 {
 		for _, path := range req.GetPaths() {
@@ -294,16 +295,16 @@ func getLogCommandSubCmd(req *gitalypb.FindCommitsRequest) git.Command {
 		}
 	}
 	if req.GetOrder() == gitalypb.FindCommitsRequest_TOPO {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--topo-order"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--topo-order"})
 	}
 	if req.GetIncludeShortstat() {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--shortstat"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--shortstat"})
 	}
 
 	if len(req.GetIncludeReferencedBy()) > 0 {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--decorate=full"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--decorate=full"})
 		for _, pattern := range req.GetIncludeReferencedBy() {
-			subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--decorate-refs=%s", pattern)})
+			subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--decorate-refs=%s", pattern)})
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/smudge"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -121,7 +122,7 @@ func validateGetArchiveRequest(in *gitalypb.GetArchiveRequest, format string) er
 
 func (s *server) validateGetArchivePrecondition(
 	ctx context.Context,
-	repo git.RepositoryExecutor,
+	repo gitcmd.RepositoryExecutor,
 	commitID string,
 	path string,
 	exclude []string,
@@ -205,7 +206,7 @@ func (s *server) handleArchive(ctx context.Context, p archiveParams) error {
 	}
 
 	var env []string
-	var config []git.ConfigPair
+	var config []gitcmd.ConfigPair
 
 	if p.in.GetIncludeLfsBlobs() {
 		smudgeCfg := smudge.Config{
@@ -232,12 +233,12 @@ func (s *server) handleArchive(ctx context.Context, p archiveParams) error {
 		config = append(config, smudgeGitConfig)
 	}
 
-	archiveCommand, err := s.gitCmdFactory.New(ctx, p.in.GetRepository(), git.Command{
+	archiveCommand, err := s.gitCmdFactory.New(ctx, p.in.GetRepository(), gitcmd.Command{
 		Name:        "archive",
-		Flags:       []git.Option{git.ValueFlag{Name: "--format", Value: p.format}, git.ValueFlag{Name: "--prefix", Value: p.in.GetPrefix() + "/"}},
+		Flags:       []gitcmd.Option{gitcmd.ValueFlag{Name: "--format", Value: p.format}, gitcmd.ValueFlag{Name: "--prefix", Value: p.in.GetPrefix() + "/"}},
 		Args:        args,
 		PostSepArgs: pathspecs,
-	}, git.WithEnv(env...), git.WithConfig(config...), git.WithSetupStdout())
+	}, gitcmd.WithEnv(env...), gitcmd.WithConfig(config...), gitcmd.WithSetupStdout())
 	if err != nil {
 		return err
 	}

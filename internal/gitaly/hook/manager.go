@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
@@ -89,7 +90,7 @@ type GitLabHookManager struct {
 	cfg                 config.Cfg
 	locator             storage.Locator
 	logger              log.Logger
-	gitCmdFactory       git.CommandFactory
+	gitCmdFactory       gitcmd.CommandFactory
 	txManager           transaction.Manager
 	gitlabClient        gitlab.Client
 	txRegistry          TransactionRegistry
@@ -108,7 +109,7 @@ func NewManager(
 	cfg config.Cfg,
 	locator storage.Locator,
 	logger log.Logger,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	txManager transaction.Manager,
 	gitlabClient gitlab.Client,
 	txRegistry TransactionRegistry,

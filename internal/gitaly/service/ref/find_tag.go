@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -64,18 +65,18 @@ func parseTagLine(ctx context.Context, objectReader catfile.ObjectContentReader,
 	}
 }
 
-func (s *server) findTag(ctx context.Context, repo git.RepositoryExecutor, tagName []byte) (*gitalypb.Tag, error) {
+func (s *server) findTag(ctx context.Context, repo gitcmd.RepositoryExecutor, tagName []byte) (*gitalypb.Tag, error) {
 	tagCmd, err := repo.Exec(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "tag",
-			Flags: []git.Option{
-				git.Flag{Name: "-l"},
-				git.ValueFlag{Name: "--format", Value: "%(objectname) %(objecttype) %(refname:lstrip=2)"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "-l"},
+				gitcmd.ValueFlag{Name: "--format", Value: "%(objectname) %(objecttype) %(refname:lstrip=2)"},
 			},
 			Args: []string{string(tagName)},
 		},
-		git.WithRefTxHook(repo),
-		git.WithSetupStdout(),
+		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("for-each-ref error: %w", err)

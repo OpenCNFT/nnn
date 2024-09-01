@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 )
 
@@ -206,26 +207,26 @@ func Revlist(
 	go func() {
 		defer close(resultChan)
 
-		flags := []git.Option{}
+		flags := []gitcmd.Option{}
 
 		if cfg.objects {
 			flags = append(flags,
-				git.Flag{Name: "--in-commit-order"},
-				git.Flag{Name: "--objects"},
-				git.Flag{Name: "--object-names"},
+				gitcmd.Flag{Name: "--in-commit-order"},
+				gitcmd.Flag{Name: "--objects"},
+				gitcmd.Flag{Name: "--object-names"},
 			)
 		}
 
 		if cfg.blobLimit > 0 {
-			flags = append(flags, git.Flag{
+			flags = append(flags, gitcmd.Flag{
 				Name: fmt.Sprintf("--filter=blob:limit=%d", cfg.blobLimit),
 			})
 		}
 
 		if cfg.objectType != "" {
 			flags = append(flags,
-				git.Flag{Name: fmt.Sprintf("--filter=object:type=%s", cfg.objectType)},
-				git.Flag{Name: "--filter-provided-objects"},
+				gitcmd.Flag{Name: fmt.Sprintf("--filter=object:type=%s", cfg.objectType)},
+				gitcmd.Flag{Name: "--filter-provided-objects"},
 			)
 		}
 
@@ -233,67 +234,67 @@ func Revlist(
 		case OrderNone:
 			// Default order, nothing to do.
 		case OrderTopo:
-			flags = append(flags, git.Flag{Name: "--topo-order"})
+			flags = append(flags, gitcmd.Flag{Name: "--topo-order"})
 		case OrderDate:
-			flags = append(flags, git.Flag{Name: "--date-order"})
+			flags = append(flags, gitcmd.Flag{Name: "--date-order"})
 		}
 
 		if cfg.reverse {
-			flags = append(flags, git.Flag{Name: "--reverse"})
+			flags = append(flags, gitcmd.Flag{Name: "--reverse"})
 		}
 
 		if cfg.maxParents > 0 {
-			flags = append(flags, git.Flag{
+			flags = append(flags, gitcmd.Flag{
 				Name: fmt.Sprintf("--max-parents=%d", cfg.maxParents),
 			},
 			)
 		}
 
 		if cfg.disabledWalk {
-			flags = append(flags, git.Flag{Name: "--no-walk"})
+			flags = append(flags, gitcmd.Flag{Name: "--no-walk"})
 		}
 
 		if cfg.firstParent {
-			flags = append(flags, git.Flag{Name: "--first-parent"})
+			flags = append(flags, gitcmd.Flag{Name: "--first-parent"})
 		}
 
 		if !cfg.before.IsZero() {
-			flags = append(flags, git.Flag{
+			flags = append(flags, gitcmd.Flag{
 				Name: fmt.Sprintf("--before=%s", cfg.before.String()),
 			})
 		}
 
 		if !cfg.after.IsZero() {
-			flags = append(flags, git.Flag{
+			flags = append(flags, gitcmd.Flag{
 				Name: fmt.Sprintf("--after=%s", cfg.after.String()),
 			})
 		}
 
 		if len(cfg.author) > 0 {
-			flags = append(flags, git.Flag{
+			flags = append(flags, gitcmd.Flag{
 				Name: fmt.Sprintf("--author=%s", string(cfg.author)),
 			})
 		}
 
 		if cfg.regexIgnoreCase {
-			flags = append(flags, git.Flag{Name: "--regexp-ignore-case"})
+			flags = append(flags, gitcmd.Flag{Name: "--regexp-ignore-case"})
 		}
 
 		if len(cfg.commitMessagePatterns) > 0 {
 			for _, pattern := range cfg.commitMessagePatterns {
-				flags = append(flags, git.Flag{Name: fmt.Sprintf("--grep=%s", pattern)})
+				flags = append(flags, gitcmd.Flag{Name: fmt.Sprintf("--grep=%s", pattern)})
 			}
 		}
 
 		var stderr strings.Builder
 		revlist, err := repo.Exec(ctx,
-			git.Command{
+			gitcmd.Command{
 				Name:  "rev-list",
 				Flags: flags,
 				Args:  revisions,
 			},
-			git.WithStderr(&stderr),
-			git.WithSetupStdout(),
+			gitcmd.WithStderr(&stderr),
+			gitcmd.WithSetupStdout(),
 		)
 		if err != nil {
 			sendRevisionResult(ctx, resultChan, RevisionResult{
@@ -414,24 +415,24 @@ func ForEachRef(
 	go func() {
 		defer close(resultChan)
 
-		flags := []git.Option{
-			git.ValueFlag{Name: "--format", Value: cfg.format},
+		flags := []gitcmd.Option{
+			gitcmd.ValueFlag{Name: "--format", Value: cfg.format},
 		}
 		if cfg.sortField != "" {
-			flags = append(flags, git.ValueFlag{Name: "--sort", Value: cfg.sortField})
+			flags = append(flags, gitcmd.ValueFlag{Name: "--sort", Value: cfg.sortField})
 		}
 		if cfg.pointsAt != "" {
-			flags = append(flags, git.ValueFlag{Name: "--points-at", Value: cfg.pointsAt})
+			flags = append(flags, gitcmd.ValueFlag{Name: "--points-at", Value: cfg.pointsAt})
 		}
 		if cfg.count > 0 {
-			flags = append(flags, git.ValueFlag{Name: "--count", Value: strconv.Itoa(cfg.count)})
+			flags = append(flags, gitcmd.ValueFlag{Name: "--count", Value: strconv.Itoa(cfg.count)})
 		}
 
-		forEachRef, err := repo.Exec(ctx, git.Command{
+		forEachRef, err := repo.Exec(ctx, gitcmd.Command{
 			Name:  "for-each-ref",
 			Flags: flags,
 			Args:  patterns,
-		}, git.WithSetupStdout())
+		}, gitcmd.WithSetupStdout())
 		if err != nil {
 			sendRevisionResult(ctx, resultChan, RevisionResult{err: err})
 			return

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -31,8 +31,8 @@ func (s *server) runUploadCommand(
 	stdout, stderr io.Writer,
 	timeoutTicker helper.Ticker,
 	boundaryPacket []byte,
-	sc git.Command,
-	opts ...git.CmdOpt,
+	sc gitcmd.Command,
+	opts ...gitcmd.CmdOpt,
 ) error {
 	ctx, cancelCtx := context.WithCancel(rpcContext)
 	defer cancelCtx()
@@ -49,11 +49,11 @@ func (s *server) runUploadCommand(
 		return fmt.Errorf("create monitor: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, repo, sc, append([]git.CmdOpt{
-		git.WithStdin(stdinPipe),
-		git.WithStdout(stdout),
-		git.WithStderr(stderr),
-		git.WithFinalizer(func(context.Context, *command.Command) { cleanup() }),
+	cmd, err := s.gitCmdFactory.New(ctx, repo, sc, append([]gitcmd.CmdOpt{
+		gitcmd.WithStdin(stdinPipe),
+		gitcmd.WithStdout(stdout),
+		gitcmd.WithStderr(stderr),
+		gitcmd.WithFinalizer(func(context.Context, *command.Command) { cleanup() }),
 	}, opts...)...)
 	stdinPipe.Close() // this now belongs to cmd
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -28,7 +29,7 @@ func Create(
 	ctx context.Context,
 	logger log.Logger,
 	locator storage.Locator,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	catfileCache catfile.Cache,
 	txManager transaction.Manager,
 	housekeepingManager housekeepingmgr.Manager,
@@ -65,23 +66,23 @@ func Create(
 
 	var stderr bytes.Buffer
 	cmd, err := gitCmdFactory.NewWithoutRepo(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "clone",
-			Flags: []git.Option{
-				git.Flag{Name: "--quiet"},
-				git.Flag{Name: "--bare"},
-				git.Flag{Name: "--local"},
-				git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--bare"},
+				gitcmd.Flag{Name: "--local"},
+				gitcmd.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 			},
 			Args: []string{sourceRepoPath, objectPoolPath},
 		},
-		git.WithRefTxHook(sourceRepo),
-		git.WithStderr(&stderr),
+		gitcmd.WithRefTxHook(sourceRepo),
+		gitcmd.WithStderr(&stderr),
 		// When cloning an empty repository then Git isn't capable to figure out the correct
 		// object hash that the new repository needs to use and just uses the default object
 		// format. To work around this shortcoming we thus set the default object hash to
 		// match the source repository's object hash.
-		git.WithEnv("GIT_DEFAULT_HASH="+objectHash.Format),
+		gitcmd.WithEnv("GIT_DEFAULT_HASH="+objectHash.Format),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("spawning clone: %w", err)
@@ -100,10 +101,10 @@ func Create(
 	// remote configuration in the gitconfig anymore, so let's remove it before returning. Note
 	// that we explicitly don't use git-remote(1) to do this, as this command would also remove
 	// references part of the remote.
-	if err := objectPool.ExecAndWait(ctx, git.Command{
+	if err := objectPool.ExecAndWait(ctx, gitcmd.Command{
 		Name: "config",
-		Flags: []git.Option{
-			git.Flag{Name: "--remove-section"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--remove-section"},
 		},
 		Args: []string{
 			"remote.origin",

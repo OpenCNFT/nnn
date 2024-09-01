@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 )
 
@@ -98,12 +99,12 @@ func (repo *Repo) WriteTag(
 	content := strings.NewReader(tagBuf)
 
 	cmd, err := repo.Exec(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "mktag",
 		},
-		git.WithStdin(content),
-		git.WithStdout(stdout),
-		git.WithStderr(stderr),
+		gitcmd.WithStdin(content),
+		gitcmd.WithStdout(stdout),
+		gitcmd.WithStderr(stderr),
 	)
 	if err != nil {
 		return "", err

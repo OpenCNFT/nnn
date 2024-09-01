@@ -6,13 +6,14 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 //nolint:revive // This is unintentionally missing documentation.
 func (m *GitLabHookManager) UpdateHook(ctx context.Context, repo *gitalypb.Repository, ref, oldValue, newValue string, env []string, stdout, stderr io.Writer) error {
-	payload, err := git.HooksPayloadFromEnv(env)
+	payload, err := gitcmd.HooksPayloadFromEnv(env)
 	if err != nil {
 		return structerr.NewInternal("extracting hooks payload: %w", err)
 	}
@@ -38,7 +39,7 @@ func (m *GitLabHookManager) UpdateHook(ctx context.Context, repo *gitalypb.Repos
 	return nil
 }
 
-func (m *GitLabHookManager) updateHook(ctx context.Context, payload git.HooksPayload, repo *gitalypb.Repository, ref, oldValue, newValue string, env []string, stdout, stderr io.Writer) error {
+func (m *GitLabHookManager) updateHook(ctx context.Context, payload gitcmd.HooksPayload, repo *gitalypb.Repository, ref, oldValue, newValue string, env []string, stdout, stderr io.Writer) error {
 	objectHash, err := git.ObjectHashByFormat(payload.ObjectFormat)
 	if err != nil {
 		return fmt.Errorf("looking up object hash: %w", err)

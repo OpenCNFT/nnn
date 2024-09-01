@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
@@ -48,13 +49,13 @@ func (repo *Repo) ResolveRevision(ctx context.Context, revision git.Revision) (g
 
 	var stdout bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "rev-parse",
-			Flags: []git.Option{git.Flag{Name: "--verify"}},
+			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--verify"}},
 			Args:  []string{revision.String()},
 		},
-		git.WithStderr(io.Discard),
-		git.WithStdout(&stdout),
+		gitcmd.WithStderr(io.Discard),
+		gitcmd.WithStdout(&stdout),
 	); err != nil {
 		if _, ok := command.ExitStatus(err); ok {
 			return "", git.ErrReferenceNotFound
@@ -79,7 +80,7 @@ func (repo *Repo) ResolveRevision(ctx context.Context, revision git.Revision) (g
 // GetReference looks up and returns the given reference. Returns a
 // ReferenceNotFound error if the reference was not found.
 func (repo *Repo) GetReference(ctx context.Context, reference git.ReferenceName) (git.Reference, error) {
-	refs, err := git.GetReferences(ctx, repo, git.GetReferencesConfig{
+	refs, err := gitcmd.GetReferences(ctx, repo, gitcmd.GetReferencesConfig{
 		Patterns: []string{reference.String()},
 		Limit:    1,
 	})
@@ -100,7 +101,7 @@ func (repo *Repo) GetReference(ctx context.Context, reference git.ReferenceName)
 // HasBranches determines whether there is at least one branch in the
 // repository.
 func (repo *Repo) HasBranches(ctx context.Context) (bool, error) {
-	refs, err := git.GetReferences(ctx, repo, git.GetReferencesConfig{
+	refs, err := gitcmd.GetReferences(ctx, repo, gitcmd.GetReferencesConfig{
 		Patterns: []string{"refs/heads/"},
 		Limit:    1,
 	})
@@ -110,7 +111,7 @@ func (repo *Repo) HasBranches(ctx context.Context) (bool, error) {
 // GetReferences returns references matching any of the given patterns. If no patterns are given,
 // all references are returned.
 func (repo *Repo) GetReferences(ctx context.Context, patterns ...string) ([]git.Reference, error) {
-	return git.GetReferences(ctx, repo, git.GetReferencesConfig{
+	return gitcmd.GetReferences(ctx, repo, gitcmd.GetReferencesConfig{
 		Patterns: patterns,
 	})
 }
@@ -242,7 +243,7 @@ func (repo *Repo) setDefaultBranchManually(ctx context.Context, txManager transa
 
 type getRemoteReferenceConfig struct {
 	patterns   []string
-	config     []git.ConfigPair
+	config     []gitcmd.ConfigPair
 	sshCommand string
 }
 
@@ -266,7 +267,7 @@ func WithSSHCommand(cmd string) GetRemoteReferencesOption {
 
 // WithConfig sets up Git configuration for the git-ls-remote(1) invocation. The config pairs are
 // set up via `WithConfigEnv()` and are thus not exposed via the command line.
-func WithConfig(config ...git.ConfigPair) GetRemoteReferencesOption {
+func WithConfig(config ...gitcmd.ConfigPair) GetRemoteReferencesOption {
 	return func(cfg *getRemoteReferenceConfig) {
 		cfg.config = config
 	}
@@ -287,18 +288,18 @@ func (repo *Repo) GetRemoteReferences(ctx context.Context, remote string, opts .
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "ls-remote",
-			Flags: []git.Option{
-				git.Flag{Name: "--refs"},
-				git.Flag{Name: "--symref"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--refs"},
+				gitcmd.Flag{Name: "--symref"},
 			},
 			Args: append([]string{remote}, cfg.patterns...),
 		},
-		git.WithStdout(stdout),
-		git.WithStderr(stderr),
-		git.WithEnv(env...),
-		git.WithConfigEnv(cfg.config...),
+		gitcmd.WithStdout(stdout),
+		gitcmd.WithStderr(stderr),
+		gitcmd.WithEnv(env...),
+		gitcmd.WithConfigEnv(cfg.config...),
 	); err != nil {
 		return nil, fmt.Errorf("create git ls-remote: %w, stderr: %q", err, stderr)
 	}
@@ -369,7 +370,7 @@ func (repo *Repo) GetDefaultBranch(ctx context.Context) (git.ReferenceName, erro
 	}
 
 	// If all else fails, return the first branch name
-	branches, err := git.GetReferences(ctx, repo, git.GetReferencesConfig{
+	branches, err := gitcmd.GetReferences(ctx, repo, gitcmd.GetReferencesConfig{
 		Patterns: []string{"refs/heads/"},
 		Limit:    1,
 	})
@@ -382,7 +383,7 @@ func (repo *Repo) GetDefaultBranch(ctx context.Context) (git.ReferenceName, erro
 
 // HeadReference returns the current value of HEAD.
 func (repo *Repo) HeadReference(ctx context.Context) (git.ReferenceName, error) {
-	symref, err := git.GetSymbolicRef(ctx, repo, "HEAD")
+	symref, err := gitcmd.GetSymbolicRef(ctx, repo, "HEAD")
 	if err != nil {
 		return "", err
 	}

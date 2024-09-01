@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	gitalyhook "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -19,12 +19,12 @@ type server struct {
 	logger             log.Logger
 	manager            gitalyhook.Manager
 	locator            storage.Locator
-	gitCmdFactory      git.CommandFactory
+	gitCmdFactory      gitcmd.CommandFactory
 	packObjectsCache   streamcache.Cache
 	packObjectsLimiter limiter.Limiter
 	runPackObjectsFn   func(
 		context.Context,
-		git.CommandFactory,
+		gitcmd.CommandFactory,
 		io.Writer,
 		*gitalypb.PackObjectsHookWithSidechannelRequest,
 		*packObjectsArgs,

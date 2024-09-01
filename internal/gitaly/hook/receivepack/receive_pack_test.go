@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
@@ -426,13 +427,13 @@ func TestRegisterProcReceiveHook(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			env, err := git.NewHooksPayload(
+			env, err := gitcmd.NewHooksPayload(
 				cfg,
 				data.repoProto,
 				gittest.DefaultObjectHash,
 				nil,
-				&git.UserDetails{},
-				git.ReceivePackHooks,
+				&gitcmd.UserDetails{},
+				gitcmd.ReceivePackHooks,
 				featureflag.FromContext(ctx),
 				transactionID,
 			).Env()

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -69,7 +70,7 @@ func TestRepo_SetConfig(t *testing.T) {
 			desc:        "invalid key",
 			key:         "missingsection",
 			value:       "overridden",
-			expectedErr: fmt.Errorf("%w: missing section or name", git.ErrInvalidArg),
+			expectedErr: fmt.Errorf("%w: missing section or name", gitcmd.ErrInvalidArg),
 		},
 		{
 			desc:        "locked",
@@ -192,7 +193,7 @@ func TestRepo_UnsetMatchingConfig(t *testing.T) {
 		{
 			desc:         "empty regex is refused",
 			regex:        "",
-			expectedErr:  fmt.Errorf("%w: \"regex\" is blank or empty", git.ErrInvalidArg),
+			expectedErr:  fmt.Errorf("%w: \"regex\" is blank or empty", gitcmd.ErrInvalidArg),
 			expectedKeys: standardKeys,
 		},
 		{
@@ -240,7 +241,7 @@ func TestRepo_UnsetMatchingConfig(t *testing.T) {
 		{
 			desc:         "invalid regex",
 			regex:        "?",
-			expectedErr:  fmt.Errorf("%w: invalid regular expression", git.ErrInvalidArg),
+			expectedErr:  fmt.Errorf("%w: invalid regular expression", gitcmd.ErrInvalidArg),
 			expectedKeys: standardKeys,
 		},
 		{

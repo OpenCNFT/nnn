@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -18,7 +18,7 @@ import (
 // HTTPServer starts an HTTP server with git-http-backend(1) as CGI handler. The repository is
 // prepared such that git-http-backend(1) will serve it by creating the "git-daemon-export-ok" magic
 // file.
-func HTTPServer(tb testing.TB, ctx context.Context, gitCmdFactory git.CommandFactory, repoPath string, middleware func(http.ResponseWriter, *http.Request, http.Handler)) int {
+func HTTPServer(tb testing.TB, ctx context.Context, gitCmdFactory gitcmd.CommandFactory, repoPath string, middleware func(http.ResponseWriter, *http.Request, http.Handler)) int {
 	require.NoError(tb, os.WriteFile(filepath.Join(repoPath, "git-daemon-export-ok"), nil, mode.File))
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

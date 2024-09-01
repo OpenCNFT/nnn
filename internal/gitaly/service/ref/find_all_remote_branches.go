@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -27,8 +27,8 @@ func (s *server) FindAllRemoteBranches(req *gitalypb.FindAllRemoteBranchesReques
 func (s *server) findAllRemoteBranches(req *gitalypb.FindAllRemoteBranchesRequest, stream gitalypb.RefService_FindAllRemoteBranchesServer) error {
 	repo := s.localrepo(req.GetRepository())
 
-	args := []git.Option{
-		git.Flag{Name: "--format=" + strings.Join(localBranchFormatFields, "%00")},
+	args := []gitcmd.Option{
+		gitcmd.Flag{Name: "--format=" + strings.Join(localBranchFormatFields, "%00")},
 	}
 
 	patterns := []string{"refs/remotes/" + req.GetRemoteName()}

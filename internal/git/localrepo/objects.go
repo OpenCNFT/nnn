@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
@@ -95,17 +96,17 @@ func (repo *Repo) ReadObject(ctx context.Context, oid git.ObjectID) ([]byte, err
 func (repo *Repo) WalkObjects(ctx context.Context, heads io.Reader, output io.Writer) error {
 	var stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "rev-list",
-			Flags: []git.Option{
-				git.Flag{Name: "--objects"},
-				git.Flag{Name: "--missing=print"},
-				git.Flag{Name: "--stdin"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--objects"},
+				gitcmd.Flag{Name: "--missing=print"},
+				gitcmd.Flag{Name: "--stdin"},
 			},
 		},
-		git.WithStdin(heads),
-		git.WithStdout(output),
-		git.WithStderr(&stderr),
+		gitcmd.WithStdin(heads),
+		gitcmd.WithStdout(output),
+		gitcmd.WithStderr(&stderr),
 	); err != nil {
 		return structerr.New("rev-list: %w", err).WithMetadata("stderr", stderr.String())
 	}
@@ -118,16 +119,16 @@ func (repo *Repo) WalkObjects(ctx context.Context, heads io.Reader, output io.Wr
 func (repo *Repo) PackObjects(ctx context.Context, objectIDs io.Reader, output io.Writer) error {
 	var stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "pack-objects",
-			Flags: []git.Option{
-				git.Flag{Name: "-q"},
-				git.Flag{Name: "--stdout"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "-q"},
+				gitcmd.Flag{Name: "--stdout"},
 			},
 		},
-		git.WithStdin(objectIDs),
-		git.WithStderr(&stderr),
-		git.WithStdout(output),
+		gitcmd.WithStdin(objectIDs),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithStdout(output),
 	); err != nil {
 		return structerr.New("pack objects: %w", err).WithMetadata("stderr", stderr.String())
 	}
@@ -139,14 +140,14 @@ func (repo *Repo) PackObjects(ctx context.Context, objectIDs io.Reader, output i
 func (repo *Repo) UnpackObjects(ctx context.Context, packFile io.Reader) error {
 	stderr := &bytes.Buffer{}
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "unpack-objects",
-			Flags: []git.Option{
-				git.Flag{Name: "-q"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "-q"},
 			},
 		},
-		git.WithStdin(packFile),
-		git.WithStderr(stderr),
+		gitcmd.WithStdin(packFile),
+		gitcmd.WithStderr(stderr),
 	); err != nil {
 		return structerr.New("unpack objects: %w", err).WithMetadata("stderr", stderr.String())
 	}

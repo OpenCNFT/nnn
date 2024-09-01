@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -19,22 +20,22 @@ import (
 func (s *server) cloneFromURLCommand(
 	ctx context.Context,
 	repoURL, resolvedAddress, repositoryFullPath, authorizationToken string, mirror bool,
-	opts ...git.CmdOpt,
+	opts ...gitcmd.CmdOpt,
 ) (*command.Command, error) {
 	refFormat := git.ReferenceBackendFiles.Name
 	if featureflag.NewRepoReftableBackend.IsEnabled(ctx) {
 		refFormat = git.ReferenceBackendReftables.Name
 	}
 
-	cloneFlags := []git.Option{
-		git.Flag{Name: "--quiet"},
-		git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
+	cloneFlags := []gitcmd.Option{
+		gitcmd.Flag{Name: "--quiet"},
+		gitcmd.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 	}
 
 	if mirror {
-		cloneFlags = append(cloneFlags, git.Flag{Name: "--mirror"})
+		cloneFlags = append(cloneFlags, gitcmd.Flag{Name: "--mirror"})
 	} else {
-		cloneFlags = append(cloneFlags, git.Flag{Name: "--bare"})
+		cloneFlags = append(cloneFlags, gitcmd.Flag{Name: "--bare"})
 	}
 
 	u, err := url.Parse(repoURL)
@@ -42,7 +43,7 @@ func (s *server) cloneFromURLCommand(
 		return nil, structerr.NewInternal("%w", err)
 	}
 
-	var config []git.ConfigPair
+	var config []gitcmd.ConfigPair
 	if u.User != nil {
 		password, hasPassword := u.User.Password()
 
@@ -55,16 +56,16 @@ func (s *server) cloneFromURLCommand(
 
 		u.User = nil
 		authHeader := fmt.Sprintf("Authorization: Basic %s", base64.StdEncoding.EncodeToString([]byte(creds)))
-		config = append(config, git.ConfigPair{Key: "http.extraHeader", Value: authHeader})
+		config = append(config, gitcmd.ConfigPair{Key: "http.extraHeader", Value: authHeader})
 	} else if len(authorizationToken) > 0 {
 		authHeader := fmt.Sprintf("Authorization: %s", authorizationToken)
-		config = append(config, git.ConfigPair{Key: "http.extraHeader", Value: authHeader})
+		config = append(config, gitcmd.ConfigPair{Key: "http.extraHeader", Value: authHeader})
 	}
 
 	urlString := u.String()
 
 	if resolvedAddress != "" {
-		modifiedURL, resolveConfig, err := git.GetURLAndResolveConfig(u.String(), resolvedAddress)
+		modifiedURL, resolveConfig, err := gitcmd.GetURLAndResolveConfig(u.String(), resolvedAddress)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("couldn't get curloptResolve config: %w", err)
 		}
@@ -74,12 +75,12 @@ func (s *server) cloneFromURLCommand(
 	}
 
 	return s.gitCmdFactory.NewWithoutRepo(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "clone",
 			Flags: cloneFlags,
 			Args:  []string{urlString, repositoryFullPath},
 		},
-		append(opts, git.WithConfigEnv(config...))...,
+		append(opts, gitcmd.WithConfigEnv(config...))...,
 	)
 }
 
@@ -101,8 +102,8 @@ func (s *server) CreateRepositoryFromURL(ctx context.Context, req *gitalypb.Crea
 			targetPath,
 			req.GetHttpAuthorizationHeader(),
 			req.GetMirror(),
-			git.WithStderr(&stderr),
-			git.WithDisabledHooks(),
+			gitcmd.WithStderr(&stderr),
+			gitcmd.WithDisabledHooks(),
 		)
 		if err != nil {
 			return fmt.Errorf("starting clone: %w", err)

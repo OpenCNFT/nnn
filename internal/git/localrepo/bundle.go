@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -38,26 +39,26 @@ func (repo *Repo) CreateBundle(ctx context.Context, out io.Writer, opts *CreateB
 
 	var stderr strings.Builder
 
-	gitOpts := []git.Option{
-		git.OutputToStdout,
+	gitOpts := []gitcmd.Option{
+		gitcmd.OutputToStdout,
 	}
-	cmdOpts := []git.CmdOpt{
-		git.WithStdout(out),
-		git.WithStderr(&stderr),
+	cmdOpts := []gitcmd.CmdOpt{
+		gitcmd.WithStdout(out),
+		gitcmd.WithStderr(&stderr),
 	}
 
 	if opts.Patterns != nil {
 		gitOpts = append(gitOpts,
-			git.Flag{Name: "--ignore-missing"},
-			git.Flag{Name: "--stdin"},
+			gitcmd.Flag{Name: "--ignore-missing"},
+			gitcmd.Flag{Name: "--stdin"},
 		)
-		cmdOpts = append(cmdOpts, git.WithStdin(opts.Patterns))
+		cmdOpts = append(cmdOpts, gitcmd.WithStdin(opts.Patterns))
 	} else {
-		gitOpts = append(gitOpts, git.Flag{Name: "--all"})
+		gitOpts = append(gitOpts, gitcmd.Flag{Name: "--all"})
 	}
 
 	err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:   "bundle",
 			Action: "create",
 			Flags:  gitOpts,
@@ -94,17 +95,17 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 
 	var cloneErr bytes.Buffer
 	cloneCmd, err := repo.gitCmdFactory.NewWithoutRepo(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "clone",
-			Flags: []git.Option{
-				git.Flag{Name: "--quiet"},
-				git.Flag{Name: "--mirror"},
-				git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--mirror"},
+				gitcmd.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 			},
 			Args: []string{bundlePath, repoPath},
 		},
-		git.WithStderr(&cloneErr),
-		git.WithDisabledHooks(),
+		gitcmd.WithStderr(&cloneErr),
+		gitcmd.WithDisabledHooks(),
 	)
 	if err != nil {
 		return fmt.Errorf("spawning git-clone: %w", err)
@@ -118,12 +119,12 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 	// is unnecessary, remove the configured "origin" remote.
 	var remoteErr bytes.Buffer
 	remoteCmd, err := repo.gitCmdFactory.New(ctx, repo,
-		git.Command{
+		gitcmd.Command{
 			Name: "remote",
 			Args: []string{"remove", "origin"},
 		},
-		git.WithStderr(&remoteErr),
-		git.WithRefTxHook(repo),
+		gitcmd.WithStderr(&remoteErr),
+		gitcmd.WithRefTxHook(repo),
 	)
 	if err != nil {
 		return fmt.Errorf("spawning git-remote: %w", err)
@@ -155,12 +156,12 @@ func (repo *Repo) FetchBundle(ctx context.Context, txManager transaction.Manager
 		return fmt.Errorf("fetch bundle: %w", err)
 	}
 
-	fetchConfig := []git.ConfigPair{
+	fetchConfig := []gitcmd.ConfigPair{
 		{Key: "remote.inmemory.url", Value: bundlePath},
 		{Key: "remote.inmemory.fetch", Value: git.MirrorRefSpec},
 	}
 	fetchOpts := FetchOpts{
-		CommandOptions: []git.CmdOpt{git.WithConfigEnv(fetchConfig...)},
+		CommandOptions: []gitcmd.CmdOpt{gitcmd.WithConfigEnv(fetchConfig...)},
 	}
 	if err := repo.FetchRemote(ctx, "inmemory", fetchOpts); err != nil {
 		return fmt.Errorf("fetch bundle: %w", err)
@@ -226,15 +227,15 @@ func (repo *Repo) updateHeadFromBundle(ctx context.Context, txManager transactio
 // findBundleHead tries to extract HEAD and its target from a bundle. Returns
 // nil when HEAD is not found.
 func (repo *Repo) findBundleHead(ctx context.Context, bundlePath string) (*git.Reference, error) {
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:   "bundle",
 		Action: "list-heads",
 		Args:   []string{bundlePath, "HEAD"},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, fmt.Errorf("find bundle HEAD: %w", err)
 	}
-	decoder := git.NewShowRefDecoder(cmd)
+	decoder := gitcmd.NewShowRefDecoder(cmd)
 	for {
 		var ref git.Reference
 		err := decoder.Decode(&ref)

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
@@ -148,17 +148,17 @@ func TestPreReceiveHook_GitlabAPIAccess(t *testing.T) {
 	client, conn := newHooksClient(t, serverSocketPath)
 	defer conn.Close()
 
-	hooksPayload, err := git.NewHooksPayload(
+	hooksPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		nil,
-		&git.UserDetails{
+		&gitcmd.UserDetails{
 			UserID:   glID,
 			Username: "username",
 			Protocol: protocol,
 		},
-		git.PreReceiveHook,
+		gitcmd.PreReceiveHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
@@ -285,17 +285,17 @@ func TestPreReceive_APIErrors(t *testing.T) {
 			client, conn := newHooksClient(t, cfg.SocketPath)
 			defer conn.Close()
 
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
 				nil,
-				&git.UserDetails{
+				&gitcmd.UserDetails{
 					UserID:   "key-123",
 					Username: "username",
 					Protocol: "web",
 				},
-				git.PreReceiveHook,
+				gitcmd.PreReceiveHook,
 				featureflag.FromContext(ctx),
 				storage.ExtractTransactionID(ctx),
 			).Env()
@@ -360,17 +360,17 @@ exit %d
 	client, conn := newHooksClient(t, cfg.SocketPath)
 	defer conn.Close()
 
-	hooksPayload, err := git.NewHooksPayload(
+	hooksPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		nil,
-		&git.UserDetails{
+		&gitcmd.UserDetails{
 			UserID:   "key-123",
 			Username: "username",
 			Protocol: "web",
 		},
-		git.PreReceiveHook,
+		gitcmd.PreReceiveHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
@@ -512,7 +512,7 @@ func TestPreReceiveHook_Primary(t *testing.T) {
 			client, conn := newHooksClient(t, cfg.SocketPath)
 			defer conn.Close()
 
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				testRepo,
 				gittest.DefaultObjectHash,
@@ -521,12 +521,12 @@ func TestPreReceiveHook_Primary(t *testing.T) {
 					Node:    "node-1",
 					Primary: tc.primary,
 				},
-				&git.UserDetails{
+				&gitcmd.UserDetails{
 					UserID:   "key-123",
 					Username: "username",
 					Protocol: "web",
 				},
-				git.PreReceiveHook,
+				gitcmd.PreReceiveHook,
 				featureflag.FromContext(ctx),
 				storage.ExtractTransactionID(ctx),
 			).Env()

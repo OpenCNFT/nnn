@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -99,16 +100,16 @@ func createCommand(tb testing.TB, cfg config.Cfg, execCfg ExecConfig, args ...st
 	gitConfig, err := factory.GlobalConfiguration(ctx)
 	require.NoError(tb, err)
 	gitConfig = append(gitConfig,
-		git.ConfigPair{Key: "init.defaultBranch", Value: git.DefaultBranch},
-		git.ConfigPair{Key: "init.templateDir", Value: ""},
-		git.ConfigPair{Key: "user.name", Value: "Your Name"},
-		git.ConfigPair{Key: "user.email", Value: "you@example.com"},
+		gitcmd.ConfigPair{Key: "init.defaultBranch", Value: git.DefaultBranch},
+		gitcmd.ConfigPair{Key: "init.templateDir", Value: ""},
+		gitcmd.ConfigPair{Key: "user.name", Value: "Your Name"},
+		gitcmd.ConfigPair{Key: "user.email", Value: "you@example.com"},
 	)
 
 	cmd := exec.CommandContext(ctx, execEnv.BinaryPath, args...)
 	cmd.Env = command.AllowedEnvironment(os.Environ())
 	cmd.Env = append(cmd.Env, "GIT_AUTHOR_DATE=1572776879 +0100", "GIT_COMMITTER_DATE=1572776879 +0100")
-	cmd.Env = append(cmd.Env, git.ConfigPairsToGitEnvironment(gitConfig)...)
+	cmd.Env = append(cmd.Env, gitcmd.ConfigPairsToGitEnvironment(gitConfig)...)
 	cmd.Env = append(cmd.Env, execEnv.EnvironmentVariables...)
 	cmd.Env = append(cmd.Env, execCfg.Env...)
 
@@ -119,13 +120,13 @@ func createCommand(tb testing.TB, cfg config.Cfg, execCfg ExecConfig, args ...st
 	return cmd
 }
 
-var _ git.RepositoryExecutor = RepositoryPathExecutor{}
+var _ gitcmd.RepositoryExecutor = RepositoryPathExecutor{}
 
-// RepositoryPathExecutor is a `git.RepositoryExecutor` that knows to execute commands in a Git repository identified by
+// RepositoryPathExecutor is a `gitcmd.RepositoryExecutor` that knows to execute commands in a Git repository identified by
 // its absolute path.
 type RepositoryPathExecutor struct {
 	storage.Repository
-	factory git.CommandFactory
+	factory gitcmd.CommandFactory
 }
 
 // NewRepositoryPathExecutor creates a new RepositoryPathExecutor for the given repository.
@@ -143,12 +144,12 @@ func NewRepositoryPathExecutor(tb testing.TB, cfg config.Cfg, repoPath string) R
 }
 
 // Exec executes a command in the given repository.
-func (e RepositoryPathExecutor) Exec(ctx context.Context, cmd git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+func (e RepositoryPathExecutor) Exec(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 	return e.factory.New(ctx, e.Repository, cmd, opts...)
 }
 
 // ExecAndWait executes a command in the given repository and waits for it to exit.
-func (e RepositoryPathExecutor) ExecAndWait(ctx context.Context, cmd git.Command, opts ...git.CmdOpt) error {
+func (e RepositoryPathExecutor) ExecAndWait(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) error {
 	command, err := e.Exec(ctx, cmd, opts...)
 	if err != nil {
 		return err
@@ -164,10 +165,10 @@ func (e RepositoryPathExecutor) GitVersion(ctx context.Context) (git.Version, er
 
 // ObjectHash determines the object hash used by the repository.
 func (e RepositoryPathExecutor) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
-	return git.DetectObjectHash(ctx, e.factory, e.Repository)
+	return gitcmd.DetectObjectHash(ctx, e.factory, e.Repository)
 }
 
 // ReferenceBackend detects the reference backend used by this repository.
 func (e RepositoryPathExecutor) ReferenceBackend(ctx context.Context) (git.ReferenceBackend, error) {
-	return git.DetectReferenceBackend(ctx, e.factory, e.Repository)
+	return gitcmd.DetectReferenceBackend(ctx, e.factory, e.Repository)
 }

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -16,7 +16,7 @@ import (
 // ProtocolDetectingCommandFactory is an intercepting Git command factory that allows the protocol
 // to be tested.
 type ProtocolDetectingCommandFactory struct {
-	git.CommandFactory
+	gitcmd.CommandFactory
 	envPath string
 }
 
@@ -24,7 +24,7 @@ type ProtocolDetectingCommandFactory struct {
 func NewProtocolDetectingCommandFactory(tb testing.TB, ctx context.Context, cfg config.Cfg) ProtocolDetectingCommandFactory {
 	envPath := filepath.Join(testhelper.TempDir(tb), "git-env")
 
-	gitCmdFactory := NewInterceptingCommandFactory(tb, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+	gitCmdFactory := NewInterceptingCommandFactory(tb, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 		return fmt.Sprintf(
 			`#!/usr/bin/env bash
 			env | grep ^GIT_PROTOCOL= >>%q

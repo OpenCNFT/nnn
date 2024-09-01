@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/lines"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -44,14 +45,14 @@ func (s *server) ListRefs(in *gitalypb.ListRefsRequest, stream gitalypb.RefServi
 
 	sorting := sortDirectionByEnum[in.GetSortBy().GetDirection()] + sortKeyByEnum[in.GetSortBy().GetKey()]
 	opts := buildFindRefsOpts(ctx, nil)
-	opts.cmdArgs = []git.Option{
+	opts.cmdArgs = []gitcmd.Option{
 		// %00 inserts the null character into the output (see for-each-ref docs)
-		git.ValueFlag{Name: "--format", Value: strings.Join(format, "%00")},
-		git.ValueFlag{Name: "--sort", Value: sorting},
+		gitcmd.ValueFlag{Name: "--format", Value: strings.Join(format, "%00")},
+		gitcmd.ValueFlag{Name: "--sort", Value: sorting},
 	}
 
 	for _, oid := range in.GetPointingAtOids() {
-		opts.cmdArgs = append(opts.cmdArgs, git.ValueFlag{Name: "--points-at", Value: string(oid)})
+		opts.cmdArgs = append(opts.cmdArgs, gitcmd.ValueFlag{Name: "--points-at", Value: string(oid)})
 	}
 
 	if err := s.findRefs(ctx, writer, repo, patterns, opts); err != nil {

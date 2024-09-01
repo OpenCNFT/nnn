@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	grpc_metadata "google.golang.org/grpc/metadata"
@@ -36,7 +36,7 @@ func testSidechannelWithRuntimeDir(t *testing.T, runtimeDir string) {
 	// Client side
 	ctxOut, wt, err := SetupSidechannel(
 		ctx,
-		git.HooksPayload{
+		gitcmd.HooksPayload{
 			RuntimeDir: runtimeDir,
 		},
 		func(c *net.UnixConn) error {
@@ -77,7 +77,7 @@ func TestSidechannel_cleanup(t *testing.T) {
 func testSidechannelCleanupWithRuntimeDir(t *testing.T, runtimeDir string) {
 	_, wt, err := SetupSidechannel(
 		testhelper.Context(t),
-		git.HooksPayload{
+		gitcmd.HooksPayload{
 			RuntimeDir: runtimeDir,
 		},
 		func(c *net.UnixConn) error { return nil },

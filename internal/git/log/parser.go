@@ -8,6 +8,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
@@ -20,7 +21,7 @@ type Parser struct {
 }
 
 // NewParser returns a new Parser
-func NewParser(ctx context.Context, catfileCache catfile.Cache, repo git.RepositoryExecutor, src io.Reader) (*Parser, func(), error) {
+func NewParser(ctx context.Context, catfileCache catfile.Cache, repo gitcmd.RepositoryExecutor, src io.Reader) (*Parser, func(), error) {
 	objectReader, cancel, err := catfileCache.ObjectReader(ctx, repo)
 	if err != nil {
 		return nil, nil, err

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -45,7 +46,7 @@ func TestCreate(t *testing.T) {
 			ctx,
 			logger,
 			config.NewLocator(cfg),
-			gittest.NewCommandFactory(t, cfg, git.WithSkipHooks()),
+			gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()),
 			catfileCache,
 			txManager,
 			housekeepingmgr.New(cfg.Prometheus, logger, txManager, nil),

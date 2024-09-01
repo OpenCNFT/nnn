@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -60,11 +61,11 @@ func (s *server) commitStats(ctx context.Context, in *gitalypb.CommitStatsReques
 		args = append(args, commit.Id+"^", commit.Id)
 	}
 
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "diff",
-		Flags: []git.Option{git.Flag{Name: "--numstat"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--numstat"}},
 		Args:  args,
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, err
 	}

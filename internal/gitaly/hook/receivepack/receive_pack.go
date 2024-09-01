@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -26,7 +27,7 @@ func RegisterProcReceiveHook(
 	ctx context.Context,
 	logger log.Logger,
 	cfg config.Cfg,
-	req git.ReceivePackRequest,
+	req gitcmd.ReceivePackRequest,
 	repo *localrepo.Repo,
 	hookManager hook.Manager,
 	txRegistry hook.TransactionRegistry,
@@ -81,7 +82,7 @@ func procReceiveHook(
 	ctx context.Context,
 	logger log.Logger,
 	cfg config.Cfg,
-	req git.ReceivePackRequest,
+	req gitcmd.ReceivePackRequest,
 	repo *localrepo.Repo,
 	hookManager hook.Manager,
 	tx hook.Transaction,
@@ -155,7 +156,7 @@ func procReceiveHook(
 
 	// The post-receive hook only executes if there are successful updates.
 	if len(acceptedUpdates) > 0 {
-		hooksPayload, err := setupHooksPayloadEnv(ctx, cfg, req, repo, git.PostReceiveHook)
+		hooksPayload, err := setupHooksPayloadEnv(ctx, cfg, req, repo, gitcmd.PostReceiveHook)
 		if err != nil {
 			return fmt.Errorf("creating hooks payload: %w", err)
 		}
@@ -196,13 +197,13 @@ func procReceiveHook(
 func receivePackReferenceUpdates(
 	ctx context.Context,
 	cfg config.Cfg,
-	req git.ReceivePackRequest,
+	req gitcmd.ReceivePackRequest,
 	repo *localrepo.Repo,
 	hookManager hook.Manager,
 	updates []hook.ReferenceUpdate,
 	stdout, stderr io.Writer,
 ) (returnedErr error) {
-	hooksPayload, err := setupHooksPayloadEnv(ctx, cfg, req, repo, git.UpdateHook)
+	hooksPayload, err := setupHooksPayloadEnv(ctx, cfg, req, repo, gitcmd.UpdateHook)
 	if err != nil {
 		return fmt.Errorf("creating hooks payload: %w", err)
 	}
@@ -246,7 +247,7 @@ func receivePackReferenceUpdates(
 	return nil
 }
 
-func setupHooksPayloadEnv(ctx context.Context, cfg config.Cfg, req git.ReceivePackRequest, repo *localrepo.Repo, hook git.Hook) (string, error) {
+func setupHooksPayloadEnv(ctx context.Context, cfg config.Cfg, req gitcmd.ReceivePackRequest, repo *localrepo.Repo, hook gitcmd.Hook) (string, error) {
 	var protocol string
 	switch req.(type) {
 	case *gitalypb.SSHReceivePackRequest:
@@ -267,12 +268,12 @@ func setupHooksPayloadEnv(ctx context.Context, cfg config.Cfg, req git.ReceivePa
 		return "", fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	hooksPayload, err := git.NewHooksPayload(
+	hooksPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		req.GetRepository(),
 		objectHash,
 		praefectTx,
-		&git.UserDetails{
+		&gitcmd.UserDetails{
 			UserID:   req.GetGlId(),
 			Username: req.GetGlUsername(),
 			Protocol: protocol,

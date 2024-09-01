@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -13,7 +14,7 @@ import (
 
 // GetRepositoryFunc is used to get a clean test repository for the different implementations of the
 // Repository interface in the common test suite TestRepository.
-type GetRepositoryFunc func(t testing.TB, ctx context.Context) (git.Repository, string)
+type GetRepositoryFunc func(t testing.TB, ctx context.Context) (gitcmd.Repository, string)
 
 // TestRepository tests an implementation of Repository.
 func TestRepository(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFunc) {
@@ -125,12 +126,12 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 
 	for _, tc := range []struct {
 		desc         string
-		repo         func(t *testing.T) git.Repository
+		repo         func(t *testing.T) gitcmd.Repository
 		expectedName git.ReferenceName
 	}{
 		{
 			desc: "default ref",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				oid := WriteCommit(t, cfg, repoPath, WithBranch("apple"))
 				WriteCommit(t, cfg, repoPath, WithParents(oid), WithBranch("main"))
@@ -140,7 +141,7 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 		},
 		{
 			desc: "legacy default ref",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				oid := WriteCommit(t, cfg, repoPath, WithBranch("apple"))
 				WriteCommit(t, cfg, repoPath, WithParents(oid), WithBranch("master"))
@@ -150,14 +151,14 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 		},
 		{
 			desc: "no branches",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, _ := getRepository(t, ctx)
 				return repo
 			},
 		},
 		{
 			desc: "one branch",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				WriteCommit(t, cfg, repoPath, WithBranch("apple"))
 				return repo
@@ -166,7 +167,7 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 		},
 		{
 			desc: "no default branches",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				oid := WriteCommit(t, cfg, repoPath, WithBranch("apple"))
 				WriteCommit(t, cfg, repoPath, WithParents(oid), WithBranch("banana"))
@@ -176,7 +177,7 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 		},
 		{
 			desc: "test repo HEAD set",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 
 				WriteCommit(t, cfg, repoPath, WithBranch("feature"))
@@ -201,12 +202,12 @@ func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository Get
 
 	for _, tc := range []struct {
 		desc         string
-		repo         func(t *testing.T) git.Repository
+		repo         func(t *testing.T) gitcmd.Repository
 		expectedName git.ReferenceName
 	}{
 		{
 			desc: "default unborn",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, _ := getRepository(t, ctx)
 				return repo
 			},
@@ -214,7 +215,7 @@ func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository Get
 		},
 		{
 			desc: "default exists",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				WriteCommit(t, cfg, repoPath, WithBranch(git.DefaultBranch))
 				return repo
@@ -223,7 +224,7 @@ func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository Get
 		},
 		{
 			desc: "HEAD set nonexistent",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				Exec(t, cfg, "-C", repoPath, "symbolic-ref", "HEAD", "refs/heads/feature")
 				return repo
@@ -232,7 +233,7 @@ func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository Get
 		},
 		{
 			desc: "HEAD set exists",
-			repo: func(t *testing.T) git.Repository {
+			repo: func(t *testing.T) gitcmd.Repository {
 				repo, repoPath := getRepository(t, ctx)
 				WriteCommit(t, cfg, repoPath, WithBranch("feature"))
 				Exec(t, cfg, "-C", repoPath, "symbolic-ref", "HEAD", "refs/heads/feature")

@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
@@ -44,11 +45,11 @@ func (repo *Repo) SetConfig(ctx context.Context, key, value string, txManager tr
 		}
 	}()
 
-	if err := repo.ExecAndWait(ctx, git.Command{
+	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name: "config",
-		Flags: []git.Option{
-			git.Flag{Name: "--replace-all"},
-			git.ValueFlag{Name: "--file", Value: writer.Path()},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--replace-all"},
+			gitcmd.ValueFlag{Name: "--file", Value: writer.Path()},
 		},
 		Args: []string{key, value},
 	}); err != nil {
@@ -57,10 +58,10 @@ func (repo *Repo) SetConfig(ctx context.Context, key, value string, txManager tr
 		switch {
 		case isExitWithCode(err, 1):
 			// section or key is invalid
-			return fmt.Errorf("%w: bad section or name", git.ErrInvalidArg)
+			return fmt.Errorf("%w: bad section or name", gitcmd.ErrInvalidArg)
 		case isExitWithCode(err, 2):
 			// no section or name was provided
-			return fmt.Errorf("%w: missing section or name", git.ErrInvalidArg)
+			return fmt.Errorf("%w: missing section or name", gitcmd.ErrInvalidArg)
 		}
 	}
 
@@ -104,21 +105,21 @@ func (repo *Repo) UnsetMatchingConfig(
 	// There is no way to directly unset all keys matching a given regular expression, so we
 	// need to go the indirect route and first discover all matching keys via `--get-regex`.
 	var stdout bytes.Buffer
-	if err := repo.ExecAndWait(ctx, git.Command{
+	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name: "config",
-		Flags: []git.Option{
-			git.Flag{Name: "--name-only"},
-			git.Flag{Name: "--get-regex"},
-			git.ValueFlag{Name: "--file", Value: writer.Path()},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--name-only"},
+			gitcmd.Flag{Name: "--get-regex"},
+			gitcmd.ValueFlag{Name: "--file", Value: writer.Path()},
 		},
 		Args: []string{regex},
-	}, git.WithStdout(&stdout)); err != nil {
+	}, gitcmd.WithStdout(&stdout)); err != nil {
 		switch {
 		case isExitWithCode(err, 1):
 			return fmt.Errorf("%w: no matching keys", git.ErrNotFound)
 		case isExitWithCode(err, 6):
 			// no section or name was provided
-			return fmt.Errorf("%w: invalid regular expression", git.ErrInvalidArg)
+			return fmt.Errorf("%w: invalid regular expression", gitcmd.ErrInvalidArg)
 		}
 		return fmt.Errorf("getting matching keys: %w", err)
 	}
@@ -139,11 +140,11 @@ func (repo *Repo) UnsetMatchingConfig(
 		}
 		keySeen[key] = true
 
-		if err := repo.ExecAndWait(ctx, git.Command{
+		if err := repo.ExecAndWait(ctx, gitcmd.Command{
 			Name: "config",
-			Flags: []git.Option{
-				git.Flag{Name: "--unset-all"},
-				git.ValueFlag{Name: "--file", Value: writer.Path()},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--unset-all"},
+				gitcmd.ValueFlag{Name: "--file", Value: writer.Path()},
 			},
 			Args: []string{key},
 		}); err != nil {

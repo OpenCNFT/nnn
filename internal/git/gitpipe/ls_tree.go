@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 )
 
@@ -72,23 +72,23 @@ func LsTree(
 			return
 		}
 
-		flags := []git.Option{
-			git.Flag{Name: "-z"},
+		flags := []gitcmd.Option{
+			gitcmd.Flag{Name: "-z"},
 		}
 
 		if cfg.recursive {
-			flags = append(flags, git.Flag{Name: "-r"})
+			flags = append(flags, gitcmd.Flag{Name: "-r"})
 		}
 
 		var stderr strings.Builder
 		cmd, err := repo.Exec(ctx,
-			git.Command{
+			gitcmd.Command{
 				Name:  "ls-tree",
 				Flags: flags,
 				Args:  []string{revision},
 			},
-			git.WithStderr(&stderr),
-			git.WithSetupStdout(),
+			gitcmd.WithStderr(&stderr),
+			gitcmd.WithSetupStdout(),
 		)
 		if err != nil {
 			sendRevisionResult(ctx, resultChan, RevisionResult{

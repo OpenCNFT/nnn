@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -27,14 +28,14 @@ type UpdaterWithHooks struct {
 	logger        log.Logger
 	locator       storage.Locator
 	hookManager   hook.Manager
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 	catfileCache  catfile.Cache
 }
 
 // CustomHookError contains an error message when executing a custom hook.
 type CustomHookError struct {
 	err      error
-	hookType git.Hook
+	hookType gitcmd.Hook
 	stdout   string
 	stderr   string
 }
@@ -66,11 +67,11 @@ func (e CustomHookError) Error() string {
 func (e CustomHookError) Proto() *gitalypb.CustomHookError {
 	hookType := gitalypb.CustomHookError_HOOK_TYPE_UNSPECIFIED
 	switch e.hookType {
-	case git.PreReceiveHook:
+	case gitcmd.PreReceiveHook:
 		hookType = gitalypb.CustomHookError_HOOK_TYPE_PRERECEIVE
-	case git.UpdateHook:
+	case gitcmd.UpdateHook:
 		hookType = gitalypb.CustomHookError_HOOK_TYPE_UPDATE
-	case git.PostReceiveHook:
+	case gitcmd.PostReceiveHook:
 		hookType = gitalypb.CustomHookError_HOOK_TYPE_POSTRECEIVE
 	}
 
@@ -89,7 +90,7 @@ func (e CustomHookError) Unwrap() error {
 // wrapHookError wraps errors returned by the hook manager into either a CustomHookError if it
 // returned a `hook.CustomHookError`, or alternatively return the error with stderr or stdout
 // appended to the message.
-func wrapHookError(err error, hookType git.Hook, stdout, stderr string) error {
+func wrapHookError(err error, hookType gitcmd.Hook, stdout, stderr string) error {
 	var customHookErr hook.CustomHookError
 	if errors.As(err, &customHookErr) {
 		return CustomHookError{
@@ -136,7 +137,7 @@ func NewUpdaterWithHooks(
 	logger log.Logger,
 	locator storage.Locator,
 	hookManager hook.Manager,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	catfileCache catfile.Cache,
 ) *UpdaterWithHooks {
 	return &UpdaterWithHooks{
@@ -189,7 +190,7 @@ func (u *UpdaterWithHooks) UpdateReference(
 
 	changes := fmt.Sprintf("%s %s %s\n", oldrev, newrev, reference)
 
-	receiveHooksPayload := git.UserDetails{
+	receiveHooksPayload := gitcmd.UserDetails{
 		UserID:   user.GetGlId(),
 		Username: user.GetGlUsername(),
 		Protocol: "web",
@@ -205,14 +206,14 @@ func (u *UpdaterWithHooks) UpdateReference(
 		quarantinedRepo = quarantineDir.QuarantinedRepo()
 	}
 
-	hooksPayload, err := git.NewHooksPayload(u.cfg, quarantinedRepo, objectHash, transaction, &receiveHooksPayload, git.ReceivePackHooks, featureflag.FromContext(ctx), storage.ExtractTransactionID(ctx)).Env()
+	hooksPayload, err := gitcmd.NewHooksPayload(u.cfg, quarantinedRepo, objectHash, transaction, &receiveHooksPayload, gitcmd.ReceivePackHooks, featureflag.FromContext(ctx), storage.ExtractTransactionID(ctx)).Env()
 	if err != nil {
 		return fmt.Errorf("constructing hooks payload: %w", err)
 	}
 
 	var stdout, stderr bytes.Buffer
 	if err := u.hookManager.PreReceiveHook(ctx, quarantinedRepo, pushOptions, []string{hooksPayload}, strings.NewReader(changes), &stdout, &stderr); err != nil {
-		return fmt.Errorf("running pre-receive hooks: %w", wrapHookError(err, git.PreReceiveHook, stdout.String(), stderr.String()))
+		return fmt.Errorf("running pre-receive hooks: %w", wrapHookError(err, gitcmd.PreReceiveHook, stdout.String(), stderr.String()))
 	}
 
 	// Now that Rails has told us that the change is okay via the pre-receive hook, we can
@@ -227,14 +228,14 @@ func (u *UpdaterWithHooks) UpdateReference(
 		// We only need to update the hooks payload to the unquarantined repo in case we
 		// had a quarantine environment. Otherwise, the initial hooks payload is for the
 		// real repository anyway.
-		hooksPayload, err = git.NewHooksPayload(u.cfg, repoProto, objectHash, transaction, &receiveHooksPayload, git.ReceivePackHooks, featureflag.FromContext(ctx), storage.ExtractTransactionID(ctx)).Env()
+		hooksPayload, err = gitcmd.NewHooksPayload(u.cfg, repoProto, objectHash, transaction, &receiveHooksPayload, gitcmd.ReceivePackHooks, featureflag.FromContext(ctx), storage.ExtractTransactionID(ctx)).Env()
 		if err != nil {
 			return fmt.Errorf("constructing quarantined hooks payload: %w", err)
 		}
 	}
 
 	if err := u.hookManager.UpdateHook(ctx, quarantinedRepo, reference.String(), oldrev.String(), newrev.String(), []string{hooksPayload}, &stdout, &stderr); err != nil {
-		return fmt.Errorf("running update hooks: %w", wrapHookError(err, git.UpdateHook, stdout.String(), stderr.String()))
+		return fmt.Errorf("running update hooks: %w", wrapHookError(err, gitcmd.UpdateHook, stdout.String(), stderr.String()))
 	}
 
 	// We are already manually invoking the reference-transaction hook, so there is no need to
@@ -308,7 +309,7 @@ func (u *UpdaterWithHooks) UpdateReference(
 			// ignore it and continue with whatever we have been doing.
 			u.logger.WithError(err).ErrorContext(ctx, "custom post-receive hook returned an error")
 		} else {
-			return fmt.Errorf("running post-receive hooks: %w", wrapHookError(err, git.PostReceiveHook, stdout.String(), stderr.String()))
+			return fmt.Errorf("running post-receive hooks: %w", wrapHookError(err, gitcmd.PostReceiveHook, stdout.String(), stderr.String()))
 		}
 	}
 

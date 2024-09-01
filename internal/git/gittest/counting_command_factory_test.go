@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -20,7 +20,7 @@ func TestCountingCommandFactory(t *testing.T) {
 		{
 			desc: "counts a command",
 			run: func(t *testing.T, f *CountingCommandFactory) {
-				_, err := f.New(ctx, repo, git.Command{Name: "cat-file"})
+				_, err := f.New(ctx, repo, gitcmd.Command{Name: "cat-file"})
 				require.NoError(t, err)
 			},
 			expected: map[string]uint64{"cat-file": 1},
@@ -28,12 +28,12 @@ func TestCountingCommandFactory(t *testing.T) {
 		{
 			desc: "counts multiple commands",
 			run: func(t *testing.T, f *CountingCommandFactory) {
-				_, err := f.New(ctx, repo, git.Command{Name: "cat-file"})
+				_, err := f.New(ctx, repo, gitcmd.Command{Name: "cat-file"})
 				require.NoError(t, err)
-				_, err = f.New(ctx, repo, git.Command{Name: "cat-file"})
+				_, err = f.New(ctx, repo, gitcmd.Command{Name: "cat-file"})
 				require.NoError(t, err)
 
-				_, err = f.New(ctx, repo, git.Command{Name: "ls-tree"})
+				_, err = f.New(ctx, repo, gitcmd.Command{Name: "ls-tree"})
 				require.NoError(t, err)
 			},
 			expected: map[string]uint64{
@@ -44,14 +44,14 @@ func TestCountingCommandFactory(t *testing.T) {
 		{
 			desc: "counts get reset",
 			run: func(t *testing.T, f *CountingCommandFactory) {
-				_, err := f.New(ctx, repo, git.Command{Name: "cat-file"})
+				_, err := f.New(ctx, repo, gitcmd.Command{Name: "cat-file"})
 				require.NoError(t, err)
-				_, err = f.New(ctx, repo, git.Command{Name: "ls-tree"})
+				_, err = f.New(ctx, repo, gitcmd.Command{Name: "ls-tree"})
 				require.NoError(t, err)
 
 				f.ResetCount()
 
-				_, err = f.New(ctx, repo, git.Command{Name: "cat-file"})
+				_, err = f.New(ctx, repo, gitcmd.Command{Name: "cat-file"})
 				require.NoError(t, err)
 			},
 			expected: map[string]uint64{"cat-file": 1},

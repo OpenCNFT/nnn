@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/updateref"
@@ -224,7 +225,7 @@ func (s *Server) fetchStartRevision(
 		startBranchName = req.GetBranchName()
 	}
 
-	var remoteRepo git.Repository = localRepo
+	var remoteRepo gitcmd.Repository = localRepo
 	if startRepository := req.GetStartRepository(); startRepository != nil {
 		var err error
 		remoteRepo, err = remoterepo.New(ctx, startRepository, s.conns)

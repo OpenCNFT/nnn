@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
@@ -42,17 +42,17 @@ func TestUpdate_CustomHooks(t *testing.T) {
 	cfg, client := setupHookService(t)
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
 
-	hooksPayload, err := git.NewHooksPayload(
+	hooksPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		nil,
-		&git.UserDetails{
+		&gitcmd.UserDetails{
 			UserID:   "key-123",
 			Username: "username",
 			Protocol: "web",
 		},
-		git.UpdateHook,
+		gitcmd.UpdateHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -26,7 +27,7 @@ func ResolveRevision(tb testing.TB, cfg config.Cfg, repoPath string, revision st
 
 // GetReferencesConfig is an alias of git.ReferencesConfig and can be passed to GetReferences to influence its default
 // behaviour.
-type GetReferencesConfig = git.GetReferencesConfig
+type GetReferencesConfig = gitcmd.GetReferencesConfig
 
 // GetReferences reads references in the Git repository.
 func GetReferences(tb testing.TB, cfg config.Cfg, repoPath string, optionalCfg ...GetReferencesConfig) []git.Reference {
@@ -37,7 +38,7 @@ func GetReferences(tb testing.TB, cfg config.Cfg, repoPath string, optionalCfg .
 		refCfg = optionalCfg[0]
 	}
 
-	refs, err := git.GetReferences(
+	refs, err := gitcmd.GetReferences(
 		testhelper.Context(tb),
 		NewRepositoryPathExecutor(tb, cfg, repoPath),
 		refCfg,
@@ -49,7 +50,7 @@ func GetReferences(tb testing.TB, cfg config.Cfg, repoPath string, optionalCfg .
 
 // GetSymbolicRef reads symbolic references in the Git repository.
 func GetSymbolicRef(tb testing.TB, cfg config.Cfg, repoPath string, refname git.ReferenceName) git.Reference {
-	symref, err := git.GetSymbolicRef(
+	symref, err := gitcmd.GetSymbolicRef(
 		testhelper.Context(tb),
 		NewRepositoryPathExecutor(tb, cfg, repoPath),
 		refname,

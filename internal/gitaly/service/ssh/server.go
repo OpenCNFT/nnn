@@ -4,8 +4,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -24,7 +24,7 @@ type server struct {
 	logger                                   log.Logger
 	cfg                                      config.Cfg
 	locator                                  storage.Locator
-	gitCmdFactory                            git.CommandFactory
+	gitCmdFactory                            gitcmd.CommandFactory
 	catfileCache                             catfile.Cache
 	txManager                                transaction.Manager
 	txRegistry                               *storagemgr.TransactionRegistry

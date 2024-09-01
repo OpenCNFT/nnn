@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
@@ -102,7 +103,7 @@ func TestRepoCreateBundle(t *testing.T) {
 
 			var refNames []git.ReferenceName
 			output := gittest.Exec(t, cfg, "-C", repoPath, "bundle", "list-heads", bundle.Name())
-			decoder := git.NewShowRefDecoder(bytes.NewReader(output))
+			decoder := gitcmd.NewShowRefDecoder(bytes.NewReader(output))
 			for {
 				var ref git.Reference
 				err := decoder.Decode(&ref)

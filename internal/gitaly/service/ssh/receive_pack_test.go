@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -208,10 +209,10 @@ func TestReceivePack_success(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, lHead, rHead, "local and remote head not equal. push failed")
 
-	payload, err := git.HooksPayloadFromEnv(capturedHookEnv)
+	payload, err := gitcmd.HooksPayloadFromEnv(capturedHookEnv)
 	require.NoError(t, err)
 
-	expectedHooks := git.ReceivePackHooks
+	expectedHooks := gitcmd.ReceivePackHooks
 
 	// Compare the repository up front so that we can use require.Equal for
 	// the remaining values.
@@ -232,7 +233,7 @@ func TestReceivePack_success(t *testing.T) {
 		expectedRepo.RelativePath = "OVERRIDDEN"
 		// When transactions are enabled the update hook is manually invoked as part of the
 		// proc-receive hook. Consequently, the requested hooks only specify the update hook.
-		expectedHooks = git.UpdateHook
+		expectedHooks = gitcmd.UpdateHook
 	}
 
 	// Compare the repository up front so that we can use require.Equal for
@@ -244,9 +245,9 @@ func TestReceivePack_success(t *testing.T) {
 	// figuring out their actual contents. So let's just remove it, too.
 	payload.Transaction = nil
 
-	var expectedFeatureFlags []git.FeatureFlagWithValue
+	var expectedFeatureFlags []gitcmd.FeatureFlagWithValue
 	for _, feature := range featureflag.DefinedFlags() {
-		expectedFeatureFlags = append(expectedFeatureFlags, git.FeatureFlagWithValue{
+		expectedFeatureFlags = append(expectedFeatureFlags, gitcmd.FeatureFlagWithValue{
 			Flag: feature, Enabled: true,
 		})
 	}
@@ -261,12 +262,12 @@ func TestReceivePack_success(t *testing.T) {
 		transactionID = 4
 	}
 
-	require.Equal(t, git.HooksPayload{
+	require.Equal(t, gitcmd.HooksPayload{
 		ObjectFormat:        gittest.DefaultObjectHash.Format,
 		RuntimeDir:          cfg.RuntimeDir,
 		InternalSocket:      cfg.InternalSocketPath(),
 		InternalSocketToken: cfg.Auth.Token,
-		UserDetails: &git.UserDetails{
+		UserDetails: &gitcmd.UserDetails{
 			UserID:   "123",
 			Username: "user",
 			Protocol: "ssh",
@@ -410,13 +411,13 @@ func TestReceive_gitProtocol(t *testing.T) {
 		Repository:   remoteRepo,
 		GlRepository: "project-123",
 		GlId:         "1",
-		GitProtocol:  git.ProtocolV2,
+		GitProtocol:  gitcmd.ProtocolV2,
 	})
 	require.NoError(t, err)
 	require.Equal(t, lHead, rHead)
 
 	envData := protocolDetectingFactory.ReadProtocol(t)
-	require.Contains(t, envData, fmt.Sprintf("GIT_PROTOCOL=%s\n", git.ProtocolV2))
+	require.Contains(t, envData, fmt.Sprintf("GIT_PROTOCOL=%s\n", gitcmd.ProtocolV2))
 }
 
 func TestReceivePack_hookFailure(t *testing.T) {
@@ -424,7 +425,7 @@ func TestReceivePack_hookFailure(t *testing.T) {
 
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg, git.WithHooksPath(testhelper.TempDir(t)))
+	gitCmdFactory := gittest.NewCommandFactory(t, cfg, gitcmd.WithHooksPath(testhelper.TempDir(t)))
 
 	testcfg.BuildGitalySSH(t, cfg)
 
@@ -814,13 +815,13 @@ func TestReceivePack_objectExistsHook(t *testing.T) {
 		Repository:   remoteRepo,
 		GlId:         glID,
 		GlRepository: glRepository,
-		GitProtocol:  git.ProtocolV2,
+		GitProtocol:  gitcmd.ProtocolV2,
 	})
 	require.NoError(t, err)
 	require.Equal(t, lHead, rHead, "local and remote head not equal. push failed")
 
 	envData := protocolDetectingFactory.ReadProtocol(t)
-	require.Contains(t, envData, fmt.Sprintf("GIT_PROTOCOL=%s\n", git.ProtocolV2))
+	require.Contains(t, envData, fmt.Sprintf("GIT_PROTOCOL=%s\n", gitcmd.ProtocolV2))
 }
 
 // repoWithChange represents a repository with two commits representing an "old" and "new" state.

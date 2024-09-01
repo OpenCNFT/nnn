@@ -441,20 +441,20 @@ be implemented in a file called `testhelper_test.go`
 ## Git Commands
 
 Gitaly relies heavily on spawning Git subprocesses to perform work. Git commands are spawned by using the Git command
-factory at [`internal/git/command_factory.go`](internal/git/command_factory.go). Proper usage is important to
+factory at [`internal/git/gitcmd/command_factory.go`](internal/git/gitcmd/command_factory.go). Proper usage is important to
 mitigate these injection risks:
 
 - When toggling an option, prefer a longer flag over a short flag for
   readability.
-  - Desired: `git.Flag{Name: "--long-flag"}` is easier to read and audit
-  - Undesired: `git.Flag{Name: "-L"}`
+  - Desired: `gitcmd.Flag{Name: "--long-flag"}` is easier to read and audit
+  - Undesired: `gitcmd.Flag{Name: "-L"}`
 - When providing a variable to configure a flag, make sure to include the
   variable after an equal sign
-  - Desired: `[]git.Flag{Name: "-a="+foo}` prevents flag injection
-  - Undesired: `[]git.Flag(Name: "-a"+foo)` allows flag injection
+  - Desired: `[]gitcmd.Flag{Name: "-a="+foo}` prevents flag injection
+  - Undesired: `[]gitcmd.Flag(Name: "-a"+foo)` allows flag injection
 - Always define a flag's name via a constant, never use a variable:
-  - Desired: `[]git.Flag{Name: "-a"}`
-  - Undesired: `[]git.Flag{Name: foo}` is ambiguous and difficult to audit
+  - Desired: `[]gitcmd.Flag{Name: "-a"}`
+  - Undesired: `[]gitcmd.Flag{Name: foo}` is ambiguous and difficult to audit
 
 ## Go Imports Style
 

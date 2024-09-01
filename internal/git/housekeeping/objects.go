@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
@@ -94,14 +95,14 @@ func RepackObjects(ctx context.Context, repo *localrepo.Repo, cfg config.RepackO
 		// ensure that packed loose objects are deleted.
 		var stderr strings.Builder
 		if err := repo.ExecAndWait(ctx,
-			git.Command{
+			gitcmd.Command{
 				Name: "prune-packed",
-				Flags: []git.Option{
+				Flags: []gitcmd.Option{
 					// We don't care about any kind of progress meter.
-					git.Flag{Name: "--quiet"},
+					gitcmd.Flag{Name: "--quiet"},
 				},
 			},
-			git.WithStderr(&stderr),
+			gitcmd.WithStderr(&stderr),
 		); err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {
@@ -113,15 +114,15 @@ func RepackObjects(ctx context.Context, repo *localrepo.Repo, cfg config.RepackO
 
 		return nil
 	case config.RepackObjectsStrategyFullWithCruft:
-		options := []git.Option{
-			git.Flag{Name: "--cruft"},
-			git.Flag{Name: "--pack-kept-objects"},
-			git.Flag{Name: "-l"},
-			git.Flag{Name: "-d"},
+		options := []gitcmd.Option{
+			gitcmd.Flag{Name: "--cruft"},
+			gitcmd.Flag{Name: "--pack-kept-objects"},
+			gitcmd.Flag{Name: "-l"},
+			gitcmd.Flag{Name: "-d"},
 		}
 
 		if !cfg.CruftExpireBefore.IsZero() {
-			options = append(options, git.ValueFlag{
+			options = append(options, gitcmd.ValueFlag{
 				Name:  "--cruft-expiration",
 				Value: git.FormatTime(cfg.CruftExpireBefore),
 			})
@@ -150,27 +151,27 @@ func PerformIncrementalRepackingWithUnreachable(ctx context.Context, repo *local
 	// There is no git-repack(1) mode that would allow us to do this, so we have to
 	// instead do it ourselves.
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "pack-objects",
-			Flags: []git.Option{
+			Flags: []gitcmd.Option{
 				// We ask git-pack-objects(1) to pack loose unreachable
 				// objects. This implies `--revs`, but as we don't supply
 				// any revisions via stdin all objects will be considered
 				// unreachable. The effect is that we simply pack all loose
 				// objects into a new packfile, regardless of whether they
 				// are reachable or not.
-				git.Flag{Name: "--pack-loose-unreachable"},
+				gitcmd.Flag{Name: "--pack-loose-unreachable"},
 				// Skip any objects which are part of an alternative object
 				// directory.
-				git.Flag{Name: "--local"},
+				gitcmd.Flag{Name: "--local"},
 				// Only pack objects which are not yet part of a different,
 				// local pack.
-				git.Flag{Name: "--incremental"},
+				gitcmd.Flag{Name: "--incremental"},
 				// Only create the packfile if it would contain at least one
 				// object.
-				git.Flag{Name: "--non-empty"},
+				gitcmd.Flag{Name: "--non-empty"},
 				// We don't care about any kind of progress meter.
-				git.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--quiet"},
 			},
 			Args: []string{
 				// We need to tell git-pack-objects(1) where to write the
@@ -183,7 +184,7 @@ func PerformIncrementalRepackingWithUnreachable(ctx context.Context, repo *local
 		// Note: we explicitly do not pass `GetRepackGitConfig()` here as none of
 		// its options apply to this kind of repack: we have no delta islands given
 		// that we do not walk the revision graph, and we won't ever write bitmaps.
-		git.WithStderr(&stderr),
+		gitcmd.WithStderr(&stderr),
 	); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -200,13 +201,13 @@ func PerformIncrementalRepackingWithUnreachable(ctx context.Context, repo *local
 func PerformFullRepackingWithUnreachable(ctx context.Context, repo *localrepo.Repo, cfg config.RepackObjectsConfig) error {
 	return PerformRepack(ctx, repo, cfg,
 		// Do a full repack.
-		git.Flag{Name: "-a"},
+		gitcmd.Flag{Name: "-a"},
 		// Don't include objects part of alternate.
-		git.Flag{Name: "-l"},
+		gitcmd.Flag{Name: "-l"},
 		// Delete loose objects made redundant by this repack.
-		git.Flag{Name: "-d"},
+		gitcmd.Flag{Name: "-d"},
 		// Keep unreachable objects part of the old packs in the new pack.
-		git.Flag{Name: "--keep-unreachable"},
+		gitcmd.Flag{Name: "--keep-unreachable"},
 	)
 }
 
@@ -245,29 +246,29 @@ func PerformGeometricRepacking(ctx context.Context, repo *localrepo.Repo, cfg co
 		// typically have a few million objects, which would boil down to having at
 		// most 32 packfiles in the repository. This number is not scientifically
 		// chosen though any may be changed at a later point in time.
-		git.ValueFlag{Name: "--geometric", Value: "2"},
+		gitcmd.ValueFlag{Name: "--geometric", Value: "2"},
 		// Make sure to delete loose objects and packfiles that are made obsolete
 		// by the new packfile.
-		git.Flag{Name: "-d"},
+		gitcmd.Flag{Name: "-d"},
 		// Don't include objects part of an alternate.
-		git.Flag{Name: "-l"},
+		gitcmd.Flag{Name: "-l"},
 	)
 }
 
 // PerformRepack performs `git-repack(1)` command on a repository with some pre-built configs.
-func PerformRepack(ctx context.Context, repo *localrepo.Repo, cfg config.RepackObjectsConfig, opts ...git.Option) error {
+func PerformRepack(ctx context.Context, repo *localrepo.Repo, cfg config.RepackObjectsConfig, opts ...gitcmd.Option) error {
 	if cfg.WriteMultiPackIndex {
-		opts = append(opts, git.Flag{Name: "--write-midx"})
+		opts = append(opts, gitcmd.Flag{Name: "--write-midx"})
 	}
 
 	var stderr strings.Builder
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "repack",
 			Flags: opts,
 		},
-		git.WithConfig(GetRepackGitConfig(ctx, repo, cfg.WriteBitmap)...),
-		git.WithStderr(&stderr),
+		gitcmd.WithConfig(GetRepackGitConfig(ctx, repo, cfg.WriteBitmap)...),
+		gitcmd.WithStderr(&stderr),
 	); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -284,8 +285,8 @@ func PerformRepack(ctx context.Context, repo *localrepo.Repo, cfg config.RepackO
 }
 
 // GetRepackGitConfig returns configuration suitable for Git commands which write new packfiles.
-func GetRepackGitConfig(ctx context.Context, repo storage.Repository, bitmap bool) []git.ConfigPair {
-	config := []git.ConfigPair{
+func GetRepackGitConfig(ctx context.Context, repo storage.Repository, bitmap bool) []gitcmd.ConfigPair {
+	config := []gitcmd.ConfigPair{
 		{Key: "repack.useDeltaIslands", Value: "true"},
 		{Key: "repack.writeBitmaps", Value: strconv.FormatBool(bitmap)},
 		{Key: "pack.writeBitmapLookupTable", Value: "true"},
@@ -293,15 +294,15 @@ func GetRepackGitConfig(ctx context.Context, repo storage.Repository, bitmap boo
 
 	if storage.IsPoolRepository(repo) {
 		config = append(config,
-			git.ConfigPair{Key: "pack.island", Value: git.ObjectPoolRefNamespace + "/he(a)ds"},
-			git.ConfigPair{Key: "pack.island", Value: git.ObjectPoolRefNamespace + "/t(a)gs"},
-			git.ConfigPair{Key: "pack.islandCore", Value: "a"},
+			gitcmd.ConfigPair{Key: "pack.island", Value: git.ObjectPoolRefNamespace + "/he(a)ds"},
+			gitcmd.ConfigPair{Key: "pack.island", Value: git.ObjectPoolRefNamespace + "/t(a)gs"},
+			gitcmd.ConfigPair{Key: "pack.islandCore", Value: "a"},
 		)
 	} else {
 		config = append(config,
-			git.ConfigPair{Key: "pack.island", Value: "r(e)fs/heads"},
-			git.ConfigPair{Key: "pack.island", Value: "r(e)fs/tags"},
-			git.ConfigPair{Key: "pack.islandCore", Value: "e"},
+			gitcmd.ConfigPair{Key: "pack.island", Value: "r(e)fs/heads"},
+			gitcmd.ConfigPair{Key: "pack.island", Value: "r(e)fs/tags"},
+			gitcmd.ConfigPair{Key: "pack.islandCore", Value: "e"},
 		)
 	}
 
@@ -319,9 +320,9 @@ type PruneObjectsConfig struct {
 // PruneObjects prunes loose objects from the repository that are already packed or which are
 // unreachable and older than the configured expiry date.
 func PruneObjects(ctx context.Context, repo *localrepo.Repo, cfg PruneObjectsConfig) error {
-	if err := repo.ExecAndWait(ctx, git.Command{
+	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name: "prune",
-		Flags: []git.Option{
+		Flags: []gitcmd.Option{
 			// By default, this prunes all unreachable objects regardless of when they
 			// have last been accessed. This opens us up for races when there are
 			// concurrent commands which are just at the point of writing objects into
@@ -331,7 +332,7 @@ func PruneObjects(ctx context.Context, repo *localrepo.Repo, cfg PruneObjectsCon
 			// To avoid this race, we use a grace window that can be specified by the
 			// caller so that we only delete objects that are older than this grace
 			// window.
-			git.ValueFlag{Name: "--expire", Value: git.FormatTime(cfg.ExpireBefore)},
+			gitcmd.ValueFlag{Name: "--expire", Value: git.FormatTime(cfg.ExpireBefore)},
 		},
 	}); err != nil {
 		return fmt.Errorf("executing prune: %w", err)

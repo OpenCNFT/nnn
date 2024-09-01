@@ -18,6 +18,7 @@ import (
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -220,7 +221,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "successful clone with protocol v2",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, _ func()) error {
 				gittest.WritePktlineString(t, clientConn, "command=fetch\n")
@@ -246,7 +247,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "client talks protocol v0 but v2 is requested",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, _ func()) error {
 				gittest.WritePktlinef(t, clientConn, "want %s multi_ack\n", commitID)
@@ -329,7 +330,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "missing input",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, _ func()) error {
 				require.NoError(t, clientConn.CloseWrite())
@@ -343,7 +344,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "short write",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, _ func()) error {
 				gittest.WritePktlineString(t, clientConn, "command=fetch\n")
@@ -360,7 +361,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "garbage",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, _ func()) error {
 				gittest.WritePktlineString(t, clientConn, "foobar")
@@ -376,7 +377,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "close and cancellation",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, cancelContext func()) error {
 				gittest.WritePktlineString(t, clientConn, "command=fetch\n")
@@ -393,7 +394,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "cancellation and close",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, cancelContext func()) error {
 				gittest.WritePktlineString(t, clientConn, "command=fetch\n")
@@ -410,7 +411,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			desc: "cancellation without close",
 			request: &gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			client: func(clientConn *sidechannel.ClientConn, cancelContext func()) error {
 				gittest.WritePktlineString(t, clientConn, "command=fetch\n")
@@ -595,9 +596,9 @@ func testUploadPackSuccessful(t *testing.T, ctx context.Context, sidechannel boo
 			desc: "full clone with protocol v2",
 			request: &gitalypb.SSHUploadPackRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
-			expectedProtocol: git.ProtocolV2,
+			expectedProtocol: gitcmd.ProtocolV2,
 		},
 		{
 			desc: "shallow clone",
@@ -613,13 +614,13 @@ func testUploadPackSuccessful(t *testing.T, ctx context.Context, sidechannel boo
 			desc: "shallow clone with protocol v2",
 			request: &gitalypb.SSHUploadPackRequest{
 				Repository:  repo,
-				GitProtocol: git.ProtocolV2,
+				GitProtocol: gitcmd.ProtocolV2,
 			},
 			cloneArgs: []string{
 				"--depth=1",
 			},
 			deepen:           1,
-			expectedProtocol: git.ProtocolV2,
+			expectedProtocol: gitcmd.ProtocolV2,
 		},
 		{
 			desc: "partial clone",
@@ -680,7 +681,7 @@ func testUploadPackSuccessful(t *testing.T, ctx context.Context, sidechannel boo
 
 			protocol := protocolDetectingFactory.ReadProtocol(t)
 			if tc.expectedProtocol != "" {
-				require.Contains(t, protocol, fmt.Sprintf("GIT_PROTOCOL=%s\n", git.ProtocolV2))
+				require.Contains(t, protocol, fmt.Sprintf("GIT_PROTOCOL=%s\n", gitcmd.ProtocolV2))
 			} else {
 				require.Empty(t, protocol)
 			}

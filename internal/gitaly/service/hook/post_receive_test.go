@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
@@ -110,7 +110,7 @@ func TestHooksMissingStdin(t *testing.T) {
 			client, conn := newHooksClient(t, serverSocketPath)
 			defer conn.Close()
 
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
@@ -119,12 +119,12 @@ func TestHooksMissingStdin(t *testing.T) {
 					Node:    "node-1",
 					Primary: tc.primary,
 				},
-				&git.UserDetails{
+				&gitcmd.UserDetails{
 					UserID:   "key_id",
 					Username: "username",
 					Protocol: "protocol",
 				},
-				git.PostReceiveHook,
+				gitcmd.PostReceiveHook,
 				featureflag.FromContext(ctx),
 				storage.ExtractTransactionID(ctx),
 			).Env()
@@ -249,17 +249,17 @@ To create a merge request for okay, visit:
 			stream, err := client.PostReceiveHook(ctx)
 			require.NoError(t, err)
 
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
 				nil,
-				&git.UserDetails{
+				&gitcmd.UserDetails{
 					UserID:   "key_id",
 					Username: "username",
 					Protocol: "protocol",
 				},
-				git.PostReceiveHook,
+				gitcmd.PostReceiveHook,
 				featureflag.FromContext(ctx),
 				storage.ExtractTransactionID(ctx),
 			).Env()

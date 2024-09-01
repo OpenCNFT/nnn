@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -115,20 +115,20 @@ func stripPrefix(s string, prefix string) []byte {
 	return []byte(strings.TrimPrefix(s, prefix))
 }
 
-func listRefNames(ctx context.Context, repo git.RepositoryExecutor, chunker *chunk.Chunker, prefix string, extraArgs []string) error {
-	flags := []git.Option{
-		git.Flag{Name: "--format=%(refname)"},
+func listRefNames(ctx context.Context, repo gitcmd.RepositoryExecutor, chunker *chunk.Chunker, prefix string, extraArgs []string) error {
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "--format=%(refname)"},
 	}
 
 	for _, arg := range extraArgs {
-		flags = append(flags, git.Flag{Name: arg})
+		flags = append(flags, gitcmd.Flag{Name: arg})
 	}
 
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "for-each-ref",
 		Flags: flags,
 		Args:  []string{prefix},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return err
 	}

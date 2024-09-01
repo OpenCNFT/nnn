@@ -1,4 +1,4 @@
-package git_test
+package gitcmd_test
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -15,13 +15,13 @@ import (
 )
 
 func TestDistributedGitEnvironmentConstructor(t *testing.T) {
-	constructor := git.DistributedGitEnvironmentConstructor{}
+	constructor := gitcmd.DistributedGitEnvironmentConstructor{}
 
 	testhelper.Unsetenv(t, "GITALY_TESTING_GIT_BINARY")
 
 	t.Run("empty configuration fails", func(t *testing.T) {
 		_, err := constructor.Construct(config.Cfg{})
-		require.Equal(t, git.ErrNotConfigured, err)
+		require.Equal(t, gitcmd.ErrNotConfigured, err)
 	})
 
 	t.Run("configuration with Git binary path succeeds", func(t *testing.T) {
@@ -69,11 +69,11 @@ func TestDistributedGitEnvironmentConstructor(t *testing.T) {
 func TestBundledGitEnvironmentConstructor(t *testing.T) {
 	testhelper.Unsetenv(t, "GITALY_TESTING_GIT_BINARY")
 
-	constructor := git.BundledGitConstructors[0]
+	constructor := gitcmd.BundledGitConstructors[0]
 
 	t.Run("disabled bundled Git fails", func(t *testing.T) {
 		_, err := constructor.Construct(config.Cfg{})
-		require.Equal(t, git.ErrNotConfigured, err)
+		require.Equal(t, gitcmd.ErrNotConfigured, err)
 	})
 
 	t.Run("complete binary directory succeeds", func(t *testing.T) {
@@ -100,13 +100,13 @@ func TestBundledGitEnvironmentConstructor(t *testing.T) {
 }
 
 func TestFallbackGitEnvironmentConstructor(t *testing.T) {
-	constructor := git.FallbackGitEnvironmentConstructor{}
+	constructor := gitcmd.FallbackGitEnvironmentConstructor{}
 
 	t.Run("failing lookup of executable causes failure", func(t *testing.T) {
 		t.Setenv("PATH", "/does/not/exist")
 
 		_, err := constructor.Construct(config.Cfg{})
-		require.Equal(t, fmt.Errorf("%w: no git executable found in PATH", git.ErrNotConfigured), err)
+		require.Equal(t, fmt.Errorf("%w: no git executable found in PATH", gitcmd.ErrNotConfigured), err)
 	})
 
 	t.Run("successfully resolved executable", func(t *testing.T) {

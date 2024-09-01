@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -27,7 +27,7 @@ func TestRepository(t *testing.T) {
 	pool := client.NewPool()
 	t.Cleanup(func() { testhelper.MustClose(t, pool) })
 
-	gittest.TestRepository(t, cfg, func(tb testing.TB, ctx context.Context) (git.Repository, string) {
+	gittest.TestRepository(t, cfg, func(tb testing.TB, ctx context.Context) (gitcmd.Repository, string) {
 		tb.Helper()
 
 		ctx, err := storage.InjectGitalyServers(ctx, "default", cfg.SocketPath, cfg.Auth.Token)

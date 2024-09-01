@@ -26,8 +26,8 @@ visibility without incurring an excessive resource burden.
 
 ```mermaid
 flowchart TD
-  git.CommandFactory --WithTrace2Hooks option--> trace2.Manager
-  git.CommandFactory -- Spawns --> command.New
+  gitcmd.CommandFactory --WithTrace2Hooks option--> trace2.Manager
+  gitcmd.CommandFactory -- Spawns --> command.New
   trace2.Manager -- Injects ENVs --> command.New
   trace2.Manager -- Manages --> trace2hooks.TracingExporter
   trace2.Manager -- Manages --> trace2hooks.PackObjectsMetrics

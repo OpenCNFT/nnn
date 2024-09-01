@@ -20,7 +20,7 @@ import (
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
@@ -219,14 +219,14 @@ func testServerPostUploadPackGitProtocol(t *testing.T, ctx context.Context, make
 
 	rpcRequest := &gitalypb.PostUploadPackWithSidechannelRequest{
 		Repository:  repo,
-		GitProtocol: git.ProtocolV2,
+		GitProtocol: gitcmd.ProtocolV2,
 	}
 
 	_, err := makeRequest(t, ctx, server.Address(), cfg.Auth.Token, rpcRequest, requestBody)
 	require.NoError(t, err)
 
 	envData := protocolDetectingFactory.ReadProtocol(t)
-	require.Equal(t, fmt.Sprintf("GIT_PROTOCOL=%s\n", git.ProtocolV2), envData)
+	require.Equal(t, fmt.Sprintf("GIT_PROTOCOL=%s\n", gitcmd.ProtocolV2), envData)
 }
 
 func TestServer_PostUploadPackWithSidechannel_suppressDeepenExitError(t *testing.T) {
@@ -469,7 +469,7 @@ func TestServer_PostUploadPackWithBundleURI(t *testing.T) {
 			gittest.WritePktlineFlush(t, requestBody)
 
 			hook.Reset()
-			req := &gitalypb.PostUploadPackWithSidechannelRequest{Repository: repoProto, GitProtocol: git.ProtocolV2}
+			req := &gitalypb.PostUploadPackWithSidechannelRequest{Repository: repoProto, GitProtocol: gitcmd.ProtocolV2}
 			responseBuffer, err := makePostUploadPackWithSidechannelRequest(t, ctx, cfg.SocketPath, cfg.Auth.Token, req, requestBody)
 			require.NoError(t, err)
 

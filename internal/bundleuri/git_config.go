@@ -6,22 +6,22 @@ import (
 	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
-// CapabilitiesGitConfig returns a slice of git.ConfigPairs that can be injected
+// CapabilitiesGitConfig returns a slice of gitcmd.ConfigPairs that can be injected
 // into the Git config to make it aware the bundle-URI capabilities are
 // supported.
 // This can be used when spawning git-upload-pack(1) --advertise-refs in
 // response to the GET /info/refs request.
-func CapabilitiesGitConfig(ctx context.Context) []git.ConfigPair {
+func CapabilitiesGitConfig(ctx context.Context) []gitcmd.ConfigPair {
 	if featureflag.BundleURI.IsDisabled(ctx) {
-		return []git.ConfigPair{}
+		return []gitcmd.ConfigPair{}
 	}
 
-	return []git.ConfigPair{
+	return []gitcmd.ConfigPair{
 		{
 			Key:   "uploadpack.advertiseBundleURIs",
 			Value: "true",
@@ -29,16 +29,16 @@ func CapabilitiesGitConfig(ctx context.Context) []git.ConfigPair {
 	}
 }
 
-// UploadPackGitConfig return a slice of git.ConfigPairs you can inject into the
+// UploadPackGitConfig return a slice of gitcmd.ConfigPairs you can inject into the
 // call to git-upload-pack(1) to advertise the available bundle to the client
 // who clones/fetches from the repository.
 func UploadPackGitConfig(
 	ctx context.Context,
 	sink *Sink,
 	repo storage.Repository,
-) ([]git.ConfigPair, error) {
+) ([]gitcmd.ConfigPair, error) {
 	if featureflag.BundleURI.IsDisabled(ctx) {
-		return []git.ConfigPair{}, nil
+		return []gitcmd.ConfigPair{}, nil
 	}
 
 	if sink == nil {
@@ -52,7 +52,7 @@ func UploadPackGitConfig(
 
 	log.AddFields(ctx, log.Fields{"bundle_uri": true})
 
-	return []git.ConfigPair{
+	return []gitcmd.ConfigPair{
 		{
 			Key:   "uploadpack.advertiseBundleURIs",
 			Value: "true",

@@ -8,23 +8,24 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
-var _ git.CommandFactory = &InterceptingCommandFactory{}
+var _ gitcmd.CommandFactory = &InterceptingCommandFactory{}
 
-// InterceptingCommandFactory is a git.CommandFactory which intercepts all executions of Git
+// InterceptingCommandFactory is a gitcmd.CommandFactory which intercepts all executions of Git
 // commands with a custom script.
 type InterceptingCommandFactory struct {
-	realCommandFactory         git.CommandFactory
-	interceptingCommandFactory git.CommandFactory
+	realCommandFactory         gitcmd.CommandFactory
+	interceptingCommandFactory gitcmd.CommandFactory
 	interceptVersion           bool
 }
 
 type interceptingCommandFactoryConfig struct {
-	opts             []git.ExecCommandFactoryOption
+	opts             []gitcmd.ExecCommandFactoryOption
 	interceptVersion bool
 }
 
@@ -34,7 +35,7 @@ type InterceptingCommandFactoryOption func(*interceptingCommandFactoryConfig)
 
 // WithRealCommandFactoryOptions is an option that allows the caller to pass options to the real
 // git.ExecCommandFactory.
-func WithRealCommandFactoryOptions(opts ...git.ExecCommandFactoryOption) InterceptingCommandFactoryOption {
+func WithRealCommandFactoryOptions(opts ...gitcmd.ExecCommandFactoryOption) InterceptingCommandFactoryOption {
 	return func(cfg *interceptingCommandFactoryConfig) {
 		cfg.opts = opts
 	}
@@ -57,7 +58,7 @@ func NewInterceptingCommandFactory(
 	tb testing.TB,
 	ctx context.Context,
 	cfg config.Cfg,
-	generateScript func(git.ExecutionEnvironment) string,
+	generateScript func(gitcmd.ExecutionEnvironment) string,
 	opts ...InterceptingCommandFactoryOption,
 ) *InterceptingCommandFactory {
 	var interceptingCommandFactoryCfg interceptingCommandFactoryConfig
@@ -100,29 +101,29 @@ func NewInterceptingCommandFactory(
 
 	return &InterceptingCommandFactory{
 		realCommandFactory:         gitCmdFactory,
-		interceptingCommandFactory: NewCommandFactory(tb, cfg, git.WithGitBinaryPath(scriptPath)),
+		interceptingCommandFactory: NewCommandFactory(tb, cfg, gitcmd.WithGitBinaryPath(scriptPath)),
 		interceptVersion:           interceptingCommandFactoryCfg.interceptVersion,
 	}
 }
 
 // New creates a new Git command for the given repository using the intercepting script.
-func (f *InterceptingCommandFactory) New(ctx context.Context, repo storage.Repository, sc git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+func (f *InterceptingCommandFactory) New(ctx context.Context, repo storage.Repository, sc gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 	return f.interceptingCommandFactory.New(ctx, repo, sc, append(
-		opts, git.WithEnv(f.realCommandFactory.GetExecutionEnvironment(ctx).EnvironmentVariables...),
+		opts, gitcmd.WithEnv(f.realCommandFactory.GetExecutionEnvironment(ctx).EnvironmentVariables...),
 	)...)
 }
 
 // NewWithoutRepo creates a new Git command using the intercepting script.
-func (f *InterceptingCommandFactory) NewWithoutRepo(ctx context.Context, sc git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+func (f *InterceptingCommandFactory) NewWithoutRepo(ctx context.Context, sc gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 	return f.interceptingCommandFactory.NewWithoutRepo(ctx, sc, append(
-		opts, git.WithEnv(f.realCommandFactory.GetExecutionEnvironment(ctx).EnvironmentVariables...),
+		opts, gitcmd.WithEnv(f.realCommandFactory.GetExecutionEnvironment(ctx).EnvironmentVariables...),
 	)...)
 }
 
 // GetExecutionEnvironment returns the execution environment of the intercetping command factory.
 // The Git binary path will point to the intercepting script, while environment variables will
 // point to the intercepted Git installation.
-func (f *InterceptingCommandFactory) GetExecutionEnvironment(ctx context.Context) git.ExecutionEnvironment {
+func (f *InterceptingCommandFactory) GetExecutionEnvironment(ctx context.Context) gitcmd.ExecutionEnvironment {
 	execEnv := f.realCommandFactory.GetExecutionEnvironment(ctx)
 	execEnv.BinaryPath = f.interceptingCommandFactory.GetExecutionEnvironment(ctx).BinaryPath
 	return execEnv

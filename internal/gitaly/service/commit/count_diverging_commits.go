@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -43,20 +43,20 @@ func (s *server) validateCountDivergingCommitsRequest(ctx context.Context, req *
 	return nil
 }
 
-func buildRevListCountCmd(from, to string, maxCount int) git.Command {
-	subCmd := git.Command{
+func buildRevListCountCmd(from, to string, maxCount int) gitcmd.Command {
+	subCmd := gitcmd.Command{
 		Name:  "rev-list",
-		Flags: []git.Option{git.Flag{Name: "--count"}, git.Flag{Name: "--left-right"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--count"}, gitcmd.Flag{Name: "--left-right"}},
 		Args:  []string{fmt.Sprintf("%s...%s", from, to)},
 	}
 	if maxCount != 0 {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
 	}
 	return subCmd
 }
 
 func (s *server) findLeftRightCount(ctx context.Context, repo *gitalypb.Repository, from, to string, maxCount int) (int32, int32, error) {
-	cmd, err := s.gitCmdFactory.New(ctx, repo, buildRevListCountCmd(from, to, maxCount), git.WithSetupStdout())
+	cmd, err := s.gitCmdFactory.New(ctx, repo, buildRevListCountCmd(from, to, maxCount), gitcmd.WithSetupStdout())
 	if err != nil {
 		return 0, 0, fmt.Errorf("git rev-list cmd: %w", err)
 	}

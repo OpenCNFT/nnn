@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
 )
 
-func isPrimary(payload git.HooksPayload) bool {
+func isPrimary(payload gitcmd.HooksPayload) bool {
 	if payload.Transaction == nil {
 		return true
 	}
@@ -22,7 +22,7 @@ type transactionHandler func(ctx context.Context, tx txinfo.Transaction) error
 // runWithTransaction runs the given function if the payload identifies a transaction. No error
 // is returned if no transaction exists. If a transaction exists and the function is executed on it,
 // then its error will ber returned directly.
-func (m *GitLabHookManager) runWithTransaction(ctx context.Context, payload git.HooksPayload, handler transactionHandler) error {
+func (m *GitLabHookManager) runWithTransaction(ctx context.Context, payload gitcmd.HooksPayload, handler transactionHandler) error {
 	if payload.Transaction == nil {
 		return nil
 	}
@@ -37,14 +37,14 @@ func (m *GitLabHookManager) voteOnTransaction(
 	ctx context.Context,
 	vote voting.Vote,
 	phase voting.Phase,
-	payload git.HooksPayload,
+	payload gitcmd.HooksPayload,
 ) error {
 	return m.runWithTransaction(ctx, payload, func(ctx context.Context, tx txinfo.Transaction) error {
 		return m.txManager.Vote(ctx, tx, vote, phase)
 	})
 }
 
-func (m *GitLabHookManager) stopTransaction(ctx context.Context, payload git.HooksPayload) error {
+func (m *GitLabHookManager) stopTransaction(ctx context.Context, payload gitcmd.HooksPayload) error {
 	return m.runWithTransaction(ctx, payload, func(ctx context.Context, tx txinfo.Transaction) error {
 		return m.txManager.Stop(ctx, tx)
 	})
@@ -61,7 +61,7 @@ func (m *GitLabHookManager) stopTransaction(ctx context.Context, payload git.Hoo
 // We thus synchronize the hook execution with a separate synchronizing vote. This ensures that the primary node has
 // finished processing the hook _before_ we try to lock references on secondaries. As a result, the critical section on
 // becomes significantly shorter, which alleviates the lock contention.
-func (m *GitLabHookManager) synchronizeHookExecution(ctx context.Context, payload git.HooksPayload, hook string) error {
+func (m *GitLabHookManager) synchronizeHookExecution(ctx context.Context, payload gitcmd.HooksPayload, hook string) error {
 	if err := m.runWithTransaction(ctx, payload, func(ctx context.Context, tx txinfo.Transaction) error {
 		return m.txManager.Vote(ctx, tx, voting.VoteFromData([]byte("synchronize "+hook+" hook")), voting.Synchronized)
 	}); err != nil {

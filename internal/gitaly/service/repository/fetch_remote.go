@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -68,7 +69,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		return false, err
 	}
 
-	sshCommand, cleanup, err := git.BuildSSHInvocation(ctx, s.logger, req.GetSshKey(), req.GetKnownHosts())
+	sshCommand, cleanup, err := gitcmd.BuildSSHInvocation(ctx, s.logger, req.GetSshKey(), req.GetKnownHosts())
 	if err != nil {
 		return false, err
 	}
@@ -155,15 +156,15 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 
 	// Parse stdout to identify required reference updates. Reference updates are queued to the
 	// respective updater based on type.
-	scanner := git.NewFetchPorcelainScanner(&stdout, objectHash)
+	scanner := gitcmd.NewFetchPorcelainScanner(&stdout, objectHash)
 	for scanner.Scan() {
 		status := scanner.StatusLine()
 
 		switch status.Type {
 		// Failed and unchanged reference updates do not need to be applied.
-		case git.RefUpdateTypeUpdateFailed, git.RefUpdateTypeUnchanged:
+		case gitcmd.RefUpdateTypeUpdateFailed, gitcmd.RefUpdateTypeUnchanged:
 		// Queue pruned references in a separate transaction to avoid F/D conflicts.
-		case git.RefUpdateTypePruned:
+		case gitcmd.RefUpdateTypePruned:
 			if err := prunedUpdater.Delete(git.ReferenceName(status.Reference)); err != nil {
 				return false, fmt.Errorf("queueing pruned ref for deletion: %w", err)
 			}
@@ -174,7 +175,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 			}
 
 			// While scanning reference updates, check if any tags changed.
-			if status.Type == git.RefUpdateTypeTagUpdate || (status.Type == git.RefUpdateTypeFetched && strings.HasPrefix(status.Reference, "refs/tags")) {
+			if status.Type == gitcmd.RefUpdateTypeTagUpdate || (status.Type == gitcmd.RefUpdateTypeFetched && strings.HasPrefix(status.Reference, "refs/tags")) {
 				tagsChanged = true
 			}
 		}
@@ -219,16 +220,16 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 
 func buildCommandOpts(opts *localrepo.FetchOpts, req *gitalypb.FetchRemoteRequest) error {
 	remoteURL := req.GetRemoteParams().GetUrl()
-	var config []git.ConfigPair
+	var config []gitcmd.ConfigPair
 
 	for _, refspec := range getRefspecs(req.GetRemoteParams().GetMirrorRefmaps()) {
-		config = append(config, git.ConfigPair{
+		config = append(config, gitcmd.ConfigPair{
 			Key: "remote.inmemory.fetch", Value: refspec,
 		})
 	}
 
 	if resolvedAddress := req.GetRemoteParams().GetResolvedAddress(); resolvedAddress != "" {
-		modifiedURL, resolveConfig, err := git.GetURLAndResolveConfig(remoteURL, resolvedAddress)
+		modifiedURL, resolveConfig, err := gitcmd.GetURLAndResolveConfig(remoteURL, resolvedAddress)
 		if err != nil {
 			return fmt.Errorf("couldn't get curloptResolve config: %w", err)
 		}
@@ -237,16 +238,16 @@ func buildCommandOpts(opts *localrepo.FetchOpts, req *gitalypb.FetchRemoteReques
 		config = append(config, resolveConfig...)
 	}
 
-	config = append(config, git.ConfigPair{Key: "remote.inmemory.url", Value: remoteURL})
+	config = append(config, gitcmd.ConfigPair{Key: "remote.inmemory.url", Value: remoteURL})
 
 	if authHeader := req.GetRemoteParams().GetHttpAuthorizationHeader(); authHeader != "" {
-		config = append(config, git.ConfigPair{
+		config = append(config, gitcmd.ConfigPair{
 			Key:   fmt.Sprintf("http.%s.extraHeader", req.GetRemoteParams().GetUrl()),
 			Value: "Authorization: " + authHeader,
 		})
 	}
 
-	opts.CommandOptions = append(opts.CommandOptions, git.WithConfigEnv(config...))
+	opts.CommandOptions = append(opts.CommandOptions, gitcmd.WithConfigEnv(config...))
 
 	return nil
 }

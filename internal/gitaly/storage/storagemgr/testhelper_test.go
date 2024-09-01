@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -689,7 +690,7 @@ type testTransactionSetup struct {
 	RepositoryPath    string
 	Repo              *localrepo.Repo
 	Config            config.Cfg
-	CommandFactory    git.CommandFactory
+	CommandFactory    gitcmd.CommandFactory
 	RepositoryFactory localrepo.Factory
 	ObjectHash        git.ObjectHash
 	NonExistentOID    git.ObjectID
@@ -1020,7 +1021,7 @@ type transactionTestCase struct {
 	expectedState StateAssertion
 }
 
-func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo git.RepositoryExecutor, updates git.ReferenceUpdates) {
+func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo gitcmd.RepositoryExecutor, updates git.ReferenceUpdates) {
 	tx.UpdateReferences(updates)
 
 	updater, err := updateref.New(ctx, rewrittenRepo)

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -27,11 +28,11 @@ import (
 )
 
 type commandFactoryWrapper struct {
-	git.CommandFactory
-	newFunc func(context.Context, storage.Repository, git.Command, ...git.CmdOpt) (*command.Command, error)
+	gitcmd.CommandFactory
+	newFunc func(context.Context, storage.Repository, gitcmd.Command, ...gitcmd.CmdOpt) (*command.Command, error)
 }
 
-func (w commandFactoryWrapper) New(ctx context.Context, repo storage.Repository, sc git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+func (w commandFactoryWrapper) New(ctx context.Context, repo storage.Repository, sc gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 	return w.newFunc(ctx, repo, sc, opts...)
 }
 
@@ -53,7 +54,7 @@ func TestUpdateRemoteMirror(t *testing.T) {
 		mirrorSymRefs        map[string]string
 		keepDivergentRefs    bool
 		onlyBranchesMatching []string
-		wrapCommandFactory   func(testing.TB, git.CommandFactory) git.CommandFactory
+		wrapCommandFactory   func(testing.TB, gitcmd.CommandFactory) gitcmd.CommandFactory
 		requests             []*gitalypb.UpdateRemoteMirrorRequest
 		expectedError        *expectedError
 		response             *gitalypb.UpdateRemoteMirrorResponse
@@ -362,10 +363,10 @@ func TestUpdateRemoteMirror(t *testing.T) {
 				"refs/heads/non-diverging": {"commit-3"},
 			},
 			keepDivergentRefs: true,
-			wrapCommandFactory: func(tb testing.TB, original git.CommandFactory) git.CommandFactory {
+			wrapCommandFactory: func(tb testing.TB, original gitcmd.CommandFactory) gitcmd.CommandFactory {
 				return commandFactoryWrapper{
 					CommandFactory: original,
-					newFunc: func(ctx context.Context, repo storage.Repository, sc git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+					newFunc: func(ctx context.Context, repo storage.Repository, sc gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 						if sc.Name == "push" {
 							// This is really hacky: we extract the
 							// remote name from the subcommands
@@ -378,9 +379,9 @@ func TestUpdateRemoteMirror(t *testing.T) {
 							// Make the branch diverge on the remote before actually performing the pushes the RPC
 							// is attempting to perform to simulate a ref diverging after the RPC has performed
 							// its checks.
-							cmd, err := original.New(ctx, repo, git.Command{
+							cmd, err := original.New(ctx, repo, gitcmd.Command{
 								Name:  "push",
-								Flags: []git.Option{git.Flag{Name: "--force"}},
+								Flags: []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 								Args:  []string{remoteName, "refs/heads/non-diverging:refs/heads/diverging"},
 							}, opts...)
 							if !assert.NoError(tb, err) {
@@ -463,11 +464,11 @@ func TestUpdateRemoteMirror(t *testing.T) {
 		},
 		{
 			desc: "pushes default branch in the first batch",
-			wrapCommandFactory: func(tb testing.TB, original git.CommandFactory) git.CommandFactory {
+			wrapCommandFactory: func(tb testing.TB, original gitcmd.CommandFactory) gitcmd.CommandFactory {
 				firstPush := true
 				return commandFactoryWrapper{
 					CommandFactory: original,
-					newFunc: func(ctx context.Context, repo storage.Repository, sc git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+					newFunc: func(ctx context.Context, repo storage.Repository, sc gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 						if sc.Name == "push" && firstPush {
 							firstPush = false
 							args, err := sc.CommandArgs()

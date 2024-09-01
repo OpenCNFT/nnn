@@ -15,6 +15,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -219,10 +220,10 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		<-ch
 
 		var stderr bytes.Buffer
-		err = repo.ExecAndWait(ctx, git.Command{
+		err = repo.ExecAndWait(ctx, gitcmd.Command{
 			Name: "symbolic-ref",
 			Args: []string{"HEAD", "refs/heads/otherbranch"},
-		}, git.WithRefTxHook(repo), git.WithStderr(&stderr))
+		}, gitcmd.WithRefTxHook(repo), gitcmd.WithStderr(&stderr))
 
 		code, ok := command.ExitStatus(err)
 		require.True(t, ok)

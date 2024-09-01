@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
 )
@@ -94,19 +94,19 @@ func (c Config) Environment() (string, error) {
 }
 
 // GitConfiguration returns the Git configuration required to run the smudge filter.
-func (c Config) GitConfiguration(cfg config.Cfg) (git.ConfigPair, error) {
+func (c Config) GitConfiguration(cfg config.Cfg) (gitcmd.ConfigPair, error) {
 	switch c.DriverType {
 	case DriverTypeFilter:
-		return git.ConfigPair{
+		return gitcmd.ConfigPair{
 			Key:   "filter.lfs.smudge",
 			Value: cfg.BinaryPath("gitaly-lfs-smudge"),
 		}, nil
 	case DriverTypeProcess:
-		return git.ConfigPair{
+		return gitcmd.ConfigPair{
 			Key:   "filter.lfs.process",
 			Value: cfg.BinaryPath("gitaly-lfs-smudge"),
 		}, nil
 	default:
-		return git.ConfigPair{}, fmt.Errorf("unknown driver type: %v", c.DriverType)
+		return gitcmd.ConfigPair{}, fmt.Errorf("unknown driver type: %v", c.DriverType)
 	}
 }

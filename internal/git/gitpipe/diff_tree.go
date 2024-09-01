@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 )
 
@@ -63,24 +64,24 @@ func DiffTree(
 	go func() {
 		defer close(resultChan)
 
-		flags := []git.Option{}
+		flags := []gitcmd.Option{}
 
 		if cfg.recursive {
-			flags = append(flags, git.Flag{Name: "-r"})
+			flags = append(flags, gitcmd.Flag{Name: "-r"})
 		}
 		if cfg.ignoreSubmodules {
-			flags = append(flags, git.Flag{Name: "--ignore-submodules"})
+			flags = append(flags, gitcmd.Flag{Name: "--ignore-submodules"})
 		}
 
 		var stderr strings.Builder
 		cmd, err := repo.Exec(ctx,
-			git.Command{
+			gitcmd.Command{
 				Name:  "diff-tree",
 				Flags: flags,
 				Args:  []string{leftRevision, rightRevision},
 			},
-			git.WithStderr(&stderr),
-			git.WithSetupStdout(),
+			gitcmd.WithStderr(&stderr),
+			gitcmd.WithSetupStdout(),
 		)
 		if err != nil {
 			sendRevisionResult(ctx, resultChan, RevisionResult{

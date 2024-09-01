@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -31,7 +32,7 @@ type Repo struct {
 	storage.Repository
 	logger        log.Logger
 	locator       storage.Locator
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 	catfileCache  catfile.Cache
 
 	detectObjectHashOnce sync.Once
@@ -44,7 +45,7 @@ type Repo struct {
 }
 
 // New creates a new Repo from its protobuf representation.
-func New(logger log.Logger, locator storage.Locator, gitCmdFactory git.CommandFactory, catfileCache catfile.Cache, repo storage.Repository) *Repo {
+func New(logger log.Logger, locator storage.Locator, gitCmdFactory gitcmd.CommandFactory, catfileCache catfile.Cache, repo storage.Repository) *Repo {
 	return &Repo{
 		Repository:    repo,
 		logger:        logger,
@@ -124,7 +125,7 @@ func (repo *Repo) QuarantineOnly() (*Repo, error) {
 
 // NewTestRepo constructs a Repo. It is intended as a helper function for tests which assembles
 // dependencies ad-hoc from the given config.
-func NewTestRepo(tb testing.TB, cfg config.Cfg, repo storage.Repository, factoryOpts ...git.ExecCommandFactoryOption) *Repo {
+func NewTestRepo(tb testing.TB, cfg config.Cfg, repo storage.Repository, factoryOpts ...gitcmd.ExecCommandFactoryOption) *Repo {
 	tb.Helper()
 
 	if cfg.SocketPath != testcfg.UnconfiguredSocketPath {
@@ -142,7 +143,7 @@ func NewTestRepo(tb testing.TB, cfg config.Cfg, repo storage.Repository, factory
 	logrusLogger.Out = io.Discard
 	logger := log.FromLogrusEntry(logrus.NewEntry(logrusLogger))
 
-	gitCmdFactory, cleanup, err := git.NewExecCommandFactory(cfg, logger, factoryOpts...)
+	gitCmdFactory, cleanup, err := gitcmd.NewExecCommandFactory(cfg, logger, factoryOpts...)
 	tb.Cleanup(cleanup)
 	require.NoError(tb, err)
 
@@ -156,13 +157,13 @@ func NewTestRepo(tb testing.TB, cfg config.Cfg, repo storage.Repository, factory
 
 // Exec creates a git command with the given args and Repo, executed in the
 // Repo. It validates the arguments in the command before executing.
-func (repo *Repo) Exec(ctx context.Context, cmd git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+func (repo *Repo) Exec(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 	return repo.gitCmdFactory.New(ctx, repo, cmd, opts...)
 }
 
 // ExecAndWait is similar to Exec, but waits for the command to exit before
 // returning.
-func (repo *Repo) ExecAndWait(ctx context.Context, cmd git.Command, opts ...git.CmdOpt) error {
+func (repo *Repo) ExecAndWait(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) error {
 	command, err := repo.Exec(ctx, cmd, opts...)
 	if err != nil {
 		return err
@@ -201,7 +202,7 @@ func (repo *Repo) StorageTempDir() (string, error) {
 // ObjectHash detects the object hash used by this particular repository.
 func (repo *Repo) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
 	repo.detectObjectHashOnce.Do(func() {
-		repo.objectHash, repo.objectHashErr = git.DetectObjectHash(ctx, repo.gitCmdFactory, repo)
+		repo.objectHash, repo.objectHashErr = gitcmd.DetectObjectHash(ctx, repo.gitCmdFactory, repo)
 	})
 	return repo.objectHash, repo.objectHashErr
 }
@@ -209,7 +210,7 @@ func (repo *Repo) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
 // ReferenceBackend detects the reference backend used by this repository.
 func (repo *Repo) ReferenceBackend(ctx context.Context) (git.ReferenceBackend, error) {
 	repo.detectRefBackendOnce.Do(func() {
-		repo.referenceBackend, repo.referenceBackendErr = git.DetectReferenceBackend(ctx, repo.gitCmdFactory, repo)
+		repo.referenceBackend, repo.referenceBackendErr = gitcmd.DetectReferenceBackend(ctx, repo.gitCmdFactory, repo)
 	})
 
 	return repo.referenceBackend, repo.referenceBackendErr

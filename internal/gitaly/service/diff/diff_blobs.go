@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/diff"
@@ -49,17 +50,17 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 		return err
 	}
 
-	var cmdOpts []git.Option
+	var cmdOpts []gitcmd.Option
 
 	switch request.GetWhitespaceChanges() {
 	case gitalypb.DiffBlobsRequest_WHITESPACE_CHANGES_IGNORE_ALL:
-		cmdOpts = append(cmdOpts, git.Flag{Name: "--ignore-all-space"})
+		cmdOpts = append(cmdOpts, gitcmd.Flag{Name: "--ignore-all-space"})
 	case gitalypb.DiffBlobsRequest_WHITESPACE_CHANGES_IGNORE:
-		cmdOpts = append(cmdOpts, git.Flag{Name: "--ignore-space-change"})
+		cmdOpts = append(cmdOpts, gitcmd.Flag{Name: "--ignore-space-change"})
 	}
 
 	if request.GetDiffMode() == gitalypb.DiffBlobsRequest_DIFF_MODE_WORD {
-		cmdOpts = append(cmdOpts, git.Flag{Name: "--word-diff=porcelain"})
+		cmdOpts = append(cmdOpts, gitcmd.Flag{Name: "--word-diff=porcelain"})
 	}
 
 	var limits diff.Limits
@@ -91,7 +92,7 @@ func diffBlob(ctx context.Context,
 	objectHash git.ObjectHash,
 	blobPair *gitalypb.DiffBlobsRequest_BlobPair,
 	limits diff.Limits,
-	opts []git.Option,
+	opts []gitcmd.Option,
 ) (*diff.Diff, error) {
 	left := string(blobPair.LeftBlob)
 	right := string(blobPair.RightBlob)
@@ -110,19 +111,19 @@ func diffBlob(ctx context.Context,
 		right = emptyBlob.String()
 	}
 
-	gitCmd := git.Command{
+	gitCmd := gitcmd.Command{
 		Name: "diff",
-		Flags: []git.Option{
+		Flags: []gitcmd.Option{
 			// The diff parser requires raw output even if only a single diff is generated.
-			git.Flag{Name: "--patch-with-raw"},
-			git.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())},
+			gitcmd.Flag{Name: "--patch-with-raw"},
+			gitcmd.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())},
 		},
 		Args: []string{left, right},
 	}
 
 	gitCmd.Flags = append(gitCmd.Flags, opts...)
 
-	cmd, err := repo.Exec(ctx, gitCmd, git.WithSetupStdout())
+	cmd, err := repo.Exec(ctx, gitCmd, gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, fmt.Errorf("spawning git-diff: %w", err)
 	}

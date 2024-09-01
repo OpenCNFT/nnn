@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -19,32 +20,32 @@ func (s *server) CountCommits(ctx context.Context, in *gitalypb.CountCommitsRequ
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	subCmd := git.Command{Name: "rev-list", Flags: []git.Option{git.Flag{Name: "--count"}}}
+	subCmd := gitcmd.Command{Name: "rev-list", Flags: []gitcmd.Option{gitcmd.Flag{Name: "--count"}}}
 
 	if in.GetAll() {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--all"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--all"})
 	} else {
 		subCmd.Args = []string{string(in.GetRevision())}
 	}
 
 	if before := in.GetBefore(); before != nil {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--before=" + timestampToRFC3339(before.Seconds)})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--before=" + timestampToRFC3339(before.Seconds)})
 	}
 	if after := in.GetAfter(); after != nil {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--after=" + timestampToRFC3339(after.Seconds)})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--after=" + timestampToRFC3339(after.Seconds)})
 	}
 	if maxCount := in.GetMaxCount(); maxCount != 0 {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
 	}
 	if in.GetFirstParent() {
-		subCmd.Flags = append(subCmd.Flags, git.Flag{Name: "--first-parent"})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--first-parent"})
 	}
 	if path := in.GetPath(); path != nil {
 		subCmd.PostSepArgs = []string{string(path)}
 	}
 
-	opts := git.ConvertGlobalOptions(in.GetGlobalOptions())
-	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, subCmd, append(opts, git.WithSetupStdout())...)
+	opts := gitcmd.ConvertGlobalOptions(in.GetGlobalOptions())
+	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, subCmd, append(opts, gitcmd.WithSetupStdout())...)
 	if err != nil {
 		return nil, structerr.NewInternal("cmd: %w", err)
 	}

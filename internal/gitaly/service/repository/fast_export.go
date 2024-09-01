@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/gitaly/v16/streamio"
@@ -25,12 +25,12 @@ func (s *server) FastExport(
 	var stderr bytes.Buffer
 
 	repo := s.localrepo(req.GetRepository())
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "fast-export",
-		Flags: []git.Option{
-			git.Flag{Name: "--all"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--all"},
 		},
-	}, git.WithSetupStdout(), git.WithStderr(&stderr))
+	}, gitcmd.WithSetupStdout(), gitcmd.WithStderr(&stderr))
 	if err != nil {
 		return structerr.NewInternal("cmd start failed: %w", err).
 			WithMetadata("stderr", stderr.String())

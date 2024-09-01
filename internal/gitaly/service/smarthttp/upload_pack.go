@@ -9,7 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -83,7 +83,7 @@ func (s *server) runStatsCollector(ctx context.Context, r io.Reader) (io.Reader,
 	return io.TeeReader(r, pw), sc
 }
 
-func (s *server) validateUploadPackRequest(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest) (string, []git.ConfigPair, error) {
+func (s *server) validateUploadPackRequest(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest) (string, []gitcmd.ConfigPair, error) {
 	repository := req.GetRepository()
 	if err := s.locator.ValidateRepository(ctx, repository); err != nil {
 		return "", nil, err
@@ -93,9 +93,9 @@ func (s *server) validateUploadPackRequest(ctx context.Context, req *gitalypb.Po
 		return "", nil, err
 	}
 
-	git.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repository.GetStorageName(), repoPath)
+	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repository.GetStorageName(), repoPath)
 
-	config, err := git.ConvertConfigOptions(req.GetGitConfigOptions())
+	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
 		return "", nil, err
 	}
@@ -103,7 +103,7 @@ func (s *server) validateUploadPackRequest(ctx context.Context, req *gitalypb.Po
 	return repoPath, config, nil
 }
 
-func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest, repoPath string, gitConfig []git.ConfigPair, stdin io.Reader, stdout io.Writer) (stats *stats.PackfileNegotiation, _ error) {
+func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest, repoPath string, gitConfig []gitcmd.ConfigPair, stdin io.Reader, stdout io.Writer) (stats *stats.PackfileNegotiation, _ error) {
 	h := sha1.New()
 
 	stdin = io.TeeReader(stdin, h)
@@ -122,17 +122,17 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 		gitConfig = append(gitConfig, uploadPackConfig...)
 	}
 
-	commandOpts := []git.CmdOpt{
-		git.WithStdin(stdin),
-		git.WithSetupStdout(),
-		git.WithGitProtocol(s.logger, req),
-		git.WithConfig(gitConfig...),
-		git.WithPackObjectsHookEnv(req.GetRepository(), "http"),
+	commandOpts := []gitcmd.CmdOpt{
+		gitcmd.WithStdin(stdin),
+		gitcmd.WithSetupStdout(),
+		gitcmd.WithGitProtocol(s.logger, req),
+		gitcmd.WithConfig(gitConfig...),
+		gitcmd.WithPackObjectsHookEnv(req.GetRepository(), "http"),
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
 		Name:  "upload-pack",
-		Flags: []git.Option{git.Flag{Name: "--stateless-rpc"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},
 		Args:  []string{repoPath},
 	}, commandOpts...)
 	if err != nil {

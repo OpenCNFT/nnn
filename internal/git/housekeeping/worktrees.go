@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
@@ -101,14 +101,14 @@ var errUnknownWorktree = errors.New("unknown worktree")
 
 func removeWorktree(ctx context.Context, repo *localrepo.Repo, name string) error {
 	var stderr bytes.Buffer
-	err := repo.ExecAndWait(ctx, git.Command{
+	err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "remove",
-		Flags:  []git.Option{git.Flag{Name: "--force"}},
+		Flags:  []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 		Args:   []string{name},
 	},
-		git.WithRefTxHook(repo),
-		git.WithStderr(&stderr),
+		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithStderr(&stderr),
 	)
 	if isExitWithCode(err, 128) && strings.HasPrefix(stderr.String(), "fatal: '"+name+"' is not a working tree") {
 		return errUnknownWorktree
@@ -164,8 +164,8 @@ func cleanDisconnectedWorktrees(ctx context.Context, repo *localrepo.Repo) error
 		return nil
 	}
 
-	return repo.ExecAndWait(ctx, git.Command{
+	return repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "prune",
-	}, git.WithRefTxHook(repo))
+	}, gitcmd.WithRefTxHook(repo))
 }

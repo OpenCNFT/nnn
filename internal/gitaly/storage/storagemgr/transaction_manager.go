@@ -20,6 +20,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -1019,7 +1020,7 @@ type TransactionManager struct {
 	// Gitaly starts.
 	stagingDirectory string
 	// commandFactory is used to spawn git commands without a repository.
-	commandFactory git.CommandFactory
+	commandFactory gitcmd.CommandFactory
 	// repositoryFactory is used to build localrepo.Repo instances.
 	repositoryFactory localrepo.StorageScopedFactory
 	// storageName is the name of the storage the TransactionManager's partition is a member of.
@@ -1106,7 +1107,7 @@ func NewTransactionManager(
 	storagePath,
 	stateDir,
 	stagingDir string,
-	cmdFactory git.CommandFactory,
+	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics transactionManagerMetrics,
 	consumer LogConsumer,
@@ -1638,11 +1639,11 @@ func (mgr *TransactionManager) packObjects(ctx context.Context, transaction *Tra
 
 			// index-pack places the pack, index, and reverse index into the transaction's staging directory.
 			var stdout, stderr bytes.Buffer
-			if err := quarantineOnlySnapshotRepository.ExecAndWait(ctx, git.Command{
+			if err := quarantineOnlySnapshotRepository.ExecAndWait(ctx, gitcmd.Command{
 				Name:  "index-pack",
-				Flags: []git.Option{git.Flag{Name: "--stdin"}, git.Flag{Name: "--rev-index"}},
+				Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stdin"}, gitcmd.Flag{Name: "--rev-index"}},
 				Args:  []string{filepath.Join(transaction.stagingDirectory, "objects.pack")},
-			}, git.WithStdin(packReader), git.WithStdout(&stdout), git.WithStderr(&stderr)); err != nil {
+			}, gitcmd.WithStdin(packReader), gitcmd.WithStdout(&stdout), gitcmd.WithStderr(&stderr)); err != nil {
 				return structerr.New("index pack: %w", err).WithMetadata("stderr", stderr.String())
 			}
 
@@ -1781,13 +1782,13 @@ func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, tran
 	// Execute git-pack-refs command. The command runs in the scope of the snapshot repository. Thus, we can
 	// let it prune the ref references without causing any impact to other concurrent transactions.
 	var stderr bytes.Buffer
-	if err := transaction.snapshotRepository.ExecAndWait(ctx, git.Command{
+	if err := transaction.snapshotRepository.ExecAndWait(ctx, gitcmd.Command{
 		Name: "pack-refs",
 		// By using the '--auto' flag, we ensure that git uses the best heuristic
 		// for compaction. For reftables, it currently uses a geometric progression.
 		// This ensures we don't keep compacting unecessarily to a single file.
-		Flags: []git.Option{git.Flag{Name: "--auto"}},
-	}, git.WithStderr(&stderr)); err != nil {
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--auto"}},
+	}, gitcmd.WithStderr(&stderr)); err != nil {
 		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
 	}
 
@@ -1872,10 +1873,10 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 	// Execute git-pack-refs command. The command runs in the scope of the snapshot repository. Thus, we can
 	// let it prune the ref references without causing any impact to other concurrent transactions.
 	var stderr bytes.Buffer
-	if err := transaction.snapshotRepository.ExecAndWait(ctx, git.Command{
+	if err := transaction.snapshotRepository.ExecAndWait(ctx, gitcmd.Command{
 		Name:  "pack-refs",
-		Flags: []git.Option{git.Flag{Name: "--all"}},
-	}, git.WithStderr(&stderr)); err != nil {
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--all"}},
+	}, gitcmd.WithStderr(&stderr)); err != nil {
 		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
 	}
 
@@ -2007,11 +2008,11 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 		if err := housekeeping.PerformRepack(ctx, workingRepository, repack.config,
 			// Do a full repack. By using `-a` instead of `-A` we will immediately discard unreachable
 			// objects instead of exploding them into loose objects.
-			git.Flag{Name: "-a"},
+			gitcmd.Flag{Name: "-a"},
 			// Don't include objects part of alternate.
-			git.Flag{Name: "-l"},
+			gitcmd.Flag{Name: "-l"},
 			// Delete loose objects made redundant by this repack and redundant packfiles.
-			git.Flag{Name: "-d"},
+			gitcmd.Flag{Name: "-d"},
 		); err != nil {
 			return err
 		}
@@ -2404,16 +2405,16 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 
 		var stderr bytes.Buffer
 		if err := repository.ExecAndWait(ctx,
-			git.Command{
+			gitcmd.Command{
 				Name: "cat-file",
-				Flags: []git.Option{
-					git.Flag{Name: "--batch-check=%(objectname)"},
-					git.Flag{Name: "--buffer"},
+				Flags: []gitcmd.Option{
+					gitcmd.Flag{Name: "--batch-check=%(objectname)"},
+					gitcmd.Flag{Name: "--buffer"},
 				},
 			},
-			git.WithStdin(oidReader),
-			git.WithStdout(resultWriter),
-			git.WithStderr(&stderr),
+			gitcmd.WithStdin(oidReader),
+			gitcmd.WithStdout(resultWriter),
+			gitcmd.WithStderr(&stderr),
 		); err != nil {
 			return structerr.New("cat-file: %w", err).WithMetadata("stderr", stderr.String())
 		}
@@ -3564,15 +3565,15 @@ func (mgr *TransactionManager) createRepository(ctx context.Context, repositoryP
 	}
 
 	stderr := &bytes.Buffer{}
-	cmd, err := mgr.commandFactory.NewWithoutRepo(ctx, git.Command{
+	cmd, err := mgr.commandFactory.NewWithoutRepo(ctx, gitcmd.Command{
 		Name: "init",
-		Flags: []git.Option{
-			git.Flag{Name: "--bare"},
-			git.Flag{Name: "--quiet"},
-			git.Flag{Name: "--object-format=" + objectHash.Format},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--bare"},
+			gitcmd.Flag{Name: "--quiet"},
+			gitcmd.Flag{Name: "--object-format=" + objectHash.Format},
 		},
 		Args: []string{repositoryPath},
-	}, git.WithStderr(stderr))
+	}, gitcmd.WithStderr(stderr))
 	if err != nil {
 		return fmt.Errorf("spawn git init: %w", err)
 	}

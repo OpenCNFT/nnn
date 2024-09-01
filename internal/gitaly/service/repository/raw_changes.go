@@ -10,6 +10,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/rawdiff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -64,7 +65,7 @@ func validateRawChangesRequest(ctx context.Context, req *gitalypb.GetRawChangesR
 	return nil
 }
 
-func (s *server) getRawChanges(stream gitalypb.RepositoryService_GetRawChangesServer, repo git.RepositoryExecutor, objectHash git.ObjectHash, objectInfoReader catfile.ObjectInfoReader, from, to string) error {
+func (s *server) getRawChanges(stream gitalypb.RepositoryService_GetRawChangesServer, repo gitcmd.RepositoryExecutor, objectHash git.ObjectHash, objectInfoReader catfile.ObjectInfoReader, from, to string) error {
 	if objectHash.IsZeroOID(git.ObjectID(to)) {
 		return nil
 	}
@@ -75,11 +76,11 @@ func (s *server) getRawChanges(stream gitalypb.RepositoryService_GetRawChangesSe
 
 	ctx := stream.Context()
 
-	diffCmd, err := repo.Exec(ctx, git.Command{
+	diffCmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "diff",
-		Flags: []git.Option{git.Flag{Name: "--raw"}, git.Flag{Name: "-z"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--raw"}, gitcmd.Flag{Name: "-z"}},
 		Args:  []string{from, to},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return fmt.Errorf("start git diff: %w", err)
 	}

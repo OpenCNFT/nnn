@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -16,14 +17,14 @@ func (s *server) FindRemoteRepository(ctx context.Context, req *gitalypb.FindRem
 
 	var output bytes.Buffer
 	cmd, err := s.gitCmdFactory.NewWithoutRepo(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "ls-remote",
 			Args: []string{
 				req.GetRemote(),
 				"HEAD",
 			},
 		},
-		git.WithStdout(&output),
+		gitcmd.WithStdout(&output),
 	)
 	if err != nil {
 		return nil, structerr.NewInternal("error executing git command: %w", err)

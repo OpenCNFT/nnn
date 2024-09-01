@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -31,9 +31,9 @@ func (s *server) RefExists(ctx context.Context, in *gitalypb.RefExistsRequest) (
 }
 
 func (s *server) refExists(ctx context.Context, repo *gitalypb.Repository, ref string) (bool, error) {
-	cmd, err := s.gitCmdFactory.New(ctx, repo, git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name:  "show-ref",
-		Flags: []git.Option{git.Flag{Name: "--verify"}, git.Flag{Name: "--quiet"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--verify"}, gitcmd.Flag{Name: "--quiet"}},
 		Args:  []string{ref},
 	})
 	if err != nil {

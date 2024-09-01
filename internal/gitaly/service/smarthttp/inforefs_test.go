@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cache"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -256,7 +256,7 @@ func TestInfoRefsUploadPack_bundleURI(t *testing.T) {
 
 	rpcRequest := &gitalypb.InfoRefsRequest{
 		Repository:       repo,
-		GitProtocol:      git.ProtocolV2,
+		GitProtocol:      gitcmd.ProtocolV2,
 		GitConfigOptions: []string{"transfer.bundleURI=true"},
 	}
 	response, err := makeInfoRefsUploadPackRequest(t, ctx, cfg.SocketPath, cfg.Auth.Token, rpcRequest)
@@ -292,7 +292,7 @@ func testInfoRefsUploadPackGitProtocol(t *testing.T, ctx context.Context) {
 
 	c, err := client.InfoRefsUploadPack(ctx, &gitalypb.InfoRefsRequest{
 		Repository:  repo,
-		GitProtocol: git.ProtocolV2,
+		GitProtocol: gitcmd.ProtocolV2,
 	})
 	require.NoError(t, err)
 
@@ -304,7 +304,7 @@ func testInfoRefsUploadPackGitProtocol(t *testing.T, ctx context.Context) {
 	}
 
 	envData := protocolDetectingFactory.ReadProtocol(t)
-	require.Contains(t, envData, fmt.Sprintf("GIT_PROTOCOL=%s\n", git.ProtocolV2))
+	require.Contains(t, envData, fmt.Sprintf("GIT_PROTOCOL=%s\n", gitcmd.ProtocolV2))
 }
 
 func TestInfoRefsUploadPack_cacheNotStuckUponContextCancellation(t *testing.T) {
@@ -332,7 +332,7 @@ func testInfoRefsUploadPackCacheNotStuckUponContextCancellation(t *testing.T, ct
 	mockInfoRefCache := newInfoRefCache(logger, &streamer)
 
 	// This is to simulate a long-running `git upload-pack` command so that we can have time to cancel the request abruptly.
-	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 		return fmt.Sprintf(`#!/usr/bin/env bash
 						if [[ "$@" =~ "upload-pack" ]]; then
 							while true; do echo "foo"; done

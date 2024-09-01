@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/diff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -33,15 +33,15 @@ func validateRequest(ctx context.Context, locator storage.Locator, in requestWit
 	return nil
 }
 
-func (s *server) eachDiff(ctx context.Context, repo *localrepo.Repo, subCmd git.Command, limits diff.Limits, callback func(*diff.Diff) error) error {
+func (s *server) eachDiff(ctx context.Context, repo *localrepo.Repo, subCmd gitcmd.Command, limits diff.Limits, callback func(*diff.Diff) error) error {
 	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	diffConfig := git.ConfigPair{Key: "diff.noprefix", Value: "false"}
+	diffConfig := gitcmd.ConfigPair{Key: "diff.noprefix", Value: "false"}
 
-	cmd, err := repo.Exec(ctx, subCmd, git.WithConfig(diffConfig), git.WithSetupStdout())
+	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithConfig(diffConfig), gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}

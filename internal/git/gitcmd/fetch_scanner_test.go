@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 )
 
 func TestFetchScannerScan(t *testing.T) {
@@ -144,7 +145,7 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 	for _, tc := range []struct {
 		desc           string
 		data           string
-		hash           ObjectHash
+		hash           git.ObjectHash
 		expectedStatus FetchPorcelainStatusLine
 		expectedError  error
 		success        bool
@@ -157,25 +158,25 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc:           "blank line",
 			data:           " ",
-			hash:           ObjectHashSHA1,
+			hash:           git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("invalid status line"),
 		},
 		{
 			desc:           "invalid flag",
 			data:           "? 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash:           ObjectHashSHA1,
+			hash:           git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("invalid reference update type: '?'"),
 		},
 		{
 			desc: "valid fast-forward status",
 			data: "  0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeFastForwardUpdate,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -183,11 +184,11 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc: "valid forced status",
 			data: "+ 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeForcedUpdate,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -195,11 +196,11 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc: "valid pruned status",
 			data: "- 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypePruned,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -207,11 +208,11 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc: "valid tag status",
 			data: "t 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeTagUpdate,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -219,11 +220,11 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc: "valid fetched status",
 			data: "* 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeFetched,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -231,11 +232,11 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc: "valid rejected status",
 			data: "! 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeUpdateFailed,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -243,11 +244,11 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc: "valid up-to-date status",
 			data: "= 0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA1,
+			hash: git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeUnchanged,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -255,25 +256,25 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc:           "invalid sha1 old OID",
 			data:           "  0 0000000000000000000000000000000000000001 refs/heads/main",
-			hash:           ObjectHashSHA1,
+			hash:           git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("constructing old OID: invalid object ID: \"0\", expected length 40, got 1"),
 		},
 		{
 			desc:           "invalid sha1 new OID",
 			data:           "  0000000000000000000000000000000000000000 1 refs/heads/main",
-			hash:           ObjectHashSHA1,
+			hash:           git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("constructing new OID: invalid object ID: \"1\", expected length 40, got 1"),
 		},
 		{
 			desc: "valid sha256 status",
 			data: "  0000000000000000000000000000000000000000000000000000000000000000 0000000000000000000000000000000000000000000000000000000000000001 refs/heads/main",
-			hash: ObjectHashSHA256,
+			hash: git.ObjectHashSHA256,
 			expectedStatus: FetchPorcelainStatusLine{
 				Type:      RefUpdateTypeFastForwardUpdate,
-				OldOID:    ObjectID("0000000000000000000000000000000000000000000000000000000000000000"),
-				NewOID:    ObjectID("0000000000000000000000000000000000000000000000000000000000000001"),
+				OldOID:    git.ObjectID("0000000000000000000000000000000000000000000000000000000000000000"),
+				NewOID:    git.ObjectID("0000000000000000000000000000000000000000000000000000000000000001"),
 				Reference: "refs/heads/main",
 			},
 			success: true,
@@ -281,21 +282,21 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 		{
 			desc:           "invalid sha256 old OID",
 			data:           "  0 0000000000000000000000000000000000000000000000000000000000000001 refs/heads/main",
-			hash:           ObjectHashSHA256,
+			hash:           git.ObjectHashSHA256,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("constructing old OID: invalid object ID: \"0\", expected length 64, got 1"),
 		},
 		{
 			desc:           "invalid sha256 new OID",
 			data:           "  0000000000000000000000000000000000000000000000000000000000000000 1 refs/heads/main",
-			hash:           ObjectHashSHA256,
+			hash:           git.ObjectHashSHA256,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("constructing new OID: invalid object ID: \"1\", expected length 64, got 1"),
 		},
 		{
 			desc:           "invalid reference",
 			data:           "  0000000000000000000000000000000000000000 0000000000000000000000000000000000000001 main",
-			hash:           ObjectHashSHA1,
+			hash:           git.ObjectHashSHA1,
 			expectedStatus: FetchPorcelainStatusLine{},
 			expectedError:  errors.New("validating reference: reference is not fully qualified"),
 		},
