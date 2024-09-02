@@ -15,15 +15,15 @@ func ContextWithTransaction(ctx context.Context, tx storage.Transaction) context
 	return context.WithValue(ctx, keyTransaction{}, tx)
 }
 
-// RunWithTransaction runs the callback with the transaction in the context. If there is
-// no transaction in the context, the callback is not ran.
-func RunWithTransaction(ctx context.Context, callback func(tx storage.Transaction)) {
+// ExtractTransaction extracts the transaction from the context. Nil is returned if there's
+// no transaction in the context.
+func ExtractTransaction(ctx context.Context) storage.Transaction {
 	value := ctx.Value(keyTransaction{})
 	if value == nil {
-		return
+		return nil
 	}
 
-	callback(value.(storage.Transaction))
+	return value.(storage.Transaction)
 }
 
 const keyPartitioningHint = "gitaly-partitioning-hint"

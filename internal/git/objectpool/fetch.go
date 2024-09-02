@@ -14,7 +14,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -119,20 +118,15 @@ func (o *ObjectPool) FetchFromOrigin(ctx context.Context, origin *localrepo.Repo
 	// the initial intention of running housekeeping after fetching. As a result, this RPC needs to
 	// manage the transaction itself so that two transactions can be committed in the right order.
 	originalPoolRepo := o.Repo
-	var commitErr error
-	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
+	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
 		originalPoolRepo = newLocalRepo(tx.OriginalRepository(&gitalypb.Repository{
 			StorageName:  origin.GetStorageName(),
 			RelativePath: origin.GetRelativePath(),
 		}))
 
 		if err := tx.Commit(ctx); err != nil {
-			commitErr = fmt.Errorf("commit: %w", err)
+			return fmt.Errorf("commit: %w", err)
 		}
-	})
-
-	if commitErr != nil {
-		return commitErr
 	}
 
 	// We've committed the original transaction above. OptimizeRepository internally starts

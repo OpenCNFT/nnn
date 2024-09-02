@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -33,11 +32,11 @@ func (s *server) GetObjectPool(ctx context.Context, in *gitalypb.GetObjectPoolRe
 	}
 
 	objectPoolProto := objectPool.ToProto()
-	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
+	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
 		// The object pool's relative path is pointing to the transaction's snapshot. Return
 		// the original relative path in the response.
 		objectPoolProto.Repository = tx.OriginalRepository(objectPoolProto.Repository)
-	})
+	}
 
 	return &gitalypb.GetObjectPoolResponse{
 		ObjectPool: objectPoolProto,

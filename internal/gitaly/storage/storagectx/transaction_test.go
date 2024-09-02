@@ -14,25 +14,12 @@ type nilTransaction struct{ storage.Transaction }
 
 func TestContextWithTransaction(t *testing.T) {
 	t.Run("no transaction in context", func(t *testing.T) {
-		RunWithTransaction(context.Background(), func(tx storage.Transaction) {
-			t.Fatalf("callback should not be executed without transaction")
-		})
+		require.Nil(t, ExtractTransaction(context.Background()))
 	})
 
 	t.Run("transaction in context", func(t *testing.T) {
-		callbackRan := false
 		expectedTX := &nilTransaction{}
-
-		RunWithTransaction(
-			ContextWithTransaction(context.Background(), expectedTX),
-			func(tx storage.Transaction) {
-				require.Same(t, expectedTX, tx)
-				require.NotSame(t, tx, &nilTransaction{})
-				callbackRan = true
-			},
-		)
-
-		require.True(t, callbackRan)
+		require.Same(t, expectedTX, ExtractTransaction(ContextWithTransaction(context.Background(), expectedTX)))
 	})
 }
 

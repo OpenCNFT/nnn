@@ -20,10 +20,10 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 
 	var root string
 	var lsn string
-	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
+	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
 		root = tx.Root()
 		lsn = tx.SnapshotLSN().String()
-	})
+	}
 	if root == "" {
 		return nil, structerr.NewInternal("backup partition: transaction not initialized")
 	}

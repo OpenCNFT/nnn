@@ -103,13 +103,10 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExisti
 		return run(ctx, nil, repo)
 	}
 
-	var tx storage.Transaction
-	if useExistingTransaction {
-		storagectx.RunWithTransaction(ctx, func(transaction storage.Transaction) {
-			tx = transaction
-		})
-	} else {
-		transaction, err := m.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
+	tx := storagectx.ExtractTransaction(ctx)
+	if !useExistingTransaction {
+		var err error
+		tx, err = m.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
 			RelativePath: repo.GetRelativePath(),
 		})
 		if err != nil {
@@ -118,20 +115,19 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExisti
 		defer func() {
 			if returnedError != nil {
 				// We prioritize actual housekeeping error and log rollback error.
-				if err := transaction.Rollback(); err != nil {
+				if err := tx.Rollback(); err != nil {
 					m.logger.WithError(err).Error("could not rollback housekeeping transaction")
 				}
 			}
 		}()
 
-		repo = localrepo.NewFrom(repo, transaction.RewriteRepository(&gitalypb.Repository{
+		repo = localrepo.NewFrom(repo, tx.RewriteRepository(&gitalypb.Repository{
 			StorageName:                   repo.GetStorageName(),
 			GitAlternateObjectDirectories: repo.GetGitAlternateObjectDirectories(),
 			GitObjectDirectory:            repo.GetGitObjectDirectory(),
 			RelativePath:                  repo.GetRelativePath(),
 		}))
 
-		tx = transaction
 		ctx = storagectx.ContextWithTransaction(ctx, tx)
 	}
 

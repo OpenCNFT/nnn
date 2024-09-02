@@ -20,9 +20,9 @@ func (s *server) RemoveRepository(ctx context.Context, in *gitalypb.RemoveReposi
 		return nil, err
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storage.Transaction) {
+	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
 		tx.DeleteRepository()
-	})
+	}
 
 	return &gitalypb.RemoveRepositoryResponse{}, nil
 }
