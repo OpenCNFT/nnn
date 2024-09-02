@@ -33,7 +33,7 @@ func TestPartitioningHint(t *testing.T) {
 	})
 
 	t.Run("hint provided", func(t *testing.T) {
-		ctx := SetPartitioningHintToIncomingContext(context.Background(), "relative-path")
+		ctx := ContextWithPartitioningHint(context.Background(), "relative-path")
 
 		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
 		require.NoError(t, err)
@@ -44,7 +44,7 @@ func TestPartitioningHint(t *testing.T) {
 		originalMetadata := grpc_metadata.New(nil)
 		originalCtx := grpc_metadata.NewIncomingContext(context.Background(), originalMetadata)
 
-		ctx := SetPartitioningHintToIncomingContext(originalCtx, "relative-path")
+		ctx := ContextWithPartitioningHint(originalCtx, "relative-path")
 
 		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestPartitioningHint(t *testing.T) {
 	})
 
 	t.Run("removes the hint", func(t *testing.T) {
-		ctx := SetPartitioningHintToIncomingContext(context.Background(), "relative-path")
+		ctx := ContextWithPartitioningHint(context.Background(), "relative-path")
 
 		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
 		require.NoError(t, err)

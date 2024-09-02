@@ -28,9 +28,9 @@ func ExtractTransaction(ctx context.Context) storage.Transaction {
 
 const keyPartitioningHint = "gitaly-partitioning-hint"
 
-// SetPartitioningHintToIncomingContext stores the relativePath as a partitioning hint into the incoming
+// ContextWithPartitioningHint stores the relativePath as a partitioning hint into the incoming
 // gRPC metadata in the context.
-func SetPartitioningHintToIncomingContext(ctx context.Context, relativePath string) context.Context {
+func ContextWithPartitioningHint(ctx context.Context, relativePath string) context.Context {
 	md, ok := grpc_metadata.FromIncomingContext(ctx)
 	if !ok {
 		md = grpc_metadata.New(nil)

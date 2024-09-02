@@ -33,7 +33,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 			desc: "partitioning hint provided",
 			createFork: func(t *testing.T, ctx context.Context, cfg config.Cfg, alternate *gitalypb.Repository) *gitalypb.Repository {
 				fork, _ := gittest.CreateRepository(t,
-					metadata.IncomingToOutgoing(storagectx.SetPartitioningHintToIncomingContext(ctx, alternate.RelativePath)),
+					metadata.IncomingToOutgoing(storagectx.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
 					cfg,
 				)
 				return fork
@@ -78,7 +78,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 
 				_, err = gitalypb.NewRepositoryServiceClient(cc).CreateFork(
 					testhelper.MergeOutgoingMetadata(
-						metadata.IncomingToOutgoing(storagectx.SetPartitioningHintToIncomingContext(ctx, alternate.RelativePath)),
+						metadata.IncomingToOutgoing(storagectx.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
 						testcfg.GitalyServersMetadataFromCfg(t, cfg),
 					),
 					&gitalypb.CreateForkRequest{
@@ -102,7 +102,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 
 				_, err = gitalypb.NewObjectPoolServiceClient(cc).CreateObjectPool(
 					testhelper.MergeOutgoingMetadata(
-						metadata.IncomingToOutgoing(storagectx.SetPartitioningHintToIncomingContext(ctx, alternate.RelativePath)),
+						metadata.IncomingToOutgoing(storagectx.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
 						testcfg.GitalyServersMetadataFromCfg(t, cfg),
 					),
 					&gitalypb.CreateObjectPoolRequest{

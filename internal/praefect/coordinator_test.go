@@ -764,7 +764,7 @@ func TestStreamDirectorMutator_ReplicateRepository(t *testing.T) {
 			ctx = correlation.ContextWithCorrelation(ctx, "my-correlation-id")
 
 			if tc.PartitioningHint != "" {
-				ctx = storagectx.SetPartitioningHintToIncomingContext(ctx, tc.PartitioningHint)
+				ctx = storagectx.ContextWithPartitioningHint(ctx, tc.PartitioningHint)
 			}
 
 			// Validate that stream parameters can be constructed successfully for

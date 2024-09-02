@@ -443,7 +443,7 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 
 	if partitioningHintRewritten && additionalRepoRelativePath != "" {
 		// Send the rewritten path as partitioning hint to Gitaly.
-		ctx = storagectx.SetPartitioningHintToIncomingContext(ctx, route.AdditionalReplicaPath)
+		ctx = storagectx.ContextWithPartitioningHint(ctx, route.AdditionalReplicaPath)
 	}
 
 	var finalizers []func() error
