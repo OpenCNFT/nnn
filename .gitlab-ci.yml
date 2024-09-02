@@ -17,7 +17,7 @@ default:
   git_minimum: "v2.45.0"
   go_default: "1.22"
   go_supported: ["1.22", "1.23"]
-  macos: "macos-12-xcode-14"
+  macos: "macos-14-xcode-15"
   pgbouncer: "1.17.0"
   postgres_default: "12-alpine"
   postgres_minimum: "11-alpine"
@@ -385,14 +385,17 @@ test:macos:
     - sudo spctl --master-disable
     # Create a 2GB RAM disk to speed up our tests.
     - sudo diskutil apfs create $(hdiutil attach -nomount ram://4194304) RAMDisk
-    - brew uninstall go
-    - brew install cmake go@${GO_VERSION}
+    - brew uninstall asdf --force
+    - rm -rf $HOME/.asdf
+    - brew install python go@${GO_VERSION}
     # Older Go versions may be keg-only and thus aren't linked into `PATH` by
     # default. We need to override this mechanism to force this specific Go
     # version to become active.
-    - brew link --force go@${GO_VERSION}
-    - sw_vers
+    - brew link --force go@${GO_VERSION} python
     - go version
+    - python3 --version
+    - sw_vers
+    - brew install cmake postgresql
     - pg_ctl --version
     - ulimit -n 4096 # The default of 256 can lead to 'too many open files' errors when running parallel tests
     - pg_ctl init
