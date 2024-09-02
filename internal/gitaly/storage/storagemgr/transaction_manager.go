@@ -1266,11 +1266,21 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 
 		if transaction.defaultBranchUpdated {
-			if err := transaction.walEntry.RecordFileUpdate(
-				transaction.snapshot.Root(),
-				filepath.Join(transaction.relativePath, "HEAD"),
-			); err != nil {
-				return fmt.Errorf("record HEAD update: %w", err)
+			refBackend, err := transaction.snapshotRepository.ReferenceBackend(ctx)
+			if err != nil {
+				return fmt.Errorf("detecting reference backend: %w", err)
+			}
+
+			// We only want to track the HEAD ref manually for the files backend.
+			// For the reftable backend, we would track the HEAD ref as a regular
+			// reference update.
+			if refBackend == git.ReferenceBackendFiles {
+				if err := transaction.walEntry.RecordFileUpdate(
+					transaction.snapshot.Root(),
+					filepath.Join(transaction.relativePath, "HEAD"),
+				); err != nil {
+					return fmt.Errorf("record HEAD update: %w", err)
+				}
 			}
 		}
 	}
