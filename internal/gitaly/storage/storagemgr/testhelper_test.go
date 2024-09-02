@@ -33,7 +33,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -1244,7 +1243,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						})
 					}
 
-					require.NoError(t, rewrittenRepo.SetDefaultBranch(storagectx.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
+					require.NoError(t, rewrittenRepo.SetDefaultBranch(storage.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
 				}
 
 				if step.CustomHooksUpdate != nil {

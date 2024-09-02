@@ -10,7 +10,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
@@ -63,7 +63,7 @@ func (o *ObjectPool) Link(ctx context.Context, repo *localrepo.Repo) (returnedEr
 		return fmt.Errorf("committing alternates: %w", err)
 	}
 
-	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		tx.MarkAlternateUpdated()
 	}
 

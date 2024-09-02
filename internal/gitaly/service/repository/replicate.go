@@ -18,7 +18,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
@@ -83,7 +82,7 @@ func (s *server) ReplicateRepository(ctx context.Context, in *gitalypb.Replicate
 	}
 
 	// The partitioning hint should not be forwarded to other Gitaly nodes as the path is irrelevant for them.
-	outgoingCtx := storagectx.ContextWithoutPartitioningHint(ctx)
+	outgoingCtx := storage.ContextWithoutPartitioningHint(ctx)
 	outgoingCtx = metadata.IncomingToOutgoing(outgoingCtx)
 
 	if err := s.replicateRepository(outgoingCtx, in.GetSource(), in.GetRepository()); err != nil {

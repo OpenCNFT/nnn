@@ -12,7 +12,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
@@ -103,7 +102,7 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExisti
 		return run(ctx, nil, repo)
 	}
 
-	tx := storagectx.ExtractTransaction(ctx)
+	tx := storage.ExtractTransaction(ctx)
 	if !useExistingTransaction {
 		var err error
 		tx, err = m.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
@@ -128,7 +127,7 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExisti
 			RelativePath:                  repo.GetRelativePath(),
 		}))
 
-		ctx = storagectx.ContextWithTransaction(ctx, tx)
+		ctx = storage.ContextWithTransaction(ctx, tx)
 	}
 
 	if err := run(ctx, tx, repo); err != nil {

@@ -8,7 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -33,7 +33,7 @@ func (s *server) FetchIntoObjectPool(ctx context.Context, req *gitalypb.FetchInt
 	}
 
 	originalPoolRepo := objectPool.Repo
-	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		originalPoolRepo = s.localrepo(tx.OriginalRepository(&gitalypb.Repository{
 			StorageName:  req.GetObjectPool().GetRepository().GetStorageName(),
 			RelativePath: req.GetObjectPool().GetRepository().GetRelativePath(),

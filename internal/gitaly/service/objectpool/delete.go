@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -26,7 +26,7 @@ func (s *server) DeleteObjectPool(ctx context.Context, in *gitalypb.DeleteObject
 		return nil, structerr.NewInternal("%w", err)
 	}
 
-	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		tx.DeleteRepository()
 	}
 

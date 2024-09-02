@@ -2,7 +2,7 @@ package repository
 
 import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/gitaly/v16/streamio"
@@ -39,7 +39,7 @@ func (s *server) SetCustomHooks(stream gitalypb.RepositoryService_SetCustomHooks
 		return structerr.NewInternal("setting custom hooks: %w", err)
 	}
 
-	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		tx.MarkCustomHooksUpdated()
 	}
 

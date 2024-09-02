@@ -7,7 +7,6 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -20,7 +19,7 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 
 	var root string
 	var lsn string
-	if tx := storagectx.ExtractTransaction(ctx); tx != nil {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		root = tx.Root()
 		lsn = tx.SnapshotLSN().String()
 	}

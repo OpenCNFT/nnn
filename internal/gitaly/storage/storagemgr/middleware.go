@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -319,7 +318,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		alternateStorageName  string
 		alternateRelativePath string
 	)
-	if hint, err := storagectx.ExtractPartitioningHint(ctx); err != nil {
+	if hint, err := storage.ExtractPartitioningHint(ctx); err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("extract partitioning hint: %w", err)
 	} else if hint != "" {
 		// In some cases a repository needs to be partitioned with a repository that isn't set as an additional
@@ -416,7 +415,7 @@ func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *Transa
 		return transactionalizedRequest{}, fmt.Errorf("begin transaction: %w", err)
 	}
 
-	ctx = storagectx.ContextWithTransaction(ctx, tx)
+	ctx = storage.ContextWithTransaction(ctx, tx)
 
 	txID := txRegistry.register(tx.Transaction)
 	ctx = storage.ContextWithTransactionID(ctx, txID)

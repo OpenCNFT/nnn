@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/proxy"
@@ -376,7 +375,7 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 		// replicate path. The hint is the @hashed/... relative path to the repo and the rewritten hint is the
 		// equivalent @cluster/... replica path tto the repo.
 		partitioningHintRewritten = true
-		additionalRepoRelativePath, err = storagectx.ExtractPartitioningHint(ctx)
+		additionalRepoRelativePath, err = storage.ExtractPartitioningHint(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("mutator call: extract partitioning hint: %w", err)
 		}
@@ -443,7 +442,7 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 
 	if partitioningHintRewritten && additionalRepoRelativePath != "" {
 		// Send the rewritten path as partitioning hint to Gitaly.
-		ctx = storagectx.ContextWithPartitioningHint(ctx, route.AdditionalReplicaPath)
+		ctx = storage.ContextWithPartitioningHint(ctx, route.AdditionalReplicaPath)
 	}
 
 	var finalizers []func() error

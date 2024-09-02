@@ -8,7 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/setup"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
@@ -33,7 +33,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 			desc: "partitioning hint provided",
 			createFork: func(t *testing.T, ctx context.Context, cfg config.Cfg, alternate *gitalypb.Repository) *gitalypb.Repository {
 				fork, _ := gittest.CreateRepository(t,
-					metadata.IncomingToOutgoing(storagectx.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
+					metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
 					cfg,
 				)
 				return fork
@@ -78,7 +78,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 
 				_, err = gitalypb.NewRepositoryServiceClient(cc).CreateFork(
 					testhelper.MergeOutgoingMetadata(
-						metadata.IncomingToOutgoing(storagectx.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
+						metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
 						testcfg.GitalyServersMetadataFromCfg(t, cfg),
 					),
 					&gitalypb.CreateForkRequest{
@@ -102,7 +102,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 
 				_, err = gitalypb.NewObjectPoolServiceClient(cc).CreateObjectPool(
 					testhelper.MergeOutgoingMetadata(
-						metadata.IncomingToOutgoing(storagectx.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
+						metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
 						testcfg.GitalyServersMetadataFromCfg(t, cfg),
 					),
 					&gitalypb.CreateObjectPoolRequest{
