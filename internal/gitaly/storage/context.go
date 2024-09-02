@@ -10,7 +10,7 @@ type TransactionID uint64
 // keyTransactionID is the context key storing a TransactionID.
 type keyTransactionID struct{}
 
-// ContextWithTransactionID stores the transaction id in the context.
+// ContextWithTransactionID stores the transaction ID in the context.
 func ContextWithTransactionID(ctx context.Context, id TransactionID) context.Context {
 	return context.WithValue(ctx, keyTransactionID{}, id)
 }
