@@ -27,7 +27,7 @@ func TestPartitioningHint(t *testing.T) {
 	t.Run("no hint provided", func(t *testing.T) {
 		ctx := context.Background()
 
-		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
+		relativePath, err := ExtractPartitioningHint(ctx)
 		require.NoError(t, err)
 		require.Empty(t, relativePath)
 	})
@@ -35,7 +35,7 @@ func TestPartitioningHint(t *testing.T) {
 	t.Run("hint provided", func(t *testing.T) {
 		ctx := ContextWithPartitioningHint(context.Background(), "relative-path")
 
-		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
+		relativePath, err := ExtractPartitioningHint(ctx)
 		require.NoError(t, err)
 		require.Equal(t, relativePath, "relative-path")
 	})
@@ -46,11 +46,11 @@ func TestPartitioningHint(t *testing.T) {
 
 		ctx := ContextWithPartitioningHint(originalCtx, "relative-path")
 
-		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
+		relativePath, err := ExtractPartitioningHint(ctx)
 		require.NoError(t, err)
 		require.Equal(t, relativePath, "relative-path")
 
-		relativePath, err = ExtractPartitioningHintFromIncomingContext(originalCtx)
+		relativePath, err = ExtractPartitioningHint(originalCtx)
 		require.NoError(t, err)
 		require.Empty(t, relativePath)
 	})
@@ -59,7 +59,7 @@ func TestPartitioningHint(t *testing.T) {
 		md := grpc_metadata.New(nil)
 		md.Set(keyPartitioningHint, "relative-path-1", "relative-path-2")
 
-		relativePath, err := ExtractPartitioningHintFromIncomingContext(
+		relativePath, err := ExtractPartitioningHint(
 			grpc_metadata.NewIncomingContext(context.Background(), md),
 		)
 		require.Equal(t, errors.New("multiple partitioning hints"), err)
@@ -69,12 +69,12 @@ func TestPartitioningHint(t *testing.T) {
 	t.Run("removes the hint", func(t *testing.T) {
 		ctx := ContextWithPartitioningHint(context.Background(), "relative-path")
 
-		relativePath, err := ExtractPartitioningHintFromIncomingContext(ctx)
+		relativePath, err := ExtractPartitioningHint(ctx)
 		require.NoError(t, err)
 		require.Equal(t, relativePath, "relative-path")
 
 		ctx = RemovePartitioningHintFromIncomingContext(ctx)
-		relativePath, err = ExtractPartitioningHintFromIncomingContext(ctx)
+		relativePath, err = ExtractPartitioningHint(ctx)
 		require.NoError(t, err)
 		require.Equal(t, relativePath, "")
 	})

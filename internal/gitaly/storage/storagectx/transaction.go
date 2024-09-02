@@ -42,9 +42,10 @@ func ContextWithPartitioningHint(ctx context.Context, relativePath string) conte
 	return grpc_metadata.NewIncomingContext(ctx, md)
 }
 
-// ExtractPartitioningHintFromIncomingContext extracts the partitioning hint from the outgoing gRPC
-// metadata in the context. Empty string is returned if no partitoning hint was provided.
-func ExtractPartitioningHintFromIncomingContext(ctx context.Context) (string, error) {
+// ExtractPartitioningHint extracts the partitioning hint from the incoming gRPC
+// metadata in the context. Empty string is returned if no partitioning hint was provided.
+// An error is returned if the metadata in the context contained multiple partitioning hints.
+func ExtractPartitioningHint(ctx context.Context) (string, error) {
 	relativePaths := grpc_metadata.ValueFromIncomingContext(ctx, keyPartitioningHint)
 	if len(relativePaths) > 1 {
 		return "", errors.New("multiple partitioning hints")

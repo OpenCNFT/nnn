@@ -319,7 +319,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		alternateStorageName  string
 		alternateRelativePath string
 	)
-	if hint, err := storagectx.ExtractPartitioningHintFromIncomingContext(ctx); err != nil {
+	if hint, err := storagectx.ExtractPartitioningHint(ctx); err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("extract partitioning hint: %w", err)
 	} else if hint != "" {
 		// In some cases a repository needs to be partitioned with a repository that isn't set as an additional

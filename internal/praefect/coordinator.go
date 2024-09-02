@@ -376,7 +376,7 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 		// replicate path. The hint is the @hashed/... relative path to the repo and the rewritten hint is the
 		// equivalent @cluster/... replica path tto the repo.
 		partitioningHintRewritten = true
-		additionalRepoRelativePath, err = storagectx.ExtractPartitioningHintFromIncomingContext(ctx)
+		additionalRepoRelativePath, err = storagectx.ExtractPartitioningHint(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("mutator call: extract partitioning hint: %w", err)
 		}

@@ -773,7 +773,7 @@ func TestStreamDirectorMutator_ReplicateRepository(t *testing.T) {
 			require.NoError(t, err)
 
 			// Validate the partitioning hint was passed through.
-			hint, err := storagectx.ExtractPartitioningHintFromIncomingContext(ctx)
+			hint, err := storagectx.ExtractPartitioningHint(ctx)
 			require.NoError(t, err)
 			require.Equal(t, tc.PartitioningHint, hint)
 
