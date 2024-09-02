@@ -19,6 +19,7 @@ import (
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
@@ -229,7 +230,7 @@ func NewPartitionManager(
 	cmdFactory gitcmd.CommandFactory,
 	localRepoFactory localrepo.Factory,
 	logger log.Logger,
-	dbMgr *keyvalue.DBManager,
+	dbMgr *databasemgr.DBManager,
 	promCfg gitalycfgprom.Config,
 	consumerFactory LogConsumerFactory,
 ) (*PartitionManager, error) {

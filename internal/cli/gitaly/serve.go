@@ -33,6 +33,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raft"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
@@ -378,7 +379,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	if cfg.Transactions.Enabled {
 		logger.WarnContext(ctx, "Transactions enabled. Transactions are an experimental feature. The feature is not production ready yet and might lead to various issues including data loss.")
 
-		dbMgr, err := keyvalue.NewDBManager(
+		dbMgr, err := databasemgr.NewDBManager(
 			cfg.Storages,
 			keyvalue.NewBadgerStore,
 			helper.NewTimerTickerFactory(time.Minute),
@@ -454,7 +455,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		if mayHaveWAL, err := storagemgr.MayHavePendingWAL(storagePaths); err != nil {
 			return fmt.Errorf("may have pending WAL: %w", err)
 		} else if mayHaveWAL {
-			dbMgr, err := keyvalue.NewDBManager(
+			dbMgr, err := databasemgr.NewDBManager(
 				cfg.Storages,
 				keyvalue.NewBadgerStore,
 				helper.NewTimerTickerFactory(time.Minute),

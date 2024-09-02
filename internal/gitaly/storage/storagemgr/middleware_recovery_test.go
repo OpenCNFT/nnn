@@ -15,6 +15,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
@@ -51,7 +52,7 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 	require.NoError(t, err)
 	defer clean()
 
-	dbMgr, err := keyvalue.NewDBManager(
+	dbMgr, err := databasemgr.NewDBManager(
 		cfg.Storages,
 		keyvalue.NewBadgerStore,
 		helper.NewNullTickerFactory(),
@@ -389,7 +390,7 @@ func TestMayHavePendingWAL(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, mayHaveWAL)
 
-	require.NoError(t, os.MkdirAll(keyvalue.DatabaseDirectoryPath(storage2), mode.Directory))
+	require.NoError(t, os.MkdirAll(databasemgr.DatabaseDirectoryPath(storage2), mode.Directory))
 
 	mayHaveWAL, err = MayHavePendingWAL([]string{storage1, storage2})
 	require.NoError(t, err)
