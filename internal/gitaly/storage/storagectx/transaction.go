@@ -59,8 +59,8 @@ func ExtractPartitioningHint(ctx context.Context) (string, error) {
 	return relativePaths[0], nil
 }
 
-// RemovePartitioningHintFromIncomingContext removes the partitioning hint from the provided context.
-func RemovePartitioningHintFromIncomingContext(ctx context.Context) context.Context {
+// ContextWithoutPartitioningHint removes the partitioning hint from the provided context.
+func ContextWithoutPartitioningHint(ctx context.Context) context.Context {
 	md, ok := grpc_metadata.FromIncomingContext(ctx)
 	if !ok {
 		md = grpc_metadata.New(nil)

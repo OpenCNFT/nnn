@@ -73,7 +73,7 @@ func TestPartitioningHint(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, relativePath, "relative-path")
 
-		ctx = RemovePartitioningHintFromIncomingContext(ctx)
+		ctx = ContextWithoutPartitioningHint(ctx)
 		relativePath, err = ExtractPartitioningHint(ctx)
 		require.NoError(t, err)
 		require.Equal(t, relativePath, "")

@@ -83,7 +83,7 @@ func (s *server) ReplicateRepository(ctx context.Context, in *gitalypb.Replicate
 	}
 
 	// The partitioning hint should not be forwarded to other Gitaly nodes as the path is irrelevant for them.
-	outgoingCtx := storagectx.RemovePartitioningHintFromIncomingContext(ctx)
+	outgoingCtx := storagectx.ContextWithoutPartitioningHint(ctx)
 	outgoingCtx = metadata.IncomingToOutgoing(outgoingCtx)
 
 	if err := s.replicateRepository(outgoingCtx, in.GetSource(), in.GetRepository()); err != nil {
