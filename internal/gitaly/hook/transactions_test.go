@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -40,17 +40,17 @@ func TestHookManager_stopCalled(t *testing.T) {
 		t, gitlab.MockAllowed, gitlab.MockPreReceive, gitlab.MockPostReceive,
 	), NewTransactionRegistry(storagemgr.NewTransactionRegistry()), NewProcReceiveRegistry(), nil)
 
-	hooksPayload, err := git.NewHooksPayload(
+	hooksPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		&expectedTx,
-		&git.UserDetails{
+		&gitcmd.UserDetails{
 			UserID:   "1234",
 			Username: "user",
 			Protocol: "web",
 		},
-		git.ReferenceTransactionHook,
+		gitcmd.ReferenceTransactionHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
@@ -146,7 +146,7 @@ func TestHookManager_contextCancellationCancelsVote(t *testing.T) {
 		t, gitlab.MockAllowed, gitlab.MockPreReceive, gitlab.MockPostReceive,
 	), NewTransactionRegistry(storagemgr.NewTransactionRegistry()), NewProcReceiveRegistry(), nil)
 
-	hooksPayload, err := git.NewHooksPayload(
+	hooksPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
@@ -154,7 +154,7 @@ func TestHookManager_contextCancellationCancelsVote(t *testing.T) {
 			ID: 1234, Node: "primary", Primary: true,
 		},
 		nil,
-		git.ReferenceTransactionHook,
+		gitcmd.ReferenceTransactionHook,
 		nil,
 		storage.ExtractTransactionID(ctx),
 	).Env()

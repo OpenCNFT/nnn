@@ -1,7 +1,7 @@
 package server
 
 import (
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -11,7 +11,7 @@ import (
 type server struct {
 	gitalypb.UnimplementedServerServiceServer
 	logger            log.Logger
-	gitCmdFactory     git.CommandFactory
+	gitCmdFactory     gitcmd.CommandFactory
 	storages          []config.Storage
 	gitSigningKeyPath string
 }

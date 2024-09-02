@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -27,19 +27,19 @@ func TestProcReceiveHandler(t *testing.T) {
 		SkipCreationViaService: true,
 	})
 
-	receiveHooksPayload := &git.UserDetails{
+	receiveHooksPayload := &gitcmd.UserDetails{
 		UserID:   "1234",
 		Username: "user",
 		Protocol: "web",
 	}
 
-	payload, err := git.NewHooksPayload(
+	payload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		nil,
 		receiveHooksPayload,
-		git.PreReceiveHook,
+		gitcmd.PreReceiveHook,
 		featureflag.FromContext(ctx),
 		1,
 	).Env()

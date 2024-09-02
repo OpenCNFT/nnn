@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
@@ -72,7 +73,7 @@ func validateListFilesRequest(ctx context.Context, locator storage.Locator, in *
 	return nil
 }
 
-func (s *server) listFiles(repo git.RepositoryExecutor, revision string, stream gitalypb.CommitService_ListFilesServer) error {
+func (s *server) listFiles(repo gitcmd.RepositoryExecutor, revision string, stream gitalypb.CommitService_ListFilesServer) error {
 	ctx := stream.Context()
 
 	objectHash, err := repo.ObjectHash(ctx)
@@ -80,16 +81,16 @@ func (s *server) listFiles(repo git.RepositoryExecutor, revision string, stream 
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "ls-tree",
-		Flags: []git.Option{
-			git.Flag{Name: "-z"},
-			git.Flag{Name: "-r"},
-			git.Flag{Name: "--full-tree"},
-			git.Flag{Name: "--full-name"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "-z"},
+			gitcmd.Flag{Name: "-r"},
+			gitcmd.Flag{Name: "--full-tree"},
+			gitcmd.Flag{Name: "--full-name"},
 		},
 		Args: []string{revision},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return err
 	}

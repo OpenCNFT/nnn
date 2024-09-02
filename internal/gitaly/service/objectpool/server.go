@@ -1,8 +1,8 @@
 package objectpool
 
 import (
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
@@ -18,7 +18,7 @@ type server struct {
 	gitalypb.UnimplementedObjectPoolServiceServer
 	logger              log.Logger
 	locator             storage.Locator
-	gitCmdFactory       git.CommandFactory
+	gitCmdFactory       gitcmd.CommandFactory
 	catfileCache        catfile.Cache
 	txManager           transaction.Manager
 	walPartitionManager *storagemgr.PartitionManager

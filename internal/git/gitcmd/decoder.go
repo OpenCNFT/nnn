@@ -1,10 +1,12 @@
-package git
+package gitcmd
 
 import (
 	"bufio"
 	"fmt"
 	"io"
 	"strings"
+
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 )
 
 // ShowRefDecoder parses the output format of git-show-ref
@@ -22,7 +24,7 @@ func NewShowRefDecoder(r io.Reader) *ShowRefDecoder {
 
 // Decode reads and parses the next reference. Returns io.EOF when the end of
 // the reader has been reached.
-func (d *ShowRefDecoder) Decode(ref *Reference) error {
+func (d *ShowRefDecoder) Decode(ref *git.Reference) error {
 	if d.err != nil {
 		return d.err
 	}
@@ -42,7 +44,7 @@ func (d *ShowRefDecoder) Decode(ref *Reference) error {
 		return fmt.Errorf("show-ref decoder: invalid line: %q", line)
 	}
 
-	*ref = NewReference(ReferenceName(splits[1]), ObjectID(splits[0]))
+	*ref = git.NewReference(git.ReferenceName(splits[1]), git.ObjectID(splits[0]))
 
 	return nil
 }

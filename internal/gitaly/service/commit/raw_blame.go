@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -30,9 +31,9 @@ func (s *server) RawBlame(in *gitalypb.RawBlameRequest, stream gitalypb.CommitSe
 	path := string(in.GetPath())
 	blameRange := string(in.GetRange())
 
-	flags := []git.Option{git.Flag{Name: "-p"}}
+	flags := []gitcmd.Option{gitcmd.Flag{Name: "-p"}}
 	if blameRange != "" {
-		flags = append(flags, git.ValueFlag{Name: "-L", Value: blameRange})
+		flags = append(flags, gitcmd.ValueFlag{Name: "-L", Value: blameRange})
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
@@ -40,12 +41,12 @@ func (s *server) RawBlame(in *gitalypb.RawBlameRequest, stream gitalypb.CommitSe
 	})
 
 	var stderr strings.Builder
-	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, gitcmd.Command{
 		Name:        "blame",
 		Flags:       flags,
 		Args:        []string{revision},
 		PostSepArgs: []string{path},
-	}, git.WithStdout(sw), git.WithStderr(&stderr))
+	}, gitcmd.WithStdout(sw), gitcmd.WithStderr(&stderr))
 	if err != nil {
 		return fmt.Errorf("starting blame: %w", err)
 	}

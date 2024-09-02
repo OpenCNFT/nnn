@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -42,15 +43,15 @@ func (s *server) commitsByMessage(in *gitalypb.CommitsByMessageRequest, stream g
 	sender := &commitsByMessageSender{stream: stream}
 	repo := s.localrepo(in.GetRepository())
 
-	gitLogExtraOptions := []git.Option{
-		git.Flag{Name: "--grep=" + in.GetQuery()},
-		git.Flag{Name: "--regexp-ignore-case"},
+	gitLogExtraOptions := []gitcmd.Option{
+		gitcmd.Flag{Name: "--grep=" + in.GetQuery()},
+		gitcmd.Flag{Name: "--regexp-ignore-case"},
 	}
 	if offset := in.GetOffset(); offset > 0 {
-		gitLogExtraOptions = append(gitLogExtraOptions, git.Flag{Name: fmt.Sprintf("--skip=%d", offset)})
+		gitLogExtraOptions = append(gitLogExtraOptions, gitcmd.Flag{Name: fmt.Sprintf("--skip=%d", offset)})
 	}
 	if limit := in.GetLimit(); limit > 0 {
-		gitLogExtraOptions = append(gitLogExtraOptions, git.Flag{Name: fmt.Sprintf("--max-count=%d", limit)})
+		gitLogExtraOptions = append(gitLogExtraOptions, gitcmd.Flag{Name: fmt.Sprintf("--max-count=%d", limit)})
 	}
 
 	revision := in.GetRevision()

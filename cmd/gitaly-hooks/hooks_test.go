@@ -16,6 +16,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -73,18 +74,18 @@ func featureFlags(ctx context.Context) map[featureflag.FeatureFlag]bool {
 func envForHooks(tb testing.TB, ctx context.Context, cfg config.Cfg, repo *gitalypb.Repository, glHookValues glHookValues, proxyValues proxyValues, gitPushOptions ...string) []string {
 	tb.Helper()
 
-	payload, err := git.NewHooksPayload(
+	payload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		nil,
-		&git.UserDetails{
+		&gitcmd.UserDetails{
 			UserID:   glHookValues.GLID,
 			Username: glHookValues.GLUsername,
 			Protocol: glHookValues.GLProtocol,
 			RemoteIP: glHookValues.RemoteIP,
 		},
-		git.AllHooks,
+		gitcmd.AllHooks,
 		featureFlags(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
@@ -464,7 +465,7 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 
 			var stdout, stderr bytes.Buffer
 
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
@@ -473,13 +474,13 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 					Node:    "node",
 					Primary: tc.primary,
 				},
-				&git.UserDetails{
+				&gitcmd.UserDetails{
 					UserID:   glID,
 					Username: glUsername,
 					Protocol: glProtocol,
 					RemoteIP: remoteIP,
 				},
-				git.PostReceiveHook,
+				gitcmd.PostReceiveHook,
 				featureFlags(ctx),
 				storage.ExtractTransactionID(ctx),
 			).Env()
@@ -547,13 +548,13 @@ func TestHooksProcReceive(t *testing.T) {
 			require.NoError(t, err)
 			defer cleanup()
 
-			hooksPayload, err := git.NewHooksPayload(
+			hooksPayload, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
 				nil,
 				nil,
-				git.ProcReceiveHook,
+				gitcmd.ProcReceiveHook,
 				featureFlags(ctx),
 				tc.transactionID,
 			).Env()
@@ -681,12 +682,12 @@ func TestHooksNotAllowed(t *testing.T) {
 }
 
 func TestRequestedHooks(t *testing.T) {
-	for hook, hookArgs := range map[git.Hook][]string{
-		git.ReferenceTransactionHook: {"reference-transaction"},
-		git.UpdateHook:               {"update"},
-		git.PreReceiveHook:           {"pre-receive"},
-		git.PostReceiveHook:          {"post-receive"},
-		git.PackObjectsHook:          {"gitaly-hooks", "git"},
+	for hook, hookArgs := range map[gitcmd.Hook][]string{
+		gitcmd.ReferenceTransactionHook: {"reference-transaction"},
+		gitcmd.UpdateHook:               {"update"},
+		gitcmd.PreReceiveHook:           {"pre-receive"},
+		gitcmd.PostReceiveHook:          {"post-receive"},
+		gitcmd.PackObjectsHook:          {"gitaly-hooks", "git"},
 	} {
 		hook := hook
 		hookArgs := hookArgs
@@ -701,13 +702,13 @@ func TestRequestedHooks(t *testing.T) {
 				testcfg.BuildGitalyHooks(t, cfg)
 				testcfg.BuildGitalySSH(t, cfg)
 
-				payload, err := git.NewHooksPayload(
+				payload, err := gitcmd.NewHooksPayload(
 					cfg,
 					&gitalypb.Repository{},
 					gittest.DefaultObjectHash,
 					nil,
 					nil,
-					git.AllHooks&^hook,
+					gitcmd.AllHooks&^hook,
 					nil,
 					0,
 				).Env()
@@ -739,7 +740,7 @@ func TestRequestedHooks(t *testing.T) {
 				testcfg.BuildGitalyHooks(t, cfg)
 				testcfg.BuildGitalySSH(t, cfg)
 
-				payload, err := git.NewHooksPayload(
+				payload, err := gitcmd.NewHooksPayload(
 					cfg,
 					&gitalypb.Repository{},
 					gittest.DefaultObjectHash,
@@ -1011,7 +1012,7 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 			cfg.PackObjectsCache.Enabled = true
 
 			var logOutput bytes.Buffer
-			cmdFactory, clean, err := git.NewExecCommandFactory(cfg, capturedOutput{
+			cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, capturedOutput{
 				Logger: testhelper.SharedLogger(t),
 				output: &logOutput,
 			})
@@ -1023,19 +1024,19 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 			ctx = featureflag.IncomingCtxWithFeatureFlag(ctx, disabledFeatureFlag, false)
 
 			var stderr, stdout bytes.Buffer
-			cmd, err := cmdFactory.New(ctx, repo, git.Command{
+			cmd, err := cmdFactory.New(ctx, repo, gitcmd.Command{
 				Name: "clone",
-				Flags: []git.Option{
-					git.ValueFlag{Name: "-u", Value: "git -c uploadpack.allowFilter -c uploadpack.packObjectsHook=" + cfg.BinaryPath("gitaly-hooks") + " upload-pack"},
-					git.Flag{Name: "--quiet"},
-					git.Flag{Name: "--no-local"},
-					git.Flag{Name: "--bare"},
+				Flags: []gitcmd.Option{
+					gitcmd.ValueFlag{Name: "-u", Value: "git -c uploadpack.allowFilter -c uploadpack.packObjectsHook=" + cfg.BinaryPath("gitaly-hooks") + " upload-pack"},
+					gitcmd.Flag{Name: "--quiet"},
+					gitcmd.Flag{Name: "--no-local"},
+					gitcmd.Flag{Name: "--bare"},
 				},
 				Args: []string{repoPath, testhelper.TempDir(t)},
 			},
-				git.WithPackObjectsHookEnv(repo, "ssh"),
-				git.WithStdout(&stdout),
-				git.WithStderr(&stderr),
+				gitcmd.WithPackObjectsHookEnv(repo, "ssh"),
+				gitcmd.WithStdout(&stdout),
+				gitcmd.WithStderr(&stderr),
 			)
 			require.NoError(t, err)
 

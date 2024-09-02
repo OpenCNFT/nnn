@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
@@ -32,7 +33,7 @@ type procReceiveHandler struct {
 // The handler is transmitted to RPCs which executed git-receive-pack(1), so they
 // can accept or reject individual reference updates.
 func NewProcReceiveHandler(env []string, stdin io.Reader, stdout, stderr io.Writer) (ProcReceiveHandler, <-chan error, error) {
-	payload, err := git.HooksPayloadFromEnv(env)
+	payload, err := gitcmd.HooksPayloadFromEnv(env)
 	if err != nil {
 		return nil, nil, fmt.Errorf("extracting hooks payload: %w", err)
 	}

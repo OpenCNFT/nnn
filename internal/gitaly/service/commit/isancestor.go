@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -40,9 +40,9 @@ func (s *server) commitIsAncestorName(ctx context.Context, repo *gitalypb.Reposi
 		"childSha":    childID,
 	}).DebugContext(ctx, "commitIsAncestor")
 
-	cmd, err := s.gitCmdFactory.New(ctx, repo, git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name:  "merge-base",
-		Flags: []git.Option{git.Flag{Name: "--is-ancestor"}}, Args: []string{ancestorID, childID},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--is-ancestor"}}, Args: []string{ancestorID, childID},
 	})
 	if err != nil {
 		return false, structerr.NewInternal("%w", err)

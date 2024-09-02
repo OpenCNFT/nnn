@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	gitlog "gitlab.com/gitlab-org/gitaly/v16/internal/git/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -12,11 +13,11 @@ import (
 func (s *server) sendCommits(
 	ctx context.Context,
 	sender chunk.Sender,
-	repo git.RepositoryExecutor,
+	repo gitcmd.RepositoryExecutor,
 	revisionRange []string,
 	paths []string,
 	options *gitalypb.GlobalOptions,
-	extraArgs ...git.Option,
+	extraArgs ...gitcmd.Option,
 ) error {
 	revisions := make([]git.Revision, len(revisionRange))
 	for i, revision := range revisionRange {

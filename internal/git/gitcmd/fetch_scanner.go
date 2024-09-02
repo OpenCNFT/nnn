@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"bufio"
@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 )
 
 // RefUpdateType represents the type of update a FetchStatusLine is. The
@@ -196,8 +198,8 @@ func parseFetchStatusLine(line []byte) (FetchStatusLine, bool) {
 // option is enabled.
 type FetchPorcelainStatusLine struct {
 	Type      RefUpdateType
-	OldOID    ObjectID
-	NewOID    ObjectID
+	OldOID    git.ObjectID
+	NewOID    git.ObjectID
 	Reference string
 }
 
@@ -206,12 +208,12 @@ type FetchPorcelainStatusLine struct {
 type FetchPorcelainScanner struct {
 	scanner  *bufio.Scanner
 	lastLine FetchPorcelainStatusLine
-	hash     ObjectHash
+	hash     git.ObjectHash
 	err      error
 }
 
 // NewFetchPorcelainScanner returns a FetchPorcelainScanner.
-func NewFetchPorcelainScanner(r io.Reader, hash ObjectHash) *FetchPorcelainScanner {
+func NewFetchPorcelainScanner(r io.Reader, hash git.ObjectHash) *FetchPorcelainScanner {
 	return &FetchPorcelainScanner{scanner: bufio.NewScanner(r), hash: hash}
 }
 
@@ -249,7 +251,7 @@ func (f *FetchPorcelainScanner) StatusLine() FetchPorcelainStatusLine {
 // The line format is as follows: <flag> <old-object-id> <new-object-id> <local-reference>
 // Each token is delimited by a single space and each line ends with a new-line. Further format
 // documentation can be found at https://git-scm.com/docs/git-fetch#_output.
-func parseFetchPorcelainStatusLine(line []byte, hash ObjectHash) (FetchPorcelainStatusLine, error) {
+func parseFetchPorcelainStatusLine(line []byte, hash git.ObjectHash) (FetchPorcelainStatusLine, error) {
 	var status FetchPorcelainStatusLine
 
 	// Unfortunately, the reference update type must be checked and parsed first. This is because
@@ -285,7 +287,7 @@ func parseFetchPorcelainStatusLine(line []byte, hash ObjectHash) (FetchPorcelain
 	}
 
 	status.Reference = string(refStatus[2])
-	if err := ValidateReference(status.Reference); err != nil {
+	if err := git.ValidateReference(status.Reference); err != nil {
 		return FetchPorcelainStatusLine{}, fmt.Errorf("validating reference: %w", err)
 	}
 

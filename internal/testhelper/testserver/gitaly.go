@@ -12,8 +12,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cache"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -274,7 +274,7 @@ type gitalyServerDeps struct {
 	txMgr               transaction.Manager
 	hookMgr             hook.Manager
 	gitlabClient        gitlab.Client
-	gitCmdFactory       git.CommandFactory
+	gitCmdFactory       gitcmd.CommandFactory
 	backchannelReg      *backchannel.Registry
 	catfileCache        catfile.Cache
 	diskCache           cache.Cache
@@ -460,9 +460,9 @@ func WithLocator(locator storage.Locator) GitalyServerOpt {
 	}
 }
 
-// WithGitCommandFactory sets a git.CommandFactory instance that will be used for gitaly services
+// WithGitCommandFactory sets a gitcmd.CommandFactory instance that will be used for gitaly services
 // initialisation.
-func WithGitCommandFactory(gitCmdFactory git.CommandFactory) GitalyServerOpt {
+func WithGitCommandFactory(gitCmdFactory gitcmd.CommandFactory) GitalyServerOpt {
 	return func(deps gitalyServerDeps) gitalyServerDeps {
 		deps.gitCmdFactory = gitCmdFactory
 		return deps

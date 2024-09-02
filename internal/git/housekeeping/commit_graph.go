@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
@@ -56,24 +56,24 @@ func commitGraphNeedsRewrite(ctx context.Context, commitGraphInfo stats.CommitGr
 // incrementally, except in the case where it doesn't exist yet or in case it is detected that the
 // commit-graph is missing bloom filters.
 func WriteCommitGraph(ctx context.Context, repo *localrepo.Repo, cfg config.WriteCommitGraphConfig) error {
-	flags := []git.Option{
-		git.Flag{Name: "--reachable"},
-		git.Flag{Name: "--changed-paths"}, // enables Bloom filters
-		git.ValueFlag{Name: "--size-multiple", Value: "4"},
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "--reachable"},
+		gitcmd.Flag{Name: "--changed-paths"}, // enables Bloom filters
+		gitcmd.ValueFlag{Name: "--size-multiple", Value: "4"},
 	}
 
 	if cfg.ReplaceChain {
-		flags = append(flags, git.Flag{Name: "--split=replace"})
+		flags = append(flags, gitcmd.Flag{Name: "--split=replace"})
 	} else {
-		flags = append(flags, git.Flag{Name: "--split"})
+		flags = append(flags, gitcmd.Flag{Name: "--split"})
 	}
 
 	var stderr bytes.Buffer
-	if err := repo.ExecAndWait(ctx, git.Command{
+	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "commit-graph",
 		Action: "write",
 		Flags:  flags,
-	}, git.WithStderr(&stderr)); err != nil {
+	}, gitcmd.WithStderr(&stderr)); err != nil {
 		return structerr.NewInternal("writing commit-graph: %w: %v", err, stderr.String())
 	}
 

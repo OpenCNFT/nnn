@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
@@ -290,7 +291,7 @@ func TestServer_CloneFromURLCommand(t *testing.T) {
 				filepath.Join(testhelper.TempDir(t), "target"),
 				tc.token,
 				false,
-				git.WithDisabledHooks(),
+				gitcmd.WithDisabledHooks(),
 			)
 			require.NoError(t, err)
 
@@ -334,7 +335,7 @@ func TestServer_CloneFromURLCommand_withMirror(t *testing.T) {
 
 	cfg := testcfg.Build(t)
 	s := server{cfg: cfg, gitCmdFactory: gittest.NewCommandFactory(t, cfg)}
-	cmd, err := s.cloneFromURLCommand(ctx, url, "", repositoryFullPath, "", true, git.WithDisabledHooks())
+	cmd, err := s.cloneFromURLCommand(ctx, url, "", repositoryFullPath, "", true, gitcmd.WithDisabledHooks())
 	require.NoError(t, err)
 
 	args := cmd.Args()
@@ -374,7 +375,7 @@ func TestServer_CloneFromURLCommand_validate(t *testing.T) {
 	}
 }
 
-func gitServerWithBasicAuth(tb testing.TB, ctx context.Context, gitCmdFactory git.CommandFactory, user, pass, repoPath string) int {
+func gitServerWithBasicAuth(tb testing.TB, ctx context.Context, gitCmdFactory gitcmd.CommandFactory, user, pass, repoPath string) int {
 	return gittest.HTTPServer(tb, ctx, gitCmdFactory, repoPath, basicAuthMiddleware(tb, user, pass))
 }
 

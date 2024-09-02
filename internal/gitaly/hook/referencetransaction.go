@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
 )
 
@@ -25,7 +26,7 @@ import (
 // We only capture regular reference updates, and updates to the default branch.
 // Any other reference updates are ignored.
 func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state ReferenceTransactionState, env []string, stdin io.Reader) error {
-	payload, err := git.HooksPayloadFromEnv(env)
+	payload, err := gitcmd.HooksPayloadFromEnv(env)
 	if err != nil {
 		return fmt.Errorf("extracting hooks payload: %w", err)
 	}

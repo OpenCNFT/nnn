@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
@@ -176,7 +177,7 @@ var commandDescriptions = map[string]commandDescription{
 				// We're not prepared for a world where the user has configured the default
 				// branch to be something different from "master" in Gitaly's git
 				// configuration. There explicitly override it on git-init.
-				ConfigPair{Key: "init.defaultBranch", Value: DefaultBranch},
+				ConfigPair{Key: "init.defaultBranch", Value: git.DefaultBranch},
 
 				// When creating a new repository, then Git will by default copy over all
 				// files from the template directory into the repository. These templates
@@ -307,7 +308,7 @@ var commandDescriptions = map[string]commandDescription{
 				// refuse them as positional arguments. We thus override validation
 				// for two of these which we are using in our codebase.
 				if strings.HasPrefix(arg, "-") {
-					if err := ValidateRevision([]byte(arg), AllowPseudoRevision()); err != nil {
+					if err := git.ValidateRevision([]byte(arg), git.AllowPseudoRevision()); err != nil {
 						return structerr.NewInvalidArgument(
 							"validating positional argument: %w", err,
 						).WithMetadata("argument", arg)
@@ -432,11 +433,11 @@ func validatePositionalArg(arg string) error {
 }
 
 func hiddenReceivePackRefPrefixes(ctx context.Context) []GlobalOption {
-	config := make([]GlobalOption, 0, len(InternalRefPrefixes))
+	config := make([]GlobalOption, 0, len(git.InternalRefPrefixes))
 
-	for refPrefix, refType := range InternalRefPrefixes {
+	for refPrefix, refType := range git.InternalRefPrefixes {
 		switch refType {
-		case InternalReferenceTypeReadonly, InternalReferenceTypeHidden:
+		case git.InternalReferenceTypeReadonly, git.InternalReferenceTypeHidden:
 			// We want to hide both read-only and hidden refs in git-receive-pack(1) so
 			// that we make neither of them writeable.
 			config = append(config, ConfigPair{Key: "receive.hideRefs", Value: refPrefix})
@@ -449,13 +450,13 @@ func hiddenReceivePackRefPrefixes(ctx context.Context) []GlobalOption {
 }
 
 func hiddenUploadPackRefPrefixes(context.Context) []GlobalOption {
-	config := make([]GlobalOption, 0, len(InternalRefPrefixes))
+	config := make([]GlobalOption, 0, len(git.InternalRefPrefixes))
 
-	for refPrefix, refType := range InternalRefPrefixes {
+	for refPrefix, refType := range git.InternalRefPrefixes {
 		switch refType {
-		case InternalReferenceTypeHidden:
+		case git.InternalReferenceTypeHidden:
 			config = append(config, ConfigPair{Key: "uploadpack.hideRefs", Value: refPrefix})
-		case InternalReferenceTypeReadonly:
+		case git.InternalReferenceTypeReadonly:
 			// git-upload-pack(1) doesn't allow writing references, and we do want to
 			// announce read-only references that aren't hidden.
 		default:

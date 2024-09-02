@@ -9,6 +9,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
@@ -250,7 +251,7 @@ func (err invalidStateTransitionError) Error() string {
 //  7. Close can be called at any time. The active transaction is aborted.
 //  8. Any sort of error causes the updater to close.
 type Updater struct {
-	repo             git.RepositoryExecutor
+	repo             gitcmd.RepositoryExecutor
 	cmd              *command.Command
 	closeErr         error
 	stdout           *bufio.Reader
@@ -293,32 +294,32 @@ func WithNoDeref() UpdaterOpt {
 //
 // It is important that ctx gets canceled somewhere. If it doesn't, the process
 // spawned by New() may never terminate.
-func New(ctx context.Context, repo git.RepositoryExecutor, opts ...UpdaterOpt) (*Updater, error) {
+func New(ctx context.Context, repo gitcmd.RepositoryExecutor, opts ...UpdaterOpt) (*Updater, error) {
 	var cfg updaterConfig
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 
-	txOption := git.WithRefTxHook(repo)
+	txOption := gitcmd.WithRefTxHook(repo)
 	if cfg.disableTransactions {
-		txOption = git.WithDisabledHooks()
+		txOption = gitcmd.WithDisabledHooks()
 	}
 
-	cmdFlags := []git.Option{git.Flag{Name: "-z"}, git.Flag{Name: "--stdin"}}
+	cmdFlags := []gitcmd.Option{gitcmd.Flag{Name: "-z"}, gitcmd.Flag{Name: "--stdin"}}
 	if cfg.noDeref {
-		cmdFlags = append(cmdFlags, git.Flag{Name: "--no-deref"})
+		cmdFlags = append(cmdFlags, gitcmd.Flag{Name: "--no-deref"})
 	}
 
 	var stderr bytes.Buffer
 	cmd, err := repo.Exec(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "update-ref",
 			Flags: cmdFlags,
 		},
 		txOption,
-		git.WithSetupStdin(),
-		git.WithSetupStdout(),
-		git.WithStderr(&stderr),
+		gitcmd.WithSetupStdin(),
+		gitcmd.WithSetupStdout(),
+		gitcmd.WithStderr(&stderr),
 	)
 	if err != nil {
 		return nil, err

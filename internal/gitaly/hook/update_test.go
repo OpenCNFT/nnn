@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
@@ -43,25 +44,25 @@ func TestUpdate_customHooks(t *testing.T) {
 		t, gitlab.MockAllowed, gitlab.MockPreReceive, gitlab.MockPostReceive,
 	), NewTransactionRegistry(storagemgr.NewTransactionRegistry()), NewProcReceiveRegistry(), nil)
 
-	receiveHooksPayload := &git.UserDetails{
+	receiveHooksPayload := &gitcmd.UserDetails{
 		UserID:   "1234",
 		Username: "user",
 		Protocol: "web",
 	}
 
-	payload, err := git.NewHooksPayload(
+	payload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
 		nil,
 		receiveHooksPayload,
-		git.UpdateHook,
+		gitcmd.UpdateHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
 	require.NoError(t, err)
 
-	primaryPayload, err := git.NewHooksPayload(
+	primaryPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
@@ -69,13 +70,13 @@ func TestUpdate_customHooks(t *testing.T) {
 			ID: 1234, Node: "primary", Primary: true,
 		},
 		receiveHooksPayload,
-		git.UpdateHook,
+		gitcmd.UpdateHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
 	require.NoError(t, err)
 
-	secondaryPayload, err := git.NewHooksPayload(
+	secondaryPayload, err := gitcmd.NewHooksPayload(
 		cfg,
 		repo,
 		gittest.DefaultObjectHash,
@@ -83,7 +84,7 @@ func TestUpdate_customHooks(t *testing.T) {
 			ID: 1234, Node: "secondary", Primary: false,
 		},
 		receiveHooksPayload,
-		git.UpdateHook,
+		gitcmd.UpdateHook,
 		featureflag.FromContext(ctx),
 		storage.ExtractTransactionID(ctx),
 	).Env()
@@ -271,17 +272,17 @@ func TestUpdate_quarantine(t *testing.T) {
 		repoProto:                    false,
 	} {
 		t.Run(fmt.Sprintf("quarantined: %v", isQuarantined), func(t *testing.T) {
-			env, err := git.NewHooksPayload(
+			env, err := gitcmd.NewHooksPayload(
 				cfg,
 				repo,
 				gittest.DefaultObjectHash,
 				nil,
-				&git.UserDetails{
+				&gitcmd.UserDetails{
 					UserID:   "1234",
 					Username: "user",
 					Protocol: "web",
 				},
-				git.PreReceiveHook,
+				gitcmd.PreReceiveHook,
 				featureflag.FromContext(ctx),
 				storage.ExtractTransactionID(ctx),
 			).Env()

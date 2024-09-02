@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/lines"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -120,26 +121,26 @@ func newFindAllRemoteBranchesWriter(stream gitalypb.RefService_FindAllRemoteBran
 }
 
 type findRefsOpts struct {
-	cmdArgs []git.Option
+	cmdArgs []gitcmd.Option
 	delim   byte
 	lines.SenderOpts
 }
 
-func (s *server) findRefs(ctx context.Context, writer lines.Sender, repo git.RepositoryExecutor, patterns []string, opts *findRefsOpts) error {
-	var options []git.Option
+func (s *server) findRefs(ctx context.Context, writer lines.Sender, repo gitcmd.RepositoryExecutor, patterns []string, opts *findRefsOpts) error {
+	var options []gitcmd.Option
 
 	if len(opts.cmdArgs) == 0 {
-		options = append(options, git.Flag{Name: "--format=%(refname)"}) // Default format
+		options = append(options, gitcmd.Flag{Name: "--format=%(refname)"}) // Default format
 	} else {
 		options = append(options, opts.cmdArgs...)
 	}
 
 	var stderr strings.Builder
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "for-each-ref",
 		Flags: options,
 		Args:  patterns,
-	}, git.WithSetupStdout(), git.WithStderr(&stderr))
+	}, gitcmd.WithSetupStdout(), gitcmd.WithStderr(&stderr))
 	if err != nil {
 		return fmt.Errorf("spawning for-each-ref: %w", err)
 	}

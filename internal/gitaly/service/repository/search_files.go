@@ -11,6 +11,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -35,22 +36,22 @@ func (s *server) SearchFilesByContent(req *gitalypb.SearchFilesByContentRequest,
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
 		Name: "grep",
-		Flags: []git.Option{
-			git.Flag{Name: "--ignore-case"},
-			git.Flag{Name: "-I"},
-			git.Flag{Name: "--line-number"},
-			git.Flag{Name: "--null"},
-			git.ValueFlag{Name: "--before-context", Value: surroundContext},
-			git.ValueFlag{Name: "--after-context", Value: surroundContext},
-			git.Flag{Name: "--perl-regexp"},
-			git.ValueFlag{Name: "-e", Value: req.GetQuery()},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--ignore-case"},
+			gitcmd.Flag{Name: "-I"},
+			gitcmd.Flag{Name: "--line-number"},
+			gitcmd.Flag{Name: "--null"},
+			gitcmd.ValueFlag{Name: "--before-context", Value: surroundContext},
+			gitcmd.ValueFlag{Name: "--after-context", Value: surroundContext},
+			gitcmd.Flag{Name: "--perl-regexp"},
+			gitcmd.ValueFlag{Name: "-e", Value: req.GetQuery()},
 		},
 		Args: []string{
 			string(req.GetRef()),
 		},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd start failed: %w", err)
 	}
@@ -130,17 +131,17 @@ func (s *server) SearchFilesByName(req *gitalypb.SearchFilesByNameRequest, strea
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
 		Name: "ls-tree",
-		Flags: []git.Option{
-			git.Flag{Name: "--full-tree"},
-			git.Flag{Name: "--name-status"},
-			git.Flag{Name: "-r"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--full-tree"},
+			gitcmd.Flag{Name: "--name-status"},
+			gitcmd.Flag{Name: "-r"},
 			// We use -z to force NULL byte termination here to prevent git from
 			// quoting and escaping unusual file names. Lstree parser would be a
 			// more ideal solution. Unfortunately, it supports parsing full
 			// output while we are interested in the filenames only.
-			git.Flag{Name: "-z"},
+			gitcmd.Flag{Name: "-z"},
 		},
 		Args: []string{
 			string(req.GetRef()),
@@ -148,7 +149,7 @@ func (s *server) SearchFilesByName(req *gitalypb.SearchFilesByNameRequest, strea
 		PostSepArgs: []string{
 			req.GetQuery(),
 		},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd start failed: %w", err)
 	}

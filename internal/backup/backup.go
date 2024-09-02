@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
@@ -204,7 +205,7 @@ func NewManagerLocal(
 	logger log.Logger,
 	locator Locator,
 	storageLocator storage.Locator,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	catfileCache catfile.Cache,
 	txManager transaction.Manager,
 	repoCounter *counter.RepositoryCounter,
@@ -490,7 +491,7 @@ func (mgr *Manager) negatedKnownRefs(ctx context.Context, step *Step) (io.ReadCl
 		}
 		defer reader.Close()
 
-		d := git.NewShowRefDecoder(reader)
+		d := gitcmd.NewShowRefDecoder(reader)
 		for {
 			var ref git.Reference
 
@@ -520,7 +521,7 @@ func (mgr *Manager) readRefs(ctx context.Context, path string) ([]git.Reference,
 
 	var refs []git.Reference
 
-	d := git.NewShowRefDecoder(reader)
+	d := gitcmd.NewShowRefDecoder(reader)
 	for {
 		var ref git.Reference
 

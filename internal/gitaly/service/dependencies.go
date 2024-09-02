@@ -4,8 +4,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cache"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	gitalyhook "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -31,7 +31,7 @@ type Dependencies struct {
 	TransactionManager  transaction.Manager
 	StorageLocator      storage.Locator
 	ClientPool          *client.Pool
-	GitCmdFactory       git.CommandFactory
+	GitCmdFactory       gitcmd.CommandFactory
 	BackchannelRegistry *backchannel.Registry
 	GitlabClient        gitlab.Client
 	CatfileCache        catfile.Cache
@@ -81,7 +81,7 @@ func (dc *Dependencies) GetConnsPool() *client.Pool {
 }
 
 // GetGitCmdFactory returns git commands factory.
-func (dc *Dependencies) GetGitCmdFactory() git.CommandFactory {
+func (dc *Dependencies) GetGitCmdFactory() gitcmd.CommandFactory {
 	return dc.GitCmdFactory
 }
 

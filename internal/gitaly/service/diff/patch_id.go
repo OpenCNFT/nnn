@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -19,10 +19,10 @@ func (s *server) GetPatchID(ctx context.Context, in *gitalypb.GetPatchIDRequest)
 	var diffCmdStderr strings.Builder
 
 	diffCmd, err := s.gitCmdFactory.New(ctx, in.Repository,
-		git.Command{
+		gitcmd.Command{
 			Name: "diff",
 			Args: []string{string(in.GetOldRevision()), string(in.GetNewRevision())},
-			Flags: []git.Option{
+			Flags: []gitcmd.Option{
 				// git-patch-id(1) will ignore binary diffs, and computing binary
 				// diffs would be expensive anyway for large blobs. This means that
 				// we must instead use the pre- and post-image blob IDs that
@@ -32,11 +32,11 @@ func (s *server) GetPatchID(ctx context.Context, in *gitalypb.GetPatchIDRequest)
 				// just ask git-diff(1) to print the full blob IDs for the pre- and
 				// post-image blobs instead of abbreviated ones so that we can avoid
 				// any kind of potential prefix collisions.
-				git.Flag{Name: "--full-index"},
+				gitcmd.Flag{Name: "--full-index"},
 			},
 		},
-		git.WithStderr(&diffCmdStderr),
-		git.WithSetupStdout(),
+		gitcmd.WithStderr(&diffCmdStderr),
+		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {
 		return nil, structerr.New("spawning diff: %w", err)
@@ -46,13 +46,13 @@ func (s *server) GetPatchID(ctx context.Context, in *gitalypb.GetPatchIDRequest)
 	var patchIDStderr strings.Builder
 
 	patchIDCmd, err := s.gitCmdFactory.NewWithoutRepo(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "patch-id",
-			Flags: []git.Option{git.Flag{Name: "--stable"}},
+			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stable"}},
 		},
-		git.WithStdin(diffCmd),
-		git.WithStdout(&patchIDStdout),
-		git.WithStderr(&patchIDStderr),
+		gitcmd.WithStdin(diffCmd),
+		gitcmd.WithStdout(&patchIDStdout),
+		gitcmd.WithStderr(&patchIDStderr),
 	)
 	if err != nil {
 		return nil, structerr.New("spawning patch-id: %w", err)

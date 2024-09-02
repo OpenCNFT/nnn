@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
@@ -110,22 +111,22 @@ func TestUpdaterWithHooks_UpdateReference(t *testing.T) {
 	requirePayload := func(t *testing.T, env []string) {
 		require.Len(t, env, 1)
 
-		expectedPayload := git.NewHooksPayload(
+		expectedPayload := gitcmd.NewHooksPayload(
 			cfg,
 			repo,
 			gittest.DefaultObjectHash,
 			nil,
-			&git.UserDetails{
+			&gitcmd.UserDetails{
 				UserID:   gittest.TestUser.GlId,
 				Username: gittest.TestUser.GlUsername,
 				Protocol: "web",
 			},
-			git.ReceivePackHooks,
+			gitcmd.ReceivePackHooks,
 			featureflag.FromContext(ctx),
 			storage.ExtractTransactionID(ctx),
 		)
 
-		actualPayload, err := git.HooksPayloadFromEnv(env)
+		actualPayload, err := gitcmd.HooksPayloadFromEnv(env)
 		require.NoError(t, err)
 
 		// Flags aren't sorted, so we just verify they contain the same elements.
@@ -326,7 +327,7 @@ func TestUpdaterWithHooks_quarantine(t *testing.T) {
 		t.Helper()
 
 		if env != nil {
-			payload, err := git.HooksPayloadFromEnv(env)
+			payload, err := gitcmd.HooksPayloadFromEnv(env)
 			require.NoError(t, err)
 			if quarantined {
 				testhelper.ProtoEqual(t, quarantine.QuarantinedRepo(), payload.Repo)

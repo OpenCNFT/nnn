@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
@@ -267,12 +268,12 @@ func fetchInternalRemote(
 			// anyway, including tags. By adding `--no-tags` we can thus ask Git to skip that and thus
 			// accelerate the fetch.
 			Tags: localrepo.FetchOptsTagsNone,
-			CommandOptions: []git.CmdOpt{
-				git.WithConfig(git.ConfigPair{Key: "fetch.negotiationAlgorithm", Value: "skipping"}),
+			CommandOptions: []gitcmd.CmdOpt{
+				gitcmd.WithConfig(gitcmd.ConfigPair{Key: "fetch.negotiationAlgorithm", Value: "skipping"}),
 				// Disable the consistency checks of objects fetched into the replicated repository.
 				// These fetched objects come from preexisting internal sources, thus it would be
 				// problematic for the fetch to fail consistency checks due to altered requirements.
-				git.WithConfig(git.ConfigPair{Key: "fetch.fsckObjects", Value: "false"}),
+				gitcmd.WithConfig(gitcmd.ConfigPair{Key: "fetch.fsckObjects", Value: "false"}),
 			},
 		},
 	); err != nil {

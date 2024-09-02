@@ -13,7 +13,7 @@ import (
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
@@ -40,30 +40,30 @@ func (e hookError) Error() string {
 }
 
 type hookCommand struct {
-	exec     func(context.Context, git.HooksPayload, gitalypb.HookServiceClient, []string) error
-	hookType git.Hook
+	exec     func(context.Context, gitcmd.HooksPayload, gitalypb.HookServiceClient, []string) error
+	hookType gitcmd.Hook
 }
 
 var hooksBySubcommand = map[string]hookCommand{
 	"update": {
 		exec:     updateHook,
-		hookType: git.UpdateHook,
+		hookType: gitcmd.UpdateHook,
 	},
 	"pre-receive": {
 		exec:     preReceiveHook,
-		hookType: git.PreReceiveHook,
+		hookType: gitcmd.PreReceiveHook,
 	},
 	"post-receive": {
 		exec:     postReceiveHook,
-		hookType: git.PostReceiveHook,
+		hookType: gitcmd.PostReceiveHook,
 	},
 	"reference-transaction": {
 		exec:     referenceTransactionHook,
-		hookType: git.ReferenceTransactionHook,
+		hookType: gitcmd.ReferenceTransactionHook,
 	},
 	"proc-receive": {
 		exec:     procReceiveHook,
-		hookType: git.ProcReceiveHook,
+		hookType: gitcmd.ProcReceiveHook,
 	},
 }
 
@@ -129,7 +129,7 @@ func run(ctx context.Context, args []string) error {
 		case "git":
 			return executeHook(ctx, hookCommand{
 				exec:     packObjectsHook,
-				hookType: git.PackObjectsHook,
+				hookType: gitcmd.PackObjectsHook,
 			}, args[2:])
 		}
 
@@ -146,7 +146,7 @@ func run(ctx context.Context, args []string) error {
 }
 
 func executeHook(ctx context.Context, cmd hookCommand, args []string) error {
-	payload, err := git.HooksPayloadFromEnv(os.Environ())
+	payload, err := gitcmd.HooksPayloadFromEnv(os.Environ())
 	if err != nil {
 		return fmt.Errorf("error when getting hooks payload: %w", err)
 	}
@@ -170,7 +170,7 @@ func executeHook(ctx context.Context, cmd hookCommand, args []string) error {
 	return cmd.exec(ctx, payload, hookClient, args)
 }
 
-func injectMetadataIntoOutgoingCtx(ctx context.Context, payload git.HooksPayload) context.Context {
+func injectMetadataIntoOutgoingCtx(ctx context.Context, payload gitcmd.HooksPayload) context.Context {
 	if payload.UserDetails != nil {
 		ctx = metadata.AppendToOutgoingContext(
 			ctx,
@@ -191,7 +191,7 @@ func injectMetadataIntoOutgoingCtx(ctx context.Context, payload git.HooksPayload
 
 func noopSender(c chan error) {}
 
-func dialGitaly(ctx context.Context, payload git.HooksPayload) (*grpc.ClientConn, error) {
+func dialGitaly(ctx context.Context, payload gitcmd.HooksPayload) (*grpc.ClientConn, error) {
 	var dialOpts []grpc.DialOption
 	if payload.InternalSocketToken != "" {
 		dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(gitalyauth.RPCCredentialsV2(payload.InternalSocketToken)))
@@ -273,7 +273,7 @@ func sendFunc(reqWriter io.Writer, stream grpc.ClientStream, stdin io.Reader) fu
 	}
 }
 
-func updateHook(ctx context.Context, payload git.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
+func updateHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
 	if len(args) != 3 {
 		return fmt.Errorf("update hook expects exactly three arguments, got %q", args)
 	}
@@ -303,7 +303,7 @@ func updateHook(ctx context.Context, payload git.HooksPayload, hookClient gitaly
 	return nil
 }
 
-func preReceiveHook(ctx context.Context, payload git.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
+func preReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
 	preReceiveHookStream, err := hookClient.PreReceiveHook(ctx)
 	if err != nil {
 		return fmt.Errorf("error when getting preReceiveHookStream client for: %w", err)
@@ -332,7 +332,7 @@ func preReceiveHook(ctx context.Context, payload git.HooksPayload, hookClient gi
 	return nil
 }
 
-func postReceiveHook(ctx context.Context, payload git.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
+func postReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
 	postReceiveHookStream, err := hookClient.PostReceiveHook(ctx)
 	if err != nil {
 		return fmt.Errorf("error when getting stream client for post-receive hook: %w", err)
@@ -361,7 +361,7 @@ func postReceiveHook(ctx context.Context, payload git.HooksPayload, hookClient g
 	return nil
 }
 
-func referenceTransactionHook(ctx context.Context, payload git.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
+func referenceTransactionHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("reference-transaction hook is missing required arguments, got %q", args)
 	}
@@ -406,7 +406,7 @@ func referenceTransactionHook(ctx context.Context, payload git.HooksPayload, hoo
 	return nil
 }
 
-func procReceiveHook(ctx context.Context, payload git.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
+func procReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
 	if len(args) != 0 {
 		return fmt.Errorf("proc-receive hook does not accept arguments, got %d", len(args))
 	}
@@ -438,7 +438,7 @@ func procReceiveHook(ctx context.Context, payload git.HooksPayload, hookClient g
 	return nil
 }
 
-func packObjectsHook(ctx context.Context, payload git.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
+func packObjectsHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient gitalypb.HookServiceClient, args []string) error {
 	ctx, wt, err := hook.SetupSidechannel(ctx, payload, func(c *net.UnixConn) error {
 		return stream.ProxyPktLine(c, os.Stdin, os.Stdout, os.Stderr)
 	})

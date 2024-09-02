@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 // StaticOption are reusable trusted options
 type StaticOption struct {

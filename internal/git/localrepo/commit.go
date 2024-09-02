@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
@@ -177,30 +178,30 @@ func (repo *Repo) WriteCommit(ctx context.Context, cfg WriteCommitConfig) (git.O
 		)
 	}
 
-	var flags []git.Option
+	var flags []gitcmd.Option
 
 	for _, parent := range cfg.Parents {
-		flags = append(flags, git.ValueFlag{Name: "-p", Value: parent.String()})
+		flags = append(flags, gitcmd.ValueFlag{Name: "-p", Value: parent.String()})
 	}
 
-	flags = append(flags, git.ValueFlag{Name: "-F", Value: "-"})
+	flags = append(flags, gitcmd.ValueFlag{Name: "-F", Value: "-"})
 
 	var stdout, stderr bytes.Buffer
 
-	opts := []git.CmdOpt{
-		git.WithStdout(&stdout),
-		git.WithStderr(&stderr),
-		git.WithStdin(strings.NewReader(cfg.Message)),
-		git.WithEnv(env...),
+	opts := []gitcmd.CmdOpt{
+		gitcmd.WithStdout(&stdout),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithStdin(strings.NewReader(cfg.Message)),
+		gitcmd.WithEnv(env...),
 	}
 
 	if featureflag.GPGSigning.IsEnabled(ctx) && cfg.Sign && cfg.GitConfig.SigningKey != "" {
-		flags = append(flags, git.Flag{Name: "--gpg-sign=" + cfg.GitConfig.SigningKey})
-		opts = append(opts, git.WithGitalyGPG())
+		flags = append(flags, gitcmd.Flag{Name: "--gpg-sign=" + cfg.GitConfig.SigningKey})
+		opts = append(opts, gitcmd.WithGitalyGPG())
 	}
 
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "commit-tree",
 			Flags: flags,
 			Args:  commitArgs,
@@ -252,12 +253,12 @@ func (repo *Repo) IsAncestor(ctx context.Context, parent, child git.Revision) (b
 
 	stderr := &bytes.Buffer{}
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "merge-base",
-			Flags: []git.Option{git.Flag{Name: "--is-ancestor"}},
+			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--is-ancestor"}},
 			Args:  []string{parent.String(), child.String()},
 		},
-		git.WithStderr(stderr),
+		gitcmd.WithStderr(stderr),
 	); err != nil {
 		status, ok := command.ExitStatus(err)
 		if ok && status == 1 {

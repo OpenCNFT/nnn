@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -54,7 +54,7 @@ func (s *server) sshUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveSer
 
 	timeoutTicker := s.uploadArchiveRequestTimeoutTickerFactory()
 
-	if err := s.runUploadCommand(ctx, req.GetRepository(), stdin, stdout, stderr, timeoutTicker, pktline.PktFlush(), git.Command{
+	if err := s.runUploadCommand(ctx, req.GetRepository(), stdin, stdout, stderr, timeoutTicker, pktline.PktFlush(), gitcmd.Command{
 		Name: "upload-archive",
 		Args: []string{repoPath},
 	}); err != nil {

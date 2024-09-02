@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -55,11 +56,11 @@ func (repo *Repo) Rebase(ctx context.Context, upstream, branch string, options .
 
 	var stdout bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "merge-base",
 			Args: []string{upstreamOID.String(), branchOID.String()},
 		},
-		git.WithStdout(&stdout),
+		gitcmd.WithStdout(&stdout),
 	); err != nil {
 		return "", structerr.NewInternal("get merge-base: %w", err)
 	}
@@ -91,16 +92,16 @@ func (repo *Repo) rebaseUsingMergeTree(ctx context.Context, cfg rebaseConfig, up
 	// Currently we drop clean cherry-picks and merge commits, which is
 	// also what git2go does.
 	// The flags are inferred from https://github.com/git/git/blob/v2.41.0/sequencer.c#L5704-L5714
-	flags := []git.Option{
-		git.Flag{Name: "--cherry-pick"},
-		git.Flag{Name: "--right-only"},
-		git.Flag{Name: "--no-merges"},
-		git.Flag{Name: "--topo-order"},
-		git.Flag{Name: "--reverse"},
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "--cherry-pick"},
+		gitcmd.Flag{Name: "--right-only"},
+		gitcmd.Flag{Name: "--no-merges"},
+		gitcmd.Flag{Name: "--topo-order"},
+		gitcmd.Flag{Name: "--reverse"},
 	}
 
 	var stderr bytes.Buffer
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "rev-list",
 		Flags: flags,
 		// The notation "<upstream>...<branch>" is used to calculate the symmetric
@@ -109,7 +110,7 @@ func (repo *Repo) rebaseUsingMergeTree(ctx context.Context, cfg rebaseConfig, up
 		// the provided --right-only flag, the result should be only commits which
 		// exist on the branch that is to be rebased.
 		Args: []string{fmt.Sprintf("%s...%s", upstreamOID, branchOID)},
-	}, git.WithStderr(&stderr), git.WithSetupStdout())
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithSetupStdout())
 	if err != nil {
 		return "", structerr.NewInternal("start git rev-list: %w", err)
 	}

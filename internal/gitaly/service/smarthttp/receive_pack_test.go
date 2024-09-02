@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -142,10 +143,10 @@ func TestPostReceivePack_successful(t *testing.T) {
 	// checks should be needed.
 	gittest.Exec(t, cfg, "-C", repoPath, "show", push.refUpdates[0].to.String())
 
-	payload, err := git.HooksPayloadFromEnv(capturedHookEnv)
+	payload, err := gitcmd.HooksPayloadFromEnv(capturedHookEnv)
 	require.NoError(t, err)
 
-	expectedHooks := git.ReceivePackHooks
+	expectedHooks := gitcmd.ReceivePackHooks
 
 	// Compare the repository up front so that we can use require.Equal for
 	// the remaining values.
@@ -164,7 +165,7 @@ func TestPostReceivePack_successful(t *testing.T) {
 		expectedRepo.RelativePath = "OVERRIDDEN"
 		// When transactions are enabled the update hook is manually invoked as part of the
 		// proc-receive hook. Consequently, the requested hooks only specify the update hook.
-		expectedHooks = git.UpdateHook
+		expectedHooks = gitcmd.UpdateHook
 	}
 
 	testhelper.ProtoEqual(t, expectedRepo, payload.Repo)
@@ -174,9 +175,9 @@ func TestPostReceivePack_successful(t *testing.T) {
 	// figuring out their actual contents. So let's just remove it, too.
 	payload.Transaction = nil
 
-	var expectedFeatureFlags []git.FeatureFlagWithValue
+	var expectedFeatureFlags []gitcmd.FeatureFlagWithValue
 	for feature, enabled := range featureflag.FromContext(ctx) {
-		expectedFeatureFlags = append(expectedFeatureFlags, git.FeatureFlagWithValue{
+		expectedFeatureFlags = append(expectedFeatureFlags, gitcmd.FeatureFlagWithValue{
 			Flag: feature, Enabled: enabled,
 		})
 	}
@@ -191,12 +192,12 @@ func TestPostReceivePack_successful(t *testing.T) {
 		transactionID = 2
 	}
 
-	require.Equal(t, git.HooksPayload{
+	require.Equal(t, gitcmd.HooksPayload{
 		ObjectFormat:        gittest.DefaultObjectHash.Format,
 		RuntimeDir:          cfg.RuntimeDir,
 		InternalSocket:      cfg.InternalSocketPath(),
 		InternalSocketToken: cfg.Auth.Token,
-		UserDetails: &git.UserDetails{
+		UserDetails: &gitcmd.UserDetails{
 			UserID:   "123",
 			Username: "user",
 			Protocol: "http",
@@ -278,11 +279,11 @@ func TestPostReceivePack_protocolV2(t *testing.T) {
 		Repository:   repo,
 		GlId:         "user-123",
 		GlRepository: "project-123",
-		GitProtocol:  git.ProtocolV2,
+		GitProtocol:  gitcmd.ProtocolV2,
 	})
 
 	envData := protocolDetectingFactory.ReadProtocol(t)
-	require.Equal(t, fmt.Sprintf("GIT_PROTOCOL=%s\n", git.ProtocolV2), envData)
+	require.Equal(t, fmt.Sprintf("GIT_PROTOCOL=%s\n", gitcmd.ProtocolV2), envData)
 
 	// The fact that this command succeeds means that we got the commit correctly, no further checks should be needed.
 	gittest.Exec(t, cfg, "-C", repoPath, "show", push.refUpdates[0].to.String())
@@ -324,7 +325,7 @@ func TestPostReceivePack_packfiles(t *testing.T) {
 		Repository:   repo,
 		GlId:         "user-123",
 		GlRepository: "project-123",
-		GitProtocol:  git.ProtocolV2,
+		GitProtocol:  gitcmd.ProtocolV2,
 		// By default, Git would unpack the received packfile if it has less than
 		// 100 objects. Decrease this limit so that we indeed end up with another
 		// new packfile even though we only push a small set of objects.
@@ -382,7 +383,7 @@ func TestPostReceivePack_rejectViaHooks(t *testing.T) {
 
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg, git.WithHooksPath(testhelper.TempDir(t)))
+	gitCmdFactory := gittest.NewCommandFactory(t, cfg, gitcmd.WithHooksPath(testhelper.TempDir(t)))
 
 	testhelper.WriteExecutable(t, filepath.Join(gitCmdFactory.HooksPath(ctx), "pre-receive"), []byte("#!/bin/sh\nexit 1"))
 

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -59,7 +59,7 @@ func setupObjectPoolWithCfg(t *testing.T, ctx context.Context, cfg config.Cfg, o
 	})
 	repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
-	gitCommandFactory := gittest.NewCommandFactory(t, cfg, git.WithSkipHooks())
+	gitCommandFactory := gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks())
 
 	catfileCache := catfile.NewCache(cfg)
 	t.Cleanup(catfileCache.Stop)

@@ -1,4 +1,4 @@
-package git_test
+package gitcmd_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -33,7 +34,7 @@ func TestShowRefDecoder(t *testing.T) {
 
 	output := gittest.Exec(t, cfg, "-C", repoPath, "show-ref")
 
-	d := git.NewShowRefDecoder(bytes.NewReader(output))
+	d := gitcmd.NewShowRefDecoder(bytes.NewReader(output))
 	var refs []git.Reference
 	for {
 		var ref git.Reference

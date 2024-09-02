@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/gitaly/v16/streamio"
@@ -36,15 +36,15 @@ func (s *server) GetInfoAttributes(in *gitalypb.GetInfoAttributesRequest, stream
 	repo := s.localrepo(in.GetRepository())
 	var stderr strings.Builder
 	// Call cat-file -p HEAD:.gitattributes instead of cat info/attributes
-	catFileCmd, err := repo.Exec(ctx, git.Command{
+	catFileCmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "cat-file",
-		Flags: []git.Option{
-			git.Flag{Name: "-p"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "-p"},
 		},
 		Args: []string{"HEAD:.gitattributes"},
 	},
-		git.WithSetupStdout(),
-		git.WithStderr(&stderr),
+		gitcmd.WithSetupStdout(),
+		gitcmd.WithStderr(&stderr),
 	)
 	if err != nil {
 		return structerr.NewInternal("read HEAD:.gitattributes: %w", err)

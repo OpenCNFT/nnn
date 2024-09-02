@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -15,7 +15,7 @@ import (
 type Factory struct {
 	logger       log.Logger
 	locator      storage.Locator
-	cmdFactory   git.CommandFactory
+	cmdFactory   gitcmd.CommandFactory
 	catfileCache catfile.Cache
 }
 
@@ -28,7 +28,7 @@ type StorageScopedFactory struct {
 
 // NewFactory returns a factory type that builds Repo instances. It helps avoid having to drill down Repo
 // dependencies to all call sites that need to build a Repo.
-func NewFactory(logger log.Logger, locator storage.Locator, cmdFactory git.CommandFactory, catfileCache catfile.Cache) Factory {
+func NewFactory(logger log.Logger, locator storage.Locator, cmdFactory gitcmd.CommandFactory, catfileCache catfile.Cache) Factory {
 	return Factory{
 		logger:       logger,
 		locator:      locator,

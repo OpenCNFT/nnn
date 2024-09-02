@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -128,7 +128,7 @@ func testServerPackObjectsHookSeparateContextWithRuntimeDir(t *testing.T, runtim
 
 		ctx, wt, err := hookPkg.SetupSidechannel(
 			ctx,
-			git.HooksPayload{
+			gitcmd.HooksPayload{
 				RuntimeDir: runtimeDir,
 			},
 			func(c *net.UnixConn) error {
@@ -193,7 +193,7 @@ func testServerPackObjectsHookSeparateContextWithRuntimeDir(t *testing.T, runtim
 
 		ctx, wt, err := hookPkg.SetupSidechannel(
 			ctx,
-			git.HooksPayload{
+			gitcmd.HooksPayload{
 				RuntimeDir: runtimeDir,
 			},
 			func(c *net.UnixConn) error {
@@ -395,7 +395,7 @@ func testServerPackObjectsHookUsesCache(t *testing.T, runtimeDir string) {
 				var stdout []byte
 				ctx, wt, err := hookPkg.SetupSidechannel(
 					ctx,
-					git.HooksPayload{
+					gitcmd.HooksPayload{
 						RuntimeDir: runtimeDir,
 					},
 					func(c *net.UnixConn) error {
@@ -528,7 +528,7 @@ func testServerPackObjectsHookWithSidechannelWithRuntimeDir(t *testing.T, runtim
 			var packets []string
 			ctx, wt, err := hookPkg.SetupSidechannel(
 				ctx,
-				git.HooksPayload{
+				gitcmd.HooksPayload{
 					RuntimeDir: runtimeDir,
 				},
 				func(c *net.UnixConn) error {
@@ -659,7 +659,7 @@ func testServerPackObjectsHookWithSidechannelCanceledWithRuntimeDir(t *testing.T
 
 	ctx, wt, err := hookPkg.SetupSidechannel(
 		ctx,
-		git.HooksPayload{
+		gitcmd.HooksPayload{
 			RuntimeDir: runtimeDir,
 		},
 		func(c *net.UnixConn) error {
@@ -687,7 +687,7 @@ func testServerPackObjectsHookWithSidechannelCanceledWithRuntimeDir(t *testing.T
 func withRunPackObjectsFn(
 	f func(
 		context.Context,
-		git.CommandFactory,
+		gitcmd.CommandFactory,
 		io.Writer,
 		*gitalypb.PackObjectsHookWithSidechannelRequest,
 		*packObjectsArgs,
@@ -703,7 +703,7 @@ func withRunPackObjectsFn(
 func setupSidechannel(t *testing.T, ctx context.Context, oid string) (context.Context, *hookPkg.SidechannelWaiter, error) {
 	return hookPkg.SetupSidechannel(
 		ctx,
-		git.HooksPayload{
+		gitcmd.HooksPayload{
 			RuntimeDir: testhelper.TempDir(t),
 		},
 		func(c *net.UnixConn) error {
@@ -909,7 +909,7 @@ func TestPackObjects_concurrencyLimit(t *testing.T) {
 				cfg.SocketPath = runHooksServer(t, cfg, []serverOption{
 					withRunPackObjectsFn(func(
 						context.Context,
-						git.CommandFactory,
+						gitcmd.CommandFactory,
 						io.Writer,
 						*gitalypb.PackObjectsHookWithSidechannelRequest,
 						*packObjectsArgs,

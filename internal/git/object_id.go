@@ -1,17 +1,12 @@
 package git
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"hash"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
@@ -95,27 +90,6 @@ func ObjectHashByProto(format gitalypb.ObjectFormat) (ObjectHash, error) {
 	default:
 		return ObjectHash{}, fmt.Errorf("unknown object format: %q", format)
 	}
-}
-
-// DetectObjectHash detects the object-hash used by the given repository.
-func DetectObjectHash(ctx context.Context, gitCmdFactory CommandFactory, repository storage.Repository) (ObjectHash, error) {
-	var stdout, stderr bytes.Buffer
-
-	revParseCmd, err := gitCmdFactory.New(ctx, repository, Command{
-		Name: "rev-parse",
-		Flags: []Option{
-			Flag{"--show-object-format"},
-		},
-	}, WithStdout(&stdout), WithStderr(&stderr))
-	if err != nil {
-		return ObjectHash{}, fmt.Errorf("spawning rev-parse: %w", err)
-	}
-
-	if err := revParseCmd.Wait(); err != nil {
-		return ObjectHash{}, structerr.New("reading object format: %w", err).WithMetadata("stderr", stderr.String())
-	}
-
-	return ObjectHashByFormat(text.ChompBytes(stdout.Bytes()))
 }
 
 // EncodedLen returns the length of the hex-encoded string of a full object ID.

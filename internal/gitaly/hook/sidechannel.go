@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	gitaly_metadata "gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"google.golang.org/grpc/metadata"
@@ -45,7 +45,7 @@ func GetSidechannel(ctx context.Context) (net.Conn, error) {
 // receives a connection. The address of the listener is stored in the
 // returned context, so that the caller can propagate it to a server. The
 // caller must Close the SidechannelWaiter to prevent resource leaks.
-func SetupSidechannel(ctx context.Context, payload git.HooksPayload, callback func(*net.UnixConn) error) (_ context.Context, _ *SidechannelWaiter, err error) {
+func SetupSidechannel(ctx context.Context, payload gitcmd.HooksPayload, callback func(*net.UnixConn) error) (_ context.Context, _ *SidechannelWaiter, err error) {
 	var sidechannelDir, sidechannelName string
 
 	// If there is a runtime directory we try to create a sidechannel directory in there that

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -396,12 +396,12 @@ func (m *RepositoryManager) packRefsIfNeeded(ctx context.Context, repo *localrep
 	defer cleanup()
 
 	var stderr bytes.Buffer
-	if err := repo.ExecAndWait(ctx, git.Command{
+	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name: "pack-refs",
-		Flags: []git.Option{
-			git.Flag{Name: "--all"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--all"},
 		},
-	}, git.WithStderr(&stderr)); err != nil {
+	}, gitcmd.WithStderr(&stderr)); err != nil {
 		return false, fmt.Errorf("packing refs: %w, stderr: %q", err, stderr.String())
 	}
 

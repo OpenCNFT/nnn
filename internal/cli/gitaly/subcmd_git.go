@@ -10,7 +10,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"gitlab.com/gitlab-org/gitaly/v16"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -71,7 +71,7 @@ func gitAction(ctx *cli.Context) (returnErr error) {
 		return fmt.Errorf("unpack auxiliary binaries: %w", err)
 	}
 
-	gitCmdFactory, cleanup, err := git.NewExecCommandFactory(cfg, logger)
+	gitCmdFactory, cleanup, err := gitcmd.NewExecCommandFactory(cfg, logger)
 	if err != nil {
 		return fmt.Errorf("creating Git command factory: %w", err)
 	}
@@ -85,7 +85,7 @@ func gitAction(ctx *cli.Context) (returnErr error) {
 	cmd.Stderr = ctx.App.ErrWriter
 
 	// Disable automatic garbage collection and maintenance
-	gitConfig := []git.ConfigPair{
+	gitConfig := []gitcmd.ConfigPair{
 		{Key: "gc.auto", Value: "0"},
 		{Key: "maintenance.auto", Value: "0"},
 	}
@@ -94,7 +94,7 @@ func gitAction(ctx *cli.Context) (returnErr error) {
 
 	cmd.Env = append(cmd.Env,
 		fmt.Sprintf("GIT_EXEC_PATH=%s", filepath.Dir(gitBinaryPath)))
-	cmd.Env = append(cmd.Env, git.ConfigPairsToGitEnvironment(gitConfig)...)
+	cmd.Env = append(cmd.Env, gitcmd.ConfigPairsToGitEnvironment(gitConfig)...)
 
 	err = cmd.Run()
 	if err != nil {

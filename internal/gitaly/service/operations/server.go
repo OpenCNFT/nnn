@@ -3,8 +3,8 @@ package operations
 import (
 	"context"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -27,7 +27,7 @@ type Server struct {
 	txManager     transaction.Manager
 	locator       storage.Locator
 	conns         *client.Pool
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 	catfileCache  catfile.Cache
 	updater       *updateref.UpdaterWithHooks
 	gitConfig     config.Git

@@ -1,8 +1,8 @@
 package commit
 
 import (
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
@@ -15,7 +15,7 @@ type server struct {
 	gitalypb.UnimplementedCommitServiceServer
 	logger        log.Logger
 	locator       storage.Locator
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 	catfileCache  catfile.Cache
 	cfg           config.Cfg
 }

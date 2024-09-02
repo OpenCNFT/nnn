@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 )
 
@@ -114,7 +115,7 @@ const (
 )
 
 func init() {
-	if maxBytesUpperBound > git.BigFileThresholdMB*1024*1024 {
+	if maxBytesUpperBound > gitcmd.BigFileThresholdMB*1024*1024 {
 		panic("big file threshold smaller than maximum upper bytes bound")
 	}
 }

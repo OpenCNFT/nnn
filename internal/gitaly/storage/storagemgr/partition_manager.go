@@ -13,7 +13,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
@@ -41,7 +41,7 @@ type transactionManagerFactory func(
 	logger log.Logger,
 	partitionID storage.PartitionID,
 	storageMgr *storageManager,
-	cmdFactory git.CommandFactory,
+	cmdFactory gitcmd.CommandFactory,
 	absoluteStateDir, stagingDir string,
 ) transactionManager
 
@@ -50,7 +50,7 @@ type PartitionManager struct {
 	// storages are the storages configured in this Gitaly server. The map is keyed by the storage name.
 	storages map[string]*storageManager
 	// commandFactory is passed as a dependency to the constructed TransactionManagers.
-	commandFactory git.CommandFactory
+	commandFactory gitcmd.CommandFactory
 	// transactionManagerFactory is a factory to create TransactionManagers. This shouldn't ever be changed
 	// during normal operation, but can be used to adjust the transaction manager's behaviour in tests.
 	transactionManagerFactory transactionManagerFactory
@@ -226,7 +226,7 @@ func clearStagingDirectory(stagingDir string) error {
 func NewPartitionManager(
 	ctx context.Context,
 	configuredStorages []config.Storage,
-	cmdFactory git.CommandFactory,
+	cmdFactory gitcmd.CommandFactory,
 	localRepoFactory localrepo.Factory,
 	logger log.Logger,
 	dbMgr *keyvalue.DBManager,
@@ -295,7 +295,7 @@ func NewPartitionManager(
 		logger log.Logger,
 		partitionID storage.PartitionID,
 		storageMgr *storageManager,
-		cmdFactory git.CommandFactory,
+		cmdFactory gitcmd.CommandFactory,
 		absoluteStateDir, stagingDir string,
 	) transactionManager {
 		return NewTransactionManager(

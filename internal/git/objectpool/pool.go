@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
@@ -39,7 +39,7 @@ type ObjectPool struct {
 
 	logger              log.Logger
 	locator             storage.Locator
-	gitCmdFactory       git.CommandFactory
+	gitCmdFactory       gitcmd.CommandFactory
 	txManager           transaction.Manager
 	housekeepingManager housekeepingmgr.Manager
 }
@@ -50,7 +50,7 @@ func FromProto(
 	ctx context.Context,
 	logger log.Logger,
 	locator storage.Locator,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	catfileCache catfile.Cache,
 	txManager transaction.Manager,
 	housekeepingManager housekeepingmgr.Manager,
@@ -147,7 +147,7 @@ func FromRepo(
 	ctx context.Context,
 	logger log.Logger,
 	locator storage.Locator,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	catfileCache catfile.Cache,
 	txManager transaction.Manager,
 	housekeepingManager housekeepingmgr.Manager,

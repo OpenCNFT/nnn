@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trace2"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trace2hooks"
@@ -172,19 +173,19 @@ func TestPackObjectsMetrics(t *testing.T) {
 
 			ctx := log.InitContextCustomFields(testhelper.Context(t))
 			repoProto, cfg, input := tc.setupRepo(ctx)
-			gitCmdFactory := gittest.NewCommandFactory(t, cfg, git.WithTrace2Hooks([]trace2.Hook{
+			gitCmdFactory := gittest.NewCommandFactory(t, cfg, gitcmd.WithTrace2Hooks([]trace2.Hook{
 				trace2hooks.NewPackObjectsMetrics(),
 			}))
 
-			cmd, err := gitCmdFactory.New(ctx, repoProto, git.Command{
+			cmd, err := gitCmdFactory.New(ctx, repoProto, gitcmd.Command{
 				Name: "pack-objects",
-				Flags: []git.Option{
-					git.Flag{Name: "--compression=0"},
-					git.Flag{Name: "--stdout"},
-					git.Flag{Name: "--unpack-unreachable"},
-					git.Flag{Name: "-q"},
+				Flags: []gitcmd.Option{
+					gitcmd.Flag{Name: "--compression=0"},
+					gitcmd.Flag{Name: "--stdout"},
+					gitcmd.Flag{Name: "--unpack-unreachable"},
+					gitcmd.Flag{Name: "-q"},
 				},
-			}, git.WithStdin(&input))
+			}, gitcmd.WithStdin(&input))
 			require.NoError(t, err)
 
 			err = cmd.Wait()

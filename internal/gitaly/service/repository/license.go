@@ -14,6 +14,7 @@ import (
 	"github.com/go-enry/go-license-detector/v4/licensedb/api"
 	"github.com/go-enry/go-license-detector/v4/licensedb/filer"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
@@ -197,13 +198,13 @@ func (f *gitFiler) ReadFile(path string) ([]byte, error) {
 
 func (f *gitFiler) ReadDir(string) ([]filer.File, error) {
 	var stderr bytes.Buffer
-	cmd, err := f.repo.Exec(f.ctx, git.Command{
+	cmd, err := f.repo.Exec(f.ctx, gitcmd.Command{
 		Name: "ls-tree",
-		Flags: []git.Option{
-			git.Flag{Name: "-z"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "-z"},
 		},
 		Args: []string{f.treeishID.String()},
-	}, git.WithStderr(&stderr), git.WithSetupStdout())
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, err
 	}

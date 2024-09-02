@@ -1,6 +1,8 @@
 package git
 
-import "io"
+import (
+	"io"
+)
 
 // ObjectInfo is an interface encapsulating information about objects.
 type ObjectInfo interface {

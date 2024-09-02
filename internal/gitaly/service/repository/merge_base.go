@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -25,11 +25,11 @@ func (s *server) FindMergeBase(ctx context.Context, req *gitalypb.FindMergeBaseR
 	}
 
 	cmd, err := s.gitCmdFactory.New(ctx, repository,
-		git.Command{
+		gitcmd.Command{
 			Name: "merge-base",
 			Args: revisions,
 		},
-		git.WithSetupStdout(),
+		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {
 		return nil, structerr.NewInternal("cmd: %w", err)

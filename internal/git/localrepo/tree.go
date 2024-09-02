@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
@@ -387,14 +388,14 @@ func (repo *Repo) listEntries(
 	relativePath string,
 	recursive bool,
 ) ([]*TreeEntry, error) {
-	flags := []git.Option{git.Flag{Name: "-z"}}
+	flags := []gitcmd.Option{gitcmd.Flag{Name: "-z"}}
 	if recursive {
 		flags = append(flags,
-			git.Flag{Name: "-r"},
+			gitcmd.Flag{Name: "-r"},
 			// By default, when -r is passed, tree entries will not
 			// be shown. -t will cause tree entries to be shown as
 			// well even when -r is passed.
-			git.Flag{Name: "-t"},
+			gitcmd.Flag{Name: "-t"},
 		)
 	}
 
@@ -403,11 +404,11 @@ func (repo *Repo) listEntries(
 	}
 
 	var stderr bytes.Buffer
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "ls-tree",
 		Args:  []string{fmt.Sprintf("%s:%s", treeish, relativePath)},
 		Flags: flags,
-	}, git.WithStderr(&stderr), git.WithSetupStdout())
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, fmt.Errorf("spawning git-ls-tree: %w", err)
 	}
@@ -612,21 +613,21 @@ func (repo *Repo) writeEntries(ctx context.Context, entries []*TreeEntry) (git.O
 		}
 	}
 
-	options := []git.Option{
-		git.ValueFlag{Name: "-t", Value: "tree"},
-		git.Flag{Name: "-w"},
-		git.Flag{Name: "--stdin"},
+	options := []gitcmd.Option{
+		gitcmd.ValueFlag{Name: "-t", Value: "tree"},
+		gitcmd.Flag{Name: "-w"},
+		gitcmd.Flag{Name: "--stdin"},
 	}
 
 	var stdout, stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "hash-object",
 			Flags: options,
 		},
-		git.WithStdout(&stdout),
-		git.WithStderr(&stderr),
-		git.WithStdin(&tree),
+		gitcmd.WithStdout(&stdout),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithStdin(&tree),
 	); err != nil {
 		return "", structerr.New("%w", err).WithMetadata("stderr", stderr.String())
 	}

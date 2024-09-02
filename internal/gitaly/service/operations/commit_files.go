@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/updateref"
@@ -133,7 +134,7 @@ func (s *Server) UserCommitFiles(stream gitalypb.OperationService_UserCommitFile
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	objectHash, err := git.DetectObjectHash(ctx, s.gitCmdFactory, header.GetRepository())
+	objectHash, err := gitcmd.DetectObjectHash(ctx, s.gitCmdFactory, header.GetRepository())
 	if err != nil {
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
@@ -751,7 +752,7 @@ func sameRepository(repoA, repoB *gitalypb.Repository) bool {
 
 func (s *Server) resolveParentCommit(
 	ctx context.Context,
-	local git.Repository,
+	local gitcmd.Repository,
 	remote *gitalypb.Repository,
 	targetBranch git.ReferenceName,
 	targetBranchCommit git.ObjectID,

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
@@ -259,13 +260,13 @@ size 12345`
 				// directory.
 				quarantineRepo := localrepo.NewTestRepo(t, cfg, repo)
 				var buffer bytes.Buffer
-				require.NoError(t, quarantineRepo.ExecAndWait(ctx, git.Command{
+				require.NoError(t, quarantineRepo.ExecAndWait(ctx, gitcmd.Command{
 					Name: "hash-object",
-					Flags: []git.Option{
-						git.Flag{Name: "-w"},
-						git.Flag{Name: "--stdin"},
+					Flags: []gitcmd.Option{
+						gitcmd.Flag{Name: "-w"},
+						gitcmd.Flag{Name: "--stdin"},
 					},
-				}, git.WithStdin(strings.NewReader(lfsPointerContents)), git.WithStdout(&buffer)))
+				}, gitcmd.WithStdin(strings.NewReader(lfsPointerContents)), gitcmd.WithStdout(&buffer)))
 
 				return setupData{
 					repo: repo,

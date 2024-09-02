@@ -12,6 +12,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 )
 
@@ -203,28 +204,28 @@ func CatfileInfoAllObjects(
 			return
 		}
 
-		batchCheckOption := git.Flag{Name: "--batch-check"}
+		batchCheckOption := gitcmd.Flag{Name: "--batch-check"}
 
 		if cfg.diskUsage {
 			batchCheckOption.Name = batchCheckOption.Name +
 				fmt.Sprintf("=%%(objectname) %%(objecttype) %%(objectsize:disk)")
 		}
 
-		options := []git.Option{
+		options := []gitcmd.Option{
 			batchCheckOption,
-			git.Flag{Name: "--batch-all-objects"},
-			git.Flag{Name: "--buffer"},
-			git.Flag{Name: "--unordered"},
+			gitcmd.Flag{Name: "--batch-all-objects"},
+			gitcmd.Flag{Name: "--buffer"},
+			gitcmd.Flag{Name: "--unordered"},
 		}
 		if featureflag.MailmapOptions.IsEnabled(ctx) {
-			options = append([]git.Option{git.Flag{Name: "--use-mailmap"}}, options...)
+			options = append([]gitcmd.Option{gitcmd.Flag{Name: "--use-mailmap"}}, options...)
 		}
 
 		var stderr bytes.Buffer
-		cmd, err := repo.Exec(ctx, git.Command{
+		cmd, err := repo.Exec(ctx, gitcmd.Command{
 			Name:  "cat-file",
 			Flags: options,
-		}, git.WithStderr(&stderr), git.WithSetupStdout())
+		}, gitcmd.WithStderr(&stderr), gitcmd.WithSetupStdout())
 		if err != nil {
 			sendCatfileInfoResult(ctx, resultChan, CatfileInfoResult{
 				err: fmt.Errorf("spawning cat-file failed: %w", err),

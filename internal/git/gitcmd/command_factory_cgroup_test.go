@@ -1,4 +1,4 @@
-package git_test
+package gitcmd_test
 
 import (
 	"io"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -43,12 +43,12 @@ func TestNewCommandAddsToCgroup(t *testing.T) {
 	})
 
 	var manager mockCgroupsManager
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg, git.WithCgroupsManager(&manager))
+	gitCmdFactory := gittest.NewCommandFactory(t, cfg, gitcmd.WithCgroupsManager(&manager))
 
-	cmd, err := gitCmdFactory.New(ctx, repo, git.Command{
+	cmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name: "rev-parse",
-		Flags: []git.Option{
-			git.Flag{Name: "--is-bare-repository"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--is-bare-repository"},
 		},
 	})
 	require.NoError(t, err)

@@ -1,8 +1,8 @@
 package analysis
 
 import (
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -14,7 +14,7 @@ type server struct {
 	gitalypb.UnimplementedAnalysisServiceServer
 	logger        log.Logger
 	locator       storage.Locator
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 	catfileCache  catfile.Cache
 }
 

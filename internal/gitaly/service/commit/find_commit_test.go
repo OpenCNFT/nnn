@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -336,12 +337,12 @@ func benchmarkFindCommit(b *testing.B, withCache bool) {
 
 	// get a list of revisions
 	gitCmdFactory := gittest.NewCommandFactory(b, cfg)
-	logCmd, err := gitCmdFactory.New(ctx, repo, git.Command{
+	logCmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name: "log",
-		Flags: []git.Option{
-			git.Flag{Name: "--format=format:%H"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--format=format:%H"},
 		},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	require.NoError(b, err)
 
 	logScanner := bufio.NewScanner(logCmd)

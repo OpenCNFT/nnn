@@ -3,8 +3,8 @@ package localrepo
 import (
 	"testing"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -39,9 +39,9 @@ func setupRepo(t *testing.T, opts ...setupRepoOption) (config.Cfg, *Repo, string
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 
-	var commandFactoryOpts []git.ExecCommandFactoryOption
+	var commandFactoryOpts []gitcmd.ExecCommandFactoryOption
 	if setupRepoCfg.disableHooks {
-		commandFactoryOpts = append(commandFactoryOpts, git.WithSkipHooks())
+		commandFactoryOpts = append(commandFactoryOpts, gitcmd.WithSkipHooks())
 	}
 
 	repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{

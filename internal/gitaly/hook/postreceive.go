@@ -9,7 +9,7 @@ import (
 	"math"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -107,7 +107,7 @@ func printAlert(m gitlab.PostReceiveMessage, w io.Writer) error {
 
 //nolint:revive // This is unintentionally missing documentation.
 func (m *GitLabHookManager) PostReceiveHook(ctx context.Context, repo *gitalypb.Repository, pushOptions, env []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	payload, err := git.HooksPayloadFromEnv(env)
+	payload, err := gitcmd.HooksPayloadFromEnv(env)
 	if err != nil {
 		return structerr.NewInternal("extracting hooks payload: %w", err)
 	}
@@ -181,7 +181,7 @@ func (m *GitLabHookManager) PostReceiveHook(ctx context.Context, repo *gitalypb.
 	return nil
 }
 
-func (m *GitLabHookManager) postReceiveHook(ctx context.Context, payload git.HooksPayload, repo *gitalypb.Repository, pushOptions, env []string, stdin []byte, stdout, stderr io.Writer) error {
+func (m *GitLabHookManager) postReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, repo *gitalypb.Repository, pushOptions, env []string, stdin []byte, stdout, stderr io.Writer) error {
 	if len(stdin) == 0 {
 		return structerr.NewInternal("hook got no reference updates")
 	}

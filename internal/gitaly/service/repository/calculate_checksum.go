@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -23,12 +24,12 @@ func (s *server) CalculateChecksum(ctx context.Context, in *gitalypb.CalculateCh
 		return nil, err
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, repo, git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name: "show-ref",
-		Flags: []git.Option{
-			git.Flag{Name: "--head"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--head"},
 		},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, structerr.NewInternal("gitCommand: %w", err)
 	}
@@ -58,13 +59,13 @@ func (s *server) CalculateChecksum(ctx context.Context, in *gitalypb.CalculateCh
 func (s *server) isValidRepo(ctx context.Context, repo *gitalypb.Repository) bool {
 	stdout := &bytes.Buffer{}
 	cmd, err := s.gitCmdFactory.New(ctx, repo,
-		git.Command{
+		gitcmd.Command{
 			Name: "rev-parse",
-			Flags: []git.Option{
-				git.Flag{Name: "--is-bare-repository"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--is-bare-repository"},
 			},
 		},
-		git.WithStdout(stdout),
+		gitcmd.WithStdout(stdout),
 	)
 	if err != nil {
 		return false

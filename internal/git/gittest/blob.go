@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -24,7 +25,7 @@ func WriteBlobs(tb testing.TB, cfg config.Cfg, repoPath string, n int) []git.Obj
 	for i := 0; i < n; i++ {
 		contents := []byte(strconv.Itoa(time.Now().Nanosecond()))
 
-		blobID, err := git.WriteBlob(ctx, repoExecutor, bytes.NewReader(contents), git.WriteBlobConfig{})
+		blobID, err := gitcmd.WriteBlob(ctx, repoExecutor, bytes.NewReader(contents), gitcmd.WriteBlobConfig{})
 		require.NoError(tb, err)
 
 		blobIDs = append(blobIDs, blobID)
@@ -37,11 +38,11 @@ func WriteBlobs(tb testing.TB, cfg config.Cfg, repoPath string, n int) []git.Obj
 func WriteBlob(tb testing.TB, cfg config.Cfg, repoPath string, contents []byte) git.ObjectID {
 	tb.Helper()
 
-	blobID, err := git.WriteBlob(
+	blobID, err := gitcmd.WriteBlob(
 		testhelper.Context(tb),
 		NewRepositoryPathExecutor(tb, cfg, repoPath),
 		bytes.NewReader(contents),
-		git.WriteBlobConfig{},
+		gitcmd.WriteBlobConfig{},
 	)
 	require.NoError(tb, err)
 

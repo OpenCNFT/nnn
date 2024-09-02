@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -58,18 +58,18 @@ func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, r
 		"service": service,
 	}).DebugContext(ctx, "handleInfoRefs")
 
-	cmdOpts := []git.CmdOpt{git.WithGitProtocol(s.logger, req), git.WithStdout(w)}
+	cmdOpts := []gitcmd.CmdOpt{gitcmd.WithGitProtocol(s.logger, req), gitcmd.WithStdout(w)}
 	if service == "receive-pack" {
-		cmdOpts = append(cmdOpts, git.WithDisabledHooks())
+		cmdOpts = append(cmdOpts, gitcmd.WithDisabledHooks())
 	}
 
-	gitConfig, err := git.ConvertConfigOptions(req.GitConfigOptions)
+	gitConfig, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
 	if err != nil {
 		return err
 	}
 	gitConfig = append(gitConfig, bundleuri.CapabilitiesGitConfig(ctx)...)
 
-	cmdOpts = append(cmdOpts, git.WithConfig(gitConfig...))
+	cmdOpts = append(cmdOpts, gitcmd.WithConfig(gitConfig...))
 
 	if _, err := pktline.WriteString(w, fmt.Sprintf("# service=git-%s\n", service)); err != nil {
 		return structerr.NewInternal("pktLine: %w", err)
@@ -79,9 +79,9 @@ func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, r
 		return structerr.NewInternal("pktFlush: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), git.Command{
+	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
 		Name:  service,
-		Flags: []git.Option{git.Flag{Name: "--stateless-rpc"}, git.Flag{Name: "--advertise-refs"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}, gitcmd.Flag{Name: "--advertise-refs"}},
 		Args:  []string{repoPath},
 	}, cmdOpts...)
 	if err != nil {

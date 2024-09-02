@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -16,10 +16,10 @@ const headPrefix = "HEAD branch: "
 
 func (s *server) findRemoteRootRefCmd(ctx context.Context, request *gitalypb.FindRemoteRootRefRequest) (*command.Command, error) {
 	remoteURL := request.GetRemoteUrl()
-	var config []git.ConfigPair
+	var config []gitcmd.ConfigPair
 
 	if resolvedAddress := request.GetResolvedAddress(); resolvedAddress != "" {
-		modifiedURL, resolveConfig, err := git.GetURLAndResolveConfig(remoteURL, resolvedAddress)
+		modifiedURL, resolveConfig, err := gitcmd.GetURLAndResolveConfig(remoteURL, resolvedAddress)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("couldn't get curloptResolve config: %w", err)
 		}
@@ -28,24 +28,24 @@ func (s *server) findRemoteRootRefCmd(ctx context.Context, request *gitalypb.Fin
 		config = append(config, resolveConfig...)
 	}
 
-	config = append(config, git.ConfigPair{Key: "remote.inmemory.url", Value: remoteURL})
+	config = append(config, gitcmd.ConfigPair{Key: "remote.inmemory.url", Value: remoteURL})
 
 	if authHeader := request.GetHttpAuthorizationHeader(); authHeader != "" {
-		config = append(config, git.ConfigPair{
+		config = append(config, gitcmd.ConfigPair{
 			Key:   fmt.Sprintf("http.%s.extraHeader", request.RemoteUrl),
 			Value: "Authorization: " + authHeader,
 		})
 	}
 
 	return s.gitCmdFactory.New(ctx, request.Repository,
-		git.Command{
+		gitcmd.Command{
 			Name:   "remote",
 			Action: "show",
 			Args:   []string{"inmemory"},
 		},
-		git.WithDisabledHooks(),
-		git.WithConfigEnv(config...),
-		git.WithSetupStdout(),
+		gitcmd.WithDisabledHooks(),
+		gitcmd.WithConfigEnv(config...),
+		gitcmd.WithSetupStdout(),
 	)
 }
 

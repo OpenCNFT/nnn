@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -23,7 +24,7 @@ func TestRepo_FetchRemote(t *testing.T) {
 
 	cfg := testcfg.Build(t)
 
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg, git.WithSkipHooks())
+	gitCmdFactory := gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks())
 	catfileCache := catfile.NewCache(cfg)
 	defer catfileCache.Stop()
 	locator := config.NewLocator(cfg)
@@ -57,7 +58,7 @@ func TestRepo_FetchRemote(t *testing.T) {
 		repo := New(logger, locator, gitCmdFactory, catfileCache, nil)
 
 		err := repo.FetchRemote(ctx, " ", FetchOpts{})
-		require.True(t, errors.Is(err, git.ErrInvalidArg))
+		require.True(t, errors.Is(err, gitcmd.ErrInvalidArg))
 		require.Contains(t, err.Error(), `"remoteName" is blank or empty`)
 	})
 
@@ -141,8 +142,8 @@ func TestRepo_FetchRemote(t *testing.T) {
 			ctx,
 			"source",
 			FetchOpts{
-				CommandOptions: []git.CmdOpt{
-					git.WithConfig(git.ConfigPair{Key: "fetch.prune", Value: "true"}),
+				CommandOptions: []gitcmd.CmdOpt{
+					gitcmd.WithConfig(gitcmd.ConfigPair{Key: "fetch.prune", Value: "true"}),
 				},
 			}),
 		)
@@ -203,14 +204,14 @@ func TestRepo_FetchRemote(t *testing.T) {
 
 		hash, err := repo.ObjectHash(ctx)
 		require.NoError(t, err)
-		scanner := git.NewFetchPorcelainScanner(&stdout, hash)
+		scanner := gitcmd.NewFetchPorcelainScanner(&stdout, hash)
 
 		// Scan the output for expected references.
 		require.True(t, scanner.Scan())
-		require.Equal(t, git.RefUpdateTypeFetched, scanner.StatusLine().Type)
+		require.Equal(t, gitcmd.RefUpdateTypeFetched, scanner.StatusLine().Type)
 		require.Equal(t, "refs/remotes/origin/main", scanner.StatusLine().Reference)
 		require.True(t, scanner.Scan())
-		require.Equal(t, git.RefUpdateTypeFetched, scanner.StatusLine().Type)
+		require.Equal(t, gitcmd.RefUpdateTypeFetched, scanner.StatusLine().Type)
 		require.Equal(t, "refs/tags/v1.0.0", scanner.StatusLine().Reference)
 
 		// Since the remote only contains two references, there should be nothing left in the buffer
@@ -278,10 +279,10 @@ func TestRepo_FetchRemote(t *testing.T) {
 // captureGitSSHCommand creates a new intercepting command factory which captures the
 // GIT_SSH_COMMAND environment variable. The returned function can be used to read the variable's
 // value.
-func captureGitSSHCommand(tb testing.TB, ctx context.Context, cfg config.Cfg) (git.CommandFactory, func() ([]byte, error)) {
+func captureGitSSHCommand(tb testing.TB, ctx context.Context, cfg config.Cfg) (gitcmd.CommandFactory, func() ([]byte, error)) {
 	envPath := filepath.Join(testhelper.TempDir(tb), "GIT_SSH_PATH")
 
-	gitCmdFactory := gittest.NewInterceptingCommandFactory(tb, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+	gitCmdFactory := gittest.NewInterceptingCommandFactory(tb, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 		return fmt.Sprintf(
 			`#!/usr/bin/env bash
 			if test -z "${GIT_SSH_COMMAND+x}"
@@ -317,14 +318,14 @@ func TestRepo_Push(t *testing.T) {
 	gittest.WriteCommit(t, cfg, sourceRepoPath, gittest.WithBranch("master"))
 	gittest.WriteCommit(t, cfg, sourceRepoPath, gittest.WithBranch("feature"))
 
-	setupPushRepo := func(tb testing.TB) (*Repo, string, []git.ConfigPair) {
+	setupPushRepo := func(tb testing.TB) (*Repo, string, []gitcmd.ConfigPair) {
 		repoProto, repopath := gittest.CreateRepository(tb, ctx, cfg, gittest.CreateRepositoryConfig{
 			SkipCreationViaService: true,
 		})
 		return New(logger, locator, gitCmdFactory, catfileCache, repoProto), repopath, nil
 	}
 
-	setupDivergedRepo := func(tb testing.TB) (*Repo, string, []git.ConfigPair) {
+	setupDivergedRepo := func(tb testing.TB) (*Repo, string, []gitcmd.ConfigPair) {
 		repoProto, repoPath := gittest.CreateRepository(tb, ctx, cfg, gittest.CreateRepositoryConfig{
 			SkipCreationViaService: true,
 		})
@@ -349,8 +350,8 @@ func TestRepo_Push(t *testing.T) {
 
 	for _, tc := range []struct {
 		desc           string
-		setupPushRepo  func(testing.TB) (*Repo, string, []git.ConfigPair)
-		config         []git.ConfigPair
+		setupPushRepo  func(testing.TB) (*Repo, string, []gitcmd.ConfigPair)
+		config         []gitcmd.ConfigPair
 		sshCommand     string
 		force          bool
 		refspecs       []string
@@ -400,7 +401,7 @@ func TestRepo_Push(t *testing.T) {
 		},
 		{
 			desc: "invalid remote",
-			setupPushRepo: func(tb testing.TB) (*Repo, string, []git.ConfigPair) {
+			setupPushRepo: func(tb testing.TB) (*Repo, string, []gitcmd.ConfigPair) {
 				repoProto, _ := gittest.CreateRepository(tb, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
 				})
@@ -420,11 +421,11 @@ func TestRepo_Push(t *testing.T) {
 		},
 		{
 			desc: "in-memory remote",
-			setupPushRepo: func(tb testing.TB) (*Repo, string, []git.ConfigPair) {
+			setupPushRepo: func(tb testing.TB) (*Repo, string, []gitcmd.ConfigPair) {
 				repoProto, repoPath := gittest.CreateRepository(tb, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
 				})
-				return New(logger, locator, gitCmdFactory, catfileCache, repoProto), "inmemory", []git.ConfigPair{
+				return New(logger, locator, gitCmdFactory, catfileCache, repoProto), "inmemory", []gitcmd.ConfigPair{
 					{Key: "remote.inmemory.url", Value: repoPath},
 				}
 			},

@@ -68,10 +68,10 @@ func TestVersion_LessThan(t *testing.T) {
 		{"1.1.1.gl1", "1.1.2"},
 	} {
 		t.Run(fmt.Sprintf("%s < %s", tc.smaller, tc.larger), func(t *testing.T) {
-			smaller, err := parseVersion(tc.smaller)
+			smaller, err := ParseVersion(tc.smaller)
 			require.NoError(t, err)
 
-			larger, err := parseVersion(tc.larger)
+			larger, err := ParseVersion(tc.larger)
 			require.NoError(t, err)
 
 			if tc.smaller == tc.larger {
@@ -85,10 +85,10 @@ func TestVersion_LessThan(t *testing.T) {
 	}
 
 	t.Run("1.1.GIT == 1.1.0", func(t *testing.T) {
-		first, err := parseVersion("1.1.GIT")
+		first, err := ParseVersion("1.1.GIT")
 		require.NoError(t, err)
 
-		second, err := parseVersion("1.1.0")
+		second, err := ParseVersion("1.1.0")
 		require.NoError(t, err)
 
 		// This is a special case: "GIT" is treated the same as "0".
@@ -158,10 +158,10 @@ func TestVersion_GreaterOrEqual(t *testing.T) {
 		{"1.1.1.gl1", "1.1.2"},
 	} {
 		t.Run(fmt.Sprintf("%s >= %s", tc.larger, tc.smaller), func(t *testing.T) {
-			smaller, err := parseVersion(tc.smaller)
+			smaller, err := ParseVersion(tc.smaller)
 			require.NoError(t, err)
 
-			larger, err := parseVersion(tc.larger)
+			larger, err := ParseVersion(tc.larger)
 			require.NoError(t, err)
 
 			if tc.smaller == tc.larger {
@@ -175,10 +175,10 @@ func TestVersion_GreaterOrEqual(t *testing.T) {
 	}
 
 	t.Run("1.1.GIT == 1.1.0", func(t *testing.T) {
-		first, err := parseVersion("1.1.GIT")
+		first, err := ParseVersion("1.1.GIT")
 		require.NoError(t, err)
 
-		second, err := parseVersion("1.1.0")
+		second, err := ParseVersion("1.1.0")
 		require.NoError(t, err)
 
 		// This is a special case: "GIT" is treated the same as "0".
@@ -205,7 +205,7 @@ func TestVersion_IsSupported(t *testing.T) {
 		{"3.0.0.gl5", true},
 	} {
 		t.Run(tc.version, func(t *testing.T) {
-			version, err := parseVersion(tc.version)
+			version, err := ParseVersion(tc.version)
 			require.NoError(t, err)
 			require.Equal(t, tc.expect, version.IsSupported())
 		})

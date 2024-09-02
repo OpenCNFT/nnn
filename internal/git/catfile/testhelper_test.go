@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -25,21 +26,21 @@ func TestMain(m *testing.M) {
 
 type repoExecutor struct {
 	storage.Repository
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 }
 
-func newRepoExecutor(t *testing.T, cfg config.Cfg, repo storage.Repository) git.RepositoryExecutor {
+func newRepoExecutor(t *testing.T, cfg config.Cfg, repo storage.Repository) gitcmd.RepositoryExecutor {
 	return &repoExecutor{
 		Repository:    repo,
 		gitCmdFactory: gittest.NewCommandFactory(t, cfg),
 	}
 }
 
-func (e *repoExecutor) Exec(ctx context.Context, cmd git.Command, opts ...git.CmdOpt) (*command.Command, error) {
+func (e *repoExecutor) Exec(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
 	return e.gitCmdFactory.New(ctx, e.Repository, cmd, opts...)
 }
 
-func (e *repoExecutor) ExecAndWait(ctx context.Context, cmd git.Command, opts ...git.CmdOpt) error {
+func (e *repoExecutor) ExecAndWait(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) error {
 	command, err := e.Exec(ctx, cmd, opts...)
 	if err != nil {
 		return err

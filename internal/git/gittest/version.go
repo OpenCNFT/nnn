@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -14,7 +15,7 @@ import (
 // SkipIfGitVersionLessThan skips the test if the Git version in use is less than
 // expected. The reason is printed out when skipping the test
 func SkipIfGitVersionLessThan(tb testing.TB, ctx context.Context, cfg config.Cfg, expected git.Version, reason string) {
-	cmdFactory, clean, err := git.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
+	cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
 	require.NoError(tb, err)
 	defer clean()
 
@@ -28,7 +29,7 @@ func SkipIfGitVersionLessThan(tb testing.TB, ctx context.Context, cfg config.Cfg
 
 // SkipIfGitVersion skips the test if the Git version is the same.
 func SkipIfGitVersion(tb testing.TB, ctx context.Context, cfg config.Cfg, expected git.Version, reason string) {
-	cmdFactory, clean, err := git.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
+	cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
 	require.NoError(tb, err)
 	defer clean()
 
@@ -43,7 +44,7 @@ func SkipIfGitVersion(tb testing.TB, ctx context.Context, cfg config.Cfg, expect
 // IfSymrefUpdateSupported returns the appropriate value based on if symref updates are
 // supported or not in the current git version.
 func IfSymrefUpdateSupported[T any](tb testing.TB, ctx context.Context, cfg config.Cfg, yes, no T) T {
-	cmdFactory, clean, err := git.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
+	cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
 	require.NoError(tb, err)
 	defer clean()
 

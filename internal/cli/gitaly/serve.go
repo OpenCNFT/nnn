@@ -18,8 +18,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cache"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -242,7 +242,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	logger.WithField("duration_ms", time.Since(began).Milliseconds()).Info("finished initializing bootstrap")
 
 	began = time.Now()
-	gitCmdFactory, cleanup, err := git.NewExecCommandFactory(cfg, logger)
+	gitCmdFactory, cleanup, err := gitcmd.NewExecCommandFactory(cfg, logger)
 	if err != nil {
 		return fmt.Errorf("creating Git command factory: %w", err)
 	}

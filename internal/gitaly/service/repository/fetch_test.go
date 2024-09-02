@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -433,7 +434,7 @@ func TestFetchSourceBranch(t *testing.T) {
 				// with status 1, this will actually fetch the refs but gitaly will think
 				// git failed. We match against a config value that is only present during
 				// a fetch.
-				gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+				gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 					return fmt.Sprintf(`#!/usr/bin/env bash
 						if [[ "$@" =~ "fetch.writeCommitGraph" ]]; then
 							%q "$@"

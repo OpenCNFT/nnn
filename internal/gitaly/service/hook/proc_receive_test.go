@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	gitalyhook "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -33,13 +34,13 @@ func TestProcReceiveHook(t *testing.T) {
 		transactionID storage.TransactionID,
 		steps []func(bytes.Buffer) *gitalypb.ProcReceiveHookResponse,
 	) {
-		hooksPayload, err := git.NewHooksPayload(
+		hooksPayload, err := gitcmd.NewHooksPayload(
 			cfg,
 			repo,
 			gittest.DefaultObjectHash,
 			nil,
 			nil,
-			git.ProcReceiveHook,
+			gitcmd.ProcReceiveHook,
 			featureflag.FromContext(ctx),
 			transactionID,
 		).Env()

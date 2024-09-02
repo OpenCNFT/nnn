@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -161,7 +161,7 @@ func isValidHook(path string) bool {
 	return true
 }
 
-func (m *GitLabHookManager) customHooksEnv(ctx context.Context, payload git.HooksPayload, pushOptions []string, envs []string) ([]string, error) {
+func (m *GitLabHookManager) customHooksEnv(ctx context.Context, payload gitcmd.HooksPayload, pushOptions []string, envs []string) ([]string, error) {
 	repoPath, err := m.locator.GetRepoPath(ctx, payload.Repo, storage.WithRepositoryVerificationSkipped())
 	if err != nil {
 		return nil, err

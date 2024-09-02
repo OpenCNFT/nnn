@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -115,26 +116,26 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 
 	var stdout, stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "am",
-			Flags: []git.Option{
-				git.Flag{Name: "--quiet"},
-				git.Flag{Name: "--3way"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--3way"},
 			},
 		},
-		git.WithEnv(
+		gitcmd.WithEnv(
 			"GIT_COMMITTER_NAME="+committerSignature.Name,
 			"GIT_COMMITTER_EMAIL="+committerSignature.Email,
 			"GIT_COMMITTER_DATE="+git.FormatTime(committerSignature.When),
 		),
-		git.WithStdin(streamio.NewReader(func() ([]byte, error) {
+		gitcmd.WithStdin(streamio.NewReader(func() ([]byte, error) {
 			req, err := stream.Recv()
 			return req.GetPatches(), err
 		})),
-		git.WithStdout(&stdout),
-		git.WithStderr(&stderr),
-		git.WithRefTxHook(header.Repository),
-		git.WithWorktree(worktreePath),
+		gitcmd.WithStdout(&stdout),
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithRefTxHook(header.Repository),
+		gitcmd.WithWorktree(worktreePath),
 	); err != nil {
 		// The Ruby implementation doesn't include stderr in errors, which makes
 		// it difficult to determine the cause of an error. This special cases the
@@ -150,17 +151,17 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 
 	var revParseStdout, revParseStderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "rev-parse",
-			Flags: []git.Option{
-				git.Flag{Name: "--quiet"},
-				git.Flag{Name: "--verify"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--quiet"},
+				gitcmd.Flag{Name: "--verify"},
 			},
 			Args: []string{"HEAD^{commit}"},
 		},
-		git.WithStdout(&revParseStdout),
-		git.WithStderr(&revParseStderr),
-		git.WithWorktree(worktreePath),
+		gitcmd.WithStdout(&revParseStdout),
+		gitcmd.WithStderr(&revParseStderr),
+		gitcmd.WithWorktree(worktreePath),
 	); err != nil {
 		return fmt.Errorf("get patched commit: %w", gitError{ErrMsg: revParseStderr.String(), Err: err})
 	}
@@ -230,20 +231,20 @@ func validateUserApplyPatchHeader(ctx context.Context, locator storage.Locator, 
 
 func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktreePath string, committish string) error {
 	args := []string{worktreePath}
-	flags := []git.Option{git.Flag{Name: "--detach"}}
+	flags := []gitcmd.Option{gitcmd.Flag{Name: "--detach"}}
 	if committish != "" {
 		args = append(args, committish)
 	} else {
-		flags = append(flags, git.Flag{Name: "--no-checkout"})
+		flags = append(flags, gitcmd.Flag{Name: "--no-checkout"})
 	}
 
 	var stderr bytes.Buffer
-	if err := repo.ExecAndWait(ctx, git.Command{
+	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "add",
 		Flags:  flags,
 		Args:   args,
-	}, git.WithStderr(&stderr), git.WithRefTxHook(repo)); err != nil {
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(repo)); err != nil {
 		return fmt.Errorf("adding worktree: %w", gitError{ErrMsg: stderr.String(), Err: err})
 	}
 
@@ -252,13 +253,13 @@ func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktree
 
 func (s *Server) removeWorktree(ctx context.Context, repo *gitalypb.Repository, worktreeName string) error {
 	cmd, err := s.gitCmdFactory.New(ctx, repo,
-		git.Command{
+		gitcmd.Command{
 			Name:   "worktree",
 			Action: "remove",
-			Flags:  []git.Option{git.Flag{Name: "--force"}},
+			Flags:  []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 			Args:   []string{worktreeName},
 		},
-		git.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(repo),
 	)
 	if err != nil {
 		return fmt.Errorf("creation of 'worktree remove': %w", err)

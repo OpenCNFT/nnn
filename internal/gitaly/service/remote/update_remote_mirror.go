@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
@@ -72,11 +73,11 @@ func (s *server) updateRemoteMirror(stream gitalypb.RemoteService_UpdateRemoteMi
 	}
 	remoteName := "inmemory-" + remoteSuffix
 
-	var remoteConfig []git.ConfigPair
+	var remoteConfig []gitcmd.ConfigPair
 	remoteURL := remote.GetUrl()
 
 	if resolvedAddress := remote.GetResolvedAddress(); resolvedAddress != "" {
-		modifiedURL, resolveConfig, err := git.GetURLAndResolveConfig(remoteURL, resolvedAddress)
+		modifiedURL, resolveConfig, err := gitcmd.GetURLAndResolveConfig(remoteURL, resolvedAddress)
 		if err != nil {
 			return fmt.Errorf("couldn't get curloptResolve config: %w", err)
 		}
@@ -85,18 +86,18 @@ func (s *server) updateRemoteMirror(stream gitalypb.RemoteService_UpdateRemoteMi
 		remoteConfig = append(remoteConfig, resolveConfig...)
 	}
 
-	remoteConfig = append(remoteConfig, git.ConfigPair{
+	remoteConfig = append(remoteConfig, gitcmd.ConfigPair{
 		Key: fmt.Sprintf("remote.%s.url", remoteName), Value: remoteURL,
 	})
 
 	if authHeader := remote.GetHttpAuthorizationHeader(); authHeader != "" {
-		remoteConfig = append(remoteConfig, git.ConfigPair{
+		remoteConfig = append(remoteConfig, gitcmd.ConfigPair{
 			Key:   fmt.Sprintf("http.%s.extraHeader", remote.GetUrl()),
 			Value: "Authorization: " + authHeader,
 		})
 	}
 
-	sshCommand, clean, err := git.BuildSSHInvocation(ctx, s.logger, firstRequest.GetSshKey(), firstRequest.GetKnownHosts())
+	sshCommand, clean, err := gitcmd.BuildSSHInvocation(ctx, s.logger, firstRequest.GetSshKey(), firstRequest.GetKnownHosts())
 	if err != nil {
 		return fmt.Errorf("build ssh invocation: %w", err)
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"gitlab.com/gitlab-org/gitaly/v16"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -77,7 +77,7 @@ func checkAPI(cfg config.Cfg, logger log.Logger) (*gitlab.CheckInfo, error) {
 		return nil, err
 	}
 
-	gitCmdFactory, cleanup, err := git.NewExecCommandFactory(cfg, logger)
+	gitCmdFactory, cleanup, err := gitcmd.NewExecCommandFactory(cfg, logger)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/receivepack"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -91,7 +91,7 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 		return err
 	}
 
-	config, err := git.ConvertConfigOptions(req.GitConfigOptions)
+	config, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
 	if err != nil {
 		return err
 	}
@@ -137,16 +137,16 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 	}
 
 	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(),
-		git.Command{
+		gitcmd.Command{
 			Name: "receive-pack",
 			Args: []string{repoPath},
 		},
-		git.WithStdin(pr),
-		git.WithStdout(stdout),
-		git.WithStderr(stderr),
-		git.WithReceivePackHooks(req, "ssh", transactionsEnabled),
-		git.WithGitProtocol(s.logger, req),
-		git.WithConfig(config...),
+		gitcmd.WithStdin(pr),
+		gitcmd.WithStdout(stdout),
+		gitcmd.WithStderr(stderr),
+		gitcmd.WithReceivePackHooks(req, "ssh", transactionsEnabled),
+		gitcmd.WithGitProtocol(s.logger, req),
+		gitcmd.WithConfig(config...),
 	)
 	if err != nil {
 		return fmt.Errorf("start cmd: %w", err)

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
@@ -48,15 +49,15 @@ const (
 )
 
 type errorInjectingCommandFactory struct {
-	git.CommandFactory
+	gitcmd.CommandFactory
 	injectedErrors map[string]error
 }
 
 func (f errorInjectingCommandFactory) New(
 	ctx context.Context,
 	repo storage.Repository,
-	cmd git.Command,
-	opts ...git.CmdOpt,
+	cmd gitcmd.Command,
+	opts ...gitcmd.CmdOpt,
 ) (*command.Command, error) {
 	if injectedErr, ok := f.injectedErrors[cmd.Name]; ok {
 		return nil, injectedErr
@@ -66,15 +67,15 @@ func (f errorInjectingCommandFactory) New(
 }
 
 type blockingCommandFactory struct {
-	git.CommandFactory
+	gitcmd.CommandFactory
 	block map[string]chan struct{}
 }
 
 func (f *blockingCommandFactory) New(
 	ctx context.Context,
 	repo storage.Repository,
-	cmd git.Command,
-	opts ...git.CmdOpt,
+	cmd gitcmd.Command,
+	opts ...gitcmd.CmdOpt,
 ) (*command.Command, error) {
 	if ch, ok := f.block[cmd.Name]; ok {
 		ch <- struct{}{}

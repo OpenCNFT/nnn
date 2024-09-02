@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 )
 
 // ObjectReader returns information about an object referenced by a given revision.
@@ -80,14 +81,14 @@ func WithoutMailmap() ObjectReaderOption {
 
 func newObjectReader(
 	ctx context.Context,
-	repo git.RepositoryExecutor,
+	repo gitcmd.RepositoryExecutor,
 	counter *prometheus.CounterVec,
 	opts ...ObjectReaderOption,
 ) (*objectReader, error) {
-	flags := []git.Option{
-		git.Flag{Name: "-Z"},
-		git.Flag{Name: "--batch-command"},
-		git.Flag{Name: "--buffer"},
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "-Z"},
+		gitcmd.Flag{Name: "--batch-command"},
+		gitcmd.Flag{Name: "--buffer"},
 	}
 
 	var cfg objectReaderConfig
@@ -96,16 +97,16 @@ func newObjectReader(
 	}
 
 	if featureflag.MailmapOptions.IsEnabled(ctx) && !cfg.disableMailmap {
-		flags = append([]git.Option{git.Flag{Name: "--use-mailmap"}}, flags...)
+		flags = append([]gitcmd.Option{gitcmd.Flag{Name: "--use-mailmap"}}, flags...)
 	}
 
 	batchCmd, err := repo.Exec(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name:  "cat-file",
 			Flags: flags,
 		},
-		git.WithSetupStdin(),
-		git.WithSetupStdout(),
+		gitcmd.WithSetupStdin(),
+		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {
 		return nil, err

@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 	testhelper.Run(m)
 }
 
-func getExpectedEnv(tb testing.TB, ctx context.Context, locator storage.Locator, gitCmdFactory git.CommandFactory, repo *gitalypb.Repository) []string {
+func getExpectedEnv(tb testing.TB, ctx context.Context, locator storage.Locator, gitCmdFactory gitcmd.CommandFactory, repo *gitalypb.Repository) []string {
 	repoPath, err := locator.GetRepoPath(ctx, repo, storage.WithRepositoryVerificationSkipped())
 	require.NoError(tb, err)
 

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -62,7 +62,7 @@ func getRelativeObjectDirs(repoPath, gitObjectDir, gitAlternateObjectDirs string
 // If successful, it will execute custom hooks with the given parameters, push
 // options and environment.
 func (m *GitLabHookManager) PreReceiveHook(ctx context.Context, repo *gitalypb.Repository, pushOptions, env []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	payload, err := git.HooksPayloadFromEnv(env)
+	payload, err := gitcmd.HooksPayloadFromEnv(env)
 	if err != nil {
 		return structerr.NewInternal("extracting hooks payload: %w", err)
 	}
@@ -94,7 +94,7 @@ func (m *GitLabHookManager) PreReceiveHook(ctx context.Context, repo *gitalypb.R
 	return nil
 }
 
-func (m *GitLabHookManager) preReceiveHook(ctx context.Context, payload git.HooksPayload, repo *gitalypb.Repository, pushOptions, envs []string, changes []byte, stdout, stderr io.Writer) error {
+func (m *GitLabHookManager) preReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, repo *gitalypb.Repository, pushOptions, envs []string, changes []byte, stdout, stderr io.Writer) error {
 	repoPath, err := m.locator.GetRepoPath(ctx, repo)
 	if err != nil {
 		return structerr.NewInternal("getting repo path: %w", err)

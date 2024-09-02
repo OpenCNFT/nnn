@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -23,9 +23,9 @@ func (s *server) FindAllBranches(in *gitalypb.FindAllBranchesRequest, stream git
 func (s *server) findAllBranches(in *gitalypb.FindAllBranchesRequest, stream gitalypb.RefService_FindAllBranchesServer) error {
 	repo := s.localrepo(in.GetRepository())
 
-	args := []git.Option{
+	args := []gitcmd.Option{
 		// %00 inserts the null character into the output (see for-each-ref docs)
-		git.Flag{Name: "--format=" + strings.Join(localBranchFormatFields, "%00")},
+		gitcmd.Flag{Name: "--format=" + strings.Join(localBranchFormatFields, "%00")},
 	}
 
 	patterns := []string{"refs/heads", "refs/remotes"}
@@ -36,7 +36,7 @@ func (s *server) findAllBranches(in *gitalypb.FindAllBranchesRequest, stream git
 			return fmt.Errorf("default branch name: %w", err)
 		}
 
-		args = append(args, git.Flag{Name: fmt.Sprintf("--merged=%s", defaultBranch.String())})
+		args = append(args, gitcmd.Flag{Name: fmt.Sprintf("--merged=%s", defaultBranch.String())})
 
 		if len(in.MergedBranches) > 0 {
 			patterns = nil

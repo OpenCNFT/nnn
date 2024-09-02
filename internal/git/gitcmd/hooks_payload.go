@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"encoding/base64"
@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/txinfo"
@@ -123,7 +124,7 @@ type jsonHooksPayload struct {
 func NewHooksPayload(
 	cfg config.Cfg,
 	repo *gitalypb.Repository,
-	objectHash ObjectHash,
+	objectHash git.ObjectHash,
 	tx *txinfo.Transaction,
 	userDetails *UserDetails,
 	requestedHooks Hook,

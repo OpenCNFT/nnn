@@ -3,7 +3,7 @@ package diff
 import (
 	"fmt"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/diff"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -35,26 +35,26 @@ func (s *server) CommitDiff(in *gitalypb.CommitDiffRequest, stream gitalypb.Diff
 		return fmt.Errorf("detecting object format: %w", err)
 	}
 
-	cmd := git.Command{
+	cmd := gitcmd.Command{
 		Name: "diff",
-		Flags: []git.Option{
-			git.Flag{Name: "--patch"},
-			git.Flag{Name: "--raw"},
-			git.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())},
-			git.Flag{Name: "--full-index"},
-			git.Flag{Name: "--find-renames=30%"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--patch"},
+			gitcmd.Flag{Name: "--raw"},
+			gitcmd.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())},
+			gitcmd.Flag{Name: "--full-index"},
+			gitcmd.Flag{Name: "--find-renames=30%"},
 		},
 		Args: []string{leftSha, rightSha},
 	}
 
 	if whitespaceChanges == gitalypb.CommitDiffRequest_WHITESPACE_CHANGES_IGNORE_ALL {
-		cmd.Flags = append(cmd.Flags, git.Flag{Name: "--ignore-all-space"})
+		cmd.Flags = append(cmd.Flags, gitcmd.Flag{Name: "--ignore-all-space"})
 	} else if whitespaceChanges == gitalypb.CommitDiffRequest_WHITESPACE_CHANGES_IGNORE {
-		cmd.Flags = append(cmd.Flags, git.Flag{Name: "--ignore-space-change"})
+		cmd.Flags = append(cmd.Flags, gitcmd.Flag{Name: "--ignore-space-change"})
 	}
 
 	if in.GetDiffMode() == gitalypb.CommitDiffRequest_WORDDIFF {
-		cmd.Flags = append(cmd.Flags, git.Flag{Name: "--word-diff=porcelain"})
+		cmd.Flags = append(cmd.Flags, gitcmd.Flag{Name: "--word-diff=porcelain"})
 	}
 	if len(paths) > 0 {
 		for _, path := range paths {

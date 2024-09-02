@@ -7,7 +7,7 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus/ctxlogrus"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -27,13 +27,13 @@ func (s *server) RawRangeDiff(in *gitalypb.RawRangeDiffRequest, stream gitalypb.
 	ctx := stream.Context()
 	repo := s.localrepo(in.GetRepository())
 
-	var flags []git.Option
+	var flags []gitcmd.Option
 	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
 		return structerr.NewInternal("detecting object hash: %w", err)
 	}
 
-	flags = append(flags, git.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())})
+	flags = append(flags, gitcmd.Flag{Name: fmt.Sprintf("--abbrev=%d", objectHash.EncodedLen())})
 
 	var revisions []string
 
@@ -46,7 +46,7 @@ func (s *server) RawRangeDiff(in *gitalypb.RawRangeDiffRequest, stream gitalypb.
 		revisions = append(revisions, in.GetBaseWithRevisions().GetBase(), in.GetBaseWithRevisions().GetRev1(), in.GetBaseWithRevisions().GetRev2())
 	}
 
-	subCmd := git.Command{
+	subCmd := gitcmd.Command{
 		Name:  "range-diff",
 		Flags: flags,
 		Args:  revisions,
@@ -93,8 +93,8 @@ func validateRawRangeDiffRequest(ctx context.Context, locator storage.Locator, i
 	return nil
 }
 
-func sendRawRangeDiffOutput(ctx context.Context, repo *localrepo.Repo, sender io.Writer, subCmd git.Command) error {
-	cmd, err := repo.Exec(ctx, subCmd, git.WithSetupStdout())
+func sendRawRangeDiffOutput(ctx context.Context, repo *localrepo.Repo, sender io.Writer, subCmd gitcmd.Command) error {
+	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}

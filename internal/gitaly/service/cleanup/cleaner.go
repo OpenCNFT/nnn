@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
@@ -29,7 +30,7 @@ type cleaner struct {
 	// Map of SHA -> reference names
 	table       map[string][]git.ReferenceName
 	removedRefs map[git.ReferenceName]struct{}
-	repo        git.RepositoryExecutor
+	repo        gitcmd.RepositoryExecutor
 }
 
 // errInvalidObjectMap is returned with descriptive text if the supplied object
@@ -38,7 +39,7 @@ type errInvalidObjectMap error
 
 // newCleaner builds a new instance of Cleaner, which is used to apply a
 // filter-repo or BFG object map to a repository.
-func newCleaner(ctx context.Context, logger log.Logger, repo git.RepositoryExecutor, forEach forEachFunc) (*cleaner, error) {
+func newCleaner(ctx context.Context, logger log.Logger, repo gitcmd.RepositoryExecutor, forEach forEachFunc) (*cleaner, error) {
 	table, err := buildLookupTable(ctx, logger, repo)
 	if err != nil {
 		return nil, err
@@ -150,7 +151,7 @@ func (c *cleaner) processEntry(ctx context.Context, updater *updateref.Updater, 
 // an object that has been rewritten by the filter-repo or BFG (and so require
 // action). It is consulted once per line in the object map. Git is optimized
 // for ref -> SHA lookups, but we want the opposite!
-func buildLookupTable(ctx context.Context, logger log.Logger, repo git.RepositoryExecutor) (map[string][]git.ReferenceName, error) {
+func buildLookupTable(ctx context.Context, logger log.Logger, repo gitcmd.RepositoryExecutor) (map[string][]git.ReferenceName, error) {
 	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("detecting object hash: %w", err)
@@ -161,11 +162,11 @@ func buildLookupTable(ctx context.Context, logger log.Logger, repo git.Repositor
 		internalRefPrefixes = append(internalRefPrefixes, refPrefix)
 	}
 
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "for-each-ref",
-		Flags: []git.Option{git.ValueFlag{Name: "--format", Value: "%(objectname) %(parent) %(refname)"}},
+		Flags: []gitcmd.Option{gitcmd.ValueFlag{Name: "--format", Value: "%(objectname) %(parent) %(refname)"}},
 		Args:  internalRefPrefixes,
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, err
 	}

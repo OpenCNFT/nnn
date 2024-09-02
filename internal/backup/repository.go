@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
@@ -449,7 +450,7 @@ func (rr *remoteRepository) newRefClient() gitalypb.RefServiceClient {
 type localRepository struct {
 	logger        log.Logger
 	locator       storage.Locator
-	gitCmdFactory git.CommandFactory
+	gitCmdFactory gitcmd.CommandFactory
 	txManager     transaction.Manager
 	repoCounter   *counter.RepositoryCounter
 	repo          *localrepo.Repo
@@ -460,7 +461,7 @@ type localRepository struct {
 func NewLocalRepository(
 	logger log.Logger,
 	locator storage.Locator,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	txManager transaction.Manager,
 	repoCounter *counter.RepositoryCounter,
 	repo *localrepo.Repo,

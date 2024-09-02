@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
@@ -230,12 +230,12 @@ func removeAlternatesIfOk(ctx context.Context, repo *localrepo.Repo, altFile, ba
 	// The choice here of git rev-list is for performance reasons.
 	// git fsck --connectivity-only performed badly for large
 	// repositories. The reasons are detailed in https://lore.kernel.org/git/9304B938-4A59-456B-B091-DBBCAA1823B2@gmail.com/
-	cmd, err := repo.Exec(ctx, git.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "rev-list",
-		Flags: []git.Option{
-			git.Flag{Name: "--objects"},
-			git.Flag{Name: "--all"},
-			git.Flag{Name: "--quiet"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--objects"},
+			gitcmd.Flag{Name: "--all"},
+			gitcmd.Flag{Name: "--quiet"},
 		},
 	})
 	if err != nil {

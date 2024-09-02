@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/receivepack"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -81,7 +81,7 @@ func (s *server) postReceivePack(
 		return err
 	}
 
-	config, err := git.ConvertConfigOptions(req.GitConfigOptions)
+	config, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
 	if err != nil {
 		return err
 	}
@@ -104,16 +104,16 @@ func (s *server) postReceivePack(
 	}
 
 	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(),
-		git.Command{
+		gitcmd.Command{
 			Name:  "receive-pack",
-			Flags: []git.Option{git.Flag{Name: "--stateless-rpc"}},
+			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},
 			Args:  []string{repoPath},
 		},
-		git.WithStdin(stdin),
-		git.WithStdout(stdout),
-		git.WithReceivePackHooks(req, "http", transactionsEnabled),
-		git.WithGitProtocol(s.logger, req),
-		git.WithConfig(config...),
+		gitcmd.WithStdin(stdin),
+		gitcmd.WithStdout(stdout),
+		gitcmd.WithReceivePackHooks(req, "http", transactionsEnabled),
+		gitcmd.WithGitProtocol(s.logger, req),
+		gitcmd.WithConfig(config...),
 	)
 	if err != nil {
 		return structerr.NewFailedPrecondition("spawning receive-pack: %w", err)

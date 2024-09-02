@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -33,10 +33,10 @@ func (s *server) findLocalBranches(in *gitalypb.FindLocalBranchesRequest, stream
 
 	writer := newFindLocalBranchesWriter(stream, objectReader)
 	opts := buildFindRefsOpts(ctx, in.GetPaginationParams())
-	opts.cmdArgs = []git.Option{
+	opts.cmdArgs = []gitcmd.Option{
 		// %00 inserts the null character into the output (see for-each-ref docs)
-		git.Flag{Name: "--format=" + strings.Join(localBranchFormatFields, "%00")},
-		git.Flag{Name: "--sort=" + parseSortKey(in.GetSortBy())},
+		gitcmd.Flag{Name: "--format=" + strings.Join(localBranchFormatFields, "%00")},
+		gitcmd.Flag{Name: "--sort=" + parseSortKey(in.GetSortBy())},
 	}
 
 	if err := s.findRefs(ctx, writer, repo, []string{"refs/heads"}, opts); err != nil {

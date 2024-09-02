@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -14,7 +15,7 @@ func TestInterceptingCommandFactory(t *testing.T) {
 	cfg, repoProto, repoPath := setup(t)
 	ctx := testhelper.Context(t)
 
-	factory := NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+	factory := NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 		return fmt.Sprintf(
 			`#!/usr/bin/env bash
 			%q rev-parse --sq-quote 'Hello, world!'
@@ -24,10 +25,10 @@ func TestInterceptingCommandFactory(t *testing.T) {
 
 	t.Run("New", func(t *testing.T) {
 		var stdout bytes.Buffer
-		cmd, err := factory.New(ctx, repoProto, git.Command{
+		cmd, err := factory.New(ctx, repoProto, gitcmd.Command{
 			Name: "rev-parse",
 			Args: []string{"something"},
-		}, git.WithStdout(&stdout))
+		}, gitcmd.WithStdout(&stdout))
 		require.NoError(t, err)
 		require.NoError(t, cmd.Wait())
 		require.Equal(t, expectedString, stdout.String())
@@ -35,13 +36,13 @@ func TestInterceptingCommandFactory(t *testing.T) {
 
 	t.Run("NewWithoutRepo", func(t *testing.T) {
 		var stdout bytes.Buffer
-		cmd, err := factory.NewWithoutRepo(ctx, git.Command{
+		cmd, err := factory.NewWithoutRepo(ctx, gitcmd.Command{
 			Name: "rev-parse",
 			Args: []string{"something"},
-			Flags: []git.Option{
-				git.ValueFlag{Name: "-C", Value: repoPath},
+			Flags: []gitcmd.Option{
+				gitcmd.ValueFlag{Name: "-C", Value: repoPath},
 			},
-		}, git.WithStdout(&stdout))
+		}, gitcmd.WithStdout(&stdout))
 		require.NoError(t, err)
 		require.NoError(t, cmd.Wait())
 		require.Equal(t, expectedString, stdout.String())
@@ -52,7 +53,7 @@ func TestInterceptingCommandFactory_GitVersion(t *testing.T) {
 	cfg, _, _ := setup(t)
 	ctx := testhelper.Context(t)
 
-	generateVersionScript := func(execEnv git.ExecutionEnvironment) string {
+	generateVersionScript := func(execEnv gitcmd.ExecutionEnvironment) string {
 		return `#!/usr/bin/env bash
 			echo "git version 1.2.3"
 		`

@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trailerparser"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -27,7 +28,7 @@ func GetCommit(ctx context.Context, objectReader ObjectContentReader, revision g
 // includes Git trailers in the returned commit.
 func GetCommitWithTrailers(
 	ctx context.Context,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	repo storage.Repository,
 	objectReader ObjectContentReader,
 	revision git.Revision,
@@ -39,14 +40,14 @@ func GetCommitWithTrailers(
 
 	// We use the commit ID here instead of revision. This way we still get
 	// trailers if the revision is not a SHA but e.g. a tag name.
-	showCmd, err := gitCmdFactory.New(ctx, repo, git.Command{
+	showCmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
 		Name: "show",
 		Args: []string{commit.Id},
-		Flags: []git.Option{
-			git.Flag{Name: "--format=%(trailers:unfold,separator=%x00)"},
-			git.Flag{Name: "--no-patch"},
+		Flags: []gitcmd.Option{
+			gitcmd.Flag{Name: "--format=%(trailers:unfold,separator=%x00)"},
+			gitcmd.Flag{Name: "--no-patch"},
 		},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return nil, fmt.Errorf("error when creating git show command: %w", err)
 	}

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/linguist"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -89,7 +90,7 @@ func (ls languageSorter) Len() int           { return len(ls) }
 func (ls languageSorter) Swap(i, j int)      { ls[i], ls[j] = ls[j], ls[i] }
 func (ls languageSorter) Less(i, j int) bool { return ls[i].Share > ls[j].Share }
 
-func (s *server) lookupRevision(ctx context.Context, repo git.RepositoryExecutor, revision string) (string, error) {
+func (s *server) lookupRevision(ctx context.Context, repo gitcmd.RepositoryExecutor, revision string) (string, error) {
 	rev, err := s.checkRevision(ctx, repo, revision)
 	if err != nil {
 		if errors.Is(err, errAmbigRef) {
@@ -110,13 +111,13 @@ func (s *server) lookupRevision(ctx context.Context, repo git.RepositoryExecutor
 	return rev, nil
 }
 
-func (s *server) checkRevision(ctx context.Context, repo git.RepositoryExecutor, revision string) (string, error) {
+func (s *server) checkRevision(ctx context.Context, repo gitcmd.RepositoryExecutor, revision string) (string, error) {
 	var stdout, stderr bytes.Buffer
 
 	revParse, err := repo.Exec(ctx,
-		git.Command{Name: "rev-parse", Args: []string{revision}},
-		git.WithStdout(&stdout),
-		git.WithStderr(&stderr),
+		gitcmd.Command{Name: "rev-parse", Args: []string{revision}},
+		gitcmd.WithStdout(&stdout),
+		gitcmd.WithStderr(&stderr),
 	)
 	if err != nil {
 		return "", err
@@ -134,12 +135,12 @@ func (s *server) checkRevision(ctx context.Context, repo git.RepositoryExecutor,
 	return text.ChompBytes(stdout.Bytes()), nil
 }
 
-func (s *server) disambiguateRevision(ctx context.Context, repo git.RepositoryExecutor, revision string) (string, error) {
-	cmd, err := repo.Exec(ctx, git.Command{
+func (s *server) disambiguateRevision(ctx context.Context, repo gitcmd.RepositoryExecutor, revision string) (string, error) {
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "for-each-ref",
-		Flags: []git.Option{git.Flag{Name: "--format=%(refname)"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--format=%(refname)"}},
 		Args:  []string{"**/" + revision},
-	}, git.WithSetupStdout())
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return "", err
 	}

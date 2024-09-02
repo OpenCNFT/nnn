@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -44,10 +45,10 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 		// allow us to easily set up HEAD to point to the correct ref. We thus have
 		// no easy choice but to use git-clone(1).
 		var stderr strings.Builder
-		flags := []git.Option{
-			git.Flag{Name: "--bare"},
-			git.Flag{Name: "--quiet"},
-			git.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
+		flags := []gitcmd.Option{
+			gitcmd.Flag{Name: "--bare"},
+			gitcmd.Flag{Name: "--quiet"},
+			gitcmd.Flag{Name: fmt.Sprintf("--ref-format=%s", refFormat)},
 		}
 
 		if req.GetRevision() != nil {
@@ -61,33 +62,33 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 			}
 
 			flags = append(flags,
-				git.Flag{Name: "--no-tags"},
-				git.Flag{Name: "--single-branch"},
-				git.Flag{Name: fmt.Sprintf("--branch=%s", branch)},
+				gitcmd.Flag{Name: "--no-tags"},
+				gitcmd.Flag{Name: "--single-branch"},
+				gitcmd.Flag{Name: fmt.Sprintf("--branch=%s", branch)},
 			)
 		}
 
 		cmd, err := s.gitCmdFactory.NewWithoutRepo(ctx,
-			git.Command{
+			gitcmd.Command{
 				Name:  "clone",
 				Flags: flags,
 				Args: []string{
-					git.InternalGitalyURL,
+					gitcmd.InternalGitalyURL,
 					targetPath,
 				},
 			},
-			git.WithInternalFetchWithSidechannel(&gitalypb.SSHUploadPackWithSidechannelRequest{
+			gitcmd.WithInternalFetchWithSidechannel(&gitalypb.SSHUploadPackWithSidechannelRequest{
 				Repository: sourceRepository,
 			}),
-			git.WithConfig(git.ConfigPair{
+			gitcmd.WithConfig(gitcmd.ConfigPair{
 				// Disable consistency checks for fetched objects when creating a
 				// fork. We don't want to end up in a situation where it's
 				// impossible to create forks we already have anyway because we have
 				// e.g. retroactively tightened the consistency checks.
 				Key: "fetch.fsckObjects", Value: "false",
 			}),
-			git.WithDisabledHooks(),
-			git.WithStderr(&stderr),
+			gitcmd.WithDisabledHooks(),
+			gitcmd.WithStderr(&stderr),
 		)
 		if err != nil {
 			return fmt.Errorf("spawning fetch: %w", err)
@@ -97,7 +98,7 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 			return fmt.Errorf("fetching source repo: %w, stderr: %q", err, stderr.String())
 		}
 
-		if target, err := git.GetSymbolicRef(ctx, s.localrepo(repo), "HEAD"); err != nil {
+		if target, err := gitcmd.GetSymbolicRef(ctx, s.localrepo(repo), "HEAD"); err != nil {
 			return fmt.Errorf("checking whether HEAD reference is sane: %w", err)
 		} else if req.GetRevision() != nil && target.Target != string(req.GetRevision()) {
 			return structerr.NewInternal("HEAD points to unexpected reference").WithMetadata("expected_target", string(req.GetRevision())).WithMetadata("actual_target", target)

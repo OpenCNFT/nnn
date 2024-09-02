@@ -17,7 +17,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	gitalyhook "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
@@ -213,7 +213,7 @@ func (s *server) runPackObjectsLimited(
 
 func runPackObjects(
 	ctx context.Context,
-	gitCmdFactory git.CommandFactory,
+	gitCmdFactory gitcmd.CommandFactory,
 	w io.Writer,
 	req *gitalypb.PackObjectsHookWithSidechannelRequest,
 	args *packObjectsArgs,
@@ -241,10 +241,10 @@ func runPackObjects(
 	}()
 
 	cmd, err := gitCmdFactory.New(ctx, repo, args.subcmd(),
-		git.WithStdin(stdin),
-		git.WithStdout(stdout),
-		git.WithStderr(stderr),
-		git.WithGlobalOption(args.globals()...),
+		gitcmd.WithStdin(stdin),
+		gitcmd.WithStdout(stdout),
+		gitcmd.WithStderr(stderr),
+		gitcmd.WithGlobalOption(args.globals()...),
 	)
 	if err != nil {
 		return err
@@ -320,21 +320,21 @@ type packObjectsArgs struct {
 	flags       []string
 }
 
-func (p *packObjectsArgs) globals() []git.GlobalOption {
-	var globals []git.GlobalOption
+func (p *packObjectsArgs) globals() []gitcmd.GlobalOption {
+	var globals []gitcmd.GlobalOption
 	if p.shallowFile {
-		globals = append(globals, git.ValueFlag{Name: "--shallow-file", Value: ""})
+		globals = append(globals, gitcmd.ValueFlag{Name: "--shallow-file", Value: ""})
 	}
 	return globals
 }
 
-func (p *packObjectsArgs) subcmd() git.Command {
-	sc := git.Command{
+func (p *packObjectsArgs) subcmd() gitcmd.Command {
+	sc := gitcmd.Command{
 		Name:  "pack-objects",
-		Flags: []git.Option{git.Flag{Name: "--stdout"}},
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stdout"}},
 	}
 	for _, f := range p.flags {
-		sc.Flags = append(sc.Flags, git.Flag{Name: f})
+		sc.Flags = append(sc.Flags, gitcmd.Flag{Name: f})
 	}
 	return sc
 }

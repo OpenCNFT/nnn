@@ -12,6 +12,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -62,22 +63,22 @@ func (s *server) FindChangedPaths(in *gitalypb.FindChangedPathsRequest, stream g
 		requests[i] = str
 	}
 
-	flags := []git.Option{
-		git.Flag{Name: "-z"},
-		git.Flag{Name: "--stdin"},
-		git.Flag{Name: "-r"},
-		git.Flag{Name: "--no-commit-id"},
+	flags := []gitcmd.Option{
+		gitcmd.Flag{Name: "-z"},
+		gitcmd.Flag{Name: "--stdin"},
+		gitcmd.Flag{Name: "-r"},
+		gitcmd.Flag{Name: "--no-commit-id"},
 		// By default, git-diff-tree(1) does not report changes in the root commit.
 		// By adding below flag we ask Git to behave as when comparing to an empty
 		// tree in that case.
-		git.Flag{Name: "--root"},
-		git.Flag{Name: "--diff-filter=AMDTCR"},
+		gitcmd.Flag{Name: "--root"},
+		gitcmd.Flag{Name: "--diff-filter=AMDTCR"},
 	}
 
 	if in.FindRenames {
-		flags = append(flags, git.Flag{Name: "--find-renames=30%"})
+		flags = append(flags, gitcmd.Flag{Name: "--find-renames=30%"})
 	} else {
-		flags = append(flags, git.Flag{Name: "--no-renames"})
+		flags = append(flags, gitcmd.Flag{Name: "--no-renames"})
 	}
 
 	switch in.MergeCommitDiffMode {
@@ -85,7 +86,7 @@ func (s *server) FindChangedPaths(in *gitalypb.FindChangedPathsRequest, stream g
 		// By default, git diff-tree --stdin does not show differences
 		// for merge commits. With this flag, it shows differences to
 		// that commit from all of its parents.
-		flags = append(flags, git.Flag{Name: "-m"})
+		flags = append(flags, gitcmd.Flag{Name: "-m"})
 	case gitalypb.FindChangedPathsRequest_MERGE_COMMIT_DIFF_MODE_ALL_PARENTS:
 		// This flag changes the way a merge commit is displayed (which
 		// means it is useful only when the command is given one
@@ -94,13 +95,13 @@ func (s *server) FindChangedPaths(in *gitalypb.FindChangedPathsRequest, stream g
 		// showing pairwise diff between a parent and the result one at
 		// a time (which is what the -m option does). Furthermore, it
 		// lists only files which were modified from all parents.
-		flags = append(flags, git.Flag{Name: "-c"})
+		flags = append(flags, gitcmd.Flag{Name: "-c"})
 	}
 
-	cmd, err := s.gitCmdFactory.New(stream.Context(), in.Repository, git.Command{
+	cmd, err := s.gitCmdFactory.New(stream.Context(), in.Repository, gitcmd.Command{
 		Name:  "diff-tree",
 		Flags: flags,
-	}, git.WithStdin(strings.NewReader(strings.Join(requests, "\n")+"\n")), git.WithSetupStdout())
+	}, gitcmd.WithStdin(strings.NewReader(strings.Join(requests, "\n")+"\n")), gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd err: %w", err)
 	}

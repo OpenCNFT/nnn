@@ -7,6 +7,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/quarantine"
@@ -30,7 +31,7 @@ type server struct {
 	locator             storage.Locator
 	txManager           transaction.Manager
 	walPartitionManager *storagemgr.PartitionManager
-	gitCmdFactory       git.CommandFactory
+	gitCmdFactory       gitcmd.CommandFactory
 	cfg                 config.Cfg
 	loggingCfg          config.Logging
 	catfileCache        catfile.Cache

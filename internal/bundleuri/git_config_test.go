@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -51,7 +51,7 @@ func testUploadPackGitConfig(t *testing.T, ctx context.Context) {
 	for _, tc := range []struct {
 		desc           string
 		setup          func(t *testing.T) setupData
-		expectedConfig []git.ConfigPair
+		expectedConfig []gitcmd.ConfigPair
 		expectedErr    error
 	}{
 		{
@@ -105,7 +105,7 @@ func testUploadPackGitConfig(t *testing.T, ctx context.Context) {
 					sink: sink,
 				}
 			},
-			expectedConfig: []git.ConfigPair{
+			expectedConfig: []gitcmd.ConfigPair{
 				{
 					Key:   "uploadpack.advertiseBundleURIs",
 					Value: "true",

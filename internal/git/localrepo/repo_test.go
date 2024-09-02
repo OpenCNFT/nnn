@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -22,7 +23,7 @@ import (
 func TestRepo(t *testing.T) {
 	cfg := testcfg.Build(t)
 
-	gittest.TestRepository(t, cfg, func(tb testing.TB, ctx context.Context) (git.Repository, string) {
+	gittest.TestRepository(t, cfg, func(tb testing.TB, ctx context.Context) (gitcmd.Repository, string) {
 		tb.Helper()
 
 		repoProto, repoPath := gittest.CreateRepository(tb, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -265,7 +266,7 @@ func TestRepo_ObjectHash(t *testing.T) {
 	// We create an intercepting command factory that detects when we run our object hash
 	// detection logic and, if so, writes a sentinel value into our output file. Like this we
 	// can test how often the logic runs.
-	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv git.ExecutionEnvironment) string {
+	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
 		return fmt.Sprintf(`#!/bin/sh
 		( echo "$@" | grep --silent -- '--show-object-format' ) && echo detection-logic >>%q
 		exec %q "$@"`, outputFile, execEnv.BinaryPath)

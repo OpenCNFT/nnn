@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -52,7 +53,7 @@ func validateFindAllCommitsRequest(ctx context.Context, locator storage.Locator,
 	return nil
 }
 
-func (s *server) findAllCommits(repo git.RepositoryExecutor, in *gitalypb.FindAllCommitsRequest, stream gitalypb.CommitService_FindAllCommitsServer, revisions []string) error {
+func (s *server) findAllCommits(repo gitcmd.RepositoryExecutor, in *gitalypb.FindAllCommitsRequest, stream gitalypb.CommitService_FindAllCommitsServer, revisions []string) error {
 	sender := &commitsSender{
 		send: func(commits []*gitalypb.GitCommit) error {
 			return stream.Send(&gitalypb.FindAllCommitsResponse{
@@ -61,20 +62,20 @@ func (s *server) findAllCommits(repo git.RepositoryExecutor, in *gitalypb.FindAl
 		},
 	}
 
-	var gitLogExtraOptions []git.Option
+	var gitLogExtraOptions []gitcmd.Option
 	if maxCount := in.GetMaxCount(); maxCount > 0 {
-		gitLogExtraOptions = append(gitLogExtraOptions, git.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
+		gitLogExtraOptions = append(gitLogExtraOptions, gitcmd.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
 	}
 	if skip := in.GetSkip(); skip > 0 {
-		gitLogExtraOptions = append(gitLogExtraOptions, git.Flag{Name: fmt.Sprintf("--skip=%d", skip)})
+		gitLogExtraOptions = append(gitLogExtraOptions, gitcmd.Flag{Name: fmt.Sprintf("--skip=%d", skip)})
 	}
 	switch in.GetOrder() {
 	case gitalypb.FindAllCommitsRequest_NONE:
 		// Do nothing
 	case gitalypb.FindAllCommitsRequest_DATE:
-		gitLogExtraOptions = append(gitLogExtraOptions, git.Flag{Name: "--date-order"})
+		gitLogExtraOptions = append(gitLogExtraOptions, gitcmd.Flag{Name: "--date-order"})
 	case gitalypb.FindAllCommitsRequest_TOPO:
-		gitLogExtraOptions = append(gitLogExtraOptions, git.Flag{Name: "--topo-order"})
+		gitLogExtraOptions = append(gitLogExtraOptions, gitcmd.Flag{Name: "--topo-order"})
 	}
 
 	return s.sendCommits(stream.Context(), sender, repo, revisions, nil, nil, gitLogExtraOptions...)

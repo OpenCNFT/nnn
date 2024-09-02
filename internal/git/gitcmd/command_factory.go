@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/alternates"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trace2"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/trace2hooks"
@@ -47,7 +48,7 @@ type CommandFactory interface {
 	// HooksPath returns the path where Gitaly's Git hooks reside.
 	HooksPath(context.Context) string
 	// GitVersion returns the Git version used by the command factory.
-	GitVersion(context.Context) (Version, error)
+	GitVersion(context.Context) (git.Version, error)
 }
 
 type execCommandFactoryConfig struct {
@@ -126,7 +127,7 @@ type hookDirectories struct {
 }
 
 type cachedGitVersion struct {
-	version Version
+	version git.Version
 	stat    os.FileInfo
 }
 
@@ -366,12 +367,12 @@ func statDiffers(a, b os.FileInfo) bool {
 
 // GitVersion returns the Git version in use. The version is cached as long as the binary remains
 // unchanged as determined by stat(3P).
-func (cf *ExecCommandFactory) GitVersion(ctx context.Context) (Version, error) {
+func (cf *ExecCommandFactory) GitVersion(ctx context.Context) (git.Version, error) {
 	gitBinary := cf.GetExecutionEnvironment(ctx).BinaryPath
 
 	stat, err := os.Stat(gitBinary)
 	if err != nil {
-		return Version{}, fmt.Errorf("cannot stat Git binary: %w", err)
+		return git.Version{}, fmt.Errorf("cannot stat Git binary: %w", err)
 	}
 
 	cf.cachedGitVersionLock.RLock()
@@ -395,7 +396,7 @@ func (cf *ExecCommandFactory) GitVersion(ctx context.Context) (Version, error) {
 	// already updated the Git version information.
 	stat, err = os.Stat(execEnv.BinaryPath)
 	if err != nil {
-		return Version{}, fmt.Errorf("cannot stat Git binary: %w", err)
+		return git.Version{}, fmt.Errorf("cannot stat Git binary: %w", err)
 	}
 
 	// There is a race here: if the Git executable has changed between calling stat(3P) on the
@@ -413,16 +414,16 @@ func (cf *ExecCommandFactory) GitVersion(ctx context.Context) (Version, error) {
 		command.WithStdout(&versionBuffer),
 	)
 	if err != nil {
-		return Version{}, fmt.Errorf("spawning version command: %w", err)
+		return git.Version{}, fmt.Errorf("spawning version command: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return Version{}, fmt.Errorf("waiting for version: %w", err)
+		return git.Version{}, fmt.Errorf("waiting for version: %w", err)
 	}
 
-	gitVersion, err := parseVersionOutput(versionBuffer.Bytes())
+	gitVersion, err := git.ParseVersionOutput(versionBuffer.Bytes())
 	if err != nil {
-		return Version{}, err
+		return git.Version{}, err
 	}
 
 	cf.cachedGitVersionByBinary[gitBinary] = cachedGitVersion{
@@ -475,7 +476,7 @@ func (cf *ExecCommandFactory) newCommand(ctx context.Context, repo storage.Repos
 	//
 	// This Git configuration has been reverted in versions 2.45.2, 2.44.2, 2.43.5, and 2.42.3. Once
 	// these versions are no longer supported by Gitaly, these options can be removed.
-	if (cmdGitVersion.GreaterOrEqual(NewVersion(2, 45, 1, 0))) && cmdGitVersion.LessThan(NewVersion(2, 45, 2, 0)) {
+	if (cmdGitVersion.GreaterOrEqual(git.NewVersion(2, 45, 1, 0))) && cmdGitVersion.LessThan(git.NewVersion(2, 45, 2, 0)) {
 		config.globals = append(config.globals,
 			ConfigPair{Key: "fsck.symlinkPointsToGitDir", Value: "ignore"},
 			ConfigPair{Key: "fetch.fsck.symlinkPointsToGitDir", Value: "ignore"},
@@ -789,10 +790,10 @@ func (cf *ExecCommandFactory) AttrTreeConfig(ctx context.Context, repo storage.R
 	}
 
 	switch strings.TrimSpace(objectFormat.String()) {
-	case ObjectHashSHA1.Format:
-		return &ConfigPair{Key: "attr.tree", Value: ObjectHashSHA1.EmptyTreeOID.String()}
-	case ObjectHashSHA256.Format:
-		return &ConfigPair{Key: "attr.tree", Value: ObjectHashSHA256.EmptyTreeOID.String()}
+	case git.ObjectHashSHA1.Format:
+		return &ConfigPair{Key: "attr.tree", Value: git.ObjectHashSHA1.EmptyTreeOID.String()}
+	case git.ObjectHashSHA256.Format:
+		return &ConfigPair{Key: "attr.tree", Value: git.ObjectHashSHA256.EmptyTreeOID.String()}
 	default:
 		return nil
 	}

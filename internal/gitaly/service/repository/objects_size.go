@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -36,17 +37,17 @@ func (s *server) ObjectsSize(server gitalypb.RepositoryService_ObjectsSizeServer
 
 	var stderr, stdout strings.Builder
 	cmd, err := repo.Exec(ctx,
-		git.Command{
+		gitcmd.Command{
 			Name: "rev-list",
-			Flags: []git.Option{
-				git.Flag{Name: "--disk-usage"},
-				git.Flag{Name: "--objects"},
-				git.Flag{Name: "--stdin"},
+			Flags: []gitcmd.Option{
+				gitcmd.Flag{Name: "--disk-usage"},
+				gitcmd.Flag{Name: "--objects"},
+				gitcmd.Flag{Name: "--stdin"},
 			},
 		},
-		git.WithStderr(&stderr),
-		git.WithStdout(&stdout),
-		git.WithSetupStdin())
+		gitcmd.WithStderr(&stderr),
+		gitcmd.WithStdout(&stdout),
+		gitcmd.WithSetupStdin())
 	if err != nil {
 		return fmt.Errorf("start rev-list command: %w", err)
 	}

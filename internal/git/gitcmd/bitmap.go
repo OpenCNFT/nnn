@@ -1,4 +1,4 @@
-package git
+package gitcmd
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/packfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/middleware/requestinfohandler"
@@ -32,7 +33,7 @@ func WarnIfTooManyBitmaps(ctx context.Context, logger log.Logger, locator storag
 		return
 	}
 
-	objdirs, err := ObjectDirectories(ctx, logger, storageRoot, repoPath)
+	objdirs, err := git.ObjectDirectories(ctx, logger, storageRoot, repoPath)
 	if err != nil {
 		logger.WithError(err).InfoContext(ctx, "bitmap check failed")
 		return
