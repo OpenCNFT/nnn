@@ -140,6 +140,11 @@ func (s *server) rewriteHistory(
 		)
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	var stderr strings.Builder
 	if err := repo.ExecAndWait(ctx,
 		gitcmd.Command{
@@ -167,7 +172,7 @@ func (s *server) rewriteHistory(
 				git.MirrorRefSpec,
 			),
 		},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(repo, objectHash),
 		gitcmd.WithStderr(&stderr),
 		gitcmd.WithConfig(gitcmd.ConfigPair{
 			Key: "advice.fetchShowForcedUpdates", Value: "false",

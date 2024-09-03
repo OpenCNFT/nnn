@@ -18,6 +18,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/auth"
@@ -995,9 +996,11 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 				Hooks: config.Hooks{CustomHooksDir: testhelper.TempDir(t)},
 			}))
 
-			repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+			repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 				SkipCreationViaService: true,
 			})
+			repo := localrepo.NewTestRepo(t, cfg, repoProto)
+
 			gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(git.DefaultBranch))
 
 			testcfg.BuildGitalyHooks(t, cfg)
@@ -1023,8 +1026,11 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 			ctx = featureflag.IncomingCtxWithFeatureFlag(ctx, enabledFeatureFlag, true)
 			ctx = featureflag.IncomingCtxWithFeatureFlag(ctx, disabledFeatureFlag, false)
 
+			objectHash, err := repo.ObjectHash(ctx)
+			require.NoError(t, err)
+
 			var stderr, stdout bytes.Buffer
-			cmd, err := cmdFactory.New(ctx, repo, gitcmd.Command{
+			cmd, err := cmdFactory.New(ctx, repoProto, gitcmd.Command{
 				Name: "clone",
 				Flags: []gitcmd.Option{
 					gitcmd.ValueFlag{Name: "-u", Value: "git -c uploadpack.allowFilter -c uploadpack.packObjectsHook=" + cfg.BinaryPath("gitaly-hooks") + " upload-pack"},
@@ -1034,7 +1040,7 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 				},
 				Args: []string{repoPath, testhelper.TempDir(t)},
 			},
-				gitcmd.WithPackObjectsHookEnv(repo, "ssh"),
+				gitcmd.WithPackObjectsHookEnv(repoProto, objectHash, "ssh"),
 				gitcmd.WithStdout(&stdout),
 				gitcmd.WithStderr(&stderr),
 			)

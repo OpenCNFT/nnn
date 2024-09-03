@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/sidechannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -17,7 +18,10 @@ import (
 )
 
 func (s *server) PostUploadPackWithSidechannel(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest) (*gitalypb.PostUploadPackWithSidechannelResponse, error) {
-	repoPath, gitConfig, err := s.validateUploadPackRequest(ctx, req)
+	repoProto := req.GetRepository()
+	repo := s.localrepo(repoProto)
+
+	repoPath, gitConfig, err := s.validateUploadPackRequest(ctx, repo, req)
 	if err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
@@ -35,7 +39,7 @@ func (s *server) PostUploadPackWithSidechannel(ctx context.Context, req *gitalyp
 	}
 	defer conn.Close()
 
-	stats, err := s.runUploadPack(ctx, req, repoPath, gitConfig, conn, conn)
+	stats, err := s.runUploadPack(ctx, req, repo, repoPath, gitConfig, conn, conn)
 	if err != nil {
 		return nil, structerr.NewInternal("running upload-pack: %w", err)
 	}
@@ -83,17 +87,16 @@ func (s *server) runStatsCollector(ctx context.Context, r io.Reader) (io.Reader,
 	return io.TeeReader(r, pw), sc
 }
 
-func (s *server) validateUploadPackRequest(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest) (string, []gitcmd.ConfigPair, error) {
-	repository := req.GetRepository()
-	if err := s.locator.ValidateRepository(ctx, repository); err != nil {
+func (s *server) validateUploadPackRequest(ctx context.Context, repo *localrepo.Repo, req *gitalypb.PostUploadPackWithSidechannelRequest) (string, []gitcmd.ConfigPair, error) {
+	if err := s.locator.ValidateRepository(ctx, repo); err != nil {
 		return "", nil, err
 	}
-	repoPath, err := s.locator.GetRepoPath(ctx, repository)
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 
-	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repository.GetStorageName(), repoPath)
+	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repo.GetStorageName(), repoPath)
 
 	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
@@ -103,7 +106,15 @@ func (s *server) validateUploadPackRequest(ctx context.Context, req *gitalypb.Po
 	return repoPath, config, nil
 }
 
-func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPackWithSidechannelRequest, repoPath string, gitConfig []gitcmd.ConfigPair, stdin io.Reader, stdout io.Writer) (stats *stats.PackfileNegotiation, _ error) {
+func (s *server) runUploadPack(
+	ctx context.Context,
+	req *gitalypb.PostUploadPackWithSidechannelRequest,
+	repo *localrepo.Repo,
+	repoPath string,
+	gitConfig []gitcmd.ConfigPair,
+	stdin io.Reader,
+	stdout io.Writer,
+) (stats *stats.PackfileNegotiation, _ error) {
 	h := sha1.New()
 
 	stdin = io.TeeReader(stdin, h)
@@ -116,10 +127,15 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 
 	gitConfig = append(gitConfig, bundleuri.CapabilitiesGitConfig(ctx)...)
 
-	uploadPackConfig, err := bundleuri.UploadPackGitConfig(ctx, s.bundleURISink, req.GetRepository())
+	uploadPackConfig, err := bundleuri.UploadPackGitConfig(ctx, s.bundleURISink, repo)
 	if err != nil {
 	} else {
 		gitConfig = append(gitConfig, uploadPackConfig...)
+	}
+
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
 	commandOpts := []gitcmd.CmdOpt{
@@ -127,7 +143,7 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 		gitcmd.WithSetupStdout(),
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(gitConfig...),
-		gitcmd.WithPackObjectsHookEnv(req.GetRepository(), "http"),
+		gitcmd.WithPackObjectsHookEnv(req.GetRepository(), objectHash, "http"),
 	}
 
 	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{

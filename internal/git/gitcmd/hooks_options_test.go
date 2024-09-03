@@ -8,6 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -20,12 +21,17 @@ func TestWithRefHook(t *testing.T) {
 	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 
-	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+	repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 		SkipCreationViaService: true,
 	})
+
+	repo := localrepo.NewTestRepo(t, cfg, repoProto)
+	objectHash, err := repo.ObjectHash(ctx)
+	require.NoError(t, err)
+
 	gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("refs/heads/master"))
 
-	opt := gitcmd.WithRefTxHook(repo)
+	opt := gitcmd.WithRefTxHook(repoProto, objectHash)
 	subCmd := gitcmd.Command{Name: "update-ref", Args: []string{"refs/heads/master", gittest.DefaultObjectHash.ZeroOID.String()}}
 
 	for _, tt := range []struct {
@@ -35,7 +41,7 @@ func TestWithRefHook(t *testing.T) {
 		{
 			name: "NewCommand",
 			fn: func() (*command.Command, error) {
-				return gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()).New(ctx, repo, subCmd, opt)
+				return gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()).New(ctx, repoProto, subCmd, opt)
 			},
 		},
 	} {
@@ -74,22 +80,26 @@ func TestWithPackObjectsHookEnv(t *testing.T) {
 	cfg := testcfg.Build(t)
 	cfg.PackObjectsCache.Enabled = true
 
-	repo, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+	repoProto, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 		SkipCreationViaService: true,
 	})
+	repo := localrepo.NewTestRepo(t, cfg, repoProto)
+
+	objectHash, err := repo.ObjectHash(ctx)
+	require.NoError(t, err)
 
 	userID := "user-123"
 	username := "username"
 	protocol := "protocol"
 	remoteIP := "1.2.3.4"
 
-	opt := gitcmd.WithPackObjectsHookEnv(repo, protocol)
+	opt := gitcmd.WithPackObjectsHookEnv(repoProto, objectHash, protocol)
 	subCmd := gitcmd.Command{Name: "upload-pack", Args: []string{"a/b/c"}}
 
 	ctx = grpcmetadata.AppendToOutgoingContext(ctx, "user_id", userID, "username", username, "remote_ip", remoteIP)
 	ctx = metadata.OutgoingToIncoming(ctx)
 
-	cmd, err := gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()).New(ctx, repo, subCmd, opt)
+	cmd, err := gittest.NewCommandFactory(t, cfg, gitcmd.WithSkipHooks()).New(ctx, repoProto, subCmd, opt)
 	require.NoError(t, err)
 
 	payload, err := gitcmd.HooksPayloadFromEnv(cmd.Env())

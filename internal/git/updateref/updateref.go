@@ -300,7 +300,12 @@ func New(ctx context.Context, repo gitcmd.RepositoryExecutor, opts ...UpdaterOpt
 		opt(&cfg)
 	}
 
-	txOption := gitcmd.WithRefTxHook(repo)
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("detecting object hash: %w", err)
+	}
+
+	txOption := gitcmd.WithRefTxHook(repo, objectHash)
 	if cfg.disableTransactions {
 		txOption = gitcmd.WithDisabledHooks()
 	}
@@ -323,11 +328,6 @@ func New(ctx context.Context, repo gitcmd.RepositoryExecutor, opts ...UpdaterOpt
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	objectHash, err := repo.ObjectHash(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
 	referenceBackend, err := repo.ReferenceBackend(ctx)

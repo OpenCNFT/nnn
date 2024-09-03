@@ -109,7 +109,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		defer cancel()
 
 		worktreeName := filepath.Base(worktreePath)
-		if err := s.removeWorktree(ctx, header.Repository, worktreeName); err != nil {
+		if err := s.removeWorktree(ctx, repo, worktreeName); err != nil {
 			s.logger.WithField("worktree_name", worktreeName).WithError(err).ErrorContext(ctx, "failed to remove worktree")
 		}
 	}()
@@ -134,7 +134,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		})),
 		gitcmd.WithStdout(&stdout),
 		gitcmd.WithStderr(&stderr),
-		gitcmd.WithRefTxHook(header.Repository),
+		gitcmd.WithRefTxHook(repo, objectHash),
 		gitcmd.WithWorktree(worktreePath),
 	); err != nil {
 		// The Ruby implementation doesn't include stderr in errors, which makes
@@ -238,20 +238,30 @@ func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktree
 		flags = append(flags, gitcmd.Flag{Name: "--no-checkout"})
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	var stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "add",
 		Flags:  flags,
 		Args:   args,
-	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(repo)); err != nil {
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(repo, objectHash)); err != nil {
 		return fmt.Errorf("adding worktree: %w", gitError{ErrMsg: stderr.String(), Err: err})
 	}
 
 	return nil
 }
 
-func (s *Server) removeWorktree(ctx context.Context, repo *gitalypb.Repository, worktreeName string) error {
+func (s *Server) removeWorktree(ctx context.Context, repo *localrepo.Repo, worktreeName string) error {
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	cmd, err := s.gitCmdFactory.New(ctx, repo,
 		gitcmd.Command{
 			Name:   "worktree",
@@ -259,7 +269,7 @@ func (s *Server) removeWorktree(ctx context.Context, repo *gitalypb.Repository, 
 			Flags:  []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 			Args:   []string{worktreeName},
 		},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(repo, objectHash),
 	)
 	if err != nil {
 		return fmt.Errorf("creation of 'worktree remove': %w", err)

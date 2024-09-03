@@ -83,6 +83,11 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 		return err
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("getting object hash: %w", err)
+	}
+
 	repoPath, err := repo.locator.GetRepoPath(ctx, repo, storage.WithRepositoryVerificationSkipped())
 	if err != nil {
 		return fmt.Errorf("getting repo path: %w", err)
@@ -124,7 +129,7 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 			Args: []string{"remove", "origin"},
 		},
 		gitcmd.WithStderr(&remoteErr),
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(repo, objectHash),
 	)
 	if err != nil {
 		return fmt.Errorf("spawning git-remote: %w", err)

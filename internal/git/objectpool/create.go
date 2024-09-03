@@ -76,7 +76,7 @@ func Create(
 			},
 			Args: []string{sourceRepoPath, objectPoolPath},
 		},
-		gitcmd.WithRefTxHook(sourceRepo),
+		gitcmd.WithRefTxHook(sourceRepo, objectHash),
 		gitcmd.WithStderr(&stderr),
 		// When cloning an empty repository then Git isn't capable to figure out the correct
 		// object hash that the new repository needs to use and just uses the default object

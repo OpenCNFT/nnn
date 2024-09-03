@@ -213,6 +213,9 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 
 		_, repo := setupRepoWithHooksServer(t, ctx, cfg, testserver.WithTransactionManager(&blockingManager{ch}))
 
+		objectHash, err := repo.ObjectHash(ctx)
+		require.NoError(t, err)
+
 		go func() {
 			_ = repo.SetDefaultBranch(ctx, &blockingManager{ch}, "refs/heads/branch")
 			doneCh <- struct{}{}
@@ -223,7 +226,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		err = repo.ExecAndWait(ctx, gitcmd.Command{
 			Name: "symbolic-ref",
 			Args: []string{"HEAD", "refs/heads/otherbranch"},
-		}, gitcmd.WithRefTxHook(repo), gitcmd.WithStderr(&stderr))
+		}, gitcmd.WithRefTxHook(repo, objectHash), gitcmd.WithStderr(&stderr))
 
 		code, ok := command.ExitStatus(err)
 		require.True(t, ok)
