@@ -62,23 +62,23 @@ func TestGenerateSentryEvent(t *testing.T) {
 			desc:     "GRPC error",
 			method:   "/gitaly.RepoService/RepoExists",
 			duration: 500 * time.Millisecond,
-			err:      status.Errorf(codes.NotFound, "Something failed"),
+			err:      status.Errorf(codes.InvalidArgument, "Something failed"),
 			expectedEvent: &sentry.Event{
-				Message:     "rpc error: code = NotFound desc = Something failed",
+				Message:     "rpc error: code = InvalidArgument desc = Something failed",
 				Transaction: "RepoService::RepoExists",
 				Tags: map[string]string{
-					"grpc.code":    "NotFound",
+					"grpc.code":    "InvalidArgument",
 					"grpc.method":  "/gitaly.RepoService/RepoExists",
 					"grpc.time_ms": "500",
 					"system":       "grpc",
 				},
 				Fingerprint: []string{
-					"grpc", "RepoService::RepoExists", "NotFound",
+					"grpc", "RepoService::RepoExists", "InvalidArgument",
 				},
 				Exception: []sentry.Exception{
 					{
 						Type:  "*status.Error",
-						Value: "rpc error: code = NotFound desc = Something failed",
+						Value: "rpc error: code = InvalidArgument desc = Something failed",
 					},
 				},
 				Extra:    map[string]any{},
@@ -96,6 +96,12 @@ func TestGenerateSentryEvent(t *testing.T) {
 			desc:          "TreeEntry with NotFound error is ignored",
 			method:        "/gitaly.CommitService/TreeEntry",
 			err:           status.Errorf(codes.NotFound, "Path not found"),
+			expectedEvent: nil,
+		},
+		{
+			desc:          "NotFound error is ignored on other methods too",
+			method:        "/gitaly.RepoService/RepoExists",
+			err:           status.Errorf(codes.NotFound, "Repo not found"),
 			expectedEvent: nil,
 		},
 		{
@@ -124,23 +130,23 @@ func TestGenerateSentryEvent(t *testing.T) {
 			}(),
 			duration: 500 * time.Millisecond,
 			method:   "/gitaly.RepoService/RepoExists",
-			err:      status.Errorf(codes.NotFound, "Something failed"),
+			err:      status.Errorf(codes.InvalidArgument, "Something failed"),
 			expectedEvent: &sentry.Event{
-				Message:     "rpc error: code = NotFound desc = Something failed",
+				Message:     "rpc error: code = InvalidArgument desc = Something failed",
 				Transaction: "RepoService::RepoExists",
 				Tags: map[string]string{
-					"grpc.code":    "NotFound",
+					"grpc.code":    "InvalidArgument",
 					"grpc.method":  "/gitaly.RepoService/RepoExists",
 					"grpc.time_ms": "500",
 					"system":       "grpc",
 				},
 				Fingerprint: []string{
-					"grpc", "RepoService::RepoExists", "NotFound",
+					"grpc", "RepoService::RepoExists", "InvalidArgument",
 				},
 				Exception: []sentry.Exception{
 					{
 						Type:  "*status.Error",
-						Value: "rpc error: code = NotFound desc = Something failed",
+						Value: "rpc error: code = InvalidArgument desc = Something failed",
 					},
 				},
 				Extra:    map[string]any{},
@@ -222,24 +228,24 @@ func TestUnaryLogHandler(t *testing.T) {
 		{
 			desc: "with structured error",
 			handler: func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
-				return nil, structerr.NewNotFound("not found")
+				return nil, structerr.NewInvalidArgument("invalid arg")
 			},
 			expectedEvents: []*sentry.Event{
 				{
-					Message:     "not found",
+					Message:     "invalid arg",
 					Transaction: "::grpc.testing.TestService/UnaryCall",
 					Tags: map[string]string{
-						"grpc.code":   "NotFound",
+						"grpc.code":   "InvalidArgument",
 						"grpc.method": "/grpc.testing.TestService/UnaryCall",
 						"system":      "grpc",
 					},
 					Fingerprint: []string{
-						"grpc", "::grpc.testing.TestService/UnaryCall", "NotFound",
+						"grpc", "::grpc.testing.TestService/UnaryCall", "InvalidArgument",
 					},
 					Exception: []sentry.Exception{
 						{
 							Type:  "structerr.Error",
-							Value: "not found",
+							Value: "invalid arg",
 						},
 					},
 					Extra:    map[string]any{},
@@ -326,24 +332,24 @@ func TestStreamLogHandler(t *testing.T) {
 		{
 			desc: "with structured error",
 			handler: func(server grpc_testing.TestService_FullDuplexCallServer) error {
-				return structerr.NewNotFound("not found")
+				return structerr.NewInvalidArgument("invalid arg")
 			},
 			expectedEvents: []*sentry.Event{
 				{
-					Message:     "not found",
+					Message:     "invalid arg",
 					Transaction: "::grpc.testing.TestService/FullDuplexCall",
 					Tags: map[string]string{
-						"grpc.code":   "NotFound",
+						"grpc.code":   "InvalidArgument",
 						"grpc.method": "/grpc.testing.TestService/FullDuplexCall",
 						"system":      "grpc",
 					},
 					Fingerprint: []string{
-						"grpc", "::grpc.testing.TestService/FullDuplexCall", "NotFound",
+						"grpc", "::grpc.testing.TestService/FullDuplexCall", "InvalidArgument",
 					},
 					Exception: []sentry.Exception{
 						{
 							Type:  "structerr.Error",
-							Value: "not found",
+							Value: "invalid arg",
 						},
 					},
 					Extra:    map[string]any{},

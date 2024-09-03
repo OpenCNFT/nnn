@@ -16,23 +16,16 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-var (
-	ignoredCodes = []codes.Code{
-		// OK means there was no error
-		codes.OK,
-		// Canceled and DeadlineExceeded indicate clients that disappeared or lost interest
-		codes.Canceled,
-		codes.DeadlineExceeded,
-		// We use FailedPrecondition to signal error conditions that are 'normal'
-		codes.FailedPrecondition,
-	}
-	method2ignoredCodes = map[string][]codes.Code{
-		"/gitaly.CommitService/TreeEntry": {
-			// NotFound is returned when a file is not found.
-			codes.NotFound,
-		},
-	}
-)
+var ignoredCodes = []codes.Code{
+	// OK means there was no error
+	codes.OK,
+	// Canceled and DeadlineExceeded indicate clients that disappeared or lost interest
+	codes.Canceled,
+	codes.DeadlineExceeded,
+	codes.NotFound,
+	// We use FailedPrecondition to signal error conditions that are 'normal'
+	codes.FailedPrecondition,
+}
 
 // Option is an option that can be passed to UnaryLogHandler or StreamLogHandler in order to modify their default
 // behaviour.
@@ -112,16 +105,10 @@ func methodToCulprit(methodName string) string {
 	return methodName
 }
 
-func logErrorToSentry(ctx context.Context, method string, err error) (code codes.Code, bypass bool) {
+func logErrorToSentry(ctx context.Context, err error) (code codes.Code, bypass bool) {
 	code = structerr.GRPCCode(err)
 
 	for _, ignoredCode := range ignoredCodes {
-		if code == ignoredCode {
-			return code, true
-		}
-	}
-
-	for _, ignoredCode := range method2ignoredCodes[method] {
 		if code == ignoredCode {
 			return code, true
 		}
@@ -136,7 +123,7 @@ func logErrorToSentry(ctx context.Context, method string, err error) (code codes
 }
 
 func generateSentryEvent(ctx context.Context, method string, duration time.Duration, err error) *sentry.Event {
-	grpcErrorCode, bypass := logErrorToSentry(ctx, method, err)
+	grpcErrorCode, bypass := logErrorToSentry(ctx, err)
 	if bypass {
 		return nil
 	}
