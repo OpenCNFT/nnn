@@ -34,6 +34,7 @@ func NewApp() *cli.App {
 			newHooksCommand(),
 			newBundleURICommand(),
 			newGitCommand(),
+			newBadgerDBCmd(),
 		},
 	}
 }
