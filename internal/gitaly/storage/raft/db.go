@@ -2,6 +2,8 @@ package raft
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/lni/dragonboat/v4/statemachine"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
@@ -30,10 +32,31 @@ func (a *namespacedDBAccessor) write(ctx context.Context, fn func(keyvalue.ReadW
 
 func newNamespacedDBAccessor(ptnMgr *storagemgr.PartitionManager, storageName string, namespace []byte) *namespacedDBAccessor {
 	return &namespacedDBAccessor{
-		access: func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) error {
-			return ptnMgr.StorageKV(ctx, storageName, readOnly, func(rw keyvalue.ReadWriter) error {
-				return fn(keyvalue.NewPrefixedReadWriter(rw, namespace))
+		access: func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) (returnedErr error) {
+			tx, err := ptnMgr.Begin(ctx, storageName, storagemgr.MetadataPartitionID, storagemgr.TransactionOptions{
+				ReadOnly: readOnly,
+				KVOnly:   true,
 			})
+			if err != nil {
+				return fmt.Errorf("begin: %w", err)
+			}
+			defer func() {
+				if returnedErr != nil {
+					if err := tx.Rollback(); err != nil {
+						returnedErr = errors.Join(returnedErr, fmt.Errorf("rollback: %w", err))
+					}
+				}
+			}()
+
+			if err := fn(keyvalue.NewPrefixedReadWriter(tx.KV(), namespace)); err != nil {
+				return err
+			}
+
+			if err := tx.Commit(ctx); err != nil {
+				return fmt.Errorf("commit: %w", err)
+			}
+
+			return nil
 		},
 	}
 }

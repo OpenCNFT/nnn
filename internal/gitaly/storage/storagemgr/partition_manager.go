@@ -348,6 +348,9 @@ type TransactionOptions struct {
 	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
 	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
 	ForceExclusiveSnapshot bool
+	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
+	// path is provided.
+	KVOnly bool
 }
 
 // Begin gets the TransactionManager for the specified repository and starts a transaction. If a
@@ -365,7 +368,10 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 
 	var relativePaths []string
 
-	if opts.RelativePath != "" {
+	if opts.KVOnly {
+		// Don't snapshot any repositories and only start a KV transaction.
+		relativePaths = []string{}
+	} else if opts.RelativePath != "" {
 		var err error
 		opts.RelativePath, err = storage.ValidateRelativePath(storageMgr.path, opts.RelativePath)
 		if err != nil {
@@ -450,35 +456,6 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 	fn(logManager)
 
 	return nil
-}
-
-// StorageKV executes the provided function against the storage's metadata DB. All write operations
-// issued by the function are committed in an atomic fashion. All read operations are performed
-// against a snapshot of the database.
-func (pm *PartitionManager) StorageKV(ctx context.Context, storageName string, readOnly bool, fn func(lm keyvalue.ReadWriter) error) error {
-	storageMgr, ok := pm.storages[storageName]
-	if !ok {
-		return structerr.NewNotFound("unknown storage: %q", storageName)
-	}
-
-	ptn, err := pm.startPartition(ctx, storageMgr, metadataPartitionID)
-	if err != nil {
-		return err
-	}
-	defer storageMgr.finalizeTransaction(ptn)
-
-	transaction, err := ptn.transactionManager.Begin(ctx, storage.BeginOptions{
-		Write:         !readOnly,
-		RelativePaths: []string{},
-	})
-	if err != nil {
-		return fmt.Errorf("begin: %w", err)
-	}
-
-	if err := fn(transaction.KV()); err != nil {
-		return errors.Join(err, transaction.Rollback())
-	}
-	return transaction.Commit(ctx)
 }
 
 // startPartition starts the TransactionManager for a partition.

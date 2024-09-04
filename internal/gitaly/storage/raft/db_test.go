@@ -49,7 +49,7 @@ func TestDbForMetadataGroup(t *testing.T) {
 			"No sets or deletes are allowed in a read-only transaction",
 		)
 		return nil
-	}), "key-value writes in a read-only transaction")
+	}), "commit: key-value writes in a read-only transaction\nrollback: transaction already committed")
 
 	require.NoError(t, db.read(ctx, func(txn keyvalue.ReadWriter) error {
 		item, err := txn.Get([]byte("data-1"))
@@ -133,7 +133,7 @@ func TestDbForStorage(t *testing.T) {
 			"No sets or deletes are allowed in a read-only transaction",
 		)
 		return nil
-	}), "key-value writes in a read-only transaction")
+	}), "commit: key-value writes in a read-only transaction\nrollback: transaction already committed")
 
 	require.NoError(t, db.read(ctx, func(txn keyvalue.ReadWriter) error {
 		item, err := txn.Get([]byte("storage"))

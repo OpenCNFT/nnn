@@ -33,8 +33,8 @@ const prefixPartitionAssignment = "partition_assignment/"
 const (
 	// invalidPartitionID is an invalid partition ID.
 	invalidPartitionID = 0
-	// metadataPartitionID is ID of the storage's metadata partition.
-	metadataPartitionID = 1
+	// MetadataPartitionID is ID of the storage's metadata partition.
+	MetadataPartitionID = 1
 	// initialPartitionID is the starting ID of normal partitions.
 	initialPartitionID = 2
 )
