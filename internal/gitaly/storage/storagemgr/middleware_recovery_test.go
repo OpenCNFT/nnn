@@ -10,9 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
@@ -48,10 +45,6 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 
 	logger := testhelper.SharedLogger(t)
 
-	cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, logger)
-	require.NoError(t, err)
-	defer clean()
-
 	dbMgr, err := databasemgr.NewDBManager(
 		cfg.Storages,
 		keyvalue.NewBadgerStore,
@@ -68,10 +61,7 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 		logger,
 		dbMgr,
 		cfg.Prometheus,
-		NewPartitionFactory(
-			cmdFactory,
-			localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, cache),
-		),
+		newStubPartitionFactory(),
 		nil,
 	)
 	require.NoError(t, err)

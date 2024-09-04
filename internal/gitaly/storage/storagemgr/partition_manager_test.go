@@ -10,9 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
@@ -39,6 +37,69 @@ type mockPartitionFactory struct {
 		metrics TransactionManagerMetrics,
 		logConsumer LogConsumer,
 	) Partition
+}
+
+// newStubPartitionFactory returns a partition factory that doesn't do anything and calls
+// on its methods succeed.
+func newStubPartitionFactory() PartitionFactory {
+	return mockPartitionFactory{
+		new: func(
+			logger log.Logger,
+			partitionID storage.PartitionID,
+			db keyvalue.Transactioner,
+			storageName string,
+			storagePath string,
+			absoluteStateDir string,
+			stagingDir string,
+			metrics TransactionManagerMetrics,
+			logConsumer LogConsumer,
+		) Partition {
+			closing := make(chan struct{})
+			isClosing := func() bool {
+				select {
+				case <-closing:
+					return true
+				default:
+					return false
+				}
+			}
+
+			// This stub emulates what a real partition implementation.
+			return mockPartition{
+				run: func() error {
+					// Run returns after the partition has been closed.
+					<-closing
+					return nil
+				},
+				begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+					// Transactions fail to begin if context is done.
+					if err := ctx.Err(); err != nil {
+						return nil, ctx.Err()
+					}
+
+					return mockTransaction{
+						commit: func(ctx context.Context) error {
+							// Commits fail if partition is closed.
+							if isClosing() {
+								return ErrTransactionProcessingStopped
+							}
+
+							// Commits fail if context is done.
+							return ctx.Err()
+						},
+						rollback: func() error { return nil },
+					}, nil
+				},
+				close: func() {
+					// Closing is idempotent.
+					if !isClosing() {
+						close(closing)
+					}
+				},
+				isClosing: isClosing,
+			}
+		},
+	}
 }
 
 func (m mockPartitionFactory) New(
@@ -70,6 +131,7 @@ type mockPartition struct {
 	run       func() error
 	close     func()
 	isClosing func() bool
+	LogManager
 }
 
 func (m mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
@@ -90,12 +152,15 @@ func (m mockPartition) IsClosing() bool {
 
 type mockTransaction struct {
 	storage.Transaction
-	commit func(context.Context) error
+	commit   func(context.Context) error
+	rollback func() error
 }
 
 func (m mockTransaction) Commit(ctx context.Context) error {
 	return m.commit(ctx)
 }
+
+func (m mockTransaction) Rollback() error { return m.rollback() }
 
 func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storage.PartitionID, expectOpen bool) {
 	t.Helper()
@@ -471,30 +536,6 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					partitionFactory: mockPartitionFactory{
-						new: func(
-							logger log.Logger,
-							partitionID storage.PartitionID,
-							db keyvalue.Transactioner,
-							storageName string,
-							storagePath string,
-							absoluteStateDir string,
-							stagingDir string,
-							metrics TransactionManagerMetrics,
-							logConsumer LogConsumer,
-						) Partition {
-							isClosing := false
-							return mockPartition{
-								run: func() error { return nil },
-								begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
-									<-ctx.Done()
-									return nil, ctx.Err()
-								},
-								close:     func() { isClosing = true },
-								isClosing: func() bool { return isClosing },
-							}
-						},
-					},
 				}
 			},
 		},
@@ -519,34 +560,6 @@ func TestPartitionManager(t *testing.T) {
 						commit{
 							ctx:           stepCtx,
 							expectedError: context.Canceled,
-						},
-					},
-					partitionFactory: mockPartitionFactory{
-						new: func(
-							logger log.Logger,
-							partitionID storage.PartitionID,
-							db keyvalue.Transactioner,
-							storageName string,
-							storagePath string,
-							absoluteStateDir string,
-							stagingDir string,
-							metrics TransactionManagerMetrics,
-							logConsumer LogConsumer,
-						) Partition {
-							isClosing := false
-							return mockPartition{
-								run: func() error { return nil },
-								begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
-									return mockTransaction{
-										commit: func(ctx context.Context) error {
-											<-ctx.Done()
-											return ctx.Err()
-										},
-									}, ctx.Err()
-								},
-								close:     func() { isClosing = true },
-								isClosing: func() bool { return isClosing },
-							}
 						},
 					},
 				}
@@ -742,7 +755,6 @@ func TestPartitionManager(t *testing.T) {
 									2: 1,
 								},
 							},
-							expectedError: ErrTransactionAlreadyRollbacked,
 						},
 					},
 				}
@@ -1038,12 +1050,6 @@ func TestPartitionManager(t *testing.T) {
 			cfg := testcfg.Build(t, testcfg.WithStorages("default", "other-storage"))
 			logger := testhelper.SharedLogger(t)
 
-			cmdFactory := gittest.NewCommandFactory(t, cfg)
-			catfileCache := catfile.NewCache(cfg)
-			t.Cleanup(catfileCache.Stop)
-
-			localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
 			setup := tc.setup(t, cfg)
 
 			// Create some existing content in the staging directory so we can assert it gets removed and
@@ -1061,12 +1067,13 @@ func TestPartitionManager(t *testing.T) {
 			require.NoError(t, err)
 			defer dbMgr.Close()
 
-			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, NewPartitionFactory(cmdFactory, localRepoFactory), nil)
-			require.NoError(t, err)
-
-			if setup.partitionFactory != nil {
-				partitionManager.partitionFactory = setup.partitionFactory
+			partitionFactory := setup.partitionFactory
+			if partitionFactory == nil {
+				partitionFactory = newStubPartitionFactory()
 			}
+
+			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, partitionFactory, nil)
+			require.NoError(t, err)
 
 			defer func() {
 				partitionManager.Close()
@@ -1214,17 +1221,11 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	cfg := testcfg.Build(t)
 	logger := testhelper.SharedLogger(t)
 
-	cmdFactory := gittest.NewCommandFactory(t, cfg)
-	catfileCache := catfile.NewCache(cfg)
-	defer catfileCache.Stop()
-
-	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
 	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, NewPartitionFactory(cmdFactory, localRepoFactory), nil)
+	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, newStubPartitionFactory(), nil)
 	require.NoError(t, err)
 	defer partitionManager.Close()
 
@@ -1274,16 +1275,10 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 	cfg := testcfg.Build(t)
 	logger := testhelper.SharedLogger(t)
 
-	cmdFactory := gittest.NewCommandFactory(t, cfg)
-	catfileCache := catfile.NewCache(cfg)
-	defer catfileCache.Stop()
-
-	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
 	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, NewPartitionFactory(cmdFactory, localRepoFactory), nil)
+	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, newStubPartitionFactory(), nil)
 	require.NoError(t, err)
 
 	defer func() {
