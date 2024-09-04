@@ -28,26 +28,26 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
-type mockTransactionManager struct {
+type mockPartition struct {
 	begin     func(context.Context, storage.BeginOptions) (storage.Transaction, error)
 	run       func() error
 	close     func()
 	isClosing func() bool
 }
 
-func (m mockTransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+func (m mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
 	return m.begin(ctx, opts)
 }
 
-func (m mockTransactionManager) Run() error {
+func (m mockPartition) Run() error {
 	return m.run()
 }
 
-func (m mockTransactionManager) Close() {
+func (m mockPartition) Close() {
 	m.close()
 }
 
-func (m mockTransactionManager) IsClosing() bool {
+func (m mockPartition) IsClosing() bool {
 	return m.isClosing()
 }
 
@@ -81,8 +81,8 @@ func blockOnPartitionClosing(t *testing.T, pm *PartitionManager, waitForFullClos
 		for _, ptn := range sp.partitions {
 			// The closePartition step closes the transaction manager directly without calling close
 			// on the partition, so we check the manager directly here as well.
-			if ptn.isClosing() || ptn.transactionManager.IsClosing() {
-				waiter := ptn.transactionManagerClosed
+			if ptn.isClosing() || ptn.partition.IsClosing() {
+				waiter := ptn.partitionClosed
 				if waitForFullClose {
 					waiter = ptn.closed
 				}
@@ -228,8 +228,8 @@ func TestPartitionManager(t *testing.T) {
 	}
 
 	type setupData struct {
-		steps                     steps
-		transactionManagerFactory transactionManagerFactory
+		steps            steps
+		partitionFactory partitionFactory
 	}
 
 	for _, tc := range []struct {
@@ -434,7 +434,7 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					transactionManagerFactory: func(
+					partitionFactory: func(
 						logger log.Logger,
 						partitionID storage.PartitionID,
 						db keyvalue.Transactioner,
@@ -446,9 +446,9 @@ func TestPartitionManager(t *testing.T) {
 						repoFactory localrepo.StorageScopedFactory,
 						metrics TransactionManagerMetrics,
 						logConsumer LogConsumer,
-					) transactionManager {
+					) Partition {
 						isClosing := false
-						return mockTransactionManager{
+						return mockPartition{
 							run: func() error { return nil },
 							begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
 								<-ctx.Done()
@@ -484,7 +484,7 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					transactionManagerFactory: func(
+					partitionFactory: func(
 						logger log.Logger,
 						partitionID storage.PartitionID,
 						db keyvalue.Transactioner,
@@ -496,9 +496,9 @@ func TestPartitionManager(t *testing.T) {
 						repoFactory localrepo.StorageScopedFactory,
 						metrics TransactionManagerMetrics,
 						logConsumer LogConsumer,
-					) transactionManager {
+					) Partition {
 						isClosing := false
-						return mockTransactionManager{
+						return mockPartition{
 							run: func() error { return nil },
 							begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
 								return mockTransaction{
@@ -1027,8 +1027,8 @@ func TestPartitionManager(t *testing.T) {
 			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
 			require.NoError(t, err)
 
-			if setup.transactionManagerFactory != nil {
-				partitionManager.transactionManagerFactory = setup.transactionManagerFactory
+			if setup.partitionFactory != nil {
+				partitionManager.partitionFactory = setup.partitionFactory
 			}
 
 			defer func() {
@@ -1130,10 +1130,10 @@ func TestPartitionManager(t *testing.T) {
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction manager stopped before being started")
 
 					data := openTransactionData[step.transactionID]
-					// Close the TransactionManager directly. Closing through the partition would change the
-					// state used to sync which should only be changed when the closing is initiated through
+					// Close the Partition instance directly. Closing through the partition wrapper would change
+					// the state used to sync which should only be changed when the closing is initiated through
 					// the normal means.
-					data.ptn.transactionManager.Close()
+					data.ptn.partition.Close()
 
 					blockOnPartitionClosing(t, partitionManager, false)
 				case finalizeTransaction:
@@ -1216,8 +1216,8 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 		partitionManager.Close()
 	}()
 
-	// The TransactionManager may return if it errors out.
-	txMgr := partitionManager.storages[cfg.Storages[0].Name].partitions[2].transactionManager
+	// The Partition may return if it errors out.
+	txMgr := partitionManager.storages[cfg.Storages[0].Name].partitions[2].partition
 	go func() {
 		defer wg.Done()
 		<-start
@@ -1262,7 +1262,7 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 
 	require.NoError(t, partitionManager.CallLogManager(ctx, cfg.Storages[0].Name, ptnID, func(lm LogManager) {
 		requirePartitionOpen(t, storageMgr, ptnID, true)
-		tm, ok := lm.(*TransactionManager)
+		tm, ok := lm.(Partition)
 		require.True(t, ok)
 
 		require.False(t, tm.IsClosing())
