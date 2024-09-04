@@ -48,7 +48,7 @@ type transactionManagerFactory func(
 	stagingDir string,
 	cmdFactory gitcmd.CommandFactory,
 	repoFactory localrepo.StorageScopedFactory,
-	metrics transactionManagerMetrics,
+	metrics TransactionManagerMetrics,
 	logConsumer LogConsumer,
 ) transactionManager
 
@@ -307,7 +307,7 @@ func NewPartitionManager(
 		stagingDir string,
 		cmdFactory gitcmd.CommandFactory,
 		repoFactory localrepo.StorageScopedFactory,
-		metrics transactionManagerMetrics,
+		metrics TransactionManagerMetrics,
 		logConsumer LogConsumer,
 	) transactionManager {
 		return NewTransactionManager(
@@ -511,7 +511,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				stagingDir,
 				pm.commandFactory,
 				storageMgr.repoFactory,
-				newTransactionManagerMetrics(
+				NewTransactionManagerMetrics(
 					pm.metrics.housekeeping,
 					pm.metrics.snapshot.Scope(storageMgr.name),
 				),

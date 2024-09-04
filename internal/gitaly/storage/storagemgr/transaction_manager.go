@@ -930,13 +930,15 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 	p.position = pos
 }
 
-type transactionManagerMetrics struct {
+// TransactionManagerMetrics contains the metrics collected by a TransactionManager.
+type TransactionManagerMetrics struct {
 	housekeeping *housekeeping.Metrics
 	snapshot     snapshot.ManagerMetrics
 }
 
-func newTransactionManagerMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.ManagerMetrics) transactionManagerMetrics {
-	return transactionManagerMetrics{
+// NewTransactionManagerMetrics returns a new TransactionManagerMetrics instance.
+func NewTransactionManagerMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.ManagerMetrics) TransactionManagerMetrics {
+	return TransactionManagerMetrics{
 		housekeeping: housekeeping,
 		snapshot:     snapshot,
 	}
@@ -1068,7 +1070,7 @@ type TransactionManager struct {
 	testHooks testHooks
 
 	// metrics stores reporters which facilitate metric recording of transactional operations.
-	metrics transactionManagerMetrics
+	metrics TransactionManagerMetrics
 }
 
 type testHooks struct {
@@ -1091,7 +1093,7 @@ func NewTransactionManager(
 	stagingDir string,
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
-	metrics transactionManagerMetrics,
+	metrics TransactionManagerMetrics,
 	consumer LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())

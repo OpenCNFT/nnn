@@ -444,7 +444,7 @@ func TestPartitionManager(t *testing.T) {
 						stagingDir string,
 						cmdFactory gitcmd.CommandFactory,
 						repoFactory localrepo.StorageScopedFactory,
-						metrics transactionManagerMetrics,
+						metrics TransactionManagerMetrics,
 						logConsumer LogConsumer,
 					) transactionManager {
 						isClosing := false
@@ -494,7 +494,7 @@ func TestPartitionManager(t *testing.T) {
 						stagingDir string,
 						cmdFactory gitcmd.CommandFactory,
 						repoFactory localrepo.StorageScopedFactory,
-						metrics transactionManagerMetrics,
+						metrics TransactionManagerMetrics,
 						logConsumer LogConsumer,
 					) transactionManager {
 						isClosing := false
