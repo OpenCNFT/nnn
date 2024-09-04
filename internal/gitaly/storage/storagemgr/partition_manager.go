@@ -31,11 +31,10 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 // a function to close the LogConsumer.
 type LogConsumerFactory func(storage.LogManagerAccessor) (_ storage.LogConsumer, cleanup func())
 
-// Partition is the interface of a Partition as used by PartitionManager.
+// Partition extends the typical Partition interface with methods needed by PartitionManager.
 type Partition interface {
-	Begin(context.Context, storage.BeginOptions) (storage.Transaction, error)
+	storage.Partition
 	Run() error
-	Close()
 	IsClosing() bool
 }
 

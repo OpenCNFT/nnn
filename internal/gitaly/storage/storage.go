@@ -123,3 +123,11 @@ type BeginOptions struct {
 	// read-only snapshots yet.
 	ForceExclusiveSnapshot bool
 }
+
+// Partition is responsible for a single partition of data.
+type Partition interface {
+	// Begin begins a transaction against the partition.
+	Begin(context.Context, BeginOptions) (Transaction, error)
+	// Close closes the partition handle to signal the caller is done using it.
+	Close()
+}
