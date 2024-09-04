@@ -60,7 +60,7 @@ func TestDiffBlobs(t *testing.T) {
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
 						fmt.Sprintf(
-							"validating right blob: validating blob ID: invalid object ID: \"\", expected length %d, got 0",
+							"getting right blob info: validating blob ID: invalid object ID: \"\", expected length %d, got 0",
 							gittest.DefaultObjectHash.EncodedLen(),
 						)).WithMetadata("revision", ""),
 					),
@@ -86,7 +86,7 @@ func TestDiffBlobs(t *testing.T) {
 						},
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
-						"validating right blob: revision is not blob").WithMetadata("revision", string(commitID)),
+						"getting right blob info: revision is not blob").WithMetadata("revision", string(commitID)),
 					),
 				}
 			},
@@ -109,7 +109,7 @@ func TestDiffBlobs(t *testing.T) {
 						},
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
-						"validating left blob: getting revision info: object not found").WithMetadata("revision", "HEAD:foo"),
+						"getting left blob info: getting revision info: object not found").WithMetadata("revision", "HEAD:foo"),
 					),
 				}
 			},

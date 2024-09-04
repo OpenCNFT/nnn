@@ -46,7 +46,7 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 		return structerr.NewInternal("detecting object format: %w", err)
 	}
 
-	if err := s.validateBlobPairs(ctx, repo, objectHash, request.BlobPairs); err != nil {
+	if _, err := s.blobInfoPairs(ctx, repo, objectHash, request.BlobPairs); err != nil {
 		return err
 	}
 
@@ -192,68 +192,96 @@ func (s *server) sendDiff(stream gitalypb.DiffService_DiffBlobsServer, diff *dif
 	return nil
 }
 
-func (s *server) validateBlobPairs(
+type blobInfoPair struct {
+	leftOID       git.ObjectID
+	rightOID      git.ObjectID
+	leftRevision  git.Revision
+	rightRevision git.Revision
+}
+
+func (s *server) blobInfoPairs(
 	ctx context.Context,
 	repo *localrepo.Repo,
 	objectHash git.ObjectHash,
 	blobPairs []*gitalypb.DiffBlobsRequest_BlobPair,
-) error {
+) ([]blobInfoPair, error) {
+	var blobInfoPairs []blobInfoPair
+
 	reader, readerCancel, err := s.catfileCache.ObjectInfoReader(ctx, repo)
 	if err != nil {
-		return fmt.Errorf("retrieving object reader: %w", err)
+		return nil, fmt.Errorf("retrieving object reader: %w", err)
 	}
 	defer readerCancel()
 
 	for _, blobPair := range blobPairs {
+		blobInfoPair := blobInfoPair{
+			leftOID:       objectHash.ZeroOID,
+			rightOID:      objectHash.ZeroOID,
+			leftRevision:  git.Revision(blobPair.LeftBlob),
+			rightRevision: git.Revision(blobPair.RightBlob),
+		}
+
 		leftNullOID := objectHash.IsZeroOID(git.ObjectID(blobPair.LeftBlob))
 		rightNullOID := objectHash.IsZeroOID(git.ObjectID(blobPair.RightBlob))
 
 		if leftNullOID && rightNullOID {
-			return structerr.NewInvalidArgument("left and right blob cannot both be null OIDs")
+			return nil, structerr.NewInvalidArgument("left and right blob cannot both be null OIDs")
 		}
 
 		// Null blob IDs do not exist in the repository.
 		if !leftNullOID {
-			if err := validateBlob(ctx, reader, objectHash, blobPair.LeftBlob); err != nil {
-				return structerr.NewInvalidArgument("validating left blob: %w", err).WithMetadata(
+			leftOID, err := blobInfo(ctx, reader, objectHash, blobPair.LeftBlob)
+			if err != nil {
+				return nil, structerr.NewInvalidArgument("getting left blob info: %w", err).WithMetadata(
 					"revision",
 					string(blobPair.LeftBlob),
 				)
 			}
+			blobInfoPair.leftOID = leftOID
 		}
 
 		if !rightNullOID {
-			if err := validateBlob(ctx, reader, objectHash, blobPair.RightBlob); err != nil {
-				return structerr.NewInvalidArgument("validating right blob: %w", err).WithMetadata(
+			rightOID, err := blobInfo(ctx, reader, objectHash, blobPair.RightBlob)
+			if err != nil {
+				return nil, structerr.NewInvalidArgument("getting right blob info: %w", err).WithMetadata(
 					"revision",
 					string(blobPair.RightBlob),
 				)
 			}
+			blobInfoPair.rightOID = rightOID
 		}
+
+		blobInfoPairs = append(blobInfoPairs, blobInfoPair)
 	}
 
-	return nil
+	return blobInfoPairs, nil
 }
 
-func validateBlob(ctx context.Context, reader catfile.ObjectInfoReader, objectHash git.ObjectHash, revision []byte) error {
+func blobInfo(
+	ctx context.Context,
+	reader catfile.ObjectInfoReader,
+	objectHash git.ObjectHash,
+	revision []byte,
+) (git.ObjectID, error) {
 	// Since only blobs are allowed, only path-scoped revisions and blob IDs are accepted.
 	if bytes.Contains(revision, []byte(":")) {
 		if err := git.ValidateRevision(revision, git.AllowPathScopedRevision()); err != nil {
-			return fmt.Errorf("validating path-scoped revision: %w", err)
+			return "", fmt.Errorf("validating path-scoped revision: %w", err)
 		}
 	} else {
 		if err := objectHash.ValidateHex(string(revision)); err != nil {
-			return fmt.Errorf("validating blob ID: %w", err)
+			return "", fmt.Errorf("validating blob ID: %w", err)
 		}
 	}
 
-	if info, err := reader.Info(ctx, git.Revision(revision)); err != nil {
-		return fmt.Errorf("getting revision info: %w", err)
+	info, err := reader.Info(ctx, git.Revision(revision))
+	if err != nil {
+		return "", fmt.Errorf("getting revision info: %w", err)
 	} else if !info.IsBlob() {
-		return errors.New("revision is not blob")
+		return "", errors.New("revision is not blob")
 	}
 
-	return nil
+	return info.Oid, nil
 }
 
 func emptyBlobID(objectHash git.ObjectHash) (git.ObjectID, error) {
