@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"regexp"
 )
@@ -33,10 +32,15 @@ type SenderOpts struct {
 	Filter *regexp.Regexp
 }
 
-// ItemsPerMessage establishes the threshold to flush the buffer when using the
-// `Send` function. It's a variable instead of a constant to make it possible to
-// override in tests.
-var ItemsPerMessage = 20
+var (
+	// ItemsPerMessage establishes the threshold to flush the buffer when using the
+	// `Send` function. It's a variable instead of a constant to make it possible to
+	// override in tests.
+	ItemsPerMessage = 20
+
+	// ErrInvalidPageToken represents an error when the provided page token is invalid
+	ErrInvalidPageToken = errors.New("could not find page token")
+)
 
 // Sender handles a buffer of lines from a Git command
 type Sender func([][]byte) error
@@ -138,7 +142,7 @@ func (w *writer) consume(r io.Reader) error {
 	}
 
 	if !pastPageToken && w.options.PageTokenError {
-		return fmt.Errorf("could not find page token")
+		return ErrInvalidPageToken
 	}
 
 	return w.flush()
