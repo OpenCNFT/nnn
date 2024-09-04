@@ -421,7 +421,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				CloseManager{},
 				Commit{
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 			},
 		},
@@ -503,7 +503,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					Hooks: testTransactionHooks{
 						BeforeAppendLogEntry: func(hookContext hookContext) { hookContext.closeManager() },
 						// This ensures we are testing the context cancellation errors being unwrapped properly
-						// to an ErrTransactionProcessingStopped instead of hitting the general case when
+						// to an storage.ErrTransactionProcessingStopped instead of hitting the general case when
 						// runDone is closed.
 						WaitForTransactionsWhenClosing: true,
 					},
@@ -513,7 +513,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				CloseManager{},
 				Commit{
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 			},
 		},
@@ -535,7 +535,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -897,7 +897,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					QuarantinedPacks: [][]byte{setup.Commits.First.Pack},
-					ExpectedError:    ErrTransactionProcessingStopped,
+					ExpectedError:    storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -1482,7 +1482,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Rollback{},
 				Rollback{
-					ExpectedError: ErrTransactionAlreadyRollbacked,
+					ExpectedError: storage.ErrTransactionAlreadyRollbacked,
 				},
 			},
 		},
@@ -1495,7 +1495,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{},
 				Rollback{
-					ExpectedError: ErrTransactionAlreadyCommitted,
+					ExpectedError: storage.ErrTransactionAlreadyCommitted,
 				},
 			},
 			expectedState: StateAssertion{
@@ -1513,7 +1513,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{},
 				Commit{
-					ExpectedError: ErrTransactionAlreadyCommitted,
+					ExpectedError: storage.ErrTransactionAlreadyCommitted,
 				},
 			},
 			expectedState: StateAssertion{
@@ -1531,7 +1531,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Rollback{},
 				Commit{
-					ExpectedError: ErrTransactionAlreadyRollbacked,
+					ExpectedError: storage.ErrTransactionAlreadyRollbacked,
 				},
 			},
 		},
@@ -2137,7 +2137,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				CloseManager{},
 				Commit{
 					TransactionID: 4,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
@@ -2286,7 +2286,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				CloseManager{},
 				Commit{
 					TransactionID: 4,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					// Insert an out-of-band log-entry directly into the database for easier test

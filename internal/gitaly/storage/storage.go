@@ -11,11 +11,29 @@ package storage
 
 import (
 	"context"
+	"errors"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+)
+
+var (
+	// ErrTransactionProcessingStopped is returned when the TransactionManager stops processing transactions.
+	ErrTransactionProcessingStopped = errors.New("transaction processing stopped")
+	// ErrTransactionAlreadyCommitted is returned when attempting to rollback or commit a transaction that
+	// already had commit called on it.
+	ErrTransactionAlreadyCommitted = errors.New("transaction already committed")
+	// ErrTransactionAlreadyRollbacked is returned when attempting to rollback or commit a transaction that
+	// already had rollback called on it.
+	ErrTransactionAlreadyRollbacked = errors.New("transaction already rollbacked")
+	// ErrAlternatePointsToSelf is returned when a repository's alternate points to the
+	// repository itself.
+	ErrAlternatePointsToSelf = errors.New("repository's alternate points to self")
+	// ErrAlternateHasAlternate is returned when a repository's alternate itself has an
+	// alternate listed.
+	ErrAlternateHasAlternate = errors.New("repository's alternate has an alternate itself")
 )
 
 // Transaction is a single unit-of-work that executes as a whole.

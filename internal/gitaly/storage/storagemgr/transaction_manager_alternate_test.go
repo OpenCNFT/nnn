@@ -803,7 +803,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: errAlternatePointsToSelf,
+					ExpectedError: storage.ErrAlternatePointsToSelf,
 				},
 			},
 			expectedState: StateAssertion{
@@ -848,7 +848,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID: 3,
-					ExpectedError: errAlternateHasAlternate,
+					ExpectedError: storage.ErrAlternateHasAlternate,
 				},
 			},
 			expectedState: StateAssertion{
@@ -1149,7 +1149,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   3,
 					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
-					ExpectedError:   ErrTransactionProcessingStopped,
+					ExpectedError:   storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -1229,7 +1229,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   3,
 					UpdateAlternate: &alternateUpdate{},
-					ExpectedError:   ErrTransactionProcessingStopped,
+					ExpectedError:   storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,

@@ -205,7 +205,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			rollbackTransaction:   true,
 			expectHandlerInvoked:  true,
 			handlerError:          errors.New("handler error"),
-			expectedRollbackError: storagemgr.ErrTransactionAlreadyRollbacked,
+			expectedRollbackError: storage.ErrTransactionAlreadyRollbacked,
 		},
 		{
 			desc: "streaming rollback error is logged",
@@ -223,7 +223,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			rollbackTransaction:   true,
 			expectHandlerInvoked:  true,
 			handlerError:          errors.New("handler error"),
-			expectedRollbackError: storagemgr.ErrTransactionAlreadyRollbacked,
+			expectedRollbackError: storage.ErrTransactionAlreadyRollbacked,
 		},
 		{
 			desc: "unary commit error is returned",

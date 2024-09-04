@@ -18,12 +18,6 @@ var (
 	// errPartitionAssignmentNotFound is returned when attempting to access a
 	// partition assignment in the database that doesn't yet exist.
 	errPartitionAssignmentNotFound = errors.New("partition assignment not found")
-	// errAlternatePointsToSelf is returned when a repository's alternate points to the
-	// repository itself.
-	errAlternatePointsToSelf = errors.New("repository's alternate points to self")
-	// errAlternateHasAlternate is returned when a repository's alternate itself has an
-	// alternate listed.
-	errAlternateHasAlternate = errors.New("repository's alternate has an alternate itself")
 	// ErrRepositoriesAreInDifferentPartitions is returned when attempting to begin a transaction spanning
 	// repositories that are in different partitions.
 	ErrRepositoriesAreInDifferentPartitions = errors.New("repositories are in different partitions")
@@ -329,7 +323,7 @@ func (pa *partitionAssigner) getAlternatePartitionID(ctx context.Context, relati
 		// recursive being true indicates we've arrived here through another repository's alternate.
 		// Repositories in Gitaly should only have a single alternate that points to the repository's
 		// pool. Chains of alternates are unexpected and could go arbitrarily long, so fail the operation.
-		return 0, errAlternateHasAlternate
+		return 0, storage.ErrAlternateHasAlternate
 	}
 
 	// The relative path should point somewhere within the same storage.
@@ -350,7 +344,7 @@ func (pa *partitionAssigner) getAlternatePartitionID(ctx context.Context, relati
 		// The alternate must not point to the repository itself. Not only is it non-sensical
 		// but it would also cause a dead lock as the repository is locked during this call
 		// already.
-		return 0, errAlternatePointsToSelf
+		return 0, storage.ErrAlternatePointsToSelf
 	}
 
 	// Recursively get the alternate's partition ID or assign it one. This time

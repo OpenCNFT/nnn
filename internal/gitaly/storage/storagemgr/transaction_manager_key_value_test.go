@@ -629,7 +629,7 @@ func generateKeyValueTests(setup testTransactionSetup) []transactionTestCase {
 				SetKey{TransactionID: 1, Key: "key-2", Value: "value-2"},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,

@@ -79,7 +79,7 @@ func newStubPartitionFactory() PartitionFactory {
 						commit: func(ctx context.Context) error {
 							// Commits fail if partition is closed.
 							if isClosing() {
-								return ErrTransactionProcessingStopped
+								return storage.ErrTransactionProcessingStopped
 							}
 
 							// Commits fail if context is done.
@@ -578,7 +578,7 @@ func TestPartitionManager(t *testing.T) {
 						},
 						closePartition{},
 						commit{
-							expectedError: ErrTransactionProcessingStopped,
+							expectedError: storage.ErrTransactionProcessingStopped,
 						},
 					},
 				}

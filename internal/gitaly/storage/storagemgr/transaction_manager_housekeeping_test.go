@@ -1348,7 +1348,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 2,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,

@@ -288,7 +288,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				CloseManager{},
 				Commit{
 					TransactionID: 2,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 			},
 			expectedState: StateAssertion{

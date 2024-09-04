@@ -45,16 +45,6 @@ import (
 var (
 	// ErrRepositoryAlreadyExists is attempting to create a repository that already exists.
 	ErrRepositoryAlreadyExists = structerr.NewAlreadyExists("repository already exists")
-	// ErrRepositoryNotFound is returned when the repository doesn't exist.
-	ErrRepositoryNotFound = structerr.NewNotFound("repository not found")
-	// ErrTransactionProcessingStopped is returned when the TransactionManager stops processing transactions.
-	ErrTransactionProcessingStopped = errors.New("transaction processing stopped")
-	// ErrTransactionAlreadyCommitted is returned when attempting to rollback or commit a transaction that
-	// already had commit called on it.
-	ErrTransactionAlreadyCommitted = errors.New("transaction already committed")
-	// ErrTransactionAlreadyRollbacked is returned when attempting to rollback or commit a transaction that
-	// already had rollback called on it.
-	ErrTransactionAlreadyRollbacked = errors.New("transaction already rollbacked")
 	// errInitializationFailed is returned when the TransactionManager failed to initialize successfully.
 	errInitializationFailed = errors.New("initializing transaction processing failed")
 	// errCommittedEntryGone is returned when the log entry of a LSN is gone from database while it's still
@@ -427,7 +417,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-mgr.ctx.Done():
-		return nil, ErrTransactionProcessingStopped
+		return nil, storage.ErrTransactionProcessingStopped
 	case <-readReady:
 		txn.db = mgr.db.NewTransaction(txn.write)
 		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
@@ -539,9 +529,9 @@ func (txn *Transaction) updateState(newState transactionState) error {
 		txn.state = newState
 		return nil
 	case transactionStateRollback:
-		return ErrTransactionAlreadyRollbacked
+		return storage.ErrTransactionAlreadyRollbacked
 	case transactionStateCommit:
-		return ErrTransactionAlreadyCommitted
+		return storage.ErrTransactionAlreadyCommitted
 	default:
 		return fmt.Errorf("unknown transaction state: %q", txn.state)
 	}
@@ -1247,12 +1237,12 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-mgr.closed:
-			return ErrTransactionProcessingStopped
+			return storage.ErrTransactionProcessingStopped
 		}
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-mgr.closing:
-		return ErrTransactionProcessingStopped
+		return storage.ErrTransactionProcessingStopped
 	}
 }
 
@@ -2090,7 +2080,7 @@ func unwrapExpectedError(err error) error {
 	// The manager controls its own execution context and it is canceled only when Stop is called.
 	// Any context.Canceled errors returned are thus from shutting down so we report that here.
 	if errors.Is(err, context.Canceled) {
-		return ErrTransactionProcessingStopped
+		return storage.ErrTransactionProcessingStopped
 	}
 
 	return err
@@ -2103,7 +2093,7 @@ func unwrapExpectedError(err error) error {
 // once they've been applied to the repository.
 //
 // Run keeps running until Stop is called or it encounters a fatal error. All transactions will error with
-// ErrTransactionProcessingStopped when Run returns.
+// storage.ErrTransactionProcessingStopped when Run returns.
 func (mgr *TransactionManager) Run() (returnedErr error) {
 	defer func() {
 		// On-going operations may fail with a context canceled error if the manager is stopped. This is
@@ -2198,7 +2188,7 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 		if transaction.repositoryCreation != nil && repositoryExists {
 			return ErrRepositoryAlreadyExists
 		} else if transaction.repositoryCreation == nil && !repositoryExists {
-			return ErrRepositoryNotFound
+			return storage.ErrRepositoryNotFound
 		}
 
 		alternateRelativePath, err := mgr.verifyAlternateUpdate(ctx, transaction)
@@ -2686,7 +2676,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 
 	alternateRelativePath := filepath.Dir(alternateObjectsDir)
 	if alternateRelativePath == transaction.relativePath {
-		return "", errAlternatePointsToSelf
+		return "", storage.ErrAlternatePointsToSelf
 	}
 
 	// Check that the alternate repository exists. This works as a basic conflict check
@@ -2699,7 +2689,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 	if _, err := gitstorage.ReadAlternatesFile(alternateRepositoryPath); !errors.Is(err, gitstorage.ErrNoAlternate) {
 		if err == nil {
 			// We don't support chaining alternates like repo-1 > repo-2 > repo-3.
-			return "", errAlternateHasAlternate
+			return "", storage.ErrAlternateHasAlternate
 		}
 
 		return "", fmt.Errorf("read alternates file: %w", err)

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -135,7 +136,7 @@ func (m *GitLabHookManager) PostReceiveHook(ctx context.Context, repo *gitalypb.
 
 		// The transaction may already be committed if the RPC invokes git-receive-pack(1) with the
 		// proc-receive hook enabled. Ignore the error indicating that here.
-		if err := tx.Commit(ctx); err != nil && !errors.Is(err, storagemgr.ErrTransactionAlreadyCommitted) {
+		if err := tx.Commit(ctx); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
 			return fmt.Errorf("commit transaction: %w", err)
 		}
 
