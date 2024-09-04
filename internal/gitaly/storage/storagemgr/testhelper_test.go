@@ -1044,11 +1044,9 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	repoPath, err := repo.Path(ctx)
 	require.NoError(t, err)
 
-	rawDatabase, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+	database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
 	require.NoError(t, err)
-	defer testhelper.MustClose(t, rawDatabase)
-
-	database := keyvalue.NewPrefixedTransactioner(rawDatabase, keyPrefixPartition(setup.PartitionID))
+	defer testhelper.MustClose(t, database)
 
 	storagePath := setup.Config.Storages[0].Path
 	stateDir := filepath.Join(storagePath, "state")
