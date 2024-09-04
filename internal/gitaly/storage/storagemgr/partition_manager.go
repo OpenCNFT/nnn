@@ -41,9 +41,15 @@ type transactionManager interface {
 type transactionManagerFactory func(
 	logger log.Logger,
 	partitionID storage.PartitionID,
-	storageMgr *storageManager,
+	db keyvalue.Transactioner,
+	storageName string,
+	storagePath string,
+	absoluteStateDir string,
+	stagingDir string,
 	cmdFactory gitcmd.CommandFactory,
-	absoluteStateDir, stagingDir string,
+	repoFactory localrepo.StorageScopedFactory,
+	metrics transactionManagerMetrics,
+	logConsumer LogConsumer,
 ) transactionManager
 
 // PartitionManager is responsible for managing the lifecycle of each TransactionManager.
@@ -55,6 +61,8 @@ type PartitionManager struct {
 	// transactionManagerFactory is a factory to create TransactionManagers. This shouldn't ever be changed
 	// during normal operation, but can be used to adjust the transaction manager's behaviour in tests.
 	transactionManagerFactory transactionManagerFactory
+	// consumer consumes the WAL from the partitions.
+	consumer LogConsumer
 	// consumerCleanup closes the LogConsumer.
 	consumerCleanup func()
 	// metrics accounts for all metrics of transaction operations. It will be
@@ -285,34 +293,34 @@ func NewPartitionManager(
 		metrics:        metrics,
 	}
 
-	var logConsumer LogConsumer
-	var cleanup func()
 	if consumerFactory != nil {
-		logConsumer, cleanup = consumerFactory(pm)
+		pm.consumer, pm.consumerCleanup = consumerFactory(pm)
 	}
 
-	pm.consumerCleanup = cleanup
 	pm.transactionManagerFactory = func(
 		logger log.Logger,
 		partitionID storage.PartitionID,
-		storageMgr *storageManager,
+		db keyvalue.Transactioner,
+		storageName string,
+		storagePath string,
+		absoluteStateDir string,
+		stagingDir string,
 		cmdFactory gitcmd.CommandFactory,
-		absoluteStateDir, stagingDir string,
+		repoFactory localrepo.StorageScopedFactory,
+		metrics transactionManagerMetrics,
+		logConsumer LogConsumer,
 	) transactionManager {
 		return NewTransactionManager(
 			partitionID,
 			logger,
-			keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),
-			storageMgr.name,
-			storageMgr.path,
+			db,
+			storageName,
+			storagePath,
 			absoluteStateDir,
 			stagingDir,
 			cmdFactory,
-			storageMgr.repoFactory,
-			newTransactionManagerMetrics(
-				metrics.housekeeping,
-				metrics.snapshot.Scope(storageMgr.name),
-			),
+			repoFactory,
+			metrics,
 			logConsumer,
 		)
 	}
@@ -493,7 +501,22 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 
 			logger := storageMgr.logger.WithField("partition_id", partitionID)
 
-			mgr := pm.transactionManagerFactory(logger, partitionID, storageMgr, pm.commandFactory, absoluteStateDir, stagingDir)
+			mgr := pm.transactionManagerFactory(
+				logger,
+				partitionID,
+				keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),
+				storageMgr.name,
+				storageMgr.path,
+				absoluteStateDir,
+				stagingDir,
+				pm.commandFactory,
+				storageMgr.repoFactory,
+				newTransactionManagerMetrics(
+					pm.metrics.housekeeping,
+					pm.metrics.snapshot.Scope(storageMgr.name),
+				),
+				pm.consumer,
+			)
 
 			ptn.transactionManager = mgr
 

@@ -436,10 +436,16 @@ func TestPartitionManager(t *testing.T) {
 					},
 					transactionManagerFactory: func(
 						logger log.Logger,
-						testPartitionID storage.PartitionID,
-						storageMgr *storageManager,
-						commandFactory gitcmd.CommandFactory,
-						absoluteStateDir, stagingDir string,
+						partitionID storage.PartitionID,
+						db keyvalue.Transactioner,
+						storageName string,
+						storagePath string,
+						absoluteStateDir string,
+						stagingDir string,
+						cmdFactory gitcmd.CommandFactory,
+						repoFactory localrepo.StorageScopedFactory,
+						metrics transactionManagerMetrics,
+						logConsumer LogConsumer,
 					) transactionManager {
 						isClosing := false
 						return mockTransactionManager{
@@ -480,10 +486,16 @@ func TestPartitionManager(t *testing.T) {
 					},
 					transactionManagerFactory: func(
 						logger log.Logger,
-						testPartitionID storage.PartitionID,
-						storageMgr *storageManager,
-						commandFactory gitcmd.CommandFactory,
-						absoluteStateDir, stagingDir string,
+						partitionID storage.PartitionID,
+						db keyvalue.Transactioner,
+						storageName string,
+						storagePath string,
+						absoluteStateDir string,
+						stagingDir string,
+						cmdFactory gitcmd.CommandFactory,
+						repoFactory localrepo.StorageScopedFactory,
+						metrics transactionManagerMetrics,
+						logConsumer LogConsumer,
 					) transactionManager {
 						isClosing := false
 						return mockTransactionManager{
