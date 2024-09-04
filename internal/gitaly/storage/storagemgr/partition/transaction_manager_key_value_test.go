@@ -1,4 +1,4 @@
-package storagemgr
+package partition
 
 import (
 	"github.com/dgraph-io/badger/v4"

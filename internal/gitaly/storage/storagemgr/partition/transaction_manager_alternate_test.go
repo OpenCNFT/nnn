@@ -1,4 +1,4 @@
-package storagemgr
+package partition
 
 import (
 	"bytes"

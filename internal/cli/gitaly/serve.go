@@ -37,6 +37,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raft"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
@@ -379,7 +380,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
 	snapshotMetrics := snapshot.NewMetrics()
 	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics)
-	txManagerMetrics := storagemgr.NewTransactionManagerMetrics(housekeepingMetrics, snapshotMetrics)
+	txManagerMetrics := partition.NewTransactionManagerMetrics(housekeepingMetrics, snapshotMetrics)
 
 	var txMiddleware server.TransactionMiddleware
 	var partitionMgr *storagemgr.PartitionManager
@@ -419,7 +420,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			logger,
 			dbMgr,
 			cfg.Prometheus,
-			storagemgr.NewPartitionFactory(
+			partition.NewFactory(
 				gitCmdFactory,
 				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 				txManagerMetrics,
@@ -482,7 +483,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				logger,
 				dbMgr,
 				cfg.Prometheus,
-				storagemgr.NewPartitionFactory(
+				partition.NewFactory(
 					gitCmdFactory,
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 					txManagerMetrics,

@@ -21,6 +21,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -806,7 +807,7 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 	}
 
 	expectedErr := testhelper.WithOrWithoutWAL(
-		structerr.NewFailedPrecondition("%w", storagemgr.ReferenceVerificationError{
+		structerr.NewFailedPrecondition("%w", partition.ReferenceVerificationError{
 			ReferenceName:  "refs/heads/branch",
 			ExpectedOldOID: git.ObjectID(commits.left.String()),
 			ActualOldOID:   concurrentCommitID,

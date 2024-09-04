@@ -20,6 +20,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -101,7 +102,7 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 				logger,
 				dbMgr,
 				cfg.Prometheus,
-				storagemgr.NewPartitionFactory(cmdFactory, localRepoFactory, storagemgr.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics())),
+				partition.NewFactory(cmdFactory, localRepoFactory, partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics())),
 				nil,
 			)
 			require.NoError(t, err)

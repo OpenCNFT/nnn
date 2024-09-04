@@ -12,6 +12,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -34,10 +35,10 @@ func TestDbForMetadataGroup(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, storagemgr.NewPartitionFactory(
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
 		cmdFactory,
 		localRepoFactory,
-		storagemgr.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
 	), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
@@ -111,10 +112,10 @@ func TestDbForStorage(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, storagemgr.NewPartitionFactory(
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
 		cmdFactory,
 		localRepoFactory,
-		storagemgr.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
 	), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)

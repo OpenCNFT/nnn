@@ -1,106 +1,28 @@
-package storagemgr
+package partition
 
 import (
+	"context"
 	"testing"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
-func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
+func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
+	customSetup := func(t *testing.T, ctx context.Context, testPartitionID storage.PartitionID, relativePath string) testTransactionSetup {
+		setup := setupTest(t, ctx, testPartitionID, relativePath)
+		setup.Consumer = &MockLogConsumer{}
+
+		return setup
+	}
+
 	return []transactionTestCase{
 		{
-			desc: "update default branch with existing branch",
-			steps: steps{
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					TransactionID: 1,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-					},
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{setup.RelativePath},
-					ExpectedSnapshotLSN: 1,
-				},
-				Commit{
-					TransactionID: 2,
-					DefaultBranchUpdate: &DefaultBranchUpdate{
-						Reference: "refs/heads/branch2",
-					},
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-				},
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						DefaultBranch: "refs/heads/branch2",
-						References: gittest.FilesOrReftables(
-							&ReferencesState{
-								FilesBackend: &FilesBackendState{
-									LooseReferences: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/branch2": setup.Commits.First.OID,
-										"refs/heads/main":    setup.Commits.First.OID,
-									},
-								},
-							}, &ReferencesState{
-								ReftableBackend: &ReftableBackendState{
-									Tables: []ReftableTable{
-										{
-											MinIndex: 1,
-											MaxIndex: 1,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/main",
-													IsSymbolic: true,
-												},
-											},
-										},
-										{
-											MinIndex: 2,
-											MaxIndex: 2,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/branch2",
-													Target: setup.Commits.First.OID.String(),
-												},
-												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.First.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 3,
-											MaxIndex: 3,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/branch2",
-													IsSymbolic: true,
-												},
-											},
-										},
-									},
-								},
-							},
-						),
-					},
-				},
-			},
-		},
-		{
-			desc: "update default branch with new branch created in same transaction",
+			desc:        "unacknowledged entry not pruned",
+			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
 				Begin{
@@ -111,109 +33,6 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 					TransactionID: 1,
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-					},
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{setup.RelativePath},
-					ExpectedSnapshotLSN: 1,
-				},
-				Commit{
-					TransactionID: 2,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-						"refs/heads/main":    {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
-					},
-					DefaultBranchUpdate: &DefaultBranchUpdate{
-						Reference: "refs/heads/branch2",
-					},
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-				},
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						DefaultBranch: "refs/heads/branch2",
-						References: gittest.FilesOrReftables(
-							&ReferencesState{
-								FilesBackend: &FilesBackendState{
-									LooseReferences: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/branch2": setup.Commits.First.OID,
-										"refs/heads/main":    setup.Commits.Second.OID,
-									},
-								},
-							}, &ReferencesState{
-								ReftableBackend: &ReftableBackendState{
-									Tables: []ReftableTable{
-										{
-											MinIndex: 1,
-											MaxIndex: 1,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/main",
-													IsSymbolic: true,
-												},
-											},
-										},
-										{
-											MinIndex: 2,
-											MaxIndex: 2,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.First.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 3,
-											MaxIndex: 3,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/branch2",
-													Target: setup.Commits.First.OID.String(),
-												},
-												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.Second.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 4,
-											MaxIndex: 4,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/branch2",
-													IsSymbolic: true,
-												},
-											},
-										},
-									},
-								},
-							},
-						),
-					},
-				},
-			},
-		},
-		{
-			desc: "update default branch to point to a non-existent reference name",
-			steps: steps{
-				StartManager{},
-				Begin{
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-					},
-					DefaultBranchUpdate: &DefaultBranchUpdate{
-						Reference: "refs/heads/non-existent",
 					},
 				},
 			},
@@ -221,9 +40,18 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
+					"/":                           {Mode: mode.Directory},
+					"/wal":                        {Mode: mode.Directory},
+					"/wal/0000000000001":          {Mode: mode.Directory},
+					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
+					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
-						DefaultBranch: "refs/heads/non-existent",
+						DefaultBranch: "refs/heads/main",
 						References: gittest.FilesOrReftables(
 							&ReferencesState{
 								FilesBackend: &FilesBackendState{
@@ -255,27 +83,21 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 												},
 											},
 										},
-										{
-											MinIndex: 3,
-											MaxIndex: 3,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/non-existent",
-													IsSymbolic: true,
-												},
-											},
-										},
 									},
 								},
 							},
 						),
 					},
 				},
+				Consumers: ConsumerState{
+					ManagerPosition: 0,
+					HighWaterMark:   1,
+				},
 			},
 		},
 		{
-			desc: "update default branch to point to reference being deleted in the same transaction",
+			desc:        "acknowledged entry pruned",
+			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
 				Begin{
@@ -285,32 +107,24 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				Commit{
 					TransactionID: 1,
 					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{setup.RelativePath},
-					ExpectedSnapshotLSN: 1,
-				},
-				Commit{
-					TransactionID: 2,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/branch2": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
-					},
-					DefaultBranchUpdate: &DefaultBranchUpdate{
-						Reference: "refs/heads/branch2",
-					},
+				ConsumerAcknowledge{
+					LSN: 1,
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+				},
+				Directory: testhelper.DirectoryState{
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
-						DefaultBranch: "refs/heads/branch2",
+						DefaultBranch: "refs/heads/main",
 						References: gittest.FilesOrReftables(
 							&ReferencesState{
 								FilesBackend: &FilesBackendState{
@@ -337,33 +151,8 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 											MaxIndex: 2,
 											References: []git.Reference{
 												{
-													Name:   "refs/heads/branch2",
-													Target: setup.Commits.First.OID.String(),
-												},
-												{
 													Name:   "refs/heads/main",
 													Target: setup.Commits.First.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 3,
-											MaxIndex: 3,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/branch2",
-													Target: setup.ObjectHash.ZeroOID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 4,
-											MaxIndex: 4,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/branch2",
-													IsSymbolic: true,
 												},
 											},
 										},
@@ -373,10 +162,15 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 						),
 					},
 				},
+				Consumers: ConsumerState{
+					ManagerPosition: 1,
+					HighWaterMark:   1,
+				},
 			},
 		},
 		{
-			desc: "update default branch with existing branch and other modifications",
+			desc:        "acknowledging a later entry prunes prior entries",
+			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
 				Begin{
@@ -386,8 +180,7 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				Commit{
 					TransactionID: 1,
 					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
 				Begin{
@@ -400,24 +193,27 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
-					DefaultBranchUpdate: &DefaultBranchUpdate{
-						Reference: "refs/heads/branch2",
-					},
+				},
+				ConsumerAcknowledge{
+					LSN: 2,
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(2).ToProto(),
 				},
+				Directory: testhelper.DirectoryState{
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
+				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
-						DefaultBranch: "refs/heads/branch2",
+						DefaultBranch: "refs/heads/main",
 						References: gittest.FilesOrReftables(
 							&ReferencesState{
 								FilesBackend: &FilesBackendState{
 									LooseReferences: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/branch2": setup.Commits.First.OID,
-										"refs/heads/main":    setup.Commits.Second.OID,
+										"refs/heads/main": setup.Commits.Second.OID,
 									},
 								},
 							}, &ReferencesState{
@@ -438,10 +234,6 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 											MinIndex: 2,
 											MaxIndex: 2,
 											References: []git.Reference{
-												{
-													Name:   "refs/heads/branch2",
-													Target: setup.Commits.First.OID.String(),
-												},
 												{
 													Name:   "refs/heads/main",
 													Target: setup.Commits.First.OID.String(),
@@ -458,36 +250,23 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 												},
 											},
 										},
-										{
-											MinIndex: 4,
-											MaxIndex: 4,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/branch2",
-													IsSymbolic: true,
-												},
-											},
-										},
 									},
 								},
 							},
 						),
 					},
 				},
+				Consumers: ConsumerState{
+					ManagerPosition: 2,
+					HighWaterMark:   2,
+				},
 			},
 		},
 		{
-			desc: "update default branch fails before storing log index",
+			desc:        "dependent transaction blocks pruning acknowledged entry",
+			customSetup: customSetup,
 			steps: steps{
-				StartManager{
-					Hooks: testTransactionHooks{
-						BeforeStoreAppliedLSN: func(hookCtx hookContext) {
-							panic(errSimulatedCrash)
-						},
-					},
-					ExpectedError: errSimulatedCrash,
-				},
+				StartManager{},
 				Begin{
 					TransactionID: 1,
 					RelativePaths: []string{setup.RelativePath},
@@ -495,43 +274,44 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 				Commit{
 					TransactionID: 1,
 					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main":    {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-						"refs/heads/branch2": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					DefaultBranchUpdate: &DefaultBranchUpdate{
-						Reference: "refs/heads/branch2",
-					},
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				ConsumerAcknowledge{
+					LSN: 1,
+				},
+				CloseManager{},
+				Commit{
+					TransactionID: 2,
 					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
-				AssertManager{
-					ExpectedError: errSimulatedCrash,
-				},
-				StartManager{},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{setup.RelativePath},
-					ExpectedSnapshotLSN: 1,
-				},
-				Commit{
-					TransactionID: 2,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
-					},
-				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
+					"/":                           {Mode: mode.Directory},
+					"/wal":                        {Mode: mode.Directory},
+					"/wal/0000000000001":          {Mode: mode.Directory},
+					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
+					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
-						DefaultBranch: "refs/heads/branch2",
+						DefaultBranch: "refs/heads/main",
 						References: gittest.FilesOrReftables(
 							&ReferencesState{
 								FilesBackend: &FilesBackendState{
 									LooseReferences: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main":    setup.Commits.Second.OID,
-										"refs/heads/branch2": setup.Commits.First.OID,
+										"refs/heads/main": setup.Commits.First.OID,
 									},
 								},
 							}, &ReferencesState{
@@ -553,9 +333,124 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 											MaxIndex: 2,
 											References: []git.Reference{
 												{
-													Name:   "refs/heads/branch2",
+													Name:   "refs/heads/main",
 													Target: setup.Commits.First.OID.String(),
 												},
+											},
+										},
+									},
+								},
+							},
+						),
+					},
+				},
+				Consumers: ConsumerState{
+					ManagerPosition: 1,
+					HighWaterMark:   1,
+				},
+			},
+		},
+		{
+			desc:        "consumer position zeroed lsn on restart",
+			customSetup: customSetup,
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				ConsumerAcknowledge{
+					LSN: 1,
+				},
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				Commit{
+					TransactionID: 2,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/other": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
+					},
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				Begin{
+					TransactionID:       4,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				ConsumerAcknowledge{
+					LSN: 2,
+				},
+				Commit{
+					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/third": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Third.OID},
+					},
+				},
+				ConsumerAcknowledge{
+					LSN: 3,
+				},
+				CloseManager{},
+				StartManager{},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+				},
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
+					"/":                           {Mode: mode.Directory},
+					"/wal":                        {Mode: mode.Directory},
+					"/wal/0000000000002":          {Mode: mode.Directory},
+					"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/other", setup.Commits.Second.OID)),
+					"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.Second.OID + "\n")},
+					"/wal/0000000000003":          {Mode: mode.Directory},
+					"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/third", setup.Commits.Third.OID)),
+					"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.Third.OID + "\n")},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					2: {{"refs/heads/other": git.ReferenceUpdate{NewOID: setup.Commits.Second.OID}}},
+					3: {{"refs/heads/third": git.ReferenceUpdate{NewOID: setup.Commits.Third.OID}}},
+				})),
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":  setup.Commits.First.OID,
+										"refs/heads/other": setup.Commits.Second.OID,
+										"refs/heads/third": setup.Commits.Third.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
 												{
 													Name:   "refs/heads/main",
 													Target: setup.Commits.First.OID.String(),
@@ -567,9 +462,8 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 											MaxIndex: 3,
 											References: []git.Reference{
 												{
-													Name:       "HEAD",
-													Target:     "refs/heads/branch2",
-													IsSymbolic: true,
+													Name:   "refs/heads/other",
+													Target: setup.Commits.Second.OID.String(),
 												},
 											},
 										},
@@ -578,8 +472,8 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 											MaxIndex: 4,
 											References: []git.Reference{
 												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.Second.OID.String(),
+													Name:   "refs/heads/third",
+													Target: setup.Commits.Third.OID.String(),
 												},
 											},
 										},
@@ -588,6 +482,89 @@ func generateDefaultBranchTests(t *testing.T, setup testTransactionSetup) []tran
 							},
 						),
 					},
+				},
+				Consumers: ConsumerState{
+					ManagerPosition: 0,
+					HighWaterMark:   3,
+				},
+			},
+		},
+		{
+			desc:        "stopped manager does not prune acknowledged entry",
+			customSetup: customSetup,
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				CloseManager{},
+				ConsumerAcknowledge{
+					LSN: 1,
+				},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+				},
+				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
+					"/":                           {Mode: mode.Directory},
+					"/wal":                        {Mode: mode.Directory},
+					"/wal/0000000000001":          {Mode: mode.Directory},
+					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
+					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+				})),
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						),
+					},
+				},
+				Consumers: ConsumerState{
+					ManagerPosition: 1,
+					HighWaterMark:   1,
 				},
 			},
 		},

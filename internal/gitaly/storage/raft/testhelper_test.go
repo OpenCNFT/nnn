@@ -22,6 +22,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -368,10 +369,10 @@ func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.Partiti
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, storagemgr.NewPartitionFactory(
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
 		cmdFactory,
 		localRepoFactory,
-		storagemgr.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
 	), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)

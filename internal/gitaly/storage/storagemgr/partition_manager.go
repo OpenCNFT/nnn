@@ -13,8 +13,6 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -54,62 +52,6 @@ type PartitionFactory interface {
 		stagingDir string,
 		logConsumer storage.LogConsumer,
 	) Partition
-}
-
-type partitionFactory struct {
-	cmdFactory  gitcmd.CommandFactory
-	repoFactory localrepo.Factory
-	metrics     TransactionManagerMetrics
-}
-
-func (f partitionFactory) New(
-	logger log.Logger,
-	partitionID storage.PartitionID,
-	db keyvalue.Transactioner,
-	storageName string,
-	storagePath string,
-	absoluteStateDir string,
-	stagingDir string,
-	logConsumer storage.LogConsumer,
-) Partition {
-	// ScopeByStorage takes in context to pass it to the locator. This may be useful in the
-	// RPC handlers to rewrite the storage in the future but never here. Requiring a context
-	// here is more of a structural issue in the code, and is not useful.
-	repoFactory, err := f.repoFactory.ScopeByStorage(context.Background(), storageName)
-	if err != nil {
-		// ScopeByStorage will only error if accessing a non existent storage. This can't
-		// be the case when Factory is used as the storage is already verified.
-		// This is a layering issue in the code, and not a realistic error scenario. We
-		// thus panic out rather than make the error part of the interface.
-		panic(fmt.Errorf("building a partition for a non-existent storage: %q", storageName))
-	}
-
-	return NewTransactionManager(
-		partitionID,
-		logger,
-		db,
-		storageName,
-		storagePath,
-		absoluteStateDir,
-		stagingDir,
-		f.cmdFactory,
-		repoFactory,
-		f.metrics,
-		logConsumer,
-	)
-}
-
-// NewPartitionFactory returns a new PartitionFactory.
-func NewPartitionFactory(
-	cmdFactory gitcmd.CommandFactory,
-	repoFactory localrepo.Factory,
-	metrics TransactionManagerMetrics,
-) PartitionFactory {
-	return partitionFactory{
-		cmdFactory:  cmdFactory,
-		repoFactory: repoFactory,
-		metrics:     metrics,
-	}
 }
 
 // PartitionManager is responsible for managing the lifecycle of each TransactionManager.

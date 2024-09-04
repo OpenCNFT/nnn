@@ -30,6 +30,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
@@ -351,10 +352,10 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 			gsd.logger,
 			dbMgr,
 			cfg.Prometheus,
-			storagemgr.NewPartitionFactory(
+			partition.NewFactory(
 				gsd.gitCmdFactory,
 				localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
-				storagemgr.NewTransactionManagerMetrics(
+				partition.NewTransactionManagerMetrics(
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
 				),
