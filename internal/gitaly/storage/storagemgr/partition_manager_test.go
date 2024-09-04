@@ -28,11 +28,37 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
-// stoppedTransactionManager is a wrapper type that prevents the transactionManager from
-// running. This is useful in tests that test certain order of operations.
-type stoppedTransactionManager struct{ transactionManager }
+type mockTransactionManager struct {
+	begin     func(context.Context, storage.BeginOptions) (storage.Transaction, error)
+	run       func() error
+	close     func()
+	isClosing func() bool
+}
 
-func (stoppedTransactionManager) Run() error { return nil }
+func (m mockTransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+	return m.begin(ctx, opts)
+}
+
+func (m mockTransactionManager) Run() error {
+	return m.run()
+}
+
+func (m mockTransactionManager) Close() {
+	m.close()
+}
+
+func (m mockTransactionManager) IsClosing() bool {
+	return m.isClosing()
+}
+
+type mockTransaction struct {
+	storage.Transaction
+	commit func(context.Context) error
+}
+
+func (m mockTransaction) Commit(ctx context.Context) error {
+	return m.commit(ctx)
+}
 
 func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storage.PartitionID, expectOpen bool) {
 	t.Helper()
@@ -415,24 +441,15 @@ func TestPartitionManager(t *testing.T) {
 						commandFactory gitcmd.CommandFactory,
 						absoluteStateDir, stagingDir string,
 					) transactionManager {
-						metrics := newMetrics(cfg.Prometheus)
-						return stoppedTransactionManager{
-							transactionManager: NewTransactionManager(
-								testPartitionID,
-								logger,
-								storageMgr.database,
-								storageMgr.name,
-								storageMgr.path,
-								absoluteStateDir,
-								stagingDir,
-								commandFactory,
-								storageMgr.repoFactory,
-								newTransactionManagerMetrics(
-									metrics.housekeeping,
-									metrics.snapshot.Scope(storageMgr.name),
-								),
-								nil,
-							),
+						isClosing := false
+						return mockTransactionManager{
+							run: func() error { return nil },
+							begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+								<-ctx.Done()
+								return nil, ctx.Err()
+							},
+							close:     func() { isClosing = true },
+							isClosing: func() bool { return isClosing },
 						}
 					},
 				}
@@ -468,31 +485,20 @@ func TestPartitionManager(t *testing.T) {
 						commandFactory gitcmd.CommandFactory,
 						absoluteStateDir, stagingDir string,
 					) transactionManager {
-						metrics := newMetrics(cfg.Prometheus)
-						txMgr := NewTransactionManager(
-							testPartitionID,
-							logger,
-							storageMgr.database,
-							storageMgr.name,
-							storageMgr.path,
-							absoluteStateDir,
-							stagingDir,
-							commandFactory,
-							storageMgr.repoFactory,
-							newTransactionManagerMetrics(
-								metrics.housekeeping,
-								metrics.snapshot.Scope(storageMgr.name),
-							),
-							nil,
-						)
-
-						// Unset the admission queue. This has the effect that we will block
-						// indefinitely when trying to submit the transaction to it in the
-						// commit step. Like this, we can racelessly verify that the context
-						// cancellation does indeed abort the commit.
-						txMgr.admissionQueue = nil
-
-						return txMgr
+						isClosing := false
+						return mockTransactionManager{
+							run: func() error { return nil },
+							begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+								return mockTransaction{
+									commit: func(ctx context.Context) error {
+										<-ctx.Done()
+										return ctx.Err()
+									},
+								}, ctx.Err()
+							},
+							close:     func() { isClosing = true },
+							isClosing: func() bool { return isClosing },
+						}
 					},
 				}
 			},
