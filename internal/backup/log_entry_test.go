@@ -18,7 +18,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -43,7 +42,7 @@ type mockLogManagerAccessor struct {
 	sync.Mutex
 }
 
-func (lma *mockLogManagerAccessor) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(storagemgr.LogManager)) error {
+func (lma *mockLogManagerAccessor) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(storage.LogManager)) error {
 	lma.Lock()
 	defer lma.Unlock()
 
@@ -55,7 +54,7 @@ func (lma *mockLogManagerAccessor) CallLogManager(ctx context.Context, storageNa
 	return nil
 }
 
-func (lm *mockLogManager) AcknowledgeTransaction(_ storagemgr.LogConsumer, lsn storage.LSN) {
+func (lm *mockLogManager) AcknowledgeTransaction(_ storage.LogConsumer, lsn storage.LSN) {
 	lm.Lock()
 	defer lm.Unlock()
 

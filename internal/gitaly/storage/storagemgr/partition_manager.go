@@ -29,6 +29,10 @@ import (
 // ErrPartitionManagerClosed is returned when the PartitionManager stops processing transactions.
 var ErrPartitionManagerClosed = errors.New("partition manager closed")
 
+// LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
+// a function to close the LogConsumer.
+type LogConsumerFactory func(storage.LogManagerAccessor) (_ storage.LogConsumer, cleanup func())
+
 // Partition is the interface of a Partition as used by PartitionManager.
 type Partition interface {
 	Begin(context.Context, storage.BeginOptions) (storage.Transaction, error)
@@ -49,7 +53,7 @@ type PartitionFactory interface {
 		absoluteStateDir string,
 		stagingDir string,
 		metrics TransactionManagerMetrics,
-		logConsumer LogConsumer,
+		logConsumer storage.LogConsumer,
 	) Partition
 }
 
@@ -67,7 +71,7 @@ func (f partitionFactory) New(
 	absoluteStateDir string,
 	stagingDir string,
 	metrics TransactionManagerMetrics,
-	logConsumer LogConsumer,
+	logConsumer storage.LogConsumer,
 ) Partition {
 	// ScopeByStorage takes in context to pass it to the locator. This may be useful in the
 	// RPC handlers to rewrite the storage in the future but never here. Requiring a context
@@ -112,7 +116,7 @@ type PartitionManager struct {
 	// during normal operation, but can be used to adjust the partition's behaviour in tests.
 	partitionFactory PartitionFactory
 	// consumer consumes the WAL from the partitions.
-	consumer LogConsumer
+	consumer storage.LogConsumer
 	// consumerCleanup closes the LogConsumer.
 	consumerCleanup func()
 	// metrics accounts for all metrics of transaction operations. It will be
@@ -456,7 +460,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 }
 
 // CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(lm LogManager)) error {
+func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
 	storageMgr, ok := pm.storages[storageName]
 	if !ok {
 		return structerr.NewNotFound("unknown storage: %q", storageName)
@@ -469,7 +473,7 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 
 	defer storageMgr.finalizeTransaction(ptn)
 
-	logManager, ok := ptn.partition.(LogManager)
+	logManager, ok := ptn.partition.(storage.LogManager)
 	if !ok {
 		return fmt.Errorf("expected LogManager, got %T", logManager)
 	}

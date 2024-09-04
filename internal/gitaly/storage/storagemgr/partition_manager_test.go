@@ -35,7 +35,7 @@ type mockPartitionFactory struct {
 		absoluteStateDir string,
 		stagingDir string,
 		metrics TransactionManagerMetrics,
-		logConsumer LogConsumer,
+		logConsumer storage.LogConsumer,
 	) Partition
 }
 
@@ -52,7 +52,7 @@ func newStubPartitionFactory() PartitionFactory {
 			absoluteStateDir string,
 			stagingDir string,
 			metrics TransactionManagerMetrics,
-			logConsumer LogConsumer,
+			logConsumer storage.LogConsumer,
 		) Partition {
 			closing := make(chan struct{})
 			isClosing := func() bool {
@@ -111,7 +111,7 @@ func (m mockPartitionFactory) New(
 	absoluteStateDir string,
 	stagingDir string,
 	metrics TransactionManagerMetrics,
-	logConsumer LogConsumer,
+	logConsumer storage.LogConsumer,
 ) Partition {
 	return m.new(
 		logger,
@@ -131,7 +131,7 @@ type mockPartition struct {
 	run       func() error
 	close     func()
 	isClosing func() bool
-	LogManager
+	storage.LogManager
 }
 
 func (m mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
@@ -1292,7 +1292,7 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 	ptnID := storage.PartitionID(1)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
 
-	require.NoError(t, partitionManager.CallLogManager(ctx, cfg.Storages[0].Name, ptnID, func(lm LogManager) {
+	require.NoError(t, partitionManager.CallLogManager(ctx, cfg.Storages[0].Name, ptnID, func(lm storage.LogManager) {
 		requirePartitionOpen(t, storageMgr, ptnID, true)
 		tm, ok := lm.(Partition)
 		require.True(t, ok)

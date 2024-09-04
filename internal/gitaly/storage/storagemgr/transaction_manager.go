@@ -854,47 +854,10 @@ type committedEntry struct {
 	objectDependencies map[git.ObjectID]struct{}
 }
 
-// LogConsumer is the interface of a log consumer that is passed to a TransactionManager.
-// The LogConsumer may perform read-only operations against the on-disk log entry.
-// The TransactionManager notifies the consumer of new transactions by invoking the
-// NotifyNewTransaction method after they are committed.
-type LogConsumer interface {
-	// NotifyNewTransactions alerts the LogConsumer that new log entries are available for
-	// consumption. The method invoked both when the TransactionManager
-	// initializes and when new transactions are committed. Both the low and high water mark
-	// LSNs are sent so that a newly initialized consumer is aware of the full range of
-	// entries it can process.
-	NotifyNewTransactions(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN)
-}
-
-// LogManagerAccessor is the interface used by the LogManager coordinator. It is called by
-// by LogConsumers to access LogManagers. A LogManager that notified a LogConsumer of a transaction
-// may have closed by the time the consumer has finished acting on the log entry. The LogManagerAccessor
-// ensures that the LogManager is available to receive the consumer's response.
-type LogManagerAccessor interface {
-	// CallLogManager executes the provided function against the requested LogManager, starting it
-	// if necessary.
-	CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(LogManager)) error
-}
-
-// LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
-// a function to close the LogConsumer.
-type LogConsumerFactory func(LogManagerAccessor) (_ LogConsumer, cleanup func())
-
-// LogManager is the interface used on the consumer side of the integration. The consumer
-// has the ability to acknowledge transactions as having been processed with AcknowledgeTransaction.
-type LogManager interface {
-	// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
-	// for the specified LogConsumer.
-	AcknowledgeTransaction(consumer LogConsumer, lsn storage.LSN)
-	// GetTransactionPath returns the path of the log entry's root directory.
-	GetTransactionPath(lsn storage.LSN) string
-}
-
 // AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
 // for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
 // completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(consumer LogConsumer, lsn storage.LSN) {
+func (mgr *TransactionManager) AcknowledgeTransaction(consumer storage.LogConsumer, lsn storage.LSN) {
 	mgr.consumerPos.setPosition(lsn)
 
 	// Alert the manager. If it has a pending acknowledgement already no action is required.
@@ -1059,7 +1022,7 @@ type TransactionManager struct {
 
 	// consumer is an the external caller that may perform read-only operations against applied
 	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
-	consumer LogConsumer
+	consumer storage.LogConsumer
 	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
 	consumerPos *consumerPosition
 	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
@@ -1094,7 +1057,7 @@ func NewTransactionManager(
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics TransactionManagerMetrics,
-	consumer LogConsumer,
+	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
