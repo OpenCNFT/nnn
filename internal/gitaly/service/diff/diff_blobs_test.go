@@ -614,7 +614,11 @@ func TestDiffBlobs(t *testing.T) {
 							},
 						},
 					},
-					expectedErr: structerr.NewInvalidArgument("left and right blob cannot both be null OIDs"),
+					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
+						"left and right blob revisions resolve to same OID").WithMetadataItems(
+						structerr.MetadataItem{Key: "left_revision", Value: blobID1.String()},
+						structerr.MetadataItem{Key: "right_revision", Value: blobID2.String()},
+					)),
 				}
 			},
 		},
@@ -635,7 +639,44 @@ func TestDiffBlobs(t *testing.T) {
 							},
 						},
 					},
-					expectedErr: structerr.NewInternal("generating diff: diff parser finished unexpectedly"),
+					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
+						"left and right blob revisions resolve to same OID").WithMetadataItems(
+						structerr.MetadataItem{Key: "left_revision", Value: blobID.String()},
+						structerr.MetadataItem{Key: "right_revision", Value: blobID.String()},
+					)),
+				}
+			},
+		},
+		{
+			desc: "left and right revisions resolve to same OID",
+			setup: func() setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				blobID1 := gittest.WriteBlob(t, cfg, repoPath, []byte("foo\n"))
+				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{
+						OID:  blobID1,
+						Mode: "100644",
+						Path: "foo",
+					},
+				))
+				revision := fmt.Sprintf("%s:foo", commitID.String())
+
+				return setupData{
+					request: &gitalypb.DiffBlobsRequest{
+						Repository: repoProto,
+						BlobPairs: []*gitalypb.DiffBlobsRequest_BlobPair{
+							{
+								LeftBlob:  []byte(blobID1),
+								RightBlob: []byte(fmt.Sprintf("%s:foo", commitID.String())),
+							},
+						},
+					},
+					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
+						"left and right blob revisions resolve to same OID").WithMetadataItems(
+						structerr.MetadataItem{Key: "left_revision", Value: blobID1.String()},
+						structerr.MetadataItem{Key: "right_revision", Value: revision},
+					)),
 				}
 			},
 		},

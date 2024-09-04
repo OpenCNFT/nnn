@@ -221,15 +221,8 @@ func (s *server) blobInfoPairs(
 			rightRevision: git.Revision(blobPair.RightBlob),
 		}
 
-		leftNullOID := objectHash.IsZeroOID(git.ObjectID(blobPair.LeftBlob))
-		rightNullOID := objectHash.IsZeroOID(git.ObjectID(blobPair.RightBlob))
-
-		if leftNullOID && rightNullOID {
-			return nil, structerr.NewInvalidArgument("left and right blob cannot both be null OIDs")
-		}
-
 		// Null blob IDs do not exist in the repository.
-		if !leftNullOID {
+		if !objectHash.IsZeroOID(git.ObjectID(blobPair.LeftBlob)) {
 			leftOID, err := blobInfo(ctx, reader, objectHash, blobPair.LeftBlob)
 			if err != nil {
 				return nil, structerr.NewInvalidArgument("getting left blob info: %w", err).WithMetadata(
@@ -240,7 +233,7 @@ func (s *server) blobInfoPairs(
 			blobInfoPair.leftOID = leftOID
 		}
 
-		if !rightNullOID {
+		if !objectHash.IsZeroOID(git.ObjectID(blobPair.RightBlob)) {
 			rightOID, err := blobInfo(ctx, reader, objectHash, blobPair.RightBlob)
 			if err != nil {
 				return nil, structerr.NewInvalidArgument("getting right blob info: %w", err).WithMetadata(
@@ -249,6 +242,13 @@ func (s *server) blobInfoPairs(
 				)
 			}
 			blobInfoPair.rightOID = rightOID
+		}
+
+		if blobInfoPair.leftOID == blobInfoPair.rightOID {
+			return nil, structerr.NewInvalidArgument("left and right blob revisions resolve to same OID").WithMetadataItems(
+				structerr.MetadataItem{Key: "left_revision", Value: string(blobPair.LeftBlob)},
+				structerr.MetadataItem{Key: "right_revision", Value: string(blobPair.RightBlob)},
+			)
 		}
 
 		blobInfoPairs = append(blobInfoPairs, blobInfoPair)
