@@ -32,7 +32,7 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 // transactionManager is the interface of TransactionManager as used by PartitionManager. See the
 // TransactionManager's documentation for more details.
 type transactionManager interface {
-	Begin(context.Context, storage.BeginOptions) (*Transaction, error)
+	Begin(context.Context, storage.BeginOptions) (storage.Transaction, error)
 	Run() error
 	Close()
 	isClosing() bool
@@ -135,7 +135,7 @@ type finalizableTransaction struct {
 	// finalize is called when the transaction is either committed or rolled back.
 	finalize func()
 	// Transaction is the underlying transaction.
-	*Transaction
+	storage.Transaction
 }
 
 // Commit commits the transaction and runs the finalizer.
@@ -152,7 +152,7 @@ func (tx *finalizableTransaction) Rollback() error {
 
 // newFinalizableTransaction returns a wrapped transaction that executes finalizeTransaction when the transaction
 // is committed or rolled back.
-func (sm *storageManager) newFinalizableTransaction(ptn *partition, tx *Transaction) *finalizableTransaction {
+func (sm *storageManager) newFinalizableTransaction(ptn *partition, tx storage.Transaction) *finalizableTransaction {
 	var finalizeOnce sync.Once
 	return &finalizableTransaction{
 		finalize: func() {

@@ -13,17 +13,17 @@ var errTransactionNotFound = errors.New("transaction not found")
 type TransactionRegistry struct {
 	m            sync.RWMutex
 	idSequence   storage.TransactionID
-	transactions map[storage.TransactionID]*Transaction
+	transactions map[storage.TransactionID]storage.Transaction
 }
 
 // NewTransactionRegistry returns a new TransactionRegistry.
 func NewTransactionRegistry() *TransactionRegistry {
 	return &TransactionRegistry{
-		transactions: make(map[storage.TransactionID]*Transaction),
+		transactions: make(map[storage.TransactionID]storage.Transaction),
 	}
 }
 
-func (r *TransactionRegistry) register(tx *Transaction) storage.TransactionID {
+func (r *TransactionRegistry) register(tx storage.Transaction) storage.TransactionID {
 	r.m.Lock()
 	defer r.m.Unlock()
 
@@ -39,7 +39,7 @@ func (r *TransactionRegistry) unregister(id storage.TransactionID) {
 }
 
 // Get retrieves a transaction by its ID. An error when a transaction is not found.
-func (r *TransactionRegistry) Get(id storage.TransactionID) (*Transaction, error) {
+func (r *TransactionRegistry) Get(id storage.TransactionID) (storage.Transaction, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 	tx, ok := r.transactions[id]

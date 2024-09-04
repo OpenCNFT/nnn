@@ -1151,21 +1151,25 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				Write:         !step.ReadOnly,
 				RelativePaths: step.RelativePaths,
 			})
-			require.ErrorIs(t, err, step.ExpectedError)
-			if err == nil {
-				require.Equalf(t, step.ExpectedSnapshotLSN, transaction.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")
-				require.NotEmpty(t, transaction.Root(), "empty Root")
-				require.Contains(t, transaction.Root(), transactionManager.snapshotsDir())
+			if step.ExpectedError != nil {
+				require.ErrorIs(t, err, step.ExpectedError)
+				continue
 			}
+			require.NoError(t, err)
+
+			tx := transaction.(*Transaction)
+			require.Equalf(t, step.ExpectedSnapshotLSN, tx.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")
+			require.NotEmpty(t, tx.Root(), "empty Root")
+			require.Contains(t, tx.Root(), transactionManager.snapshotsDir())
 
 			if step.ReadOnly {
 				require.Empty(t,
-					transaction.quarantineDirectory,
+					tx.quarantineDirectory,
 					"read-only transaction should not have a quarantine directory",
 				)
 			}
 
-			openTransactions[step.TransactionID] = transaction
+			openTransactions[step.TransactionID] = tx
 		case Commit:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction committed before beginning it")
 
