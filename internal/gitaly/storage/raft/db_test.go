@@ -32,7 +32,7 @@ func TestDbForMetadataGroup(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, storagemgr.NewPartitionFactory(cmdFactory, localRepoFactory), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
 
@@ -105,7 +105,7 @@ func TestDbForStorage(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, storagemgr.NewPartitionFactory(cmdFactory, localRepoFactory), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
 

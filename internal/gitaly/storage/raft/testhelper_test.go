@@ -366,7 +366,7 @@ func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.Partiti
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, storagemgr.NewPartitionFactory(cmdFactory, localRepoFactory), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
 

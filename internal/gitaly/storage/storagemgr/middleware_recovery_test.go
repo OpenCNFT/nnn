@@ -65,11 +65,13 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 	defer cache.Stop()
 
 	ptnMgr, err := NewPartitionManager(ctx, cfg.Storages,
-		cmdFactory,
-		localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, cache),
 		logger,
 		dbMgr,
 		cfg.Prometheus,
+		NewPartitionFactory(
+			cmdFactory,
+			localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, cache),
+		),
 		nil,
 	)
 	require.NoError(t, err)

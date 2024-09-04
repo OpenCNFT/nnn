@@ -1061,7 +1061,7 @@ func TestPartitionManager(t *testing.T) {
 			require.NoError(t, err)
 			defer dbMgr.Close()
 
-			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, NewPartitionFactory(cmdFactory, localRepoFactory), nil)
 			require.NoError(t, err)
 
 			if setup.partitionFactory != nil {
@@ -1224,7 +1224,7 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, NewPartitionFactory(cmdFactory, localRepoFactory), nil)
 	require.NoError(t, err)
 	defer partitionManager.Close()
 
@@ -1283,7 +1283,7 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, NewPartitionFactory(cmdFactory, localRepoFactory), nil)
 	require.NoError(t, err)
 
 	defer func() {

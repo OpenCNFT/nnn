@@ -346,11 +346,13 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		partitionManager, err = storagemgr.NewPartitionManager(
 			testhelper.Context(tb),
 			cfg.Storages,
-			gsd.gitCmdFactory,
-			localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
 			gsd.logger,
 			dbMgr,
 			cfg.Prometheus,
+			storagemgr.NewPartitionFactory(
+				gsd.gitCmdFactory,
+				localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
+			),
 			nil,
 		)
 		require.NoError(tb, err)

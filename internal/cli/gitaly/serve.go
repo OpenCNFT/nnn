@@ -409,11 +409,13 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		partitionMgr, err = storagemgr.NewPartitionManager(
 			ctx,
 			cfg.Storages,
-			gitCmdFactory,
-			localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 			logger,
 			dbMgr,
 			cfg.Prometheus,
+			storagemgr.NewPartitionFactory(
+				gitCmdFactory,
+				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+			),
 			consumerFactory,
 		)
 		if err != nil {
@@ -469,11 +471,13 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			partitionMgr, err := storagemgr.NewPartitionManager(
 				ctx,
 				cfg.Storages,
-				gitCmdFactory,
-				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 				logger,
 				dbMgr,
 				cfg.Prometheus,
+				storagemgr.NewPartitionFactory(
+					gitCmdFactory,
+					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+				),
 				nil,
 			)
 			if err != nil {

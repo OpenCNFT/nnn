@@ -96,11 +96,10 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 			partitionManager, err := storagemgr.NewPartitionManager(
 				testhelper.Context(t),
 				cfg.Storages,
-				cmdFactory,
-				localRepoFactory,
 				logger,
 				dbMgr,
 				cfg.Prometheus,
+				storagemgr.NewPartitionFactory(cmdFactory, localRepoFactory),
 				nil,
 			)
 			require.NoError(t, err)

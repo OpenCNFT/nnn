@@ -283,11 +283,10 @@ func clearStagingDirectory(stagingDir string) error {
 func NewPartitionManager(
 	ctx context.Context,
 	configuredStorages []config.Storage,
-	cmdFactory gitcmd.CommandFactory,
-	localRepoFactory localrepo.Factory,
 	logger log.Logger,
 	dbMgr *databasemgr.DBManager,
 	promCfg gitalycfgprom.Config,
+	partitionFactory PartitionFactory,
 	consumerFactory LogConsumerFactory,
 ) (*PartitionManager, error) {
 	metrics := newMetrics(promCfg)
@@ -332,7 +331,7 @@ func NewPartitionManager(
 	pm := &PartitionManager{
 		storages:         storages,
 		metrics:          metrics,
-		partitionFactory: NewPartitionFactory(cmdFactory, localRepoFactory),
+		partitionFactory: partitionFactory,
 	}
 
 	if consumerFactory != nil {
