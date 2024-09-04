@@ -46,7 +46,8 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 		return structerr.NewInternal("detecting object format: %w", err)
 	}
 
-	if _, err := s.blobInfoPairs(ctx, repo, objectHash, request.BlobPairs); err != nil {
+	blobInfoPairs, err := s.blobInfoPairs(ctx, repo, objectHash, request.BlobPairs)
+	if err != nil {
 		return err
 	}
 
@@ -70,11 +71,11 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 		limits.MaxPatchBytes = int(request.PatchBytesLimit)
 	}
 
-	for _, blobPair := range request.BlobPairs {
+	for _, blobInfoPair := range blobInfoPairs {
 		// Each diff gets computed using an independent Git process and diff parser. Ideally a
 		// single Git process could be used to process each blob pair, but unfortunately Git
 		// does not yet have a means to accomplish this.
-		blobDiff, err := diffBlob(ctx, repo, objectHash, blobPair, limits, cmdOpts)
+		blobDiff, err := diffBlob(ctx, repo, objectHash, blobInfoPair, limits, cmdOpts)
 		if err != nil {
 			return structerr.NewInternal("generating diff: %w", err)
 		}
@@ -90,12 +91,12 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 func diffBlob(ctx context.Context,
 	repo *localrepo.Repo,
 	objectHash git.ObjectHash,
-	blobPair *gitalypb.DiffBlobsRequest_BlobPair,
+	blobInfoPair blobInfoPair,
 	limits diff.Limits,
 	opts []gitcmd.Option,
 ) (*diff.Diff, error) {
-	left := string(blobPair.LeftBlob)
-	right := string(blobPair.RightBlob)
+	left := blobInfoPair.leftRevision.String()
+	right := blobInfoPair.rightRevision.String()
 
 	emptyBlob, err := emptyBlobID(objectHash)
 	if err != nil {
@@ -109,6 +110,19 @@ func diffBlob(ctx context.Context,
 
 	if objectHash.IsZeroOID(git.ObjectID(right)) {
 		right = emptyBlob.String()
+	}
+
+	// Generating diffs between identical revisions is not supported as git-diff(1) does not produce
+	// any patch or raw formatted output. Unfortunately, because NULL OIDs are rewritten to an empty
+	// blob ID, it becomes possible for revisions to resolve to the same OID. For example, the newly
+	// added file itself may also be empty and resolve to an empty blob. Luckily, it such scenarios,
+	// the resulting diff is expected to be empty. Special case this situation by detecting matching
+	// revisions and returning an empty diff early.
+	if left == blobInfoPair.rightOID.String() || right == blobInfoPair.leftOID.String() {
+		return &diff.Diff{
+			FromID: blobInfoPair.leftOID.String(),
+			ToID:   blobInfoPair.rightOID.String(),
+		}, nil
 	}
 
 	gitCmd := gitcmd.Command{
@@ -149,11 +163,11 @@ func diffBlob(ctx context.Context,
 	blobDiff := diffParser.Diff()
 
 	// If a null OID was initially requested, rewrite the empty blob ID back to a null OID.
-	if objectHash.IsZeroOID(git.ObjectID(blobPair.LeftBlob)) {
+	if objectHash.IsZeroOID(blobInfoPair.leftOID) {
 		blobDiff.FromID = objectHash.ZeroOID.String()
 	}
 
-	if objectHash.IsZeroOID(git.ObjectID(blobPair.RightBlob)) {
+	if objectHash.IsZeroOID(blobInfoPair.rightOID) {
 		blobDiff.ToID = objectHash.ZeroOID.String()
 	}
 

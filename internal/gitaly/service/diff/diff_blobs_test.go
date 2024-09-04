@@ -702,10 +702,13 @@ func TestDiffBlobs(t *testing.T) {
 							},
 						},
 					},
-					// The diff parser currently relies on the "raw" output to parse diffs. If the
-					// pre-image and post-image blob revision match, there is no output and the
-					// diff parser is unable to handle the expected empty diff. This is a bug.
-					expectedErr: structerr.NewInternal("generating diff: diff parser finished unexpectedly"),
+					expectedResponses: []*gitalypb.DiffBlobsResponse{
+						{
+							LeftBlobId:  blobID1.String(),
+							RightBlobId: blobID2.String(),
+							Status:      gitalypb.DiffBlobsResponse_STATUS_END_OF_PATCH,
+						},
+					},
 				}
 			},
 		},
