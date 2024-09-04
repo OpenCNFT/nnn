@@ -55,7 +55,7 @@ func blockOnPartitionClosing(t *testing.T, pm *PartitionManager, waitForFullClos
 		for _, ptn := range sp.partitions {
 			// The closePartition step closes the transaction manager directly without calling close
 			// on the partition, so we check the manager directly here as well.
-			if ptn.isClosing() || ptn.transactionManager.isClosing() {
+			if ptn.isClosing() || ptn.transactionManager.IsClosing() {
 				waiter := ptn.transactionManagerClosed
 				if waitForFullClose {
 					waiter = ptn.closed
@@ -1247,7 +1247,7 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 		tm, ok := lm.(*TransactionManager)
 		require.True(t, ok)
 
-		require.False(t, tm.isClosing())
+		require.False(t, tm.IsClosing())
 	}))
 
 	blockOnPartitionClosing(t, partitionManager, true)

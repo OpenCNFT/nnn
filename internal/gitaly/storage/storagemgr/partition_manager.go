@@ -35,7 +35,7 @@ type transactionManager interface {
 	Begin(context.Context, storage.BeginOptions) (storage.Transaction, error)
 	Run() error
 	Close()
-	isClosing() bool
+	IsClosing() bool
 }
 
 type transactionManagerFactory func(

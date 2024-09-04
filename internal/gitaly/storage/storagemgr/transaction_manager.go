@@ -2443,8 +2443,8 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 // Close stops the transaction processing causing Run to return.
 func (mgr *TransactionManager) Close() { mgr.close() }
 
-// isClosing returns whether closing of the manager was initiated.
-func (mgr *TransactionManager) isClosing() bool {
+// IsClosing returns whether closing of the manager was initiated.
+func (mgr *TransactionManager) IsClosing() bool {
 	select {
 	case <-mgr.closing:
 		return true
