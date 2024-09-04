@@ -22,6 +22,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/packfile"
@@ -33,6 +34,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -695,7 +697,6 @@ type testTransactionSetup struct {
 	NonExistentOID    git.ObjectID
 	Commits           testTransactionCommits
 	AnnotatedTags     []testTransactionTag
-	Metrics           *metrics
 	Consumer          LogConsumer
 }
 
@@ -1055,10 +1056,9 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	require.NoError(t, os.Mkdir(stagingDir, mode.Directory))
 
 	newMetrics := func() transactionManagerMetrics {
-		m := newMetrics(setup.Config.Prometheus)
 		return newTransactionManagerMetrics(
-			m.housekeeping,
-			m.snapshot.Scope(storageName),
+			housekeeping.NewMetrics(setup.Config.Prometheus),
+			snapshot.NewMetrics().Scope(storageName),
 		)
 	}
 
