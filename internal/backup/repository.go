@@ -605,6 +605,10 @@ func (r *localRepository) HeadReference(ctx context.Context) (git.ReferenceName,
 // ResetRefs attempts to reset the list of refs in the repository to match the
 // specified refs slice. Do not include the symbolic HEAD reference in the list.
 func (r *localRepository) ResetRefs(ctx context.Context, refs []git.Reference) (returnedErr error) {
+	if err := r.locator.ValidateRepository(ctx, r.repo); err != nil {
+		return fmt.Errorf("invalid repository: %w", err)
+	}
+
 	u, err := updateref.New(ctx, r.repo)
 	if err != nil {
 		return fmt.Errorf("error when running creating new updater: %w", err)
