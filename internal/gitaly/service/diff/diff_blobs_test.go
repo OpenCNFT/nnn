@@ -619,6 +619,27 @@ func TestDiffBlobs(t *testing.T) {
 			},
 		},
 		{
+			desc: "matching blob IDs",
+			setup: func() setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				blobID := gittest.WriteBlob(t, cfg, repoPath, []byte("foo"))
+
+				return setupData{
+					request: &gitalypb.DiffBlobsRequest{
+						Repository: repoProto,
+						BlobPairs: []*gitalypb.DiffBlobsRequest_BlobPair{
+							{
+								LeftBlob:  []byte(blobID),
+								RightBlob: []byte(blobID),
+							},
+						},
+					},
+					expectedErr: structerr.NewInternal("generating diff: diff parser finished unexpectedly"),
+				}
+			},
+		},
+		{
 			desc: "empty file added",
 			setup: func() setupData {
 				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
