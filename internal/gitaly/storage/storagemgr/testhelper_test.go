@@ -1058,7 +1058,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	newMetrics := func() TransactionManagerMetrics {
 		return NewTransactionManagerMetrics(
 			housekeeping.NewMetrics(setup.Config.Prometheus),
-			snapshot.NewMetrics().Scope(storageName),
+			snapshot.NewMetrics(),
 		)
 	}
 

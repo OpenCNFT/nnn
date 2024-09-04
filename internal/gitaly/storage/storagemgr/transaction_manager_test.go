@@ -23,11 +23,13 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -2463,11 +2465,14 @@ func BenchmarkTransactionManager(b *testing.B) {
 				stagingDir := filepath.Join(storagePath, "staging", strconv.Itoa(i))
 				require.NoError(b, os.MkdirAll(stagingDir, mode.Directory))
 
-				m := newMetrics(cfg.Prometheus)
+				m := NewTransactionManagerMetrics(
+					housekeeping.NewMetrics(cfg.Prometheus),
+					snapshot.NewMetrics(),
+				)
 
 				// Valid partition IDs are >=1.
 				testPartitionID := storage.PartitionID(i + 1)
-				manager := NewTransactionManager(testPartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, cmdFactory, repositoryFactory, NewTransactionManagerMetrics(m.housekeeping, m.snapshot.Scope(storageName)), nil)
+				manager := NewTransactionManager(testPartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, cmdFactory, repositoryFactory, m, nil)
 
 				managers = append(managers, manager)
 

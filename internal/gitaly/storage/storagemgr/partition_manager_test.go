@@ -34,7 +34,6 @@ type mockPartitionFactory struct {
 		storagePath string,
 		absoluteStateDir string,
 		stagingDir string,
-		metrics TransactionManagerMetrics,
 		logConsumer storage.LogConsumer,
 	) Partition
 }
@@ -51,7 +50,6 @@ func newStubPartitionFactory() PartitionFactory {
 			storagePath string,
 			absoluteStateDir string,
 			stagingDir string,
-			metrics TransactionManagerMetrics,
 			logConsumer storage.LogConsumer,
 		) Partition {
 			closing := make(chan struct{})
@@ -110,7 +108,6 @@ func (m mockPartitionFactory) New(
 	storagePath string,
 	absoluteStateDir string,
 	stagingDir string,
-	metrics TransactionManagerMetrics,
 	logConsumer storage.LogConsumer,
 ) Partition {
 	return m.new(
@@ -121,7 +118,6 @@ func (m mockPartitionFactory) New(
 		storagePath,
 		absoluteStateDir,
 		stagingDir,
-		metrics,
 		logConsumer,
 	)
 }

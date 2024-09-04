@@ -52,7 +52,6 @@ type PartitionFactory interface {
 		storagePath string,
 		absoluteStateDir string,
 		stagingDir string,
-		metrics TransactionManagerMetrics,
 		logConsumer storage.LogConsumer,
 	) Partition
 }
@@ -60,6 +59,7 @@ type PartitionFactory interface {
 type partitionFactory struct {
 	cmdFactory  gitcmd.CommandFactory
 	repoFactory localrepo.Factory
+	metrics     TransactionManagerMetrics
 }
 
 func (f partitionFactory) New(
@@ -70,7 +70,6 @@ func (f partitionFactory) New(
 	storagePath string,
 	absoluteStateDir string,
 	stagingDir string,
-	metrics TransactionManagerMetrics,
 	logConsumer storage.LogConsumer,
 ) Partition {
 	// ScopeByStorage takes in context to pass it to the locator. This may be useful in the
@@ -95,16 +94,21 @@ func (f partitionFactory) New(
 		stagingDir,
 		f.cmdFactory,
 		repoFactory,
-		metrics,
+		f.metrics,
 		logConsumer,
 	)
 }
 
 // NewPartitionFactory returns a new PartitionFactory.
-func NewPartitionFactory(cmdFactory gitcmd.CommandFactory, repoFactory localrepo.Factory) PartitionFactory {
+func NewPartitionFactory(
+	cmdFactory gitcmd.CommandFactory,
+	repoFactory localrepo.Factory,
+	metrics TransactionManagerMetrics,
+) PartitionFactory {
 	return partitionFactory{
 		cmdFactory:  cmdFactory,
 		repoFactory: repoFactory,
+		metrics:     metrics,
 	}
 }
 
@@ -526,10 +530,6 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				storageMgr.path,
 				absoluteStateDir,
 				stagingDir,
-				NewTransactionManagerMetrics(
-					pm.metrics.housekeeping,
-					pm.metrics.snapshot.Scope(storageMgr.name),
-				),
 				pm.consumer,
 			)
 

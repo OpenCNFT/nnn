@@ -20,6 +20,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	housekeepingmgr "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/manager"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -36,6 +37,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raft"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -374,6 +376,11 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		defer stop()
 	}
 
+	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
+	snapshotMetrics := snapshot.NewMetrics()
+	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics)
+	txManagerMetrics := storagemgr.NewTransactionManagerMetrics(housekeepingMetrics, snapshotMetrics)
+
 	var txMiddleware server.TransactionMiddleware
 	var partitionMgr *storagemgr.PartitionManager
 	if cfg.Transactions.Enabled {
@@ -415,6 +422,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			storagemgr.NewPartitionFactory(
 				gitCmdFactory,
 				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+				txManagerMetrics,
 			),
 			consumerFactory,
 		)
@@ -477,6 +485,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				storagemgr.NewPartitionFactory(
 					gitCmdFactory,
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+					txManagerMetrics,
 				),
 				nil,
 			)
