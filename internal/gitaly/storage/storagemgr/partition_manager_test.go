@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -27,6 +26,44 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
+
+type mockPartitionFactory struct {
+	new func(
+		logger log.Logger,
+		partitionID storage.PartitionID,
+		db keyvalue.Transactioner,
+		storageName string,
+		storagePath string,
+		absoluteStateDir string,
+		stagingDir string,
+		metrics TransactionManagerMetrics,
+		logConsumer LogConsumer,
+	) Partition
+}
+
+func (m mockPartitionFactory) New(
+	logger log.Logger,
+	partitionID storage.PartitionID,
+	db keyvalue.Transactioner,
+	storageName string,
+	storagePath string,
+	absoluteStateDir string,
+	stagingDir string,
+	metrics TransactionManagerMetrics,
+	logConsumer LogConsumer,
+) Partition {
+	return m.new(
+		logger,
+		partitionID,
+		db,
+		storageName,
+		storagePath,
+		absoluteStateDir,
+		stagingDir,
+		metrics,
+		logConsumer,
+	)
+}
 
 type mockPartition struct {
 	begin     func(context.Context, storage.BeginOptions) (storage.Transaction, error)
@@ -229,7 +266,7 @@ func TestPartitionManager(t *testing.T) {
 
 	type setupData struct {
 		steps            steps
-		partitionFactory partitionFactory
+		partitionFactory PartitionFactory
 	}
 
 	for _, tc := range []struct {
@@ -434,29 +471,29 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					partitionFactory: func(
-						logger log.Logger,
-						partitionID storage.PartitionID,
-						db keyvalue.Transactioner,
-						storageName string,
-						storagePath string,
-						absoluteStateDir string,
-						stagingDir string,
-						cmdFactory gitcmd.CommandFactory,
-						repoFactory localrepo.StorageScopedFactory,
-						metrics TransactionManagerMetrics,
-						logConsumer LogConsumer,
-					) Partition {
-						isClosing := false
-						return mockPartition{
-							run: func() error { return nil },
-							begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
-								<-ctx.Done()
-								return nil, ctx.Err()
-							},
-							close:     func() { isClosing = true },
-							isClosing: func() bool { return isClosing },
-						}
+					partitionFactory: mockPartitionFactory{
+						new: func(
+							logger log.Logger,
+							partitionID storage.PartitionID,
+							db keyvalue.Transactioner,
+							storageName string,
+							storagePath string,
+							absoluteStateDir string,
+							stagingDir string,
+							metrics TransactionManagerMetrics,
+							logConsumer LogConsumer,
+						) Partition {
+							isClosing := false
+							return mockPartition{
+								run: func() error { return nil },
+								begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+									<-ctx.Done()
+									return nil, ctx.Err()
+								},
+								close:     func() { isClosing = true },
+								isClosing: func() bool { return isClosing },
+							}
+						},
 					},
 				}
 			},
@@ -484,33 +521,33 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					partitionFactory: func(
-						logger log.Logger,
-						partitionID storage.PartitionID,
-						db keyvalue.Transactioner,
-						storageName string,
-						storagePath string,
-						absoluteStateDir string,
-						stagingDir string,
-						cmdFactory gitcmd.CommandFactory,
-						repoFactory localrepo.StorageScopedFactory,
-						metrics TransactionManagerMetrics,
-						logConsumer LogConsumer,
-					) Partition {
-						isClosing := false
-						return mockPartition{
-							run: func() error { return nil },
-							begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
-								return mockTransaction{
-									commit: func(ctx context.Context) error {
-										<-ctx.Done()
-										return ctx.Err()
-									},
-								}, ctx.Err()
-							},
-							close:     func() { isClosing = true },
-							isClosing: func() bool { return isClosing },
-						}
+					partitionFactory: mockPartitionFactory{
+						new: func(
+							logger log.Logger,
+							partitionID storage.PartitionID,
+							db keyvalue.Transactioner,
+							storageName string,
+							storagePath string,
+							absoluteStateDir string,
+							stagingDir string,
+							metrics TransactionManagerMetrics,
+							logConsumer LogConsumer,
+						) Partition {
+							isClosing := false
+							return mockPartition{
+								run: func() error { return nil },
+								begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+									return mockTransaction{
+										commit: func(ctx context.Context) error {
+											<-ctx.Done()
+											return ctx.Err()
+										},
+									}, ctx.Err()
+								},
+								close:     func() { isClosing = true },
+								isClosing: func() bool { return isClosing },
+							}
+						},
 					},
 				}
 			},

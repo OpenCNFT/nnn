@@ -37,7 +37,28 @@ type Partition interface {
 	IsClosing() bool
 }
 
-type partitionFactory func(
+// PartitionFactory is factory type that can create new partitions.
+type PartitionFactory interface {
+	// New returns a new Partition instance.
+	New(
+		logger log.Logger,
+		partitionID storage.PartitionID,
+		db keyvalue.Transactioner,
+		storageName string,
+		storagePath string,
+		absoluteStateDir string,
+		stagingDir string,
+		metrics TransactionManagerMetrics,
+		logConsumer LogConsumer,
+	) Partition
+}
+
+type partitionFactory struct {
+	cmdFactory  gitcmd.CommandFactory
+	repoFactory localrepo.Factory
+}
+
+func (f partitionFactory) New(
 	logger log.Logger,
 	partitionID storage.PartitionID,
 	db keyvalue.Transactioner,
@@ -45,21 +66,51 @@ type partitionFactory func(
 	storagePath string,
 	absoluteStateDir string,
 	stagingDir string,
-	cmdFactory gitcmd.CommandFactory,
-	repoFactory localrepo.StorageScopedFactory,
 	metrics TransactionManagerMetrics,
 	logConsumer LogConsumer,
-) Partition
+) Partition {
+	// ScopeByStorage takes in context to pass it to the locator. This may be useful in the
+	// RPC handlers to rewrite the storage in the future but never here. Requiring a context
+	// here is more of a structural issue in the code, and is not useful.
+	repoFactory, err := f.repoFactory.ScopeByStorage(context.Background(), storageName)
+	if err != nil {
+		// ScopeByStorage will only error if accessing a non existent storage. This can't
+		// be the case when Factory is used as the storage is already verified.
+		// This is a layering issue in the code, and not a realistic error scenario. We
+		// thus panic out rather than make the error part of the interface.
+		panic(fmt.Errorf("building a partition for a non-existent storage: %q", storageName))
+	}
+
+	return NewTransactionManager(
+		partitionID,
+		logger,
+		db,
+		storageName,
+		storagePath,
+		absoluteStateDir,
+		stagingDir,
+		f.cmdFactory,
+		repoFactory,
+		metrics,
+		logConsumer,
+	)
+}
+
+// NewPartitionFactory returns a new PartitionFactory.
+func NewPartitionFactory(cmdFactory gitcmd.CommandFactory, repoFactory localrepo.Factory) PartitionFactory {
+	return partitionFactory{
+		cmdFactory:  cmdFactory,
+		repoFactory: repoFactory,
+	}
+}
 
 // PartitionManager is responsible for managing the lifecycle of each TransactionManager.
 type PartitionManager struct {
 	// storages are the storages configured in this Gitaly server. The map is keyed by the storage name.
 	storages map[string]*storageManager
-	// commandFactory is passed as a dependency to the constructed TransactionManagers.
-	commandFactory gitcmd.CommandFactory
 	// partitionFactory is a factory to create Partitions. This shouldn't ever be changed
 	// during normal operation, but can be used to adjust the partition's behaviour in tests.
-	partitionFactory partitionFactory
+	partitionFactory PartitionFactory
 	// consumer consumes the WAL from the partitions.
 	consumer LogConsumer
 	// consumerCleanup closes the LogConsumer.
@@ -85,8 +136,6 @@ type storageManager struct {
 	name string
 	// path is the absolute path to the storage's root.
 	path string
-	// repoFactory is a factory type that builds localrepo instances for this storage.
-	repoFactory localrepo.StorageScopedFactory
 	// stagingDirectory is the directory where all of the partition staging directories
 	// should be created.
 	stagingDirectory string
@@ -245,11 +294,6 @@ func NewPartitionManager(
 
 	storages := make(map[string]*storageManager, len(configuredStorages))
 	for _, configuredStorage := range configuredStorages {
-		repoFactory, err := localRepoFactory.ScopeByStorage(ctx, configuredStorage.Name)
-		if err != nil {
-			return nil, fmt.Errorf("scope by storage: %w", err)
-		}
-
 		internalDir := internalDirectoryPath(configuredStorage.Path)
 		stagingDir := stagingDirectoryPath(internalDir)
 		// Remove a possible already existing staging directory as it may contain stale files
@@ -277,7 +321,6 @@ func NewPartitionManager(
 			logger:            storageLogger,
 			name:              configuredStorage.Name,
 			path:              configuredStorage.Path,
-			repoFactory:       repoFactory,
 			stagingDirectory:  stagingDir,
 			database:          db,
 			partitionAssigner: pa,
@@ -287,41 +330,13 @@ func NewPartitionManager(
 	}
 
 	pm := &PartitionManager{
-		storages:       storages,
-		commandFactory: cmdFactory,
-		metrics:        metrics,
+		storages:         storages,
+		metrics:          metrics,
+		partitionFactory: NewPartitionFactory(cmdFactory, localRepoFactory),
 	}
 
 	if consumerFactory != nil {
 		pm.consumer, pm.consumerCleanup = consumerFactory(pm)
-	}
-
-	pm.partitionFactory = func(
-		logger log.Logger,
-		partitionID storage.PartitionID,
-		db keyvalue.Transactioner,
-		storageName string,
-		storagePath string,
-		absoluteStateDir string,
-		stagingDir string,
-		cmdFactory gitcmd.CommandFactory,
-		repoFactory localrepo.StorageScopedFactory,
-		metrics TransactionManagerMetrics,
-		logConsumer LogConsumer,
-	) Partition {
-		return NewTransactionManager(
-			partitionID,
-			logger,
-			db,
-			storageName,
-			storagePath,
-			absoluteStateDir,
-			stagingDir,
-			cmdFactory,
-			repoFactory,
-			metrics,
-			logConsumer,
-		)
 	}
 
 	return pm, nil
@@ -500,7 +515,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 
 			logger := storageMgr.logger.WithField("partition_id", partitionID)
 
-			mgr := pm.partitionFactory(
+			mgr := pm.partitionFactory.New(
 				logger,
 				partitionID,
 				keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),
@@ -508,8 +523,6 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				storageMgr.path,
 				absoluteStateDir,
 				stagingDir,
-				pm.commandFactory,
-				storageMgr.repoFactory,
 				NewTransactionManagerMetrics(
 					pm.metrics.housekeeping,
 					pm.metrics.snapshot.Scope(storageMgr.name),
