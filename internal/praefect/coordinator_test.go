@@ -22,7 +22,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/repository"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	gitaly_metadata "gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
@@ -764,7 +763,7 @@ func TestStreamDirectorMutator_ReplicateRepository(t *testing.T) {
 			ctx = correlation.ContextWithCorrelation(ctx, "my-correlation-id")
 
 			if tc.PartitioningHint != "" {
-				ctx = storagectx.SetPartitioningHintToIncomingContext(ctx, tc.PartitioningHint)
+				ctx = storage.ContextWithPartitioningHint(ctx, tc.PartitioningHint)
 			}
 
 			// Validate that stream parameters can be constructed successfully for
@@ -773,7 +772,7 @@ func TestStreamDirectorMutator_ReplicateRepository(t *testing.T) {
 			require.NoError(t, err)
 
 			// Validate the partitioning hint was passed through.
-			hint, err := storagectx.ExtractPartitioningHintFromIncomingContext(ctx)
+			hint, err := storage.ExtractPartitioningHint(ctx)
 			require.NoError(t, err)
 			require.Equal(t, tc.PartitioningHint, hint)
 
@@ -1064,18 +1063,18 @@ func runMockMaintenanceServer(t *testing.T, cfg gconfig.Cfg) (*mockMaintenanceSe
 }
 
 func (m *mockMaintenanceServer) OptimizeRepository(ctx context.Context, in *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error) {
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		in.Repository = tx.OriginalRepository(in.Repository)
-	})
+	}
 
 	m.requestCh <- in
 	return &gitalypb.OptimizeRepositoryResponse{}, nil
 }
 
 func (m *mockMaintenanceServer) PruneUnreachableObjects(ctx context.Context, in *gitalypb.PruneUnreachableObjectsRequest) (*gitalypb.PruneUnreachableObjectsResponse, error) {
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		in.Repository = tx.OriginalRepository(in.Repository)
-	})
+	}
 
 	m.requestCh <- in
 	return &gitalypb.PruneUnreachableObjectsResponse{}, nil

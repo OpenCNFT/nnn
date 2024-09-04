@@ -11,6 +11,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/transaction/voting"
 )
 
@@ -41,7 +42,7 @@ func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state 
 		return fmt.Errorf("reading stdin from request: %w", err)
 	}
 
-	var tx Transaction
+	var tx storage.Transaction
 	if payload.TransactionID > 0 {
 		tx, err = m.txRegistry.Get(payload.TransactionID)
 		if err != nil {

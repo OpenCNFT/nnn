@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -54,27 +53,17 @@ type Manager interface {
 	ProcReceiveRegistry() *ProcReceiveRegistry
 }
 
-// Transaction is the interface of storagemgr.Transaction. It's used for mocking in the tests.
-type Transaction interface {
-	RecordInitialReferenceValues(context.Context, map[git.ReferenceName]git.Reference) error
-	UpdateReferences(git.ReferenceUpdates)
-	Commit(context.Context) error
-	OriginalRepository(*gitalypb.Repository) *gitalypb.Repository
-	RewriteRepository(*gitalypb.Repository) *gitalypb.Repository
-	MarkDefaultBranchUpdated()
-}
-
 // TransactionRegistry is the interface of storagemgr.TransactionRegistry. It's used for mocking
 // in the tests.
 type TransactionRegistry interface {
-	Get(storage.TransactionID) (Transaction, error)
+	Get(storage.TransactionID) (storage.Transaction, error)
 }
 
 type transactionRegistry struct {
 	registry *storagemgr.TransactionRegistry
 }
 
-func (r *transactionRegistry) Get(id storage.TransactionID) (Transaction, error) {
+func (r *transactionRegistry) Get(id storage.TransactionID) (storage.Transaction, error) {
 	return r.registry.Get(id)
 }
 

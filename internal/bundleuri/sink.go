@@ -12,7 +12,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"gocloud.dev/blob"
@@ -87,10 +86,10 @@ func (s Sink) Generate(ctx context.Context, repo *localrepo.Repo) (returnErr err
 		return fmt.Errorf("unexpected repository type %t", repo.Repository)
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		origRepo := tx.OriginalRepository(repoProto)
 		bundlePath = s.relativePath(origRepo, defaultBundle)
-	})
+	}
 
 	writer := backup.NewLazyWriter(func() (io.WriteCloser, error) {
 		return s.getWriter(ctx, bundlePath)
@@ -125,10 +124,10 @@ func (s Sink) SignedURL(ctx context.Context, repo storage.Repository) (string, e
 		return "", fmt.Errorf("unexpected repository type %t", repo)
 	}
 
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		origRepo := tx.OriginalRepository(repoProto)
 		relativePath = s.relativePath(origRepo, defaultBundle)
-	})
+	}
 
 	if exists, err := s.bucket.Exists(ctx, relativePath); !exists {
 		if err == nil {

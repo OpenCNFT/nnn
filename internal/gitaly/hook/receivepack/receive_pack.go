@@ -85,7 +85,7 @@ func procReceiveHook(
 	req gitcmd.ReceivePackRequest,
 	repo *localrepo.Repo,
 	hookManager hook.Manager,
-	tx hook.Transaction,
+	tx storage.Transaction,
 	handler hook.ProcReceiveHandler,
 ) (returnedErr error) {
 	var acceptedUpdates []hook.ReferenceUpdate

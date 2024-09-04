@@ -20,7 +20,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	gitalyhook "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/stream"
@@ -118,12 +118,12 @@ func (s *server) computeCacheKey(ctx context.Context, req *gitalypb.PackObjectsH
 	cacheHash := sha256.New()
 
 	repository := req.Repository
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		// The cache uses the requests as the keys. As the request's repository in the RPC handler has been rewritten
 		// to point to the transaction's repository, the handler sees each request as different even if they point to
 		// the same repository. Restore the original request to ensure identical requests get the same key.
 		repository = tx.OriginalRepository(req.Repository)
-	})
+	}
 
 	cacheKeyPrefix, err := protojson.Marshal(&gitalypb.PackObjectsHookWithSidechannelRequest{
 		Repository:  repository,

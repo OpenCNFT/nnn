@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -346,16 +345,11 @@ messages and behavior by erroring out the requests before they even hit this int
 				testhelper.ProtoEqual(t, &gitalypb.CreateObjectPoolResponse{}, resp)
 			},
 			assertAdditionalRepository: func(t *testing.T, ctx context.Context, actual *gitalypb.Repository) {
-				var originalRepo *gitalypb.Repository
-				storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
-					originalRepo = tx.OriginalRepository(actual)
-				})
-
 				expected := validAdditionalRepository()
 				// The additional repository's relative path should have been rewritten.
 				require.NotEqual(t, expected.RelativePath, actual.RelativePath)
 				// But the restored non-snapshotted repository should match the original.
-				testhelper.ProtoEqual(t, expected, originalRepo)
+				testhelper.ProtoEqual(t, expected, storage.ExtractTransaction(ctx).OriginalRepository(actual))
 			},
 			expectHandlerInvoked: true,
 		},
@@ -384,16 +378,11 @@ messages and behavior by erroring out the requests before they even hit this int
 				testhelper.ProtoEqual(t, &gitalypb.LinkRepositoryToObjectPoolResponse{}, resp)
 			},
 			assertAdditionalRepository: func(t *testing.T, ctx context.Context, actual *gitalypb.Repository) {
-				var originalRepo *gitalypb.Repository
-				storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
-					originalRepo = tx.OriginalRepository(actual)
-				})
-
 				expected := validAdditionalRepository()
 				// The additional repository's relative path should have been rewritten.
 				require.NotEqual(t, expected.RelativePath, actual.RelativePath)
 				// But the restored non-snapshotted repository should match the original.
-				testhelper.ProtoEqual(t, expected, originalRepo)
+				testhelper.ProtoEqual(t, expected, storage.ExtractTransaction(ctx).OriginalRepository(actual))
 			},
 			expectHandlerInvoked: true,
 		},
@@ -555,11 +544,7 @@ messages and behavior by erroring out the requests before they even hit this int
 				assert.Equal(t, storage.TransactionID(1), transactionID)
 
 				// The transaction itself should be included in the context.
-				transactionInContext := false
-				storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
-					transactionInContext = true
-				})
-				assert.True(t, transactionInContext)
+				assert.True(t, storage.ExtractTransaction(ctx) != nil)
 
 				// The transaction should be registered into the registry and retrievable
 				// with its ID.

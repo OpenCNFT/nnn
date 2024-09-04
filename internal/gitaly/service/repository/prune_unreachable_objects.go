@@ -8,7 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -45,8 +45,7 @@ func (s *server) PruneUnreachableObjects(
 	}
 
 	if s.walPartitionManager != nil {
-		var commitErr error
-		storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+		if tx := storage.ExtractTransaction(ctx); tx != nil {
 			tx.Repack(housekeepingcfg.RepackObjectsConfig{
 				Strategy:            housekeepingcfg.RepackObjectsStrategyFullWithCruft,
 				WriteMultiPackIndex: true,
@@ -58,12 +57,8 @@ func (s *server) PruneUnreachableObjects(
 			})
 
 			if err := tx.Commit(ctx); err != nil {
-				commitErr = fmt.Errorf("commit: %w", err)
+				return nil, fmt.Errorf("commit: %w", err)
 			}
-		})
-
-		if commitErr != nil {
-			return nil, commitErr
 		}
 
 		return &gitalypb.PruneUnreachableObjectsResponse{}, nil

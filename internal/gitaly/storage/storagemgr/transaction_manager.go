@@ -212,8 +212,8 @@ type transactionMetrics struct {
 
 // Transaction is a unit-of-work that contains reference changes to perform on the repository.
 type Transaction struct {
-	// readOnly denotes whether or not this transaction is read-only.
-	readOnly bool
+	// write denotes whether or not this transaction is a write transaction.
+	write bool
 	// repositoryExists indicates whether the target repository existed when this transaction began.
 	repositoryExists bool
 	// metrics stores metric reporters inherited from the manager.
@@ -306,26 +306,12 @@ type Transaction struct {
 	objectDependencies map[git.ObjectID]struct{}
 }
 
-// BeginOptions contains options supported by begin.
-type BeginOptions struct {
-	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
-	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
-	ForceExclusiveSnapshot bool
-}
-
 // Begin opens a new transaction. The caller must call either Commit or Rollback to release
 // the resources tied to the transaction. The returned Transaction is not safe for concurrent use.
 //
 // The returned Transaction's read snapshot includes all writes that were committed prior to the
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
-//
-// relativePaths are the repositories that will be part of the snapshot. Only
-// the first repository will be checked for writes. If relativePaths is nil
-// then all repositories in the partition will be included.
-//
-// readOnly indicates whether this is a read-only transaction. Read-only transactions are not
-// configured with a quarantine directory and do not commit a log entry.
-func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string, readOnly bool, possibleOpts ...BeginOptions) (_ *Transaction, returnedErr error) {
+func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (_ *Transaction, returnedErr error) {
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
 	select {
@@ -337,30 +323,25 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 		}
 	}
 
-	var opts BeginOptions
-	if len(possibleOpts) > 0 {
-		opts = possibleOpts[0]
-	}
-
 	var relativePath string
-	if len(relativePaths) > 0 {
+	if len(opts.RelativePaths) > 0 {
 		// Set the first repository as the tracked repository
-		relativePath = relativePaths[0]
+		relativePath = opts.RelativePaths[0]
 	}
 
-	if relativePaths == nil && !readOnly {
+	if opts.RelativePaths == nil && opts.Write {
 		return nil, errWritableAllRepository
 	}
 
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.Begin", nil)
-	span.SetTag("readonly", readOnly)
+	span.SetTag("write", opts.Write)
 	span.SetTag("relativePath", relativePath)
 	defer span.Finish()
 
 	mgr.mutex.Lock()
 
 	txn := &Transaction{
-		readOnly:     readOnly,
+		write:        opts.Write,
 		commit:       mgr.commit,
 		snapshotLSN:  mgr.appendedLSN,
 		finished:     make(chan struct{}),
@@ -373,7 +354,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 	readReady := mgr.snapshotLocks[txn.snapshotLSN].applied
 
 	var entry *committedEntry
-	if !txn.readOnly {
+	if txn.write {
 		entry = mgr.updateCommittedEntry(txn.snapshotLSN)
 	}
 
@@ -388,7 +369,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 				txn.db.Discard()
 			}
 
-			if !txn.readOnly {
+			if txn.write {
 				var removedAnyEntry bool
 
 				mgr.mutex.Lock()
@@ -448,9 +429,10 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 	case <-mgr.ctx.Done():
 		return nil, ErrTransactionProcessingStopped
 	case <-readReady:
-		txn.db = mgr.db.NewTransaction(!txn.readOnly)
+		txn.db = mgr.db.NewTransaction(txn.write)
 		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
 
+		relativePaths := opts.RelativePaths
 		if relativePaths == nil {
 			relativePaths = txn.partitionRelativePaths()
 		}
@@ -463,7 +445,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 
 		if txn.snapshot, err = mgr.snapshotManager.GetSnapshot(ctx,
 			relativePaths,
-			!txn.readOnly || opts.ForceExclusiveSnapshot,
+			txn.write || opts.ForceExclusiveSnapshot,
 		); err != nil {
 			return nil, fmt.Errorf("get snapshot: %w", err)
 		}
@@ -475,7 +457,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, relativePaths []string
 			}
 
 			txn.snapshotRepository = mgr.repositoryFactory.Build(txn.snapshot.RelativePath(txn.relativePath))
-			if !txn.readOnly {
+			if txn.write {
 				if txn.repositoryExists {
 					txn.quarantineDirectory = filepath.Join(txn.stagingDirectory, "quarantine")
 					if err := os.MkdirAll(filepath.Join(txn.quarantineDirectory, "pack"), mode.Directory); err != nil {
@@ -578,7 +560,7 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 		}
 	}()
 
-	if txn.readOnly {
+	if !txn.write {
 		// These errors are only for reporting programming mistakes where updates have been
 		// accidentally staged in a read-only transaction. The changes would not be anyway
 		// performed as read-only transactions are not committed through the manager.

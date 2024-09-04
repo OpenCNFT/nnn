@@ -11,7 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
@@ -76,7 +76,7 @@ func (m *RepositoryManager) OptimizeRepository(
 	}
 	defer cleanup()
 
-	if err := m.maybeStartTransaction(ctx, cfg.UseExistingTransaction, repo, func(ctx context.Context, tx storagectx.Transaction, repo *localrepo.Repo) error {
+	if err := m.maybeStartTransaction(ctx, cfg.UseExistingTransaction, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
 		if m.optimizeFunc != nil {
 			strategy, err := m.validate(ctx, repo, cfg)
 			if err != nil {
@@ -97,18 +97,15 @@ func (m *RepositoryManager) OptimizeRepository(
 	return nil
 }
 
-func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExistingTransaction bool, repo *localrepo.Repo, run func(context.Context, storagectx.Transaction, *localrepo.Repo) error) (returnedError error) {
+func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExistingTransaction bool, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedError error) {
 	if m.walPartitionManager == nil {
 		return run(ctx, nil, repo)
 	}
 
-	var tx storagectx.Transaction
-	if useExistingTransaction {
-		storagectx.RunWithTransaction(ctx, func(transaction storagectx.Transaction) {
-			tx = transaction
-		})
-	} else {
-		transaction, err := m.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
+	tx := storage.ExtractTransaction(ctx)
+	if !useExistingTransaction {
+		var err error
+		tx, err = m.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
 			RelativePath: repo.GetRelativePath(),
 		})
 		if err != nil {
@@ -117,21 +114,20 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExisti
 		defer func() {
 			if returnedError != nil {
 				// We prioritize actual housekeeping error and log rollback error.
-				if err := transaction.Rollback(); err != nil {
+				if err := tx.Rollback(); err != nil {
 					m.logger.WithError(err).Error("could not rollback housekeeping transaction")
 				}
 			}
 		}()
 
-		repo = localrepo.NewFrom(repo, transaction.RewriteRepository(&gitalypb.Repository{
+		repo = localrepo.NewFrom(repo, tx.RewriteRepository(&gitalypb.Repository{
 			StorageName:                   repo.GetStorageName(),
 			GitAlternateObjectDirectories: repo.GetGitAlternateObjectDirectories(),
 			GitObjectDirectory:            repo.GetGitObjectDirectory(),
 			RelativePath:                  repo.GetRelativePath(),
 		}))
 
-		tx = transaction
-		ctx = storagectx.ContextWithTransaction(ctx, tx)
+		ctx = storage.ContextWithTransaction(ctx, tx)
 	}
 
 	if err := run(ctx, tx, repo); err != nil {
@@ -277,7 +273,7 @@ func (m *RepositoryManager) optimizeRepository(
 // optimizeRepositoryWithTransaction performs optimizations in the context of WAL transaction.
 func (m *RepositoryManager) optimizeRepositoryWithTransaction(
 	ctx context.Context,
-	transaction storagectx.Transaction,
+	transaction storage.Transaction,
 	repo *localrepo.Repo,
 	cfg OptimizeRepositoryConfig,
 ) (returnedError error) {

@@ -33,7 +33,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -1148,7 +1147,10 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				beginCtx = step.Context
 			}
 
-			transaction, err := transactionManager.Begin(beginCtx, step.RelativePaths, step.ReadOnly)
+			transaction, err := transactionManager.Begin(beginCtx, storage.BeginOptions{
+				Write:         !step.ReadOnly,
+				RelativePaths: step.RelativePaths,
+			})
 			require.ErrorIs(t, err, step.ExpectedError)
 			if err == nil {
 				require.Equalf(t, step.ExpectedSnapshotLSN, transaction.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")
@@ -1241,7 +1243,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						})
 					}
 
-					require.NoError(t, rewrittenRepo.SetDefaultBranch(storagectx.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
+					require.NoError(t, rewrittenRepo.SetDefaultBranch(storage.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
 				}
 
 				if step.CustomHooksUpdate != nil {
@@ -1604,7 +1606,9 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 			// Begin a transaction to wait until the manager has applied all log entries currently
 			// committed. This ensures the disk state assertions run with all log entries fully applied
 			// to the repository.
-			tx, err := mgr.Begin(ctx, []string{"non-existent"}, false)
+			tx, err := mgr.Begin(ctx, storage.BeginOptions{
+				RelativePaths: []string{"non-existent"},
+			})
 			require.NoError(t, err)
 			require.NoError(t, tx.Rollback())
 

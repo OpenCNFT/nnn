@@ -417,7 +417,7 @@ func TestRegisterProcReceiveHook(t *testing.T) {
 				repo,
 				hook.NewMockManager(t, nil, data.postReceiveHook, data.updateHook, nil, procReceiveRegistry),
 				&mockTransactionRegistry{
-					getFunc: func(id storage.TransactionID) (hook.Transaction, error) {
+					getFunc: func(id storage.TransactionID) (storage.Transaction, error) {
 						return mockTransaction{
 							commitFunc: data.commit,
 						}, nil
@@ -468,15 +468,15 @@ func TestRegisterProcReceiveHook(t *testing.T) {
 }
 
 type mockTransactionRegistry struct {
-	getFunc func(storage.TransactionID) (hook.Transaction, error)
+	getFunc func(storage.TransactionID) (storage.Transaction, error)
 }
 
-func (m mockTransactionRegistry) Get(id storage.TransactionID) (hook.Transaction, error) {
+func (m mockTransactionRegistry) Get(id storage.TransactionID) (storage.Transaction, error) {
 	return m.getFunc(id)
 }
 
 type mockTransaction struct {
-	hook.Transaction
+	storage.Transaction
 	commitFunc func(context.Context) error
 }
 

@@ -8,7 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -33,12 +33,12 @@ func (s *server) FetchIntoObjectPool(ctx context.Context, req *gitalypb.FetchInt
 	}
 
 	originalPoolRepo := objectPool.Repo
-	storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		originalPoolRepo = s.localrepo(tx.OriginalRepository(&gitalypb.Repository{
 			StorageName:  req.GetObjectPool().GetRepository().GetStorageName(),
 			RelativePath: req.GetObjectPool().GetRepository().GetRelativePath(),
 		}))
-	})
+	}
 
 	// When transactions are enabled, housekeeping tasks are scheduled on the transaction (by operations
 	// like OptimizeRepository) but are only executed when the transaction is committed.

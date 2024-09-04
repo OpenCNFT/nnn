@@ -26,7 +26,6 @@ import (
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagectx"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -1248,12 +1247,12 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, pm)
 		manager.optimizeFunc = func(ctx context.Context, repo *localrepo.Repo, _ housekeeping.OptimizationStrategy) error {
 			relativePath := repo.GetRelativePath()
-			storagectx.RunWithTransaction(ctx, func(tx storagectx.Transaction) {
+			if tx := storage.ExtractTransaction(ctx); tx != nil {
 				relativePath = tx.OriginalRepository(&gitalypb.Repository{
 					StorageName:  repo.GetStorageName(),
 					RelativePath: repo.GetRelativePath(),
 				}).GetRelativePath()
-			})
+			}
 
 			reposOptimized[relativePath] = struct{}{}
 
