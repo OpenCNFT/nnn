@@ -409,12 +409,17 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 		return structerr.NewNotFound("unknown storage: %q", storageName)
 	}
 
-	ptn, err := storageMgr.startPartition(ctx, partitionID)
+	return storageMgr.CallLogManager(ctx, partitionID, fn)
+}
+
+// CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
+func (sm *storageManager) CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
+	ptn, err := sm.startPartition(ctx, partitionID)
 	if err != nil {
 		return err
 	}
 
-	defer storageMgr.finalizeTransaction(ptn)
+	defer sm.finalizeTransaction(ptn)
 
 	logManager, ok := ptn.partition.(storage.LogManager)
 	if !ok {
