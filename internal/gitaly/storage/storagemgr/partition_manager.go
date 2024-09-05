@@ -375,7 +375,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
 	}
 
-	ptn, err := pm.startPartition(ctx, storageMgr, partitionID)
+	ptn, err := storageMgr.startPartition(ctx, partitionID)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +409,7 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 		return structerr.NewNotFound("unknown storage: %q", storageName)
 	}
 
-	ptn, err := pm.startPartition(ctx, storageMgr, partitionID)
+	ptn, err := storageMgr.startPartition(ctx, partitionID)
 	if err != nil {
 		return err
 	}
@@ -426,26 +426,26 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 	return nil
 }
 
-// startPartition starts the TransactionManager for a partition.
-func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *storageManager, partitionID storage.PartitionID) (*partition, error) {
+// startPartition starts a partition.
+func (sm *storageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partition, error) {
 	relativeStateDir := deriveStateDirectory(partitionID)
-	absoluteStateDir := filepath.Join(storageMgr.path, relativeStateDir)
+	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncHierarchy(storageMgr.path, filepath.Dir(relativeStateDir)); err != nil {
+	if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
 		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
 	}
 
 	for {
-		storageMgr.mu.Lock()
-		if storageMgr.closed {
-			storageMgr.mu.Unlock()
+		sm.mu.Lock()
+		if sm.closed {
+			sm.mu.Unlock()
 			return nil, ErrPartitionManagerClosed
 		}
 
-		ptn, ok := storageMgr.partitions[partitionID]
+		ptn, ok := sm.partitions[partitionID]
 		if !ok {
 			ptn = &partition{
 				closing:         make(chan struct{}),
@@ -453,31 +453,31 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				partitionClosed: make(chan struct{}),
 			}
 
-			stagingDir, err := os.MkdirTemp(storageMgr.stagingDirectory, "")
+			stagingDir, err := os.MkdirTemp(sm.stagingDirectory, "")
 			if err != nil {
-				storageMgr.mu.Unlock()
+				sm.mu.Unlock()
 				return nil, fmt.Errorf("create staging directory: %w", err)
 			}
 
-			logger := storageMgr.logger.WithField("partition_id", partitionID)
+			logger := sm.logger.WithField("partition_id", partitionID)
 
-			mgr := storageMgr.partitionFactory.New(
+			mgr := sm.partitionFactory.New(
 				logger,
 				partitionID,
-				keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),
-				storageMgr.name,
-				storageMgr.path,
+				keyvalue.NewPrefixedTransactioner(sm.database, keyPrefixPartition(partitionID)),
+				sm.name,
+				sm.path,
 				absoluteStateDir,
 				stagingDir,
-				storageMgr.consumer,
+				sm.consumer,
 			)
 
 			ptn.partition = mgr
 
-			storageMgr.partitions[partitionID] = ptn
+			sm.partitions[partitionID] = ptn
 
-			storageMgr.metrics.partitionsStarted.Inc()
-			storageMgr.activePartitions.Add(1)
+			sm.metrics.partitionsStarted.Inc()
+			sm.activePartitions.Add(1)
 			go func() {
 				if err := mgr.Run(); err != nil {
 					logger.WithError(err).WithField("partition_state_directory", relativeStateDir).Error("partition failed")
@@ -487,9 +487,9 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				// need to be started in order to continue processing transactions. The partition instance
 				// is deleted allowing the next transaction for the repository to create a new partition
 				// instance.
-				storageMgr.mu.Lock()
-				delete(storageMgr.partitions, partitionID)
-				storageMgr.mu.Unlock()
+				sm.mu.Lock()
+				delete(sm.partitions, partitionID)
+				sm.mu.Unlock()
 
 				close(ptn.partitionClosed)
 
@@ -505,9 +505,9 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 					logger.WithError(err).Error("failed removing partition's staging directory")
 				}
 
-				storageMgr.metrics.partitionsStopped.Inc()
+				sm.metrics.partitionsStopped.Inc()
 				close(ptn.closed)
-				storageMgr.activePartitions.Done()
+				sm.activePartitions.Done()
 			}()
 		}
 
@@ -516,7 +516,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 			// used. The lock is released while waiting for the partition to complete closing as to
 			// not block other partitions from processing transactions. Once closing is complete, a
 			// new attempt is made to get a valid partition.
-			storageMgr.mu.Unlock()
+			sm.mu.Unlock()
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -527,7 +527,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 		}
 
 		ptn.pendingTransactionCount++
-		storageMgr.mu.Unlock()
+		sm.mu.Unlock()
 
 		return ptn, nil
 	}
