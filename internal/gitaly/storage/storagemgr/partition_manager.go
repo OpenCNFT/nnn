@@ -57,11 +57,6 @@ type PartitionFactory interface {
 type PartitionManager struct {
 	// storages are the storages configured in this Gitaly server. The map is keyed by the storage name.
 	storages map[string]*storageManager
-	// partitionFactory is a factory to create Partitions. This shouldn't ever be changed
-	// during normal operation, but can be used to adjust the partition's behaviour in tests.
-	partitionFactory PartitionFactory
-	// consumer consumes the WAL from the partitions.
-	consumer storage.LogConsumer
 	// consumerCleanup closes the LogConsumer.
 	consumerCleanup func()
 	// metrics accounts for all metrics of transaction operations. It will be
@@ -99,6 +94,10 @@ type storageManager struct {
 	partitions map[storage.PartitionID]*partition
 	// activePartitions keeps track of active partitions.
 	activePartitions sync.WaitGroup
+	// partitionFactory is a factory to create Partitions.
+	partitionFactory PartitionFactory
+	// consumer consumes the WAL from the partitions.
+	consumer storage.LogConsumer
 
 	// metrics are the metrics gathered from the storage manager.
 	metrics storageManagerMetrics
@@ -238,9 +237,16 @@ func NewPartitionManager(
 	partitionFactory PartitionFactory,
 	consumerFactory LogConsumerFactory,
 ) (*PartitionManager, error) {
-	metrics := newMetrics(promCfg)
+	pm := &PartitionManager{
+		storages: make(map[string]*storageManager, len(configuredStorages)),
+		metrics:  newMetrics(promCfg),
+	}
 
-	storages := make(map[string]*storageManager, len(configuredStorages))
+	var consumer storage.LogConsumer
+	if consumerFactory != nil {
+		consumer, pm.consumerCleanup = consumerFactory(pm)
+	}
+
 	for _, configuredStorage := range configuredStorages {
 		internalDir := internalDirectoryPath(configuredStorage.Path)
 		stagingDir := stagingDirectoryPath(internalDir)
@@ -265,7 +271,7 @@ func NewPartitionManager(
 			return nil, fmt.Errorf("new partition assigner: %w", err)
 		}
 
-		storages[configuredStorage.Name] = &storageManager{
+		pm.storages[configuredStorage.Name] = &storageManager{
 			logger:            storageLogger,
 			name:              configuredStorage.Name,
 			path:              configuredStorage.Path,
@@ -273,18 +279,10 @@ func NewPartitionManager(
 			database:          db,
 			partitionAssigner: pa,
 			partitions:        map[storage.PartitionID]*partition{},
-			metrics:           metrics.storageManagerMetrics(configuredStorage.Name),
+			partitionFactory:  partitionFactory,
+			consumer:          consumer,
+			metrics:           pm.metrics.storageManagerMetrics(configuredStorage.Name),
 		}
-	}
-
-	pm := &PartitionManager{
-		storages:         storages,
-		metrics:          metrics,
-		partitionFactory: partitionFactory,
-	}
-
-	if consumerFactory != nil {
-		pm.consumer, pm.consumerCleanup = consumerFactory(pm)
 	}
 
 	return pm, nil
@@ -463,7 +461,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 
 			logger := storageMgr.logger.WithField("partition_id", partitionID)
 
-			mgr := pm.partitionFactory.New(
+			mgr := storageMgr.partitionFactory.New(
 				logger,
 				partitionID,
 				keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),
@@ -471,7 +469,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				storageMgr.path,
 				absoluteStateDir,
 				stagingDir,
-				pm.consumer,
+				storageMgr.consumer,
 			)
 
 			ptn.partition = mgr
