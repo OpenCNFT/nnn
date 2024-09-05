@@ -14,7 +14,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
@@ -26,10 +25,6 @@ import (
 
 // ErrPartitionManagerClosed is returned when the PartitionManager stops processing transactions.
 var ErrPartitionManagerClosed = errors.New("partition manager closed")
-
-// LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
-// a function to close the LogConsumer.
-type LogConsumerFactory func(storage.LogManagerAccessor) (_ storage.LogConsumer, cleanup func())
 
 // Partition extends the typical Partition interface with methods needed by PartitionManager.
 type Partition interface {
@@ -51,18 +46,6 @@ type PartitionFactory interface {
 		stagingDir string,
 		logConsumer storage.LogConsumer,
 	) Partition
-}
-
-// PartitionManager is responsible for managing the lifecycle of each TransactionManager.
-type PartitionManager struct {
-	// storages are the storages configured in this Gitaly server. The map is keyed by the storage name.
-	storages map[string]*StorageManager
-	// consumerCleanup closes the LogConsumer.
-	consumerCleanup func()
-	// metrics accounts for all metrics of transaction operations. It will be
-	// passed down to each partition and is shared between them. The
-	// metrics must be registered to be collected by prometheus collector.
-	metrics *Metrics
 }
 
 type storageManagerMetrics struct {
@@ -275,44 +258,6 @@ func clearStagingDirectory(stagingDir string) error {
 	return nil
 }
 
-// NewPartitionManager returns a new PartitionManager.
-func NewPartitionManager(
-	ctx context.Context,
-	configuredStorages []config.Storage,
-	logger log.Logger,
-	dbMgr *databasemgr.DBManager,
-	promCfg gitalycfgprom.Config,
-	partitionFactory PartitionFactory,
-	consumerFactory LogConsumerFactory,
-) (*PartitionManager, error) {
-	pm := &PartitionManager{
-		storages: make(map[string]*StorageManager, len(configuredStorages)),
-		metrics:  NewMetrics(promCfg),
-	}
-
-	var consumer storage.LogConsumer
-	if consumerFactory != nil {
-		consumer, pm.consumerCleanup = consumerFactory(pm)
-	}
-
-	for _, configuredStorage := range configuredStorages {
-		var err error
-		if pm.storages[configuredStorage.Name], err = NewStorageManager(
-			logger,
-			configuredStorage.Name,
-			configuredStorage.Path,
-			dbMgr,
-			partitionFactory,
-			consumer,
-			pm.metrics,
-		); err != nil {
-			return nil, fmt.Errorf("new storage manage: %w", err)
-		}
-	}
-
-	return pm, nil
-}
-
 func keyPrefixPartition(ptnID storage.PartitionID) []byte {
 	return []byte(fmt.Sprintf("p/%s/", ptnID.MarshalBinary()))
 }
@@ -324,22 +269,6 @@ func internalDirectoryPath(storagePath string) string {
 
 func stagingDirectoryPath(storagePath string) string {
 	return filepath.Join(storagePath, "staging")
-}
-
-// Begin gets the Partition for the specified repository and starts a transaction. If a
-// Partition is not already running, a new one is created and used. The partition tracks
-// the number of pending transactions and this counter gets incremented when Begin is invoked.
-//
-// Specifying storageName and partitionID will begin a transaction targeting an
-// entire partition. If the partitionID is zero, then the partition is detected
-// from opts.RelativePath.
-func (pm *PartitionManager) Begin(ctx context.Context, storageName string, partitionID storage.PartitionID, opts storage.TransactionOptions) (storage.Transaction, error) {
-	storageMgr, ok := pm.storages[storageName]
-	if !ok {
-		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
-	}
-
-	return storageMgr.Begin(ctx, partitionID, opts)
 }
 
 // Begin gets the Partition for the specified repository and starts a transaction. If a
@@ -414,16 +343,6 @@ func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.Partiti
 	}
 
 	return sm.newFinalizableTransaction(ptn, transaction), nil
-}
-
-// CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
-	storageMgr, ok := pm.storages[storageName]
-	if !ok {
-		return structerr.NewNotFound("unknown storage: %q", storageName)
-	}
-
-	return storageMgr.CallLogManager(ctx, partitionID, fn)
 }
 
 // CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
@@ -573,33 +492,4 @@ func deriveStateDirectory(id storage.PartitionID) string {
 		hash[2:4],
 		id.String(),
 	)
-}
-
-// Close closes transaction processing for all storages and waits for closing completion.
-func (pm *PartitionManager) Close() {
-	var activeStorages sync.WaitGroup
-	for _, storageMgr := range pm.storages {
-		activeStorages.Add(1)
-		storageMgr := storageMgr
-		go func() {
-			storageMgr.Close()
-			activeStorages.Done()
-		}()
-	}
-
-	if pm.consumerCleanup != nil {
-		pm.consumerCleanup()
-	}
-
-	activeStorages.Wait()
-}
-
-// Describe is used to describe Prometheus metrics.
-func (pm *PartitionManager) Describe(metrics chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(pm, metrics)
-}
-
-// Collect is used to collect Prometheus metrics.
-func (pm *PartitionManager) Collect(metrics chan<- prometheus.Metric) {
-	pm.metrics.Collect(metrics)
 }
