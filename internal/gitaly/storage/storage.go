@@ -34,6 +34,9 @@ var (
 	// ErrAlternateHasAlternate is returned when a repository's alternate itself has an
 	// alternate listed.
 	ErrAlternateHasAlternate = errors.New("repository's alternate has an alternate itself")
+	// ErrPartitionAssignmentNotFound is returned when attempting to access a
+	// partition assignment in the database that doesn't yet exist.
+	ErrPartitionAssignmentNotFound = errors.New("partition assignment not found")
 )
 
 // Transaction is a single unit-of-work that executes as a whole.
@@ -154,6 +157,9 @@ type TransactionOptions struct {
 
 // Storage is the interface of a storage.
 type Storage interface {
+	// GetAssignedPartitionID returns the assigned ID of the partition the relative path
+	// has been assigned to.
+	GetAssignedPartitionID(relativePath string) (PartitionID, error)
 	// Begin begins a transaction against a partition.
 	Begin(context.Context, PartitionID, TransactionOptions) (Transaction, error)
 }

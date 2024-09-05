@@ -552,6 +552,11 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 	}
 }
 
+// GetAssignedPartitionID returns the ID of the partition the relative path has been assigned to.
+func (sm *StorageManager) GetAssignedPartitionID(relativePath string) (storage.PartitionID, error) {
+	return sm.partitionAssigner.partitionAssignmentTable.getPartitionID(relativePath)
+}
+
 // deriveStateDirectory hashes the partition ID and returns the state
 // directory where state related to the partition should be stored.
 func deriveStateDirectory(id storage.PartitionID) string {

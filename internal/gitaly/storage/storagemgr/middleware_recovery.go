@@ -149,7 +149,7 @@ func (mw *TransactionRecoveryMiddleware) applyPendingWAL(ctx context.Context, me
 
 	ptnID, err := storageMgr.partitionAssigner.partitionAssignmentTable.getPartitionID(targetRepo.GetRelativePath())
 	if err != nil {
-		if errors.Is(err, errPartitionAssignmentNotFound) {
+		if errors.Is(err, storage.ErrPartitionAssignmentNotFound) {
 			// The repository wasn't yet assigned to a partition. It thus hasn't been accessed with transactions
 			// and can't have pending WAL entries.
 			return nil
