@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -212,7 +212,7 @@ func TestMetadataGroup_BootstrapIfNeeded(t *testing.T) {
 	})
 }
 
-func bootstrapClusterWithMetadataGroup(t *testing.T, cluster *testRaftCluster, ptnMgr *storagemgr.PartitionManager) map[raftID]*metadataRaftGroup {
+func bootstrapClusterWithMetadataGroup(t *testing.T, cluster *testRaftCluster, node storage.Node) map[raftID]*metadataRaftGroup {
 	ctx := testhelper.Context(t)
 	logger := testhelper.NewLogger(t)
 
@@ -221,7 +221,7 @@ func bootstrapClusterWithMetadataGroup(t *testing.T, cluster *testRaftCluster, p
 
 	fanOut(3, func(i raftID) {
 		metadataGroup, err := newMetadataRaftGroup(
-			ctx, cluster.nodes[i].nodeHost, dbForMetadataGroup(ptnMgr, fmt.Sprintf("node-%d", i)), cluster.createRaftConfig(i), logger,
+			ctx, cluster.nodes[i].nodeHost, dbForMetadataGroup(node, fmt.Sprintf("node-%d", i)), cluster.createRaftConfig(i), logger,
 		)
 		require.NoError(t, err)
 

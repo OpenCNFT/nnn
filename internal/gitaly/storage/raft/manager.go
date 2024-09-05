@@ -9,7 +9,7 @@ import (
 	"github.com/lni/dragonboat/v4"
 	dragonboatConf "github.com/lni/dragonboat/v4/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -64,7 +64,7 @@ func NewManager(
 	storages []config.Storage,
 	clusterCfg config.Raft,
 	managerCfg ManagerConfig,
-	ptnMgr *storagemgr.PartitionManager,
+	node storage.Node,
 	logger log.Logger,
 ) (*Manager, error) {
 	SetLogger(logger, true)
@@ -104,7 +104,7 @@ func NewManager(
 		return nil, fmt.Errorf("creating dragonboat nodehost: %w", err)
 	}
 
-	m.storageManagers[storage.Name] = newStorageManager(storage.Name, ptnMgr, nodeHost)
+	m.storageManagers[storage.Name] = newStorageManager(storage.Name, node, nodeHost)
 	if m.firstStorage == nil {
 		m.firstStorage = m.storageManagers[storage.Name]
 	}

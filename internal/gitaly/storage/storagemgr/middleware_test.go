@@ -470,7 +470,7 @@ messages and behavior by erroring out the requests before they even hit this int
 					StorageName: "fake",
 					PartitionId: 1,
 				})
-				require.ErrorContains(t, err, `begin transaction: unknown storage: "fake"`)
+				require.ErrorContains(t, err, `get storage: storage name not found`)
 				require.Nil(t, resp)
 			},
 		},

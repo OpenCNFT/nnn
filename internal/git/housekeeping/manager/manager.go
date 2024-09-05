@@ -9,7 +9,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
@@ -216,8 +215,8 @@ type RepositoryManager struct {
 	logger log.Logger
 	// txManager is Praefect's transaction manager using voting mechanism. It will be deprecated soon.
 	txManager transaction.Manager
-	// walPartitionManager is the WAL partition manager. It is used to control housekeeping transactions.
-	walPartitionManager *storagemgr.PartitionManager
+	// node is used to access the storages.
+	node storage.Node
 
 	metrics          *housekeeping.Metrics
 	optimizeFunc     func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error
@@ -225,12 +224,12 @@ type RepositoryManager struct {
 }
 
 // New creates a new RepositoryManager.
-func New(promCfg gitalycfgprom.Config, logger log.Logger, txManager transaction.Manager, partitionManager *storagemgr.PartitionManager) *RepositoryManager {
+func New(promCfg gitalycfgprom.Config, logger log.Logger, txManager transaction.Manager, node storage.Node) *RepositoryManager {
 	return &RepositoryManager{
-		logger:              logger.WithField("system", "housekeeping"),
-		txManager:           txManager,
-		walPartitionManager: partitionManager,
-		metrics:             housekeeping.NewMetrics(promCfg),
+		logger:    logger.WithField("system", "housekeeping"),
+		txManager: txManager,
+		node:      node,
+		metrics:   housekeeping.NewMetrics(promCfg),
 		repositoryStates: repositoryStates{
 			values: make(map[string]*refCountedState),
 		},

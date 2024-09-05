@@ -35,6 +35,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
+	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raft"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
@@ -377,13 +378,14 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		defer stop()
 	}
 
+	storageMetrics := storagemgr.NewMetrics(cfg.Prometheus)
 	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
 	snapshotMetrics := snapshot.NewMetrics()
-	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics)
+	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics, storageMetrics)
 	txManagerMetrics := partition.NewTransactionManagerMetrics(housekeepingMetrics, snapshotMetrics)
 
 	var txMiddleware server.TransactionMiddleware
-	var partitionMgr *storagemgr.PartitionManager
+	var node *nodeimpl.Manager
 	if cfg.Transactions.Enabled {
 		logger.WarnContext(ctx, "Transactions enabled. Transactions are an experimental feature. The feature is not production ready yet and might lead to various issues including data loss.")
 
@@ -398,7 +400,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		}
 		defer dbMgr.Close()
 
-		var consumerFactory storagemgr.LogConsumerFactory
+		var consumerFactory nodeimpl.LogConsumerFactory
 		if cfg.Backup.WALGoCloudURL != "" {
 			walSink, err := backup.ResolveSink(ctx, cfg.Backup.WALGoCloudURL)
 			if err != nil {
@@ -414,29 +416,28 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			}
 		}
 
-		partitionMgr, err = storagemgr.NewPartitionManager(
-			ctx,
+		node, err = nodeimpl.NewManager(
 			cfg.Storages,
-			logger,
-			dbMgr,
-			cfg.Prometheus,
-			partition.NewFactory(
-				gitCmdFactory,
-				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-				txManagerMetrics,
+			storagemgr.NewFactory(
+				logger,
+				dbMgr,
+				partition.NewFactory(
+					gitCmdFactory,
+					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+					txManagerMetrics,
+				),
+				storageMetrics,
 			),
 			consumerFactory,
 		)
 		if err != nil {
-			return fmt.Errorf("new partition manager: %w", err)
+			return fmt.Errorf("new node: %w", err)
 		}
-		defer partitionMgr.Close()
-
-		prometheus.MustRegister(partitionMgr)
+		defer node.Close()
 
 		txMiddleware = server.TransactionMiddleware{
-			UnaryInterceptor:  storagemgr.NewUnaryInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, partitionMgr, locator),
-			StreamInterceptor: storagemgr.NewStreamInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, partitionMgr, locator),
+			UnaryInterceptor:  storagemgr.NewUnaryInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, node, locator),
+			StreamInterceptor: storagemgr.NewStreamInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, node, locator),
 		}
 
 		if cfg.Raft.Enabled {
@@ -447,7 +448,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			}
 			raftManager, err := raft.NewManager(ctx, cfg.Storages, cfg.Raft, raft.ManagerConfig{
 				BootstrapCluster: initRaft,
-			}, partitionMgr, logger)
+			}, node, logger)
 			if err != nil {
 				return fmt.Errorf("initializing raft manager: %w", err)
 			}
@@ -477,27 +478,26 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			}
 			defer dbMgr.Close()
 
-			partitionMgr, err := storagemgr.NewPartitionManager(
-				ctx,
+			node, err = nodeimpl.NewManager(
 				cfg.Storages,
-				logger,
-				dbMgr,
-				cfg.Prometheus,
-				partition.NewFactory(
-					gitCmdFactory,
-					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-					txManagerMetrics,
+				storagemgr.NewFactory(
+					logger,
+					dbMgr,
+					partition.NewFactory(
+						gitCmdFactory,
+						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+						txManagerMetrics,
+					),
+					storageMetrics,
 				),
 				nil,
 			)
 			if err != nil {
-				return fmt.Errorf("new partition manager: %w", err)
+				return fmt.Errorf("new node: %w", err)
 			}
-			defer partitionMgr.Close()
+			defer node.Close()
 
-			prometheus.MustRegister(partitionMgr)
-
-			recoveryMiddleware := storagemgr.NewTransactionRecoveryMiddleware(protoregistry.GitalyProtoPreregistered, partitionMgr)
+			recoveryMiddleware := storagemgr.NewTransactionRecoveryMiddleware(protoregistry.GitalyProtoPreregistered, node)
 			txMiddleware = server.TransactionMiddleware{
 				UnaryInterceptor:  recoveryMiddleware.UnaryServerInterceptor(),
 				StreamInterceptor: recoveryMiddleware.StreamServerInterceptor(),
@@ -505,7 +505,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		}
 	}
 
-	housekeepingManager := housekeepingmgr.New(cfg.Prometheus, logger, transactionManager, partitionMgr)
+	housekeepingManager := housekeepingmgr.New(cfg.Prometheus, logger, transactionManager, node)
 	prometheus.MustRegister(housekeepingManager)
 
 	gitalyServerFactory := server.NewGitalyServerFactory(
@@ -539,7 +539,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		gitlabClient,
 		hook.NewTransactionRegistry(txRegistry),
 		hook.NewProcReceiveRegistry(),
-		partitionMgr,
+		node,
 	)
 
 	updaterWithHooks := updateref.NewUpdaterWithHooks(cfg, logger, locator, hookManager, gitCmdFactory, catfileCache)
@@ -605,7 +605,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			PackObjectsLimiter:  packObjectsLimiter,
 			RepositoryCounter:   repoCounter,
 			UpdaterWithHooks:    updaterWithHooks,
-			PartitionManager:    partitionMgr,
+			Node:                node,
 			TransactionRegistry: txRegistry,
 			HousekeepingManager: housekeepingManager,
 			BackupSink:          backupSink,

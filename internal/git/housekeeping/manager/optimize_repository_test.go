@@ -26,7 +26,6 @@ import (
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/perm"
@@ -1076,21 +1075,21 @@ func TestOptimizeRepository(t *testing.T) {
 		tc := tc
 
 		testRepoAndPool(t, tc.desc, func(t *testing.T, relativePath string) {
-			testWithAndWithoutTransaction(t, tc.desc, func(t *testing.T, cfg gitalycfg.Cfg, partitionMgr *storagemgr.PartitionManager) {
+			testWithAndWithoutTransaction(t, tc.desc, func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 				t.Parallel()
 
-				if tc.shouldNotRunInTransaction != "" && partitionMgr != nil {
+				if tc.shouldNotRunInTransaction != "" && node != nil {
 					t.Skipf("test should not run in transaction: %s", tc.shouldNotRunInTransaction)
 					return
 				}
 				setup := tc.setup(t, cfg, relativePath)
-				manager := New(cfg.Prometheus, testhelper.SharedLogger(t), txManager, partitionMgr)
+				manager := New(cfg.Prometheus, testhelper.SharedLogger(t), txManager, node)
 
 				err := manager.OptimizeRepository(ctx, setup.repo, setup.options...)
 				require.Equal(t, setup.expectedErr, err)
 
 				expectedMetrics := setup.expectedMetrics
-				if partitionMgr != nil && setup.expectedMetricsForTransaction != nil {
+				if node != nil && setup.expectedMetricsForTransaction != nil {
 					expectedMetrics = setup.expectedMetricsForTransaction
 				}
 				// If object pool is enabled, asserting transaction's metrics using
@@ -1128,7 +1127,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 	t.Parallel()
 	ctx := testhelper.Context(t)
 
-	testWithAndWithoutTransaction(t, "subsequent calls get skipped", func(t *testing.T, cfg gitalycfg.Cfg, pm *storagemgr.PartitionManager) {
+	testWithAndWithoutTransaction(t, "subsequent calls get skipped", func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 		reqReceivedCh, ch := make(chan struct{}), make(chan struct{})
 
 		repoProto, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -1136,7 +1135,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		})
 		repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
-		manager := New(gitalycfgprom.Config{}, testhelper.NewLogger(t), nil, pm)
+		manager := New(gitalycfgprom.Config{}, testhelper.NewLogger(t), nil, node)
 		manager.optimizeFunc = func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error {
 			reqReceivedCh <- struct{}{}
 			ch <- struct{}{}
@@ -1163,7 +1162,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 	// We want to confirm that even if a state exists, the housekeeping shall run as
 	// long as the state doesn't state that there is another housekeeping running
 	// i.e. `isRunning` is set to false.
-	testWithAndWithoutTransaction(t, "there is no other housekeeping running but state exists", func(t *testing.T, cfg gitalycfg.Cfg, pm *storagemgr.PartitionManager) {
+	testWithAndWithoutTransaction(t, "there is no other housekeeping running but state exists", func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 		ch := make(chan struct{})
 
 		repoProto, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -1171,7 +1170,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		})
 		repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
-		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, pm)
+		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, node)
 		manager.optimizeFunc = func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error {
 			// This should only happen if housekeeping is running successfully.
 			// So by sending data on this channel we can notify the test that this
@@ -1203,13 +1202,13 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		wg.Wait()
 	})
 
-	testWithAndWithoutTransaction(t, "there is a housekeeping running state", func(t *testing.T, cfg gitalycfg.Cfg, pm *storagemgr.PartitionManager) {
+	testWithAndWithoutTransaction(t, "there is a housekeeping running state", func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 		repoProto, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 			SkipCreationViaService: true,
 		})
 		repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
-		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, pm)
+		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, node)
 		manager.optimizeFunc = func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error {
 			require.FailNow(t, "housekeeping run should have been skipped")
 			return nil
@@ -1230,7 +1229,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		require.NotContains(t, manager.repositoryStates.values, stateKey)
 	})
 
-	testWithAndWithoutTransaction(t, "multiple repositories concurrently", func(t *testing.T, cfg gitalycfg.Cfg, pm *storagemgr.PartitionManager) {
+	testWithAndWithoutTransaction(t, "multiple repositories concurrently", func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 		reqReceivedCh, ch := make(chan struct{}), make(chan struct{})
 
 		repoProtoFirst, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -1244,7 +1243,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 
 		reposOptimized := make(map[string]struct{})
 
-		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, pm)
+		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, node)
 		manager.optimizeFunc = func(ctx context.Context, repo *localrepo.Repo, _ housekeeping.OptimizationStrategy) error {
 			relativePath := repo.GetRelativePath()
 			if tx := storage.ExtractTransaction(ctx); tx != nil {
@@ -1286,7 +1285,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		wg.Wait()
 	})
 
-	testWithAndWithoutTransaction(t, "serialized optimizations", func(t *testing.T, cfg gitalycfg.Cfg, pm *storagemgr.PartitionManager) {
+	testWithAndWithoutTransaction(t, "serialized optimizations", func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 		reqReceivedCh, ch := make(chan struct{}), make(chan struct{})
 		repoProto, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 			SkipCreationViaService: true,
@@ -1294,7 +1293,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		repo := localrepo.NewTestRepo(t, cfg, repoProto)
 		var optimizations int
 
-		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, pm)
+		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, node)
 		manager.optimizeFunc = func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error {
 			optimizations++
 

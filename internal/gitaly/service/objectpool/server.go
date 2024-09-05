@@ -8,7 +8,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -21,7 +20,7 @@ type server struct {
 	gitCmdFactory       gitcmd.CommandFactory
 	catfileCache        catfile.Cache
 	txManager           transaction.Manager
-	walPartitionManager *storagemgr.PartitionManager
+	node                storage.Node
 	housekeepingManager housekeepingmgr.Manager
 	repositoryCounter   *counter.RepositoryCounter
 }
@@ -34,7 +33,7 @@ func NewServer(deps *service.Dependencies) gitalypb.ObjectPoolServiceServer {
 		gitCmdFactory:       deps.GetGitCmdFactory(),
 		catfileCache:        deps.GetCatfileCache(),
 		txManager:           deps.GetTxManager(),
-		walPartitionManager: deps.GetPartitionManager(),
+		node:                deps.GetNode(),
 		housekeepingManager: deps.GetHousekeepingManager(),
 		repositoryCounter:   deps.GetRepositoryCounter(),
 	}

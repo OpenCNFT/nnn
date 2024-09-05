@@ -21,6 +21,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
+	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -359,7 +360,7 @@ func setupTestDBManager(t *testing.T, cfg config.Cfg) *databasemgr.DBManager {
 	return dbMgr
 }
 
-func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.PartitionManager {
+func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *nodeimpl.Manager {
 	logger := testhelper.NewLogger(t)
 	dbMgr := setupTestDBManager(t, cfg)
 
@@ -369,15 +370,27 @@ func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *storagemgr.Partiti
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
-		cmdFactory,
-		localRepoFactory,
-		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
-	), nil)
+	node, err := nodeimpl.NewManager(
+		cfg.Storages,
+		storagemgr.NewFactory(
+			logger,
+			dbMgr,
+			partition.NewFactory(
+				cmdFactory,
+				localRepoFactory,
+				partition.NewTransactionManagerMetrics(
+					housekeeping.NewMetrics(cfg.Prometheus),
+					snapshot.NewMetrics(),
+				),
+			),
+			storagemgr.NewMetrics(cfg.Prometheus),
+		),
+		nil,
+	)
 	require.NoError(t, err)
-	t.Cleanup(partitionManager.Close)
+	t.Cleanup(node.Close)
 
-	return partitionManager
+	return node
 }
 
 // fanOut executes f concurrently num times. The supplied raftID begins from 1.

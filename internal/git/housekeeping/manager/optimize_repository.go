@@ -97,14 +97,18 @@ func (m *RepositoryManager) OptimizeRepository(
 }
 
 func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExistingTransaction bool, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedError error) {
-	if m.walPartitionManager == nil {
+	if m.node == nil {
 		return run(ctx, nil, repo)
 	}
 
 	tx := storage.ExtractTransaction(ctx)
 	if !useExistingTransaction {
-		var err error
-		tx, err = m.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storage.TransactionOptions{
+		storageHandle, err := m.node.GetStorage(repo.GetStorageName())
+		if err != nil {
+			return fmt.Errorf("get storage: %w", err)
+		}
+
+		tx, err = storageHandle.Begin(ctx, 0, storage.TransactionOptions{
 			RelativePath: repo.GetRelativePath(),
 		})
 		if err != nil {

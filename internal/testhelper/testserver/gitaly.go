@@ -29,6 +29,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -182,13 +183,13 @@ func runGitaly(tb testing.TB, cfg config.Cfg, registrar func(srv *grpc.Server, d
 	tb.Cleanup(func() { testhelper.MustClose(tb, gsd.conns) })
 
 	var txMiddleware server.TransactionMiddleware
-	if deps.GetPartitionManager() != nil {
+	if deps.GetNode() != nil {
 		txMiddleware = server.TransactionMiddleware{
 			UnaryInterceptor: storagemgr.NewUnaryInterceptor(
-				deps.Logger, protoregistry.GitalyProtoPreregistered, deps.GetTransactionRegistry(), deps.GetPartitionManager(), deps.GetLocator(),
+				deps.Logger, protoregistry.GitalyProtoPreregistered, deps.GetTransactionRegistry(), deps.GetNode(), deps.GetLocator(),
 			),
 			StreamInterceptor: storagemgr.NewStreamInterceptor(
-				deps.Logger, protoregistry.GitalyProtoPreregistered, deps.GetTransactionRegistry(), deps.GetPartitionManager(), deps.GetLocator(),
+				deps.Logger, protoregistry.GitalyProtoPreregistered, deps.GetTransactionRegistry(), deps.GetNode(), deps.GetLocator(),
 			),
 		}
 	}
@@ -335,7 +336,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		gsd.procReceiveRegistry = hook.NewProcReceiveRegistry()
 	}
 
-	var partitionManager *storagemgr.PartitionManager
+	var node storage.Node
 	if testhelper.IsWALEnabled() {
 		dbMgr, err := databasemgr.NewDBManager(
 			cfg.Storages,
@@ -346,24 +347,27 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		require.NoError(tb, err)
 		tb.Cleanup(dbMgr.Close)
 
-		partitionManager, err = storagemgr.NewPartitionManager(
-			testhelper.Context(tb),
+		nodeMgr, err := nodeimpl.NewManager(
 			cfg.Storages,
-			gsd.logger,
-			dbMgr,
-			cfg.Prometheus,
-			partition.NewFactory(
-				gsd.gitCmdFactory,
-				localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
-				partition.NewTransactionManagerMetrics(
-					housekeeping.NewMetrics(cfg.Prometheus),
-					snapshot.NewMetrics(),
+			storagemgr.NewFactory(
+				gsd.logger,
+				dbMgr,
+				partition.NewFactory(
+					gsd.gitCmdFactory,
+					localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
+					partition.NewTransactionManagerMetrics(
+						housekeeping.NewMetrics(cfg.Prometheus),
+						snapshot.NewMetrics(),
+					),
 				),
+				storagemgr.NewMetrics(cfg.Prometheus),
 			),
 			nil,
 		)
 		require.NoError(tb, err)
-		tb.Cleanup(partitionManager.Close)
+		tb.Cleanup(nodeMgr.Close)
+
+		node = nodeMgr
 	}
 
 	if gsd.hookMgr == nil {
@@ -375,7 +379,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 			gsd.gitlabClient,
 			hook.NewTransactionRegistry(gsd.transactionRegistry),
 			gsd.procReceiveRegistry,
-			partitionManager,
+			node,
 		)
 	}
 
@@ -417,7 +421,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 	}
 
 	if gsd.housekeepingManager == nil {
-		gsd.housekeepingManager = housekeepingmgr.New(cfg.Prometheus, gsd.logger, gsd.txMgr, partitionManager)
+		gsd.housekeepingManager = housekeepingmgr.New(cfg.Prometheus, gsd.logger, gsd.txMgr, node)
 	}
 
 	if gsd.signingKey != "" {
@@ -443,7 +447,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 		UpdaterWithHooks:    gsd.updaterWithHooks,
 		HousekeepingManager: gsd.housekeepingManager,
 		TransactionRegistry: gsd.transactionRegistry,
-		PartitionManager:    partitionManager,
+		Node:                node,
 		BackupSink:          gsd.backupSink,
 		BackupLocator:       gsd.backupLocator,
 		BundleURISink:       gsd.bundleURISink,

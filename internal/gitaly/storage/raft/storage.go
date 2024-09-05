@@ -7,8 +7,8 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/lni/dragonboat/v4"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
 )
@@ -19,18 +19,18 @@ import (
 type storageManager struct {
 	id            raftID
 	name          string
-	ptnMgr        *storagemgr.PartitionManager
+	node          storage.Node
 	db            dbAccessor
 	nodeHost      *dragonboat.NodeHost
 	persistedInfo *gitalypb.Storage
 }
 
 // newStorageManager returns an instance of storage manager.
-func newStorageManager(name string, ptnMgr *storagemgr.PartitionManager, nodeHost *dragonboat.NodeHost) *storageManager {
+func newStorageManager(name string, node storage.Node, nodeHost *dragonboat.NodeHost) *storageManager {
 	return &storageManager{
 		name:     name,
-		db:       dbForStorage(ptnMgr, name),
-		ptnMgr:   ptnMgr,
+		db:       dbForStorage(node, name),
+		node:     node,
 		nodeHost: nodeHost,
 	}
 }
@@ -88,5 +88,5 @@ func (m *storageManager) clearStorageInfo() {
 }
 
 func (m *storageManager) dbForMetadataGroup() dbAccessor {
-	return dbForMetadataGroup(m.ptnMgr, m.name)
+	return dbForMetadataGroup(m.node, m.name)
 }

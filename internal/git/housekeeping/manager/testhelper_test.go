@@ -16,9 +16,11 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -72,7 +74,7 @@ func testRepoAndPool(t *testing.T, desc string, testFunc func(t *testing.T, rela
 	})
 }
 
-func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*testing.T, config.Cfg, *storagemgr.PartitionManager)) {
+func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*testing.T, config.Cfg, storage.Node)) {
 	t.Helper()
 	t.Run(desc, func(t *testing.T) {
 		t.Run("with transaction", func(t *testing.T) {
@@ -96,19 +98,27 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 			require.NoError(t, err)
 			t.Cleanup(dbMgr.Close)
 
-			partitionManager, err := storagemgr.NewPartitionManager(
-				testhelper.Context(t),
+			node, err := nodeimpl.NewManager(
 				cfg.Storages,
-				logger,
-				dbMgr,
-				cfg.Prometheus,
-				partition.NewFactory(cmdFactory, localRepoFactory, partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics())),
+				storagemgr.NewFactory(
+					logger,
+					dbMgr,
+					partition.NewFactory(
+						cmdFactory,
+						localRepoFactory,
+						partition.NewTransactionManagerMetrics(
+							housekeeping.NewMetrics(cfg.Prometheus),
+							snapshot.NewMetrics(),
+						),
+					),
+					storagemgr.NewMetrics(cfg.Prometheus),
+				),
 				nil,
 			)
 			require.NoError(t, err)
-			defer partitionManager.Close()
+			defer node.Close()
 
-			testFunc(t, cfg, partitionManager)
+			testFunc(t, cfg, node)
 		})
 
 		t.Run("without transaction", func(t *testing.T) {
