@@ -19,7 +19,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -170,33 +169,31 @@ func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storag
 // blockOnPartitionClosing checks if any partitions are currently in the process of
 // closing. If some are, the function waits for the closing process to complete before
 // continuing. This is required in order to accurately validate partition state.
-func blockOnPartitionClosing(t *testing.T, pm *PartitionManager, waitForFullClose bool) {
+func blockOnPartitionClosing(t *testing.T, mgr *storageManager, waitForFullClose bool) {
 	t.Helper()
 
 	var waitFor []chan struct{}
-	for _, sp := range pm.storages {
-		sp.mu.Lock()
-		for _, ptn := range sp.partitions {
-			// The closePartition step closes the transaction manager directly without calling close
-			// on the partition, so we check the manager directly here as well.
-			if ptn.isClosing() || ptn.partition.IsClosing() {
-				waiter := ptn.partitionClosed
-				if waitForFullClose {
-					waiter = ptn.closed
-				}
-
-				waitFor = append(waitFor, waiter)
+	mgr.mu.Lock()
+	for _, ptn := range mgr.partitions {
+		// The closePartition step closes the transaction manager directly without calling close
+		// on the partition, so we check the manager directly here as well.
+		if ptn.isClosing() || ptn.partition.IsClosing() {
+			waiter := ptn.partitionClosed
+			if waitForFullClose {
+				waiter = ptn.closed
 			}
+
+			waitFor = append(waitFor, waiter)
 		}
-		sp.mu.Unlock()
 	}
+	mgr.mu.Unlock()
 
 	for _, closed := range waitFor {
 		<-closed
 	}
 }
 
-func TestPartitionManager(t *testing.T) {
+func TestStorageManager(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
@@ -214,9 +211,6 @@ func TestPartitionManager(t *testing.T) {
 		ctx context.Context
 		// repo is the repository that the transaction belongs to.
 		repo storage.Repository
-		// storageName is the storage that the transaction belongs to.
-		// Overwritten by the repo storage name if repo is set.
-		storageName string
 		// partitionID is the partition that the transaction belongs to.
 		// Overwritten by the repo partition ID if repo is set.
 		partitionID storage.PartitionID
@@ -224,9 +218,9 @@ func TestPartitionManager(t *testing.T) {
 		alternateRelativePath string
 		// readOnly indicates if the transaction is read-only.
 		readOnly bool
-		// expectedState contains the partitions by their storages and their pending transaction count at
+		// expectedState contains the partitions and their pending transaction count at
 		// the end of the step.
-		expectedState map[string]map[storage.PartitionID]uint
+		expectedState map[storage.PartitionID]uint
 		// expectedError is the error expected to be returned when beginning the transaction.
 		expectedError error
 	}
@@ -237,9 +231,9 @@ func TestPartitionManager(t *testing.T) {
 		transactionID int
 		// ctx is the context used when `Commit()` gets invoked.
 		ctx context.Context
-		// expectedState contains the partitions by their storages and their pending transaction count at
+		// expectedState contains the partitions and their pending transaction count at
 		// the end of the step.
-		expectedState map[string]map[storage.PartitionID]uint
+		expectedState map[storage.PartitionID]uint
 		// expectedError is the error that is expected to be returned when committing the transaction.
 		expectedError error
 	}
@@ -248,9 +242,9 @@ func TestPartitionManager(t *testing.T) {
 	type rollback struct {
 		// transactionID identifies the transaction to rollback.
 		transactionID int
-		// expectedState contains the partitions by their storages and their pending transaction count at
+		// expectedState contains the partitions and their pending transaction count at
 		// the end of the step.
-		expectedState map[string]map[storage.PartitionID]uint
+		expectedState map[storage.PartitionID]uint
 		// expectedError is the error that is expected to be returned when rolling back the transaction.
 		expectedError error
 	}
@@ -273,35 +267,24 @@ func TestPartitionManager(t *testing.T) {
 	// being processed without a running partition manager.
 	type closeManager struct{}
 
-	type metricValues struct {
+	// assertMetrics is a step used to assert the current state of metrics.
+	type assertMetrics struct {
 		partitionsStartedTotal uint64
 		partitionsStoppedTotal uint64
 	}
 
-	// assertMetrics is a step used to assert the current state of metrics.
-	type assertMetrics struct {
-		defaultStorage metricValues
-		otherStorage   metricValues
-	}
-
 	// checkExpectedState validates that the partition manager contains the correct partitions and
 	// associated transaction count at the point of execution.
-	checkExpectedState := func(t *testing.T, cfg config.Cfg, partitionManager *PartitionManager, expectedState map[string]map[storage.PartitionID]uint) {
+	checkExpectedState := func(t *testing.T, cfg config.Cfg, mgr *storageManager, expectedState map[storage.PartitionID]uint) {
 		t.Helper()
 
-		actualState := map[string]map[storage.PartitionID]uint{}
-		for storageName, storageMgr := range partitionManager.storages {
-			for ptnID, partition := range storageMgr.partitions {
-				if actualState[storageName] == nil {
-					actualState[storageName] = map[storage.PartitionID]uint{}
-				}
-
-				actualState[storageName][ptnID] = partition.pendingTransactionCount
-			}
+		actualState := map[storage.PartitionID]uint{}
+		for ptnID, partition := range mgr.partitions {
+			actualState[ptnID] = partition.pendingTransactionCount
 		}
 
 		if expectedState == nil {
-			expectedState = map[string]map[storage.PartitionID]uint{}
+			expectedState = map[storage.PartitionID]uint{}
 		}
 
 		require.Equal(t, expectedState, actualState)
@@ -343,10 +326,8 @@ func TestPartitionManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{},
@@ -364,10 +345,8 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{
@@ -376,10 +355,8 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{
@@ -399,27 +376,21 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 2,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 2,
 							},
 						},
 						commit{
 							transactionID: 1,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{
@@ -434,59 +405,45 @@ func TestPartitionManager(t *testing.T) {
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
 				repoA := setupRepository(t, cfg, cfg.Storages[0])
 				repoB := setupRepository(t, cfg, cfg.Storages[0])
-				repoC := setupRepository(t, cfg, cfg.Storages[1])
+				repoC := setupRepository(t, cfg, cfg.Storages[0])
 
 				return setupData{
 					steps: steps{
 						begin{
 							transactionID: 1,
 							repo:          repoA,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repoB,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-									3: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
+								3: 1,
 							},
 						},
 						begin{
 							transactionID: 3,
 							repo:          repoC,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-									3: 1,
-								},
-								"other-storage": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
+								3: 1,
+								4: 1,
 							},
 						},
 						commit{
 							transactionID: 1,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									3: 1,
-								},
-								"other-storage": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								3: 1,
+								4: 1,
 							},
 						},
 						commit{
 							transactionID: 2,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"other-storage": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								4: 1,
 							},
 						},
 						commit{
@@ -505,10 +462,8 @@ func TestPartitionManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						rollback{},
@@ -547,10 +502,8 @@ func TestPartitionManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{
@@ -570,10 +523,8 @@ func TestPartitionManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						closePartition{},
@@ -594,10 +545,8 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						closePartition{
@@ -606,10 +555,8 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						finalizeTransaction{
@@ -661,22 +608,6 @@ func TestPartitionManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "transaction for a non-existent storage",
-			setup: func(t *testing.T, cfg config.Cfg) setupData {
-				return setupData{
-					steps: steps{
-						begin{
-							repo: &gitalypb.Repository{
-								StorageName: "non-existent",
-							},
-							expectedError: structerr.NewNotFound("unknown storage: %q", "non-existent"),
-						},
-					},
-				}
-			},
-		},
-
-		{
 			desc: "relative paths are cleaned",
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
 				repo := setupRepository(t, cfg, cfg.Storages[0])
@@ -686,10 +617,8 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						begin{
@@ -698,10 +627,8 @@ func TestPartitionManager(t *testing.T) {
 								StorageName:  repo.GetStorageName(),
 								RelativePath: filepath.Join(repo.GetRelativePath(), "child-dir", ".."),
 							},
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 2,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 2,
 							},
 						},
 					},
@@ -718,10 +645,8 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						begin{
@@ -730,26 +655,20 @@ func TestPartitionManager(t *testing.T) {
 								StorageName:  repo.GetStorageName(),
 								RelativePath: repo.GetRelativePath(),
 							},
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 2,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 2,
 							},
 						},
 						rollback{
 							transactionID: 2,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						rollback{
 							transactionID: 2,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 					},
@@ -768,44 +687,34 @@ func TestPartitionManager(t *testing.T) {
 							transactionID:         1,
 							repo:                  repo,
 							alternateRelativePath: alternateRepo.GetRelativePath(),
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 2,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 2,
 							},
 						},
 						begin{
 							transactionID: 3,
 							repo:          alternateRepo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 3,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 3,
 							},
 						},
 						rollback{
 							transactionID: 1,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 2,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 2,
 							},
 						},
 						rollback{
 							transactionID: 2,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						rollback{
@@ -826,31 +735,25 @@ func TestPartitionManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo1,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo2,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-									3: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
+								3: 1,
 							},
 						},
 						begin{
 							transactionID:         3,
 							repo:                  repo1,
 							alternateRelativePath: repo2.GetRelativePath(),
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-									3: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
+								3: 1,
 							},
 							expectedError: fmt.Errorf("get partition: %w", ErrRepositoriesAreInDifferentPartitions),
 						},
@@ -864,13 +767,10 @@ func TestPartitionManager(t *testing.T) {
 				return setupData{
 					steps: steps{
 						begin{
-							storageName: cfg.Storages[0].Name,
 							partitionID: 2,
 							readOnly:    true,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{},
@@ -894,7 +794,7 @@ func TestPartitionManager(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(readOnlyDir, "file-to-remove"), nil, mode.File))
 				require.NoError(t, storage.SetDirectoryMode(readOnlyDir, snapshot.ModeReadOnlyDirectory))
 
-				// We don't have any steps in the test as we're just asserting that PartitionManager initializes
+				// We don't have any steps in the test as we're just asserting that StorageManager initializes
 				// correctly and removes read-only directories in staging directory.
 				return setupData{}
 			},
@@ -907,13 +807,10 @@ func TestPartitionManager(t *testing.T) {
 				return setupData{
 					steps: steps{
 						begin{
-							storageName: cfg.Storages[0].Name,
 							partitionID: 2,
 							repo:        repo,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						commit{},
@@ -929,7 +826,6 @@ func TestPartitionManager(t *testing.T) {
 				return setupData{
 					steps: steps{
 						begin{
-							storageName:   cfg.Storages[0].Name,
 							partitionID:   100,
 							repo:          repo,
 							expectedError: fmt.Errorf("partition ID does not match repository partition"),
@@ -945,94 +841,49 @@ func TestPartitionManager(t *testing.T) {
 					steps: steps{
 						begin{
 							transactionID: 1,
-							storageName:   cfg.Storages[0].Name,
 							partitionID:   2,
 							readOnly:      true,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						assertMetrics{
-							defaultStorage: metricValues{
-								partitionsStartedTotal: 1,
-							},
+							partitionsStartedTotal: 1,
 						},
 						begin{
 							transactionID: 2,
-							storageName:   cfg.Storages[0].Name,
 							partitionID:   2,
 							readOnly:      true,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 2,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 2,
 							},
 						},
 						commit{
 							transactionID: 1,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
 						assertMetrics{
-							defaultStorage: metricValues{
-								partitionsStartedTotal: 1,
-							},
+							partitionsStartedTotal: 1,
 						},
 						commit{transactionID: 2},
 						assertMetrics{
-							defaultStorage: metricValues{
-								partitionsStartedTotal: 1,
-								partitionsStoppedTotal: 1,
-							},
+							partitionsStartedTotal: 1,
+							partitionsStoppedTotal: 1,
 						},
 						begin{
 							transactionID: 3,
-							storageName:   cfg.Storages[0].Name,
 							partitionID:   2,
 							readOnly:      true,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
 							},
 						},
-						begin{
-							transactionID: 4,
-							storageName:   cfg.Storages[1].Name,
-							partitionID:   2,
-							readOnly:      true,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"default": {
-									2: 1,
-								},
-								"other-storage": {
-									2: 1,
-								},
-							},
-						},
-						commit{
-							transactionID: 3,
-							expectedState: map[string]map[storage.PartitionID]uint{
-								"other-storage": {
-									2: 1,
-								},
-							},
-						},
-						commit{transactionID: 4},
+						commit{transactionID: 3},
 						assertMetrics{
-							defaultStorage: metricValues{
-								partitionsStartedTotal: 2,
-								partitionsStoppedTotal: 2,
-							},
-							otherStorage: metricValues{
-								partitionsStartedTotal: 1,
-								partitionsStoppedTotal: 1,
-							},
+							partitionsStartedTotal: 2,
+							partitionsStoppedTotal: 2,
 						},
 					},
 				}
@@ -1043,7 +894,7 @@ func TestPartitionManager(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := testcfg.Build(t, testcfg.WithStorages("default", "other-storage"))
+			cfg := testcfg.Build(t)
 			logger := testhelper.SharedLogger(t)
 
 			setup := tc.setup(t, cfg)
@@ -1068,11 +919,20 @@ func TestPartitionManager(t *testing.T) {
 				partitionFactory = newStubPartitionFactory()
 			}
 
-			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, partitionFactory, nil)
+			metrics := newMetrics(cfg.Prometheus)
+			storageMgr, err := newStorageManager(
+				logger,
+				cfg.Storages[0].Name,
+				cfg.Storages[0].Path,
+				dbMgr,
+				partitionFactory,
+				nil,
+				metrics.storageManagerMetrics(cfg.Storages[0].Name),
+			)
 			require.NoError(t, err)
 
 			defer func() {
-				partitionManager.Close()
+				storageMgr.close()
 				dbMgr.Close()
 				for _, storage := range cfg.Storages {
 					// Assert all staging directories have been emptied at the end.
@@ -1093,7 +953,7 @@ func TestPartitionManager(t *testing.T) {
 			// created during the testcase.
 			openTransactionData := map[int]*transactionData{}
 
-			var partitionManagerStopped bool
+			var storageManagerStopped bool
 			for _, step := range setup.steps {
 				switch step := step.(type) {
 				case begin:
@@ -1104,29 +964,24 @@ func TestPartitionManager(t *testing.T) {
 						beginCtx = step.ctx
 					}
 
-					var (
-						storageName  = step.storageName
-						relativePath string
-					)
+					var relativePath string
 					if step.repo != nil {
-						storageName = step.repo.GetStorageName()
 						relativePath = step.repo.GetRelativePath()
 					}
-					txn, err := partitionManager.Begin(beginCtx, storageName, step.partitionID, TransactionOptions{
+					txn, err := storageMgr.Begin(beginCtx, step.partitionID, TransactionOptions{
 						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
 						ReadOnly:              step.readOnly,
 					})
 					require.Equal(t, step.expectedError, err)
 
-					blockOnPartitionClosing(t, partitionManager, true)
-					checkExpectedState(t, cfg, partitionManager, step.expectedState)
+					blockOnPartitionClosing(t, storageMgr, true)
+					checkExpectedState(t, cfg, storageMgr, step.expectedState)
 
 					if err != nil {
 						continue
 					}
 
-					storageMgr := partitionManager.storages[storageName]
 					storageMgr.mu.Lock()
 
 					ptnID := step.partitionID
@@ -1156,16 +1011,16 @@ func TestPartitionManager(t *testing.T) {
 
 					require.ErrorIs(t, data.txn.Commit(commitCtx), step.expectedError)
 
-					blockOnPartitionClosing(t, partitionManager, true)
-					checkExpectedState(t, cfg, partitionManager, step.expectedState)
+					blockOnPartitionClosing(t, storageMgr, true)
+					checkExpectedState(t, cfg, storageMgr, step.expectedState)
 				case rollback:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction rolled back before being started")
 
 					data := openTransactionData[step.transactionID]
 					require.ErrorIs(t, data.txn.Rollback(), step.expectedError)
 
-					blockOnPartitionClosing(t, partitionManager, true)
-					checkExpectedState(t, cfg, partitionManager, step.expectedState)
+					blockOnPartitionClosing(t, storageMgr, true)
+					checkExpectedState(t, cfg, storageMgr, step.expectedState)
 				case closePartition:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction manager stopped before being started")
 
@@ -1175,7 +1030,7 @@ func TestPartitionManager(t *testing.T) {
 					// the normal means.
 					data.ptn.partition.Close()
 
-					blockOnPartitionClosing(t, partitionManager, false)
+					blockOnPartitionClosing(t, storageMgr, false)
 				case finalizeTransaction:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction finalized before being started")
 
@@ -1183,25 +1038,21 @@ func TestPartitionManager(t *testing.T) {
 
 					data.storageMgr.finalizeTransaction(data.ptn)
 				case closeManager:
-					require.False(t, partitionManagerStopped, "test error: partition manager already stopped")
-					partitionManagerStopped = true
+					require.False(t, storageManagerStopped, "test error: storage manager already stopped")
+					storageManagerStopped = true
 
-					partitionManager.Close()
+					storageMgr.close()
 				case assertMetrics:
-					testhelper.RequirePromMetrics(t, partitionManager, fmt.Sprintf(`
+					testhelper.RequirePromMetrics(t, metrics, fmt.Sprintf(`
 # HELP gitaly_partitions_started_total Number of partitions started.
 # TYPE gitaly_partitions_started_total counter
 gitaly_partitions_started_total{storage="default"} %d
-gitaly_partitions_started_total{storage="other-storage"} %d
 # HELP gitaly_partitions_stopped_total Number of partitions stopped.
 # TYPE gitaly_partitions_stopped_total counter
 gitaly_partitions_stopped_total{storage="default"} %d
-gitaly_partitions_stopped_total{storage="other-storage"} %d
 					`,
-						step.defaultStorage.partitionsStartedTotal,
-						step.otherStorage.partitionsStartedTotal,
-						step.defaultStorage.partitionsStoppedTotal,
-						step.otherStorage.partitionsStoppedTotal,
+						step.partitionsStartedTotal,
+						step.partitionsStoppedTotal,
 					))
 				}
 			}
@@ -1209,7 +1060,7 @@ gitaly_partitions_stopped_total{storage="other-storage"} %d
 	}
 }
 
-func TestPartitionManager_concurrentClose(t *testing.T) {
+func TestStorageManager_concurrentClose(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
@@ -1221,11 +1072,12 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, newStubPartitionFactory(), nil)
+	storageName := cfg.Storages[0].Name
+	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus).storageManagerMetrics(storageName))
 	require.NoError(t, err)
-	defer partitionManager.Close()
+	defer storageMgr.close()
 
-	tx, err := partitionManager.Begin(ctx, cfg.Storages[0].Name, 0, TransactionOptions{
+	tx, err := storageMgr.Begin(ctx, 0, TransactionOptions{
 		RelativePath: "relative-path",
 		AllowPartitionAssignmentWithoutRepository: true,
 	})
@@ -1243,15 +1095,15 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 		assert.NoError(t, tx.Rollback())
 	}()
 
-	// PartitionManager may be closed if the server is shutting down.
+	// StorageManager may be closed if the server is shutting down.
 	go func() {
 		defer wg.Done()
 		<-start
-		partitionManager.Close()
+		storageMgr.close()
 	}()
 
 	// The Partition may return if it errors out.
-	txMgr := partitionManager.storages[cfg.Storages[0].Name].partitions[2].partition
+	txMgr := storageMgr.partitions[2].partition
 	go func() {
 		defer wg.Done()
 		<-start
@@ -1263,7 +1115,7 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	wg.Wait()
 }
 
-func TestPartitionManager_callLogManager(t *testing.T) {
+func TestStorageManager_callLogManager(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
@@ -1274,21 +1126,19 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, newStubPartitionFactory(), nil)
+	storageName := cfg.Storages[0].Name
+	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus).storageManagerMetrics(storageName))
 	require.NoError(t, err)
 
 	defer func() {
-		partitionManager.Close()
+		storageMgr.close()
 		dbMgr.Close()
 	}()
-
-	storageMgr, ok := partitionManager.storages[cfg.Storages[0].Name]
-	require.True(t, ok)
 
 	ptnID := storage.PartitionID(1)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
 
-	require.NoError(t, partitionManager.CallLogManager(ctx, cfg.Storages[0].Name, ptnID, func(lm storage.LogManager) {
+	require.NoError(t, storageMgr.CallLogManager(ctx, ptnID, func(lm storage.LogManager) {
 		requirePartitionOpen(t, storageMgr, ptnID, true)
 		tm, ok := lm.(Partition)
 		require.True(t, ok)
@@ -1296,6 +1146,6 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 		require.False(t, tm.IsClosing())
 	}))
 
-	blockOnPartitionClosing(t, partitionManager, true)
+	blockOnPartitionClosing(t, storageMgr, true)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
 }
