@@ -14,6 +14,7 @@ Please complete all but the "Reading material" section in your first few working
   - [ ] [#gitaly-deployments](https://gitlab.slack.com/archives/gitaly-deployments) (Notifications for Gitaly deployments)
 - Ask your manager or your mentor in order to:
   - [ ] get Maintainer access to the [@gl-gitaly](https://gitlab.com/groups/gl-gitaly/-/group_members) group
+  - [ ] get Maintainer access to the [@gl-gitaly](https://ops.gitlab.net/groups/gl-gitaly/-/group_members) group on ops.gitlab.com
   - [ ] be added to the weekly discussion sessions and [async news doc](https://docs.google.com/document/d/1k1hY0ZdeFUnSqF6GUToFaJEtVIN_SjWeaRdx1V0i25E/edit)
   - [ ] be added to [Geekbot](https://app.geekbot.com/dashboard) for daily Slack standup updates
   - [ ] get Maintainer access to the [Gitaly Retrospective](https://gitlab.com/gl-retrospectives/enablement-section/gitaly) respository
