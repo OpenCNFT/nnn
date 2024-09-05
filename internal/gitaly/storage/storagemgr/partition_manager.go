@@ -111,7 +111,7 @@ func newStorageManager(
 	dbMgr *databasemgr.DBManager,
 	partitionFactory PartitionFactory,
 	consumer storage.LogConsumer,
-	metrics storageManagerMetrics,
+	metrics *metrics,
 ) (*storageManager, error) {
 	internalDir := internalDirectoryPath(path)
 	stagingDir := stagingDirectoryPath(internalDir)
@@ -146,7 +146,7 @@ func newStorageManager(
 		partitions:        map[storage.PartitionID]*partition{},
 		partitionFactory:  partitionFactory,
 		consumer:          consumer,
-		metrics:           metrics,
+		metrics:           metrics.storageManagerMetrics(name),
 	}, nil
 }
 
@@ -303,7 +303,7 @@ func NewPartitionManager(
 			dbMgr,
 			partitionFactory,
 			consumer,
-			pm.metrics.storageManagerMetrics(configuredStorage.Name),
+			pm.metrics,
 		); err != nil {
 			return nil, fmt.Errorf("new storage manage: %w", err)
 		}

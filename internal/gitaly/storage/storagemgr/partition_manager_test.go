@@ -927,7 +927,7 @@ func TestStorageManager(t *testing.T) {
 				dbMgr,
 				partitionFactory,
 				nil,
-				metrics.storageManagerMetrics(cfg.Storages[0].Name),
+				metrics,
 			)
 			require.NoError(t, err)
 
@@ -1073,7 +1073,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus).storageManagerMetrics(storageName))
+	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer storageMgr.close()
 
@@ -1127,7 +1127,7 @@ func TestStorageManager_callLogManager(t *testing.T) {
 	require.NoError(t, err)
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus).storageManagerMetrics(storageName))
+	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 
 	defer func() {
