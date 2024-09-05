@@ -417,7 +417,7 @@ func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *Transa
 
 	ctx = storage.ContextWithTransaction(ctx, tx)
 
-	txID := txRegistry.register(tx.Transaction)
+	txID := txRegistry.register(tx)
 	ctx = storage.ContextWithTransactionID(ctx, txID)
 
 	// If the proc-receive or post-receive hook is invoked, the transaction may already be committed
@@ -490,7 +490,7 @@ func restoreSnapshotRelativePath(ctx context.Context, methodInfo protoregistry.M
 	return rewrittenReq, nil
 }
 
-func rewriteRequest(tx *finalizableTransaction, methodInfo protoregistry.MethodInfo, req proto.Message) (proto.Message, error) {
+func rewriteRequest(tx storage.Transaction, methodInfo protoregistry.MethodInfo, req proto.Message) (proto.Message, error) {
 	if methodInfo.Scope != protoregistry.ScopeRepository {
 		return req, nil
 	}

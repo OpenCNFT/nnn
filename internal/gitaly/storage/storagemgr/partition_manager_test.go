@@ -303,7 +303,7 @@ func TestStorageManager(t *testing.T) {
 
 	// transactionData holds relevant data for each transaction created during a testcase.
 	type transactionData struct {
-		txn        *finalizableTransaction
+		txn        storage.Transaction
 		storageMgr *StorageManager
 		ptn        *partition
 	}
