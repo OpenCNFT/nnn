@@ -334,6 +334,15 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
 	}
 
+	return storageMgr.Begin(ctx, partitionID, opts)
+}
+
+// Begin gets the Partition for the specified repository and starts a transaction. If a
+// Partition is not already running, a new one is created and used. The partition tracks
+// the number of pending transactions and this counter gets incremented when Begin is invoked.
+//
+// If the partitionID is zero, then the partition is detected from opts.RelativePath.
+func (sm *storageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
 	var relativePaths []string
 
 	if opts.KVOnly {
@@ -341,12 +350,12 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		relativePaths = []string{}
 	} else if opts.RelativePath != "" {
 		var err error
-		opts.RelativePath, err = storage.ValidateRelativePath(storageMgr.path, opts.RelativePath)
+		opts.RelativePath, err = storage.ValidateRelativePath(sm.path, opts.RelativePath)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
 		}
 
-		repoPartitionID, err := storageMgr.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+		repoPartitionID, err := sm.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
 		if err != nil {
 			if errors.Is(err, badger.ErrDBClosed) {
 				// The database is closed when PartitionManager is closing. Return a more
@@ -366,16 +375,16 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 	}
 
 	relativeStateDir := deriveStateDirectory(partitionID)
-	absoluteStateDir := filepath.Join(storageMgr.path, relativeStateDir)
+	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncHierarchy(storageMgr.path, filepath.Dir(relativeStateDir)); err != nil {
+	if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
 		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
 	}
 
-	ptn, err := storageMgr.startPartition(ctx, partitionID)
+	ptn, err := sm.startPartition(ctx, partitionID)
 	if err != nil {
 		return nil, err
 	}
@@ -394,12 +403,12 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		// inflight. A transaction failing does not necessarily mean the transaction manager has
 		// stopped running. Consequently, if there are no other pending transactions the partition
 		// should be closed.
-		storageMgr.finalizeTransaction(ptn)
+		sm.finalizeTransaction(ptn)
 
 		return nil, err
 	}
 
-	return storageMgr.newFinalizableTransaction(ptn, transaction), nil
+	return sm.newFinalizableTransaction(ptn, transaction), nil
 }
 
 // CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
