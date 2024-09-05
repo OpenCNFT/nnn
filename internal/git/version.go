@@ -14,9 +14,9 @@ import (
 // - https://docs.gitlab.com/ee/install/installation.html#software-requirements
 // - https://docs.gitlab.com/ee/update/ (see e.g. https://docs.gitlab.com/ee/update/#1440)
 var minimumVersion = Version{
-	versionString: "2.45.0",
+	versionString: "2.46.0",
 	major:         2,
-	minor:         45,
+	minor:         46,
 	patch:         0,
 	rc:            false,
 
