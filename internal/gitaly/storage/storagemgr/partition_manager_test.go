@@ -968,7 +968,7 @@ func TestStorageManager(t *testing.T) {
 					if step.repo != nil {
 						relativePath = step.repo.GetRelativePath()
 					}
-					txn, err := storageMgr.Begin(beginCtx, step.partitionID, TransactionOptions{
+					txn, err := storageMgr.Begin(beginCtx, step.partitionID, storage.TransactionOptions{
 						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
 						ReadOnly:              step.readOnly,
@@ -1077,7 +1077,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
-	tx, err := storageMgr.Begin(ctx, 0, TransactionOptions{
+	tx, err := storageMgr.Begin(ctx, 0, storage.TransactionOptions{
 		RelativePath: "relative-path",
 		AllowPartitionAssignmentWithoutRepository: true,
 	})

@@ -326,26 +326,6 @@ func stagingDirectoryPath(storagePath string) string {
 	return filepath.Join(storagePath, "staging")
 }
 
-// TransactionOptions are used to pass transaction options into Begin.
-type TransactionOptions struct {
-	// ReadOnly indicates whether this is a read-only transaction. Read-only transactions are not
-	// configured with a quarantine directory and do not commit a log entry.
-	ReadOnly bool
-	// RelativePath specifies which repository in the partition will be the target.
-	RelativePath string
-	// AlternateRelativePath specifies a repository to include in the transaction's snapshot as well.
-	AlternateRelativePath string
-	// AllowPartitionAssignmentWithoutRepository determines whether a partition assignment should be
-	// written out even if repository does not exist.
-	AllowPartitionAssignmentWithoutRepository bool
-	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
-	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
-	ForceExclusiveSnapshot bool
-	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
-	// path is provided.
-	KVOnly bool
-}
-
 // Begin gets the Partition for the specified repository and starts a transaction. If a
 // Partition is not already running, a new one is created and used. The partition tracks
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
@@ -353,7 +333,7 @@ type TransactionOptions struct {
 // Specifying storageName and partitionID will begin a transaction targeting an
 // entire partition. If the partitionID is zero, then the partition is detected
 // from opts.RelativePath.
-func (pm *PartitionManager) Begin(ctx context.Context, storageName string, partitionID storage.PartitionID, opts TransactionOptions) (storage.Transaction, error) {
+func (pm *PartitionManager) Begin(ctx context.Context, storageName string, partitionID storage.PartitionID, opts storage.TransactionOptions) (storage.Transaction, error) {
 	storageMgr, ok := pm.storages[storageName]
 	if !ok {
 		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
@@ -367,7 +347,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
 //
 // If the partitionID is zero, then the partition is detected from opts.RelativePath.
-func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts TransactionOptions) (storage.Transaction, error) {
+func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts storage.TransactionOptions) (storage.Transaction, error) {
 	var relativePaths []string
 
 	if opts.KVOnly {

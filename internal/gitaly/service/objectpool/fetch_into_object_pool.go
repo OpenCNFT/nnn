@@ -9,7 +9,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -62,7 +61,7 @@ func (s *server) executeMaybeWithTransaction(ctx context.Context, repo *localrep
 		return execute(repo)
 	}
 
-	transaction, err := s.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
+	transaction, err := s.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storage.TransactionOptions{
 		ReadOnly:     true,
 		RelativePath: repo.GetRelativePath(),
 	})

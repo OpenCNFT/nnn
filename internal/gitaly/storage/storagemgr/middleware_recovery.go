@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"google.golang.org/grpc"
@@ -165,7 +166,7 @@ func (mw *TransactionRecoveryMiddleware) applyPendingWAL(ctx context.Context, me
 
 	// Start a transaction against the repository. The partition's WAL is applied before beginning
 	// transactions which ensures the WAL is fully applied.
-	tx, err := mw.mgr.Begin(ctx, targetRepo.GetStorageName(), 0, TransactionOptions{
+	tx, err := mw.mgr.Begin(ctx, targetRepo.GetStorageName(), 0, storage.TransactionOptions{
 		ReadOnly:     true,
 		RelativePath: targetRepo.GetRelativePath(),
 	})

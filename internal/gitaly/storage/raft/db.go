@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lni/dragonboat/v4/statemachine"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 )
@@ -33,7 +34,7 @@ func (a *namespacedDBAccessor) write(ctx context.Context, fn func(keyvalue.ReadW
 func newNamespacedDBAccessor(ptnMgr *storagemgr.PartitionManager, storageName string, namespace []byte) *namespacedDBAccessor {
 	return &namespacedDBAccessor{
 		access: func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) (returnedErr error) {
-			tx, err := ptnMgr.Begin(ctx, storageName, storagemgr.MetadataPartitionID, storagemgr.TransactionOptions{
+			tx, err := ptnMgr.Begin(ctx, storageName, storagemgr.MetadataPartitionID, storage.TransactionOptions{
 				ReadOnly: readOnly,
 				KVOnly:   true,
 			})

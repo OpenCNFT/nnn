@@ -260,7 +260,7 @@ func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegi
 		req,
 		targetStorage,
 		storage.PartitionID(targetPartition),
-		TransactionOptions{
+		storage.TransactionOptions{
 			ReadOnly: methodInfo.Operation == protoregistry.OpAccessor,
 		},
 	)
@@ -389,7 +389,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		req,
 		targetRepo.StorageName,
 		0,
-		TransactionOptions{
+		storage.TransactionOptions{
 			ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
 			RelativePath:          targetRepo.RelativePath,
 			AlternateRelativePath: alternateRelativePath,
@@ -399,7 +399,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 	)
 }
 
-func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, methodInfo protoregistry.MethodInfo, req proto.Message, storageName string, partitionID storage.PartitionID, transactionOptions TransactionOptions) (_ transactionalizedRequest, returnedErr error) {
+func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, methodInfo protoregistry.MethodInfo, req proto.Message, storageName string, partitionID storage.PartitionID, transactionOptions storage.TransactionOptions) (_ transactionalizedRequest, returnedErr error) {
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.transactionalizeRequest", nil)
 
 	tx, err := mgr.Begin(ctx, storageName, partitionID, transactionOptions)

@@ -131,3 +131,23 @@ type Partition interface {
 	// Close closes the partition handle to signal the caller is done using it.
 	Close()
 }
+
+// TransactionOptions are used to pass transaction options into Begin.
+type TransactionOptions struct {
+	// ReadOnly indicates whether this is a read-only transaction. Read-only transactions are not
+	// configured with a quarantine directory and do not commit a log entry.
+	ReadOnly bool
+	// RelativePath specifies which repository in the partition will be the target.
+	RelativePath string
+	// AlternateRelativePath specifies a repository to include in the transaction's snapshot as well.
+	AlternateRelativePath string
+	// AllowPartitionAssignmentWithoutRepository determines whether a partition assignment should be
+	// written out even if repository does not exist.
+	AllowPartitionAssignmentWithoutRepository bool
+	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
+	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
+	ForceExclusiveSnapshot bool
+	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
+	// path is provided.
+	KVOnly bool
+}
