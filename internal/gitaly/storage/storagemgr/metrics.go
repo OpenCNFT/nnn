@@ -5,14 +5,16 @@ import (
 	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 )
 
-type metrics struct {
+// Metrics contains the unscoped collected by StorageManager.
+type Metrics struct {
 	partitionsStarted *prometheus.CounterVec
 	partitionsStopped *prometheus.CounterVec
 }
 
-func newMetrics(promCfg gitalycfgprom.Config) *metrics {
+// NewMetrics returns a new Metrics instance.
+func NewMetrics(promCfg gitalycfgprom.Config) *Metrics {
 	labels := []string{"storage"}
-	return &metrics{
+	return &Metrics{
 		partitionsStarted: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "gitaly_partitions_started_total",
 			Help: "Number of partitions started.",
@@ -25,18 +27,18 @@ func newMetrics(promCfg gitalycfgprom.Config) *metrics {
 }
 
 // Describe is used to describe Prometheus metrics.
-func (m *metrics) Describe(metrics chan<- *prometheus.Desc) {
+func (m *Metrics) Describe(metrics chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(m, metrics)
 }
 
 // Collect is used to collect Prometheus metrics.
-func (m *metrics) Collect(metrics chan<- prometheus.Metric) {
+func (m *Metrics) Collect(metrics chan<- prometheus.Metric) {
 	m.partitionsStarted.Collect(metrics)
 	m.partitionsStopped.Collect(metrics)
 }
 
 // storageManageMetrics returns metrics scoped for a specific storageManager.
-func (m *metrics) storageManagerMetrics(storage string) storageManagerMetrics {
+func (m *Metrics) storageManagerMetrics(storage string) storageManagerMetrics {
 	labels := prometheus.Labels{"storage": storage}
 	return storageManagerMetrics{
 		partitionsStarted: m.partitionsStarted.With(labels),

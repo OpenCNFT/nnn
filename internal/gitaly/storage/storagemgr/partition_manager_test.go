@@ -157,7 +157,7 @@ func (m mockTransaction) Commit(ctx context.Context) error {
 
 func (m mockTransaction) Rollback() error { return m.rollback() }
 
-func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storage.PartitionID, expectOpen bool) {
+func requirePartitionOpen(t *testing.T, storageMgr *StorageManager, ptnID storage.PartitionID, expectOpen bool) {
 	t.Helper()
 
 	storageMgr.mu.Lock()
@@ -169,7 +169,7 @@ func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storag
 // blockOnPartitionClosing checks if any partitions are currently in the process of
 // closing. If some are, the function waits for the closing process to complete before
 // continuing. This is required in order to accurately validate partition state.
-func blockOnPartitionClosing(t *testing.T, mgr *storageManager, waitForFullClose bool) {
+func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose bool) {
 	t.Helper()
 
 	var waitFor []chan struct{}
@@ -275,7 +275,7 @@ func TestStorageManager(t *testing.T) {
 
 	// checkExpectedState validates that the partition manager contains the correct partitions and
 	// associated transaction count at the point of execution.
-	checkExpectedState := func(t *testing.T, cfg config.Cfg, mgr *storageManager, expectedState map[storage.PartitionID]uint) {
+	checkExpectedState := func(t *testing.T, cfg config.Cfg, mgr *StorageManager, expectedState map[storage.PartitionID]uint) {
 		t.Helper()
 
 		actualState := map[storage.PartitionID]uint{}
@@ -304,7 +304,7 @@ func TestStorageManager(t *testing.T) {
 	// transactionData holds relevant data for each transaction created during a testcase.
 	type transactionData struct {
 		txn        *finalizableTransaction
-		storageMgr *storageManager
+		storageMgr *StorageManager
 		ptn        *partition
 	}
 
@@ -919,8 +919,8 @@ func TestStorageManager(t *testing.T) {
 				partitionFactory = newStubPartitionFactory()
 			}
 
-			metrics := newMetrics(cfg.Prometheus)
-			storageMgr, err := newStorageManager(
+			metrics := NewMetrics(cfg.Prometheus)
+			storageMgr, err := NewStorageManager(
 				logger,
 				cfg.Storages[0].Name,
 				cfg.Storages[0].Path,
@@ -932,7 +932,7 @@ func TestStorageManager(t *testing.T) {
 			require.NoError(t, err)
 
 			defer func() {
-				storageMgr.close()
+				storageMgr.Close()
 				dbMgr.Close()
 				for _, storage := range cfg.Storages {
 					// Assert all staging directories have been emptied at the end.
@@ -1041,7 +1041,7 @@ func TestStorageManager(t *testing.T) {
 					require.False(t, storageManagerStopped, "test error: storage manager already stopped")
 					storageManagerStopped = true
 
-					storageMgr.close()
+					storageMgr.Close()
 				case assertMetrics:
 					testhelper.RequirePromMetrics(t, metrics, fmt.Sprintf(`
 # HELP gitaly_partitions_started_total Number of partitions started.
@@ -1073,9 +1073,9 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
-	defer storageMgr.close()
+	defer storageMgr.Close()
 
 	tx, err := storageMgr.Begin(ctx, 0, TransactionOptions{
 		RelativePath: "relative-path",
@@ -1099,7 +1099,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		storageMgr.close()
+		storageMgr.Close()
 	}()
 
 	// The Partition may return if it errors out.
@@ -1127,11 +1127,11 @@ func TestStorageManager_callLogManager(t *testing.T) {
 	require.NoError(t, err)
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := newStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, newMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 
 	defer func() {
-		storageMgr.close()
+		storageMgr.Close()
 		dbMgr.Close()
 	}()
 

@@ -56,13 +56,13 @@ type PartitionFactory interface {
 // PartitionManager is responsible for managing the lifecycle of each TransactionManager.
 type PartitionManager struct {
 	// storages are the storages configured in this Gitaly server. The map is keyed by the storage name.
-	storages map[string]*storageManager
+	storages map[string]*StorageManager
 	// consumerCleanup closes the LogConsumer.
 	consumerCleanup func()
 	// metrics accounts for all metrics of transaction operations. It will be
 	// passed down to each partition and is shared between them. The
 	// metrics must be registered to be collected by prometheus collector.
-	metrics *metrics
+	metrics *Metrics
 }
 
 type storageManagerMetrics struct {
@@ -70,8 +70,8 @@ type storageManagerMetrics struct {
 	partitionsStopped prometheus.Counter
 }
 
-// storageManager represents a single storage.
-type storageManager struct {
+// StorageManager represents a single storage.
+type StorageManager struct {
 	// mu synchronizes access to the fields of storageManager.
 	mu sync.Mutex
 	// logger handles all logging for storageManager.
@@ -103,16 +103,16 @@ type storageManager struct {
 	metrics storageManagerMetrics
 }
 
-// newStorageManager instantiates a new storageManager.
-func newStorageManager(
+// NewStorageManager instantiates a new StorageManager.
+func NewStorageManager(
 	logger log.Logger,
 	name string,
 	path string,
 	dbMgr *databasemgr.DBManager,
 	partitionFactory PartitionFactory,
 	consumer storage.LogConsumer,
-	metrics *metrics,
-) (*storageManager, error) {
+	metrics *Metrics,
+) (*StorageManager, error) {
 	internalDir := internalDirectoryPath(path)
 	stagingDir := stagingDirectoryPath(internalDir)
 	// Remove a possible already existing staging directory as it may contain stale files
@@ -136,7 +136,7 @@ func newStorageManager(
 		return nil, fmt.Errorf("new partition assigner: %w", err)
 	}
 
-	return &storageManager{
+	return &StorageManager{
 		logger:            storageLogger,
 		name:              name,
 		path:              path,
@@ -150,7 +150,8 @@ func newStorageManager(
 	}, nil
 }
 
-func (sm *storageManager) close() {
+// Close closes the manager for further access and waits for all partitions to stop.
+func (sm *StorageManager) Close() {
 	sm.mu.Lock()
 	// Mark the storage as closed so no new transactions can begin anymore. This
 	// also means no more partitions are spawned.
@@ -171,7 +172,7 @@ func (sm *storageManager) close() {
 
 // finalizeTransaction decrements the partition's pending transaction count and closes it if there are no more
 // transactions pending.
-func (sm *storageManager) finalizeTransaction(ptn *partition) {
+func (sm *StorageManager) finalizeTransaction(ptn *partition) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -203,7 +204,7 @@ func (tx *finalizableTransaction) Rollback() error {
 
 // newFinalizableTransaction returns a wrapped transaction that executes finalizeTransaction when the transaction
 // is committed or rolled back.
-func (sm *storageManager) newFinalizableTransaction(ptn *partition, tx storage.Transaction) *finalizableTransaction {
+func (sm *StorageManager) newFinalizableTransaction(ptn *partition, tx storage.Transaction) *finalizableTransaction {
 	var finalizeOnce sync.Once
 	return &finalizableTransaction{
 		finalize: func() {
@@ -285,8 +286,8 @@ func NewPartitionManager(
 	consumerFactory LogConsumerFactory,
 ) (*PartitionManager, error) {
 	pm := &PartitionManager{
-		storages: make(map[string]*storageManager, len(configuredStorages)),
-		metrics:  newMetrics(promCfg),
+		storages: make(map[string]*StorageManager, len(configuredStorages)),
+		metrics:  NewMetrics(promCfg),
 	}
 
 	var consumer storage.LogConsumer
@@ -296,7 +297,7 @@ func NewPartitionManager(
 
 	for _, configuredStorage := range configuredStorages {
 		var err error
-		if pm.storages[configuredStorage.Name], err = newStorageManager(
+		if pm.storages[configuredStorage.Name], err = NewStorageManager(
 			logger,
 			configuredStorage.Name,
 			configuredStorage.Path,
@@ -366,7 +367,7 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
 //
 // If the partitionID is zero, then the partition is detected from opts.RelativePath.
-func (sm *storageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
+func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
 	var relativePaths []string
 
 	if opts.KVOnly {
@@ -446,7 +447,7 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 }
 
 // CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-func (sm *storageManager) CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
+func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
 	ptn, err := sm.startPartition(ctx, partitionID)
 	if err != nil {
 		return err
@@ -465,7 +466,7 @@ func (sm *storageManager) CallLogManager(ctx context.Context, partitionID storag
 }
 
 // startPartition starts a partition.
-func (sm *storageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partition, error) {
+func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partition, error) {
 	relativeStateDir := deriveStateDirectory(partitionID)
 	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
@@ -596,7 +597,7 @@ func (pm *PartitionManager) Close() {
 		activeStorages.Add(1)
 		storageMgr := storageMgr
 		go func() {
-			storageMgr.close()
+			storageMgr.Close()
 			activeStorages.Done()
 		}()
 	}
