@@ -103,6 +103,53 @@ type storageManager struct {
 	metrics storageManagerMetrics
 }
 
+// newStorageManager instantiates a new storageManager.
+func newStorageManager(
+	logger log.Logger,
+	name string,
+	path string,
+	dbMgr *databasemgr.DBManager,
+	partitionFactory PartitionFactory,
+	consumer storage.LogConsumer,
+	metrics storageManagerMetrics,
+) (*storageManager, error) {
+	internalDir := internalDirectoryPath(path)
+	stagingDir := stagingDirectoryPath(internalDir)
+	// Remove a possible already existing staging directory as it may contain stale files
+	// if the previous process didn't shutdown gracefully.
+	if err := clearStagingDirectory(stagingDir); err != nil {
+		return nil, fmt.Errorf("failed clearing storage's staging directory: %w", err)
+	}
+
+	if err := os.MkdirAll(stagingDir, mode.Directory); err != nil {
+		return nil, fmt.Errorf("create storage's staging directory: %w", err)
+	}
+
+	storageLogger := logger.WithField("storage", name)
+	db, err := dbMgr.GetDB(name)
+	if err != nil {
+		return nil, err
+	}
+
+	pa, err := newPartitionAssigner(db, path)
+	if err != nil {
+		return nil, fmt.Errorf("new partition assigner: %w", err)
+	}
+
+	return &storageManager{
+		logger:            storageLogger,
+		name:              name,
+		path:              path,
+		stagingDirectory:  stagingDir,
+		database:          db,
+		partitionAssigner: pa,
+		partitions:        map[storage.PartitionID]*partition{},
+		partitionFactory:  partitionFactory,
+		consumer:          consumer,
+		metrics:           metrics,
+	}, nil
+}
+
 func (sm *storageManager) close() {
 	sm.mu.Lock()
 	// Mark the storage as closed so no new transactions can begin anymore. This
@@ -248,40 +295,17 @@ func NewPartitionManager(
 	}
 
 	for _, configuredStorage := range configuredStorages {
-		internalDir := internalDirectoryPath(configuredStorage.Path)
-		stagingDir := stagingDirectoryPath(internalDir)
-		// Remove a possible already existing staging directory as it may contain stale files
-		// if the previous process didn't shutdown gracefully.
-		if err := clearStagingDirectory(stagingDir); err != nil {
-			return nil, fmt.Errorf("failed clearing storage's staging directory: %w", err)
-		}
-
-		if err := os.MkdirAll(stagingDir, mode.Directory); err != nil {
-			return nil, fmt.Errorf("create storage's staging directory: %w", err)
-		}
-
-		storageLogger := logger.WithField("storage", configuredStorage.Name)
-		db, err := dbMgr.GetDB(configuredStorage.Name)
-		if err != nil {
-			return nil, err
-		}
-
-		pa, err := newPartitionAssigner(db, configuredStorage.Path)
-		if err != nil {
-			return nil, fmt.Errorf("new partition assigner: %w", err)
-		}
-
-		pm.storages[configuredStorage.Name] = &storageManager{
-			logger:            storageLogger,
-			name:              configuredStorage.Name,
-			path:              configuredStorage.Path,
-			stagingDirectory:  stagingDir,
-			database:          db,
-			partitionAssigner: pa,
-			partitions:        map[storage.PartitionID]*partition{},
-			partitionFactory:  partitionFactory,
-			consumer:          consumer,
-			metrics:           pm.metrics.storageManagerMetrics(configuredStorage.Name),
+		var err error
+		if pm.storages[configuredStorage.Name], err = newStorageManager(
+			logger,
+			configuredStorage.Name,
+			configuredStorage.Path,
+			dbMgr,
+			partitionFactory,
+			consumer,
+			pm.metrics.storageManagerMetrics(configuredStorage.Name),
+		); err != nil {
+			return nil, fmt.Errorf("new storage manage: %w", err)
 		}
 	}
 
