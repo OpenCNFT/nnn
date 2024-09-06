@@ -30,7 +30,6 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 type Partition interface {
 	storage.Partition
 	Run() error
-	IsClosing() bool
 }
 
 // PartitionFactory is factory type that can create new partitions.

@@ -2398,16 +2398,6 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 // Close stops the transaction processing causing Run to return.
 func (mgr *TransactionManager) Close() { mgr.close() }
 
-// IsClosing returns whether closing of the manager was initiated.
-func (mgr *TransactionManager) IsClosing() bool {
-	select {
-	case <-mgr.closing:
-		return true
-	default:
-		return false
-	}
-}
-
 // snapshotsDir returns the directory where the transactions' snapshots are stored.
 func (mgr *TransactionManager) snapshotsDir() string {
 	return filepath.Join(mgr.stagingDirectory, "snapshots")

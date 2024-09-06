@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,18 +52,10 @@ func newStubPartitionFactory() PartitionFactory {
 			stagingDir string,
 			logConsumer storage.LogConsumer,
 		) Partition {
+			var closeOnce sync.Once
 			closing := make(chan struct{})
-			isClosing := func() bool {
-				select {
-				case <-closing:
-					return true
-				default:
-					return false
-				}
-			}
-
 			// This stub emulates what a real partition implementation.
-			return mockPartition{
+			return &mockPartition{
 				run: func() error {
 					// Run returns after the partition has been closed.
 					<-closing
@@ -76,24 +69,24 @@ func newStubPartitionFactory() PartitionFactory {
 
 					return mockTransaction{
 						commit: func(ctx context.Context) error {
-							// Commits fail if partition is closed.
-							if isClosing() {
+							select {
+							case <-closing:
+								// Commits fail if partition is closed.
 								return storage.ErrTransactionProcessingStopped
+							default:
+								// Commits fail if context is done.
+								return ctx.Err()
 							}
-
-							// Commits fail if context is done.
-							return ctx.Err()
 						},
 						rollback: func() error { return nil },
 					}, nil
 				},
 				close: func() {
 					// Closing is idempotent.
-					if !isClosing() {
+					closeOnce.Do(func() {
 						close(closing)
-					}
+					})
 				},
-				isClosing: isClosing,
 			}
 		},
 	}
@@ -122,27 +115,24 @@ func (m mockPartitionFactory) New(
 }
 
 type mockPartition struct {
-	begin     func(context.Context, storage.BeginOptions) (storage.Transaction, error)
-	run       func() error
-	close     func()
-	isClosing func() bool
+	begin func(context.Context, storage.BeginOptions) (storage.Transaction, error)
+	run   func() error
+	close func()
 	storage.LogManager
+	closeCalled atomic.Bool
 }
 
-func (m mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+func (m *mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
 	return m.begin(ctx, opts)
 }
 
-func (m mockPartition) Run() error {
+func (m *mockPartition) Run() error {
 	return m.run()
 }
 
-func (m mockPartition) Close() {
+func (m *mockPartition) Close() {
+	m.closeCalled.Store(true)
 	m.close()
-}
-
-func (m mockPartition) IsClosing() bool {
-	return m.isClosing()
 }
 
 type mockTransaction struct {
@@ -177,7 +167,7 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 	for _, ptn := range mgr.partitions {
 		// The closePartition step closes the transaction manager directly without calling close
 		// on the partition, so we check the manager directly here as well.
-		if ptn.isClosing() || ptn.partition.IsClosing() {
+		if ptn.isClosing() || ptn.partition.(*mockPartition).closeCalled.Load() {
 			waiter := ptn.partitionClosed
 			if waitForFullClose {
 				waiter = ptn.closed
@@ -1143,7 +1133,7 @@ func TestStorageManager_callLogManager(t *testing.T) {
 		tm, ok := lm.(Partition)
 		require.True(t, ok)
 
-		require.False(t, tm.IsClosing())
+		require.False(t, tm.(*mockPartition).closeCalled.Load())
 	}))
 
 	blockOnPartitionClosing(t, storageMgr, true)
