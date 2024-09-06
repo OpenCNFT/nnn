@@ -117,21 +117,16 @@ func (o *ObjectPool) FetchFromOrigin(ctx context.Context, origin *localrepo.Repo
 	// fetching one. The housekeeping task's effect is pushed to the next request. That's opposed to
 	// the initial intention of running housekeeping after fetching. As a result, this RPC needs to
 	// manage the transaction itself so that two transactions can be committed in the right order.
-	originalPoolRepo := o.Repo
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		originalPoolRepo = newLocalRepo(tx.OriginalRepository(&gitalypb.Repository{
-			StorageName:  origin.GetStorageName(),
-			RelativePath: origin.GetRelativePath(),
-		}))
-
 		if err := tx.Commit(ctx); err != nil {
 			return fmt.Errorf("commit: %w", err)
 		}
 	}
 
 	// We've committed the original transaction above. OptimizeRepository internally starts
-	// another transaction.
-	if err := o.housekeepingManager.OptimizeRepository(ctx, originalPoolRepo); err != nil {
+	// another transaction, and knows how to retrieve the original relative path of the repository
+	// if there is a transaction in the context.
+	if err := o.housekeepingManager.OptimizeRepository(ctx, o.Repo); err != nil {
 		return fmt.Errorf("optimizing pool repo: %w", err)
 	}
 
