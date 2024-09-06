@@ -1164,11 +1164,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		// When repository optimizations are performed for a specific repository already,
 		// then any subsequent calls to the same repository should just return immediately
 		// without doing any optimizations at all.
-		if err := manager.OptimizeRepository(ctx, repo); node != nil {
-			require.Equal(t, fmt.Errorf("run: %w", fmt.Errorf("unexpected second optimize call")), err)
-		} else {
-			require.NoError(t, err)
-		}
+		require.NoError(t, manager.OptimizeRepository(ctx, repo))
 	})
 	// We want to confirm that even if a state exists, the housekeeping shall run as
 	// long as the state doesn't state that there is another housekeeping running
@@ -1220,9 +1216,8 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
 		manager := New(gitalycfgprom.Config{}, testhelper.SharedLogger(t), nil, node)
-		optimizeCalled := false
 		manager.optimizeFunc = func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error {
-			optimizeCalled = true
+			require.FailNow(t, "housekeeping run should have been skipped")
 			return nil
 		}
 
@@ -1235,12 +1230,6 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		require.Contains(t, manager.repositoryStates.values, stateKey)
 
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
-
-		if node != nil {
-			require.True(t, optimizeCalled)
-			return
-		}
-		require.False(t, optimizeCalled)
 
 		// After running the cleanup, the state should be removed.
 		cleanup()
@@ -1339,11 +1328,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
-		expectedOptimizations := 1
-		if node != nil {
-			expectedOptimizations = 4
-		}
-		assert.Equal(t, expectedOptimizations, optimizations)
+		assert.Equal(t, 1, optimizations)
 
 		<-ch
 		wg.Wait()
@@ -1354,11 +1339,7 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
-		expectedOptimizations = 4
-		if node != nil {
-			expectedOptimizations = 7
-		}
-		assert.Equal(t, expectedOptimizations, optimizations)
+		assert.Equal(t, 4, optimizations)
 	})
 }
 

@@ -68,7 +68,19 @@ func (m *RepositoryManager) OptimizeRepository(
 	defer span.Finish()
 
 	if err := m.maybeStartTransaction(ctx, cfg.UseExistingTransaction, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
-		ok, cleanup := m.repositoryStates.tryRunningHousekeeping(repo)
+		originalRepo := &gitalypb.Repository{
+			StorageName:  repo.GetStorageName(),
+			RelativePath: repo.GetRelativePath(),
+		}
+		if tx != nil {
+			originalRepo = tx.OriginalRepository(originalRepo)
+		}
+
+		// tryRunningHousekeeping acquires a lock on the repository to prevent other concurrent housekeeping calls on the repository.
+		// As we may be in a transaction, the repository's relative path may have been rewritten. We use the original unrewritten relative
+		// path here to ensure we hit the same key regardless if we run in different transactions where the snapshot prefixes in the
+		// relative paths may differ.
+		ok, cleanup := m.repositoryStates.tryRunningHousekeeping(originalRepo)
 		// If we didn't succeed to set the state to "running" because of a concurrent housekeeping run
 		// we exit early.
 		if !ok {
