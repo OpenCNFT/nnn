@@ -71,6 +71,18 @@ var forceExclusiveSnapshot = map[string]bool{
 	gitalypb.CommitService_CommitLanguages_FullMethodName: true,
 }
 
+// forceReadOnly forces an RPC to treated as a read-only even if it not an accessor.
+var forceReadOnly = map[string]bool{
+	// OptimizeRepository invokes the housekeeping manager that starts its own write
+	// transactions if necessary. The RPC itself doesn't need to be considered a write
+	// for that reason.
+	gitalypb.RepositoryService_OptimizeRepository_FullMethodName: true,
+}
+
+func isReadOnly(info protoregistry.MethodInfo) bool {
+	return info.Operation == protoregistry.OpAccessor || forceReadOnly[info.FullMethodName()]
+}
+
 // NewUnaryInterceptor returns an unary interceptor that manages a unary RPC's transaction. It starts a transaction
 // on the target repository of the request and rewrites the request to point to the transaction's snapshot repository.
 // The transaction is committed if the handler doesn't return an error and rolled back otherwise.
@@ -272,7 +284,7 @@ func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegi
 	}()
 
 	tx, err := partition.Begin(ctx, storage.BeginOptions{
-		Write: methodInfo.Operation == protoregistry.OpMutator || methodInfo.Operation == protoregistry.OpMaintenance,
+		Write: !isReadOnly(methodInfo),
 	})
 	if err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("begin: %w", err)
@@ -401,7 +413,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 	}
 
 	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
-		ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
+		ReadOnly:              isReadOnly(methodInfo),
 		RelativePath:          targetRepo.RelativePath,
 		AlternateRelativePath: alternateRelativePath,
 		AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,

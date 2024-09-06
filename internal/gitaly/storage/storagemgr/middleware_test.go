@@ -30,12 +30,13 @@ import (
 )
 
 type mockRepositoryService struct {
-	objectFormatFunc       func(context.Context, *gitalypb.ObjectFormatRequest) (*gitalypb.ObjectFormatResponse, error)
-	optimizeRepositoryFunc func(context.Context, *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error)
-	removeRepositoryFunc   func(context.Context, *gitalypb.RemoveRepositoryRequest) (*gitalypb.RemoveRepositoryResponse, error)
-	setCustomHooksFunc     func(gitalypb.RepositoryService_SetCustomHooksServer) error
-	getCustomHooksFunc     func(*gitalypb.GetCustomHooksRequest, gitalypb.RepositoryService_GetCustomHooksServer) error
-	createForkFunc         func(context.Context, *gitalypb.CreateForkRequest) (*gitalypb.CreateForkResponse, error)
+	objectFormatFunc            func(context.Context, *gitalypb.ObjectFormatRequest) (*gitalypb.ObjectFormatResponse, error)
+	optimizeRepositoryFunc      func(context.Context, *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error)
+	pruneUnreachableObjectsFunc func(context.Context, *gitalypb.PruneUnreachableObjectsRequest) (*gitalypb.PruneUnreachableObjectsResponse, error)
+	removeRepositoryFunc        func(context.Context, *gitalypb.RemoveRepositoryRequest) (*gitalypb.RemoveRepositoryResponse, error)
+	setCustomHooksFunc          func(gitalypb.RepositoryService_SetCustomHooksServer) error
+	getCustomHooksFunc          func(*gitalypb.GetCustomHooksRequest, gitalypb.RepositoryService_GetCustomHooksServer) error
+	createForkFunc              func(context.Context, *gitalypb.CreateForkRequest) (*gitalypb.CreateForkResponse, error)
 	gitalypb.UnimplementedRepositoryServiceServer
 }
 
@@ -45,6 +46,10 @@ func (m mockRepositoryService) ObjectFormat(ctx context.Context, req *gitalypb.O
 
 func (m mockRepositoryService) OptimizeRepository(ctx context.Context, req *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error) {
 	return m.optimizeRepositoryFunc(ctx, req)
+}
+
+func (m mockRepositoryService) PruneUnreachableObjects(ctx context.Context, req *gitalypb.PruneUnreachableObjectsRequest) (*gitalypb.PruneUnreachableObjectsResponse, error) {
+	return m.pruneUnreachableObjectsFunc(ctx, req)
 }
 
 func (m mockRepositoryService) RemoveRepository(ctx context.Context, req *gitalypb.RemoveRepositoryRequest) (*gitalypb.RemoveRepositoryResponse, error) {
@@ -433,6 +438,17 @@ messages and behavior by erroring out the requests before they even hit this int
 		{
 			desc: "maintenance rpc",
 			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
+				resp, err := gitalypb.NewRepositoryServiceClient(cc).PruneUnreachableObjects(ctx, &gitalypb.PruneUnreachableObjectsRequest{
+					Repository: validRepository(),
+				})
+				require.NoError(t, err)
+				testhelper.ProtoEqual(t, &gitalypb.PruneUnreachableObjectsResponse{}, resp)
+			},
+			expectHandlerInvoked: true,
+		},
+		{
+			desc: "OptimizeRepository",
+			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
 				resp, err := gitalypb.NewRepositoryServiceClient(cc).OptimizeRepository(ctx, &gitalypb.OptimizeRepositoryRequest{
 					Repository: validRepository(),
 				})
@@ -599,8 +615,12 @@ messages and behavior by erroring out the requests before they even hit this int
 						return &gitalypb.RemoveRepositoryResponse{}, tc.handlerError
 					},
 					optimizeRepositoryFunc: func(ctx context.Context, req *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error) {
-						assertHandler(ctx, true, req.GetRepository(), false)
+						assertHandler(ctx, false, req.GetRepository(), false)
 						return &gitalypb.OptimizeRepositoryResponse{}, nil
+					},
+					pruneUnreachableObjectsFunc: func(ctx context.Context, req *gitalypb.PruneUnreachableObjectsRequest) (*gitalypb.PruneUnreachableObjectsResponse, error) {
+						assertHandler(ctx, true, req.GetRepository(), false)
+						return &gitalypb.PruneUnreachableObjectsResponse{}, nil
 					},
 				})
 				gitalypb.RegisterPartitionServiceServer(server, mockPartitionService{
