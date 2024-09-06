@@ -27,17 +27,17 @@ func (s *server) FetchRemote(ctx context.Context, req *gitalypb.FetchRemoteReque
 		defer cancel()
 	}
 
-	tagsChanged, err := s.fetchRemoteAtomic(ctx, req)
+	tagsChanged, repoChanged, err := s.fetchRemoteAtomic(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &gitalypb.FetchRemoteResponse{TagsChanged: tagsChanged}, nil
+	return &gitalypb.FetchRemoteResponse{TagsChanged: tagsChanged, RepoChanged: repoChanged}, nil
 }
 
 // fetchRemoteAtomic fetches changes from the specified remote repository. To be atomic, fetched
 // objects are first quarantined and only migrated before committing the reference transaction.
-func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemoteRequest) (_ bool, returnedErr error) {
+func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemoteRequest) (_ bool, _ bool, returnedErr error) {
 	var stdout, stderr bytes.Buffer
 	opts := localrepo.FetchOpts{
 		Stdout:  &stdout,
@@ -66,12 +66,12 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 	}
 
 	if err := buildCommandOpts(&opts, req); err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	sshCommand, cleanup, err := gitcmd.BuildSSHInvocation(ctx, s.logger, req.GetSshKey(), req.GetKnownHosts())
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 	defer cleanup()
 
@@ -83,7 +83,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 	// fetched prior to being migrated to the main repository when reference updates are committed.
 	quarantineDir, err := quarantine.New(ctx, req.GetRepository(), s.logger, s.locator)
 	if err != nil {
-		return false, fmt.Errorf("creating quarantine directory: %w", err)
+		return false, false, fmt.Errorf("creating quarantine directory: %w", err)
 	}
 
 	quarantineRepo := s.localrepo(quarantineDir.QuarantinedRepo())
@@ -95,7 +95,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		// message is present, it is determined that an error occurred and the operation halts.
 		errMsg := stderr.String()
 		if errMsg != "" {
-			return false, structerr.NewInternal("fetch remote: %q: %w", errMsg, err)
+			return false, false, structerr.NewInternal("fetch remote: %q: %w", errMsg, err)
 		}
 
 		// Some errors during the `git-fetch(1)` operation do not print to stderr. If the error
@@ -103,7 +103,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		// reference updates and the operation halts. Otherwise, it is assumed the error is from a
 		// failed reference update and the operation proceeds to update references.
 		if err.Error() != "exit status 1" {
-			return false, structerr.NewInternal("fetch remote: %w", err)
+			return false, false, structerr.NewInternal("fetch remote: %w", err)
 		}
 	}
 
@@ -120,7 +120,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 	// different instances of `updateref.Updater` are used to keep the transactions separate.
 	prunedUpdater, err := updateref.New(ctx, quarantineRepo)
 	if err != nil {
-		return false, fmt.Errorf("spawning pruned updater: %w", err)
+		return false, false, fmt.Errorf("spawning pruned updater: %w", err)
 	}
 	defer func() {
 		if err := prunedUpdater.Close(); err != nil && returnedErr == nil {
@@ -131,7 +131,7 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 	// All other reference updates can be queued as part of the same transaction.
 	refUpdater, err := updateref.New(ctx, quarantineRepo)
 	if err != nil {
-		return false, fmt.Errorf("spawning ref updater: %w", err)
+		return false, false, fmt.Errorf("spawning ref updater: %w", err)
 	}
 	defer func() {
 		if err := refUpdater.Close(); err != nil && returnedErr == nil {
@@ -140,19 +140,20 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 	}()
 
 	if err := prunedUpdater.Start(); err != nil {
-		return false, fmt.Errorf("start reference transaction: %w", err)
+		return false, false, fmt.Errorf("start reference transaction: %w", err)
 	}
 
 	if err := refUpdater.Start(); err != nil {
-		return false, fmt.Errorf("start reference transaction: %w", err)
+		return false, false, fmt.Errorf("start reference transaction: %w", err)
 	}
 
 	objectHash, err := quarantineRepo.ObjectHash(ctx)
 	if err != nil {
-		return false, fmt.Errorf("detecting object hash: %w", err)
+		return false, false, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	var tagsChanged bool
+	tagsChanged := false
+	repoChanged := false
 
 	// Parse stdout to identify required reference updates. Reference updates are queued to the
 	// respective updater based on type.
@@ -166,13 +167,15 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		// Queue pruned references in a separate transaction to avoid F/D conflicts.
 		case gitcmd.RefUpdateTypePruned:
 			if err := prunedUpdater.Delete(git.ReferenceName(status.Reference)); err != nil {
-				return false, fmt.Errorf("queueing pruned ref for deletion: %w", err)
+				return false, false, fmt.Errorf("queueing pruned ref for deletion: %w", err)
 			}
+			repoChanged = true
 		// Queue all other reference updates in the same transaction.
 		default:
 			if err := refUpdater.Update(git.ReferenceName(status.Reference), status.NewOID, status.OldOID); err != nil {
-				return false, fmt.Errorf("queueing ref to be updated: %w", err)
+				return false, false, fmt.Errorf("queueing ref to be updated: %w", err)
 			}
+			repoChanged = true
 
 			// While scanning reference updates, check if any tags changed.
 			if status.Type == gitcmd.RefUpdateTypeTagUpdate || (status.Type == gitcmd.RefUpdateTypeFetched && strings.HasPrefix(status.Reference, "refs/tags")) {
@@ -181,41 +184,45 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		}
 	}
 	if scanner.Err() != nil {
-		return false, fmt.Errorf("scanning fetch output: %w", scanner.Err())
+		return false, false, fmt.Errorf("scanning fetch output: %w", scanner.Err())
 	}
 
 	// Prepare pruned references in separate transaction to avoid F/D conflicts.
 	if err := prunedUpdater.Prepare(); err != nil {
-		return false, fmt.Errorf("preparing reference prune: %w", err)
+		return false, false, fmt.Errorf("preparing reference prune: %w", err)
 	}
 
 	// Commit pruned references to complete transaction and apply changes.
 	if err := prunedUpdater.Commit(); err != nil {
-		return false, fmt.Errorf("committing reference prune: %w", err)
+		return false, false, fmt.Errorf("committing reference prune: %w", err)
 	}
 
 	// Prepare the remaining queued reference updates.
 	if err := refUpdater.Prepare(); err != nil {
-		return false, fmt.Errorf("preparing reference update: %w", err)
+		return false, false, fmt.Errorf("preparing reference update: %w", err)
 	}
 
 	// Before committing the remaining reference updates, fetched objects must be migrated out of
 	// the quarantine directory.
 	if err := quarantineDir.Migrate(ctx); err != nil {
-		return false, fmt.Errorf("migrating quarantined objects: %w", err)
+		return false, false, fmt.Errorf("migrating quarantined objects: %w", err)
 	}
 
 	// Commit the remaining queued reference updates so the changes get applied.
 	if err := refUpdater.Commit(); err != nil {
-		return false, fmt.Errorf("committing reference update: %w", err)
+		return false, false, fmt.Errorf("committing reference update: %w", err)
 	}
 
-	if req.GetCheckTagsChanged() {
-		return tagsChanged, nil
+	if !req.GetCheckTagsChanged() {
+		tagsChanged = true
 	}
 
-	// If the request does not specify to check if tags changed, return true as the default value.
-	return true, nil
+	if !req.GetCheckRepoChanged() {
+		repoChanged = true
+	}
+
+	// If the request does not specify to check if tags or repo changed, return true as the default value.
+	return tagsChanged, repoChanged, nil
 }
 
 func buildCommandOpts(opts *localrepo.FetchOpts, req *gitalypb.FetchRemoteRequest) error {

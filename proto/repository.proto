@@ -245,8 +245,8 @@ service RepositoryService {
   // CreateRepositoryFromSnapshot creates a new repository based on a snapshot created with
   // the GetSnapshot RPC. The snapshot is fetched via HTTP.
   //
-  // Due to the inherent structure of the TAR format, it's challenging to definitively verify 
-  // if a provided TAR file is complete or truncated/malformed. While basic integrity checks 
+  // Due to the inherent structure of the TAR format, it's challenging to definitively verify
+  // if a provided TAR file is complete or truncated/malformed. While basic integrity checks
   // are performed, users should ensure the completeness and integrity of their TAR files.
   rpc CreateRepositoryFromSnapshot(CreateRepositoryFromSnapshotRequest) returns (CreateRepositoryFromSnapshotResponse) {
     option (op_type) = {
@@ -582,6 +582,8 @@ message FetchRemoteRequest {
   // check_tags_changed defined whether to check if any tags were modified,
   // returning the result in the tags_changed field of FetchRemoteResponse.
   bool check_tags_changed = 11;
+  // check_repo_changed decides whether to check if the repo was updated.
+  bool check_repo_changed = 12;
 
   reserved 2;
   reserved "remote";
@@ -593,6 +595,8 @@ message FetchRemoteResponse {
   // and false when no tags were change. It is only calculated when check_tags_changed
   // was set in the FetchRemoteRequest.
   bool tags_changed = 1;
+  // repo_changed is set to true if the repo was changed.
+  bool repo_changed = 2;
 }
 
 // CreateRepositoryRequest is a request for the CreateRepository RPC.
