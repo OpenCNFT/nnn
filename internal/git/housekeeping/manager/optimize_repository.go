@@ -3,6 +3,7 @@ package manager
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -96,11 +97,15 @@ func (m *RepositoryManager) OptimizeRepository(
 	return nil
 }
 
-func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedError error) {
+func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) error {
 	if m.node == nil {
 		return run(ctx, nil, repo)
 	}
 
+	return m.runInTransaction(ctx, repo, run)
+}
+
+func (m *RepositoryManager) runInTransaction(ctx context.Context, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedErr error) {
 	originalRepo := &gitalypb.Repository{
 		StorageName:  repo.GetStorageName(),
 		RelativePath: repo.GetRelativePath(),
@@ -118,26 +123,26 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, repo *loc
 		RelativePath: originalRepo.GetRelativePath(),
 	})
 	if err != nil {
-		return fmt.Errorf("initializing WAL transaction: %w", err)
+		return fmt.Errorf("begin: %w", err)
 	}
 	defer func() {
-		if returnedError != nil {
-			// We prioritize actual housekeeping error and log rollback error.
+		if returnedErr != nil {
 			if err := tx.Rollback(); err != nil {
-				m.logger.WithError(err).Error("could not rollback housekeeping transaction")
+				returnedErr = errors.Join(err, fmt.Errorf("rollback: %w", err))
 			}
 		}
 	}()
 
-	repo = localrepo.NewFrom(repo, tx.RewriteRepository(originalRepo))
-	ctx = storage.ContextWithTransaction(ctx, tx)
-
-	if err := run(ctx, tx, repo); err != nil {
+	if err := run(
+		storage.ContextWithTransaction(ctx, tx),
+		tx,
+		localrepo.NewFrom(repo, tx.RewriteRepository(originalRepo)),
+	); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("committing housekeeping transaction: %w", err)
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
