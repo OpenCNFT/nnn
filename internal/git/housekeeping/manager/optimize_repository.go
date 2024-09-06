@@ -86,7 +86,7 @@ func (m *RepositoryManager) OptimizeRepository(
 		}
 
 		if tx != nil {
-			return m.optimizeRepositoryWithTransaction(ctx, tx, repo, cfg)
+			return m.optimizeRepositoryWithTransaction(ctx, repo, cfg)
 		}
 
 		return m.optimizeRepository(ctx, repo, cfg)
@@ -102,10 +102,10 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, repo *loc
 		return run(ctx, nil, repo)
 	}
 
-	return m.runInTransaction(ctx, repo, run)
+	return m.runInTransaction(ctx, true, repo, run)
 }
 
-func (m *RepositoryManager) runInTransaction(ctx context.Context, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedErr error) {
+func (m *RepositoryManager) runInTransaction(ctx context.Context, readOnly bool, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedErr error) {
 	originalRepo := &gitalypb.Repository{
 		StorageName:  repo.GetStorageName(),
 		RelativePath: repo.GetRelativePath(),
@@ -120,6 +120,7 @@ func (m *RepositoryManager) runInTransaction(ctx context.Context, repo *localrep
 	}
 
 	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
+		ReadOnly:     readOnly,
 		RelativePath: originalRepo.GetRelativePath(),
 	})
 	if err != nil {
@@ -273,69 +274,100 @@ func (m *RepositoryManager) optimizeRepository(
 }
 
 // optimizeRepositoryWithTransaction performs optimizations in the context of WAL transaction.
+//
+// Reference repacking and object repacking are run in two different transactions. This decreases the chance of conflicts as it
+// allow reference repacking to commit faster. Reference repacking conflicts with reference deletions but runs relatively fast.
+// Object repacking is slower but is conflict-free if no pruning is done.
+//
+// Note that the strategy is selected in a parent transaction. The repository's state may change in the meanwhile but this shouldn't
+// really change things too much. RepositoryManager itself prevents concurrent housekeeping. Even if there was a housekeeping operation
+// committed in between, we'd just do redundant repacks.
 func (m *RepositoryManager) optimizeRepositoryWithTransaction(
 	ctx context.Context,
-	transaction storage.Transaction,
 	repo *localrepo.Repo,
 	cfg OptimizeRepositoryConfig,
-) (returnedError error) {
+) error {
 	strategy, err := m.validate(ctx, repo, cfg)
 	if err != nil {
 		return err
 	}
 
 	repackNeeded, repackCfg := strategy.ShouldRepackObjects(ctx)
-	if repackNeeded {
-		transaction.Repack(repackCfg)
-	}
-
 	packRefsNeeded := strategy.ShouldRepackReferences(ctx)
-	if packRefsNeeded {
-		transaction.PackRefs()
-	}
 
 	writeCommitGraphNeeded, writeCommitGraphCfg, err := strategy.ShouldWriteCommitGraph(ctx)
 	if err != nil {
 		return fmt.Errorf("checking commit graph writing eligibility: %w", err)
 	}
+
+	var errPackReferences error
+	if packRefsNeeded {
+		if err := m.runInTransaction(ctx, false, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+			tx.PackRefs()
+			return nil
+		}); err != nil {
+			errPackReferences = fmt.Errorf("run reference packing: %w", err)
+		}
+	}
+
+	var errRepackObjects error
+	if repackNeeded || writeCommitGraphNeeded {
+		if err := m.runInTransaction(ctx, false, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+			if repackNeeded {
+				tx.Repack(repackCfg)
+			}
+
+			if writeCommitGraphNeeded {
+				tx.WriteCommitGraphs(writeCommitGraphCfg)
+			}
+			return nil
+		}); err != nil {
+			errRepackObjects = fmt.Errorf("run object repacking: %w", err)
+		}
+	}
+
+	getStatus := func(err error) string {
+		if err != nil {
+			return "failure"
+		}
+
+		return "success"
+	}
+
+	repackObjectsStatus := getStatus(errRepackObjects)
+
+	optimizations := make(map[string]string)
+	if repackNeeded {
+		optimizations["packed_objects_"+string(repackCfg.Strategy)] = repackObjectsStatus
+		if repackCfg.WriteBitmap {
+			optimizations["written_bitmap"] = repackObjectsStatus
+		}
+		if repackCfg.WriteMultiPackIndex {
+			optimizations["written_multi_pack_index"] = repackObjectsStatus
+		}
+	}
+
+	if packRefsNeeded {
+		optimizations["packed_refs"] = getStatus(errPackReferences)
+	}
+
 	if writeCommitGraphNeeded {
-		transaction.WriteCommitGraphs(writeCommitGraphCfg)
+		if writeCommitGraphCfg.ReplaceChain {
+			optimizations["written_commit_graph_full"] = repackObjectsStatus
+		} else {
+			optimizations["written_commit_graph_incremental"] = repackObjectsStatus
+		}
 	}
 
-	logResult := func(status string) {
-		optimizations := make(map[string]string)
-
-		if repackNeeded {
-			optimizations["packed_objects_"+string(repackCfg.Strategy)] = status
-			if repackCfg.WriteBitmap {
-				optimizations["written_bitmap"] = status
-			}
-			if repackCfg.WriteMultiPackIndex {
-				optimizations["written_multi_pack_index"] = status
-			}
-		}
-
-		if packRefsNeeded {
-			optimizations["packed_refs"] = status
-		}
-
-		if writeCommitGraphNeeded {
-			if writeCommitGraphCfg.ReplaceChain {
-				optimizations["written_commit_graph_full"] = status
-			} else {
-				optimizations["written_commit_graph_incremental"] = status
-			}
-		}
-
-		m.logger.WithField("optimizations", optimizations).Info("optimized repository with WAL")
-		for task, status := range optimizations {
-			m.metrics.TasksTotal.WithLabelValues(task, status).Inc()
-		}
-		m.metrics.TasksTotal.WithLabelValues("total", status).Add(1)
+	m.logger.WithField("optimizations", optimizations).Info("optimized repository with WAL")
+	for task, status := range optimizations {
+		m.metrics.TasksTotal.WithLabelValues(task, status).Inc()
 	}
 
-	logResult("success")
-	return nil
+	errCombined := errors.Join(errPackReferences, errRepackObjects)
+	m.metrics.TasksTotal.WithLabelValues("total", getStatus(errCombined)).Add(1)
+
+	return errCombined
 }
 
 // repackIfNeeded repacks the repository according to the strategy.
