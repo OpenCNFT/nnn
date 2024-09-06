@@ -10,7 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -127,7 +127,7 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 		var notAllowedError hook.NotAllowedError
 		var customHookErr updateref.CustomHookError
 		var updateRefError updateref.Error
-		var errReferenceVerification storagemgr.ReferenceVerificationError
+		var errReferenceVerification partition.ReferenceVerificationError
 
 		if errors.As(err, &notAllowedError) {
 			return structerr.NewPermissionDenied("%w", notAllowedError).WithDetail(

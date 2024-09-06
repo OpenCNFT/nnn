@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
@@ -92,7 +91,7 @@ type LogEntryArchiver struct {
 	// archiveSink is the Sink used to backup log entries.
 	archiveSink Sink
 	// partitionMgr is the LogManagerAccessor used to access LogManagers.
-	partitionMgr storagemgr.LogManagerAccessor
+	partitionMgr storage.LogManagerAccessor
 
 	// notificationCh is the channel used to signal that a new notification has arrived.
 	notificationCh chan struct{}
@@ -130,12 +129,12 @@ type LogEntryArchiver struct {
 }
 
 // NewLogEntryArchiver constructs a new LogEntryArchiver.
-func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storagemgr.LogManagerAccessor) *LogEntryArchiver {
+func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storage.LogManagerAccessor) *LogEntryArchiver {
 	return newLogEntryArchiver(logger, archiveSink, workerCount, partitionMgr, helper.NewTimerTicker)
 }
 
 // newLogEntryArchiver constructs a new LogEntryArchiver with a configurable ticker function.
-func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storagemgr.LogManagerAccessor, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
+func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storage.LogManagerAccessor, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
 	if workerCount < 1 {
 		workerCount = 1
 	}
@@ -294,7 +293,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// We have already backed up all entries sent by the LogManager, but the manager is
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
-			if err := la.partitionMgr.CallLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storagemgr.LogManager) {
+			if err := la.partitionMgr.CallLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storage.LogManager) {
 				lm.AcknowledgeTransaction(la, state.nextLSN-1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
@@ -359,7 +358,7 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 		la.waitDur = minRetryWait
 	}
 
-	if err := la.partitionMgr.CallLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storagemgr.LogManager) {
+	if err := la.partitionMgr.CallLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
 		lm.AcknowledgeTransaction(la, entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
@@ -388,7 +387,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 	})
 
 	var entryPath string
-	if err := la.partitionMgr.CallLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storagemgr.LogManager) {
+	if err := la.partitionMgr.CallLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
 		entryPath = lm.GetTransactionPath(entry.lsn)
 	}); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)

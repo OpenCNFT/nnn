@@ -8,13 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
@@ -29,11 +25,138 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
-// stoppedTransactionManager is a wrapper type that prevents the transactionManager from
-// running. This is useful in tests that test certain order of operations.
-type stoppedTransactionManager struct{ transactionManager }
+type mockPartitionFactory struct {
+	new func(
+		logger log.Logger,
+		partitionID storage.PartitionID,
+		db keyvalue.Transactioner,
+		storageName string,
+		storagePath string,
+		absoluteStateDir string,
+		stagingDir string,
+		logConsumer storage.LogConsumer,
+	) Partition
+}
 
-func (stoppedTransactionManager) Run() error { return nil }
+// newStubPartitionFactory returns a partition factory that doesn't do anything and calls
+// on its methods succeed.
+func newStubPartitionFactory() PartitionFactory {
+	return mockPartitionFactory{
+		new: func(
+			logger log.Logger,
+			partitionID storage.PartitionID,
+			db keyvalue.Transactioner,
+			storageName string,
+			storagePath string,
+			absoluteStateDir string,
+			stagingDir string,
+			logConsumer storage.LogConsumer,
+		) Partition {
+			closing := make(chan struct{})
+			isClosing := func() bool {
+				select {
+				case <-closing:
+					return true
+				default:
+					return false
+				}
+			}
+
+			// This stub emulates what a real partition implementation.
+			return mockPartition{
+				run: func() error {
+					// Run returns after the partition has been closed.
+					<-closing
+					return nil
+				},
+				begin: func(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+					// Transactions fail to begin if context is done.
+					if err := ctx.Err(); err != nil {
+						return nil, ctx.Err()
+					}
+
+					return mockTransaction{
+						commit: func(ctx context.Context) error {
+							// Commits fail if partition is closed.
+							if isClosing() {
+								return storage.ErrTransactionProcessingStopped
+							}
+
+							// Commits fail if context is done.
+							return ctx.Err()
+						},
+						rollback: func() error { return nil },
+					}, nil
+				},
+				close: func() {
+					// Closing is idempotent.
+					if !isClosing() {
+						close(closing)
+					}
+				},
+				isClosing: isClosing,
+			}
+		},
+	}
+}
+
+func (m mockPartitionFactory) New(
+	logger log.Logger,
+	partitionID storage.PartitionID,
+	db keyvalue.Transactioner,
+	storageName string,
+	storagePath string,
+	absoluteStateDir string,
+	stagingDir string,
+	logConsumer storage.LogConsumer,
+) Partition {
+	return m.new(
+		logger,
+		partitionID,
+		db,
+		storageName,
+		storagePath,
+		absoluteStateDir,
+		stagingDir,
+		logConsumer,
+	)
+}
+
+type mockPartition struct {
+	begin     func(context.Context, storage.BeginOptions) (storage.Transaction, error)
+	run       func() error
+	close     func()
+	isClosing func() bool
+	storage.LogManager
+}
+
+func (m mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
+	return m.begin(ctx, opts)
+}
+
+func (m mockPartition) Run() error {
+	return m.run()
+}
+
+func (m mockPartition) Close() {
+	m.close()
+}
+
+func (m mockPartition) IsClosing() bool {
+	return m.isClosing()
+}
+
+type mockTransaction struct {
+	storage.Transaction
+	commit   func(context.Context) error
+	rollback func() error
+}
+
+func (m mockTransaction) Commit(ctx context.Context) error {
+	return m.commit(ctx)
+}
+
+func (m mockTransaction) Rollback() error { return m.rollback() }
 
 func requirePartitionOpen(t *testing.T, storageMgr *storageManager, ptnID storage.PartitionID, expectOpen bool) {
 	t.Helper()
@@ -56,8 +179,8 @@ func blockOnPartitionClosing(t *testing.T, pm *PartitionManager, waitForFullClos
 		for _, ptn := range sp.partitions {
 			// The closePartition step closes the transaction manager directly without calling close
 			// on the partition, so we check the manager directly here as well.
-			if ptn.isClosing() || ptn.transactionManager.isClosing() {
-				waiter := ptn.transactionManagerClosed
+			if ptn.isClosing() || ptn.partition.IsClosing() {
+				waiter := ptn.partitionClosed
 				if waitForFullClose {
 					waiter = ptn.closed
 				}
@@ -203,8 +326,8 @@ func TestPartitionManager(t *testing.T) {
 	}
 
 	type setupData struct {
-		steps                     steps
-		transactionManagerFactory transactionManagerFactory
+		steps            steps
+		partitionFactory PartitionFactory
 	}
 
 	for _, tc := range []struct {
@@ -409,33 +532,6 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					transactionManagerFactory: func(
-						logger log.Logger,
-						testPartitionID storage.PartitionID,
-						storageMgr *storageManager,
-						commandFactory gitcmd.CommandFactory,
-						absoluteStateDir, stagingDir string,
-					) transactionManager {
-						metrics := newMetrics(cfg.Prometheus)
-						return stoppedTransactionManager{
-							transactionManager: NewTransactionManager(
-								testPartitionID,
-								logger,
-								storageMgr.database,
-								storageMgr.name,
-								storageMgr.path,
-								absoluteStateDir,
-								stagingDir,
-								commandFactory,
-								storageMgr.repoFactory,
-								newTransactionManagerMetrics(
-									metrics.housekeeping,
-									metrics.snapshot.Scope(storageMgr.name),
-								),
-								nil,
-							),
-						}
-					},
 				}
 			},
 		},
@@ -462,39 +558,6 @@ func TestPartitionManager(t *testing.T) {
 							expectedError: context.Canceled,
 						},
 					},
-					transactionManagerFactory: func(
-						logger log.Logger,
-						testPartitionID storage.PartitionID,
-						storageMgr *storageManager,
-						commandFactory gitcmd.CommandFactory,
-						absoluteStateDir, stagingDir string,
-					) transactionManager {
-						metrics := newMetrics(cfg.Prometheus)
-						txMgr := NewTransactionManager(
-							testPartitionID,
-							logger,
-							storageMgr.database,
-							storageMgr.name,
-							storageMgr.path,
-							absoluteStateDir,
-							stagingDir,
-							commandFactory,
-							storageMgr.repoFactory,
-							newTransactionManagerMetrics(
-								metrics.housekeeping,
-								metrics.snapshot.Scope(storageMgr.name),
-							),
-							nil,
-						)
-
-						// Unset the admission queue. This has the effect that we will block
-						// indefinitely when trying to submit the transaction to it in the
-						// commit step. Like this, we can racelessly verify that the context
-						// cancellation does indeed abort the commit.
-						txMgr.admissionQueue = nil
-
-						return txMgr
-					},
 				}
 			},
 		},
@@ -515,7 +578,7 @@ func TestPartitionManager(t *testing.T) {
 						},
 						closePartition{},
 						commit{
-							expectedError: ErrTransactionProcessingStopped,
+							expectedError: storage.ErrTransactionProcessingStopped,
 						},
 					},
 				}
@@ -688,7 +751,6 @@ func TestPartitionManager(t *testing.T) {
 									2: 1,
 								},
 							},
-							expectedError: ErrTransactionAlreadyRollbacked,
 						},
 					},
 				}
@@ -984,12 +1046,6 @@ func TestPartitionManager(t *testing.T) {
 			cfg := testcfg.Build(t, testcfg.WithStorages("default", "other-storage"))
 			logger := testhelper.SharedLogger(t)
 
-			cmdFactory := gittest.NewCommandFactory(t, cfg)
-			catfileCache := catfile.NewCache(cfg)
-			t.Cleanup(catfileCache.Stop)
-
-			localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
 			setup := tc.setup(t, cfg)
 
 			// Create some existing content in the staging directory so we can assert it gets removed and
@@ -1007,12 +1063,13 @@ func TestPartitionManager(t *testing.T) {
 			require.NoError(t, err)
 			defer dbMgr.Close()
 
-			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
-			require.NoError(t, err)
-
-			if setup.transactionManagerFactory != nil {
-				partitionManager.transactionManagerFactory = setup.transactionManagerFactory
+			partitionFactory := setup.partitionFactory
+			if partitionFactory == nil {
+				partitionFactory = newStubPartitionFactory()
 			}
+
+			partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, partitionFactory, nil)
+			require.NoError(t, err)
 
 			defer func() {
 				partitionManager.Close()
@@ -1113,10 +1170,10 @@ func TestPartitionManager(t *testing.T) {
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction manager stopped before being started")
 
 					data := openTransactionData[step.transactionID]
-					// Close the TransactionManager directly. Closing through the partition would change the
-					// state used to sync which should only be changed when the closing is initiated through
+					// Close the Partition instance directly. Closing through the partition wrapper would change
+					// the state used to sync which should only be changed when the closing is initiated through
 					// the normal means.
-					data.ptn.transactionManager.Close()
+					data.ptn.partition.Close()
 
 					blockOnPartitionClosing(t, partitionManager, false)
 				case finalizeTransaction:
@@ -1160,17 +1217,11 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 	cfg := testcfg.Build(t)
 	logger := testhelper.SharedLogger(t)
 
-	cmdFactory := gittest.NewCommandFactory(t, cfg)
-	catfileCache := catfile.NewCache(cfg)
-	defer catfileCache.Stop()
-
-	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
 	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, newStubPartitionFactory(), nil)
 	require.NoError(t, err)
 	defer partitionManager.Close()
 
@@ -1199,8 +1250,8 @@ func TestPartitionManager_concurrentClose(t *testing.T) {
 		partitionManager.Close()
 	}()
 
-	// The TransactionManager may return if it errors out.
-	txMgr := partitionManager.storages[cfg.Storages[0].Name].partitions[2].transactionManager
+	// The Partition may return if it errors out.
+	txMgr := partitionManager.storages[cfg.Storages[0].Name].partitions[2].partition
 	go func() {
 		defer wg.Done()
 		<-start
@@ -1220,16 +1271,10 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 	cfg := testcfg.Build(t)
 	logger := testhelper.SharedLogger(t)
 
-	cmdFactory := gittest.NewCommandFactory(t, cfg)
-	catfileCache := catfile.NewCache(cfg)
-	defer catfileCache.Stop()
-
-	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
 	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 
-	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := NewPartitionManager(ctx, cfg.Storages, logger, dbMgr, cfg.Prometheus, newStubPartitionFactory(), nil)
 	require.NoError(t, err)
 
 	defer func() {
@@ -1243,232 +1288,14 @@ func TestPartitionManager_callLogManager(t *testing.T) {
 	ptnID := storage.PartitionID(1)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
 
-	require.NoError(t, partitionManager.CallLogManager(ctx, cfg.Storages[0].Name, ptnID, func(lm LogManager) {
+	require.NoError(t, partitionManager.CallLogManager(ctx, cfg.Storages[0].Name, ptnID, func(lm storage.LogManager) {
 		requirePartitionOpen(t, storageMgr, ptnID, true)
-		tm, ok := lm.(*TransactionManager)
+		tm, ok := lm.(Partition)
 		require.True(t, ok)
 
-		require.False(t, tm.isClosing())
+		require.False(t, tm.IsClosing())
 	}))
 
 	blockOnPartitionClosing(t, partitionManager, true)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
-}
-
-func TestPartitionManager_StorageKV(t *testing.T) {
-	t.Parallel()
-
-	setupPartitionManager := func(t *testing.T, ctx context.Context, cfg config.Cfg) *PartitionManager {
-		logger := testhelper.SharedLogger(t)
-
-		cmdFactory := gittest.NewCommandFactory(t, cfg)
-		catfileCache := catfile.NewCache(cfg)
-		defer catfileCache.Stop()
-
-		localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-
-		dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
-		require.NoError(t, err)
-
-		partitionManager, err := NewPartitionManager(ctx, cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
-		require.NoError(t, err)
-
-		t.Cleanup(partitionManager.Close)
-		t.Cleanup(dbMgr.Close)
-
-		return partitionManager
-	}
-
-	t.Run("read/write/delete keys successfully", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
-		partitionManager := setupPartitionManager(t, ctx, cfg)
-
-		storageMgr, ok := partitionManager.storages[cfg.Storages[0].Name]
-		require.True(t, ok)
-
-		ptnID := storage.PartitionID(metadataPartitionID)
-
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			require.NoError(t, kv.Set([]byte("key1"), []byte("value1")))
-			require.NoError(t, kv.Set([]byte("key2"), []byte("value2")))
-			return nil
-		}))
-
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			item, err := kv.Get([]byte("key1"))
-			require.NoError(t, err)
-			require.NoError(t, item.Value(func(val []byte) error {
-				require.Equal(t, []byte("value1"), val)
-				return nil
-			}))
-
-			item, err = kv.Get([]byte("key2"))
-			require.NoError(t, err)
-			require.NoError(t, item.Value(func(val []byte) error {
-				require.Equal(t, []byte("value2"), val)
-				return nil
-			}))
-
-			it := kv.NewIterator(keyvalue.IteratorOptions{})
-			defer it.Close()
-			values := map[string][]byte{}
-			for it.Rewind(); it.Valid(); it.Next() {
-				k, err := it.Item().ValueCopy(nil)
-				require.NoError(t, err)
-				values[string(it.Item().Key())] = k
-			}
-			require.Equal(t, map[string][]byte{
-				"key1": []byte("value1"),
-				"key2": []byte("value2"),
-			}, values)
-
-			require.NoError(t, kv.Delete([]byte("key1")))
-
-			return nil
-		}))
-
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			_, err := kv.Get([]byte("key1"))
-			require.Equal(t, badger.ErrKeyNotFound, err)
-
-			return nil
-		}))
-
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-	})
-
-	t.Run("rollback a failed operation", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
-		partitionManager := setupPartitionManager(t, ctx, cfg)
-
-		storageMgr, ok := partitionManager.storages[cfg.Storages[0].Name]
-		require.True(t, ok)
-
-		ptnID := storage.PartitionID(metadataPartitionID)
-
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		// Set key1, key2
-		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			require.NoError(t, kv.Set([]byte("key1"), []byte("value1")))
-			require.NoError(t, kv.Set([]byte("key2"), []byte("value2")))
-			return nil
-		}))
-
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		// Attempt to delete key1 and set key2
-		require.EqualError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			require.NoError(t, kv.Delete([]byte("key1")))
-			require.NoError(t, kv.Set([]byte("key3"), []byte("value3")))
-
-			return fmt.Errorf("something goes wrong")
-		}), "something goes wrong")
-
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		// The above update doesn't take any effect because the underlying transaction is rolled back.
-		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			it := kv.NewIterator(keyvalue.IteratorOptions{})
-			defer it.Close()
-			values := map[string][]byte{}
-			for it.Rewind(); it.Valid(); it.Next() {
-				k, err := it.Item().ValueCopy(values[string(it.Item().Key())])
-				require.NoError(t, err)
-				values[string(it.Item().Key())] = k
-			}
-			require.Equal(t, map[string][]byte{
-				"key1": []byte("value1"),
-				"key2": []byte("value2"),
-			}, values)
-			return nil
-		}))
-
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-	})
-
-	t.Run("read-only KV operations", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := testhelper.Context(t)
-		cfg := testcfg.Build(t)
-		partitionManager := setupPartitionManager(t, ctx, cfg)
-
-		storageMgr, ok := partitionManager.storages[cfg.Storages[0].Name]
-		require.True(t, ok)
-
-		ptnID := storage.PartitionID(metadataPartitionID)
-
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		assertKeys := func() {
-			require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, true, func(kv keyvalue.ReadWriter) error {
-				requirePartitionOpen(t, storageMgr, ptnID, true)
-
-				it := kv.NewIterator(keyvalue.IteratorOptions{})
-				defer it.Close()
-				values := map[string][]byte{}
-				for it.Rewind(); it.Valid(); it.Next() {
-					k, err := it.Item().ValueCopy(nil)
-					require.NoError(t, err)
-					values[string(it.Item().Key())] = k
-				}
-				require.Equal(t, map[string][]byte{
-					"key1": []byte("value1"),
-					"key2": []byte("value2"),
-				}, values)
-
-				return nil
-			}))
-		}
-		require.NoError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, false, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-
-			require.NoError(t, kv.Set([]byte("key1"), []byte("value1")))
-			require.NoError(t, kv.Set([]byte("key2"), []byte("value2")))
-			return nil
-		}))
-
-		assertKeys()
-		blockOnPartitionClosing(t, partitionManager, true)
-		requirePartitionOpen(t, storageMgr, ptnID, false)
-
-		require.EqualError(t, partitionManager.StorageKV(ctx, cfg.Storages[0].Name, true, func(kv keyvalue.ReadWriter) error {
-			requirePartitionOpen(t, storageMgr, ptnID, true)
-			return kv.Set([]byte("key3"), []byte("value3"))
-		}), "No sets or deletes are allowed in a read-only transaction")
-
-		// Ensure no changes due to the above transaction.
-		assertKeys()
-	})
 }

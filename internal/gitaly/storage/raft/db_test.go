@@ -6,11 +6,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -32,7 +35,11 @@ func TestDbForMetadataGroup(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
+		cmdFactory,
+		localRepoFactory,
+		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+	), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
 
@@ -49,7 +56,7 @@ func TestDbForMetadataGroup(t *testing.T) {
 			"No sets or deletes are allowed in a read-only transaction",
 		)
 		return nil
-	}), "key-value writes in a read-only transaction")
+	}), "commit: key-value writes in a read-only transaction\nrollback: transaction already committed")
 
 	require.NoError(t, db.read(ctx, func(txn keyvalue.ReadWriter) error {
 		item, err := txn.Get([]byte("data-1"))
@@ -105,7 +112,11 @@ func TestDbForStorage(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, cmdFactory, localRepoFactory, logger, dbMgr, cfg.Prometheus, nil)
+	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
+		cmdFactory,
+		localRepoFactory,
+		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+	), nil)
 	require.NoError(t, err)
 	t.Cleanup(partitionManager.Close)
 
@@ -133,7 +144,7 @@ func TestDbForStorage(t *testing.T) {
 			"No sets or deletes are allowed in a read-only transaction",
 		)
 		return nil
-	}), "key-value writes in a read-only transaction")
+	}), "commit: key-value writes in a read-only transaction\nrollback: transaction already committed")
 
 	require.NoError(t, db.read(ctx, func(txn keyvalue.ReadWriter) error {
 		item, err := txn.Get([]byte("storage"))

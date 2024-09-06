@@ -1,4 +1,4 @@
-package storagemgr
+package partition
 
 import (
 	"archive/tar"
@@ -17,18 +17,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -290,8 +291,6 @@ func setupTest(t *testing.T, ctx context.Context, testPartitionID storage.Partit
 
 		return pack.Bytes()
 	}
-	metrics := newMetrics(cfg.Prometheus)
-	prometheus.MustRegister(metrics)
 
 	return testTransactionSetup{
 		PartitionID:       testPartitionID,
@@ -321,7 +320,6 @@ func setupTest(t *testing.T, ctx context.Context, testPartitionID storage.Partit
 				Pack: packCommit(divergingCommitOID),
 			},
 		},
-		Metrics: metrics,
 	}
 }
 
@@ -423,7 +421,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				CloseManager{},
 				Commit{
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 			},
 		},
@@ -505,7 +503,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					Hooks: testTransactionHooks{
 						BeforeAppendLogEntry: func(hookContext hookContext) { hookContext.closeManager() },
 						// This ensures we are testing the context cancellation errors being unwrapped properly
-						// to an ErrTransactionProcessingStopped instead of hitting the general case when
+						// to an storage.ErrTransactionProcessingStopped instead of hitting the general case when
 						// runDone is closed.
 						WaitForTransactionsWhenClosing: true,
 					},
@@ -515,7 +513,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				CloseManager{},
 				Commit{
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 			},
 		},
@@ -537,7 +535,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -899,7 +897,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 					QuarantinedPacks: [][]byte{setup.Commits.First.Pack},
-					ExpectedError:    ErrTransactionProcessingStopped,
+					ExpectedError:    storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -1484,7 +1482,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Rollback{},
 				Rollback{
-					ExpectedError: ErrTransactionAlreadyRollbacked,
+					ExpectedError: storage.ErrTransactionAlreadyRollbacked,
 				},
 			},
 		},
@@ -1497,7 +1495,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{},
 				Rollback{
-					ExpectedError: ErrTransactionAlreadyCommitted,
+					ExpectedError: storage.ErrTransactionAlreadyCommitted,
 				},
 			},
 			expectedState: StateAssertion{
@@ -1515,7 +1513,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Commit{},
 				Commit{
-					ExpectedError: ErrTransactionAlreadyCommitted,
+					ExpectedError: storage.ErrTransactionAlreadyCommitted,
 				},
 			},
 			expectedState: StateAssertion{
@@ -1533,7 +1531,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				Rollback{},
 				Commit{
-					ExpectedError: ErrTransactionAlreadyRollbacked,
+					ExpectedError: storage.ErrTransactionAlreadyRollbacked,
 				},
 			},
 		},
@@ -2139,7 +2137,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				CloseManager{},
 				Commit{
 					TransactionID: 4,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
@@ -2288,7 +2286,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				CloseManager{},
 				Commit{
 					TransactionID: 4,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					// Insert an out-of-band log-entry directly into the database for easier test
@@ -2467,11 +2465,14 @@ func BenchmarkTransactionManager(b *testing.B) {
 				stagingDir := filepath.Join(storagePath, "staging", strconv.Itoa(i))
 				require.NoError(b, os.MkdirAll(stagingDir, mode.Directory))
 
-				m := newMetrics(cfg.Prometheus)
+				m := NewTransactionManagerMetrics(
+					housekeeping.NewMetrics(cfg.Prometheus),
+					snapshot.NewMetrics(),
+				)
 
 				// Valid partition IDs are >=1.
 				testPartitionID := storage.PartitionID(i + 1)
-				manager := NewTransactionManager(testPartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, cmdFactory, repositoryFactory, newTransactionManagerMetrics(m.housekeeping, m.snapshot.Scope(storageName)), nil)
+				manager := NewTransactionManager(testPartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, cmdFactory, repositoryFactory, m, nil)
 
 				managers = append(managers, manager)
 

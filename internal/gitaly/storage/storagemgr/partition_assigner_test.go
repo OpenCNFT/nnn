@@ -272,13 +272,13 @@ func TestPartitionAssigner_alternates(t *testing.T) {
 		{
 			desc:                    "alternate pointing to self fails",
 			memberAlternatesContent: []byte("../objects"),
-			expectedError:           errAlternatePointsToSelf,
+			expectedError:           storage.ErrAlternatePointsToSelf,
 		},
 		{
 			desc:                    "alternate having an alternate fails",
 			poolAlternatesContent:   []byte("unexpected"),
 			memberAlternatesContent: []byte("../../pool/objects"),
-			expectedError:           errAlternateHasAlternate,
+			expectedError:           storage.ErrAlternateHasAlternate,
 		},
 		{
 			desc:                    "alternate points outside the storage",

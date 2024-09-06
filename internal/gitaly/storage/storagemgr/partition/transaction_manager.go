@@ -1,4 +1,4 @@
-package storagemgr
+package partition
 
 import (
 	"bufio"
@@ -45,16 +45,6 @@ import (
 var (
 	// ErrRepositoryAlreadyExists is attempting to create a repository that already exists.
 	ErrRepositoryAlreadyExists = structerr.NewAlreadyExists("repository already exists")
-	// ErrRepositoryNotFound is returned when the repository doesn't exist.
-	ErrRepositoryNotFound = structerr.NewNotFound("repository not found")
-	// ErrTransactionProcessingStopped is returned when the TransactionManager stops processing transactions.
-	ErrTransactionProcessingStopped = errors.New("transaction processing stopped")
-	// ErrTransactionAlreadyCommitted is returned when attempting to rollback or commit a transaction that
-	// already had commit called on it.
-	ErrTransactionAlreadyCommitted = errors.New("transaction already committed")
-	// ErrTransactionAlreadyRollbacked is returned when attempting to rollback or commit a transaction that
-	// already had rollback called on it.
-	ErrTransactionAlreadyRollbacked = errors.New("transaction already rollbacked")
 	// errInitializationFailed is returned when the TransactionManager failed to initialize successfully.
 	errInitializationFailed = errors.New("initializing transaction processing failed")
 	// errCommittedEntryGone is returned when the log entry of a LSN is gone from database while it's still
@@ -311,7 +301,7 @@ type Transaction struct {
 //
 // The returned Transaction's read snapshot includes all writes that were committed prior to the
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
-func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (_ *Transaction, returnedErr error) {
+func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (_ storage.Transaction, returnedErr error) {
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
 	select {
@@ -427,7 +417,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-mgr.ctx.Done():
-		return nil, ErrTransactionProcessingStopped
+		return nil, storage.ErrTransactionProcessingStopped
 	case <-readReady:
 		txn.db = mgr.db.NewTransaction(txn.write)
 		txn.recordingReadWriter = keyvalue.NewRecordingReadWriter(txn.db)
@@ -539,9 +529,9 @@ func (txn *Transaction) updateState(newState transactionState) error {
 		txn.state = newState
 		return nil
 	case transactionStateRollback:
-		return ErrTransactionAlreadyRollbacked
+		return storage.ErrTransactionAlreadyRollbacked
 	case transactionStateCommit:
-		return ErrTransactionAlreadyCommitted
+		return storage.ErrTransactionAlreadyCommitted
 	default:
 		return fmt.Errorf("unknown transaction state: %q", txn.state)
 	}
@@ -854,47 +844,10 @@ type committedEntry struct {
 	objectDependencies map[git.ObjectID]struct{}
 }
 
-// LogConsumer is the interface of a log consumer that is passed to a TransactionManager.
-// The LogConsumer may perform read-only operations against the on-disk log entry.
-// The TransactionManager notifies the consumer of new transactions by invoking the
-// NotifyNewTransaction method after they are committed.
-type LogConsumer interface {
-	// NotifyNewTransactions alerts the LogConsumer that new log entries are available for
-	// consumption. The method invoked both when the TransactionManager
-	// initializes and when new transactions are committed. Both the low and high water mark
-	// LSNs are sent so that a newly initialized consumer is aware of the full range of
-	// entries it can process.
-	NotifyNewTransactions(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN)
-}
-
-// LogManagerAccessor is the interface used by the LogManager coordinator. It is called by
-// by LogConsumers to access LogManagers. A LogManager that notified a LogConsumer of a transaction
-// may have closed by the time the consumer has finished acting on the log entry. The LogManagerAccessor
-// ensures that the LogManager is available to receive the consumer's response.
-type LogManagerAccessor interface {
-	// CallLogManager executes the provided function against the requested LogManager, starting it
-	// if necessary.
-	CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(LogManager)) error
-}
-
-// LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
-// a function to close the LogConsumer.
-type LogConsumerFactory func(LogManagerAccessor) (_ LogConsumer, cleanup func())
-
-// LogManager is the interface used on the consumer side of the integration. The consumer
-// has the ability to acknowledge transactions as having been processed with AcknowledgeTransaction.
-type LogManager interface {
-	// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
-	// for the specified LogConsumer.
-	AcknowledgeTransaction(consumer LogConsumer, lsn storage.LSN)
-	// GetTransactionPath returns the path of the log entry's root directory.
-	GetTransactionPath(lsn storage.LSN) string
-}
-
 // AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
 // for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
 // completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(consumer LogConsumer, lsn storage.LSN) {
+func (mgr *TransactionManager) AcknowledgeTransaction(consumer storage.LogConsumer, lsn storage.LSN) {
 	mgr.consumerPos.setPosition(lsn)
 
 	// Alert the manager. If it has a pending acknowledgement already no action is required.
@@ -930,13 +883,15 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 	p.position = pos
 }
 
-type transactionManagerMetrics struct {
+// TransactionManagerMetrics contains the metrics collected by a TransactionManager.
+type TransactionManagerMetrics struct {
 	housekeeping *housekeeping.Metrics
-	snapshot     snapshot.ManagerMetrics
+	snapshot     snapshot.Metrics
 }
 
-func newTransactionManagerMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.ManagerMetrics) transactionManagerMetrics {
-	return transactionManagerMetrics{
+// NewTransactionManagerMetrics returns a new TransactionManagerMetrics instance.
+func NewTransactionManagerMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) TransactionManagerMetrics {
+	return TransactionManagerMetrics{
 		housekeeping: housekeeping,
 		snapshot:     snapshot,
 	}
@@ -1057,7 +1012,7 @@ type TransactionManager struct {
 
 	// consumer is an the external caller that may perform read-only operations against applied
 	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
-	consumer LogConsumer
+	consumer storage.LogConsumer
 	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
 	consumerPos *consumerPosition
 	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
@@ -1068,7 +1023,7 @@ type TransactionManager struct {
 	testHooks testHooks
 
 	// metrics stores reporters which facilitate metric recording of transactional operations.
-	metrics transactionManagerMetrics
+	metrics TransactionManagerMetrics
 }
 
 type testHooks struct {
@@ -1091,8 +1046,8 @@ func NewTransactionManager(
 	stagingDir string,
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
-	metrics transactionManagerMetrics,
-	consumer LogConsumer,
+	metrics TransactionManagerMetrics,
+	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1282,12 +1237,12 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-mgr.closed:
-			return ErrTransactionProcessingStopped
+			return storage.ErrTransactionProcessingStopped
 		}
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-mgr.closing:
-		return ErrTransactionProcessingStopped
+		return storage.ErrTransactionProcessingStopped
 	}
 }
 
@@ -2125,7 +2080,7 @@ func unwrapExpectedError(err error) error {
 	// The manager controls its own execution context and it is canceled only when Stop is called.
 	// Any context.Canceled errors returned are thus from shutting down so we report that here.
 	if errors.Is(err, context.Canceled) {
-		return ErrTransactionProcessingStopped
+		return storage.ErrTransactionProcessingStopped
 	}
 
 	return err
@@ -2138,7 +2093,7 @@ func unwrapExpectedError(err error) error {
 // once they've been applied to the repository.
 //
 // Run keeps running until Stop is called or it encounters a fatal error. All transactions will error with
-// ErrTransactionProcessingStopped when Run returns.
+// storage.ErrTransactionProcessingStopped when Run returns.
 func (mgr *TransactionManager) Run() (returnedErr error) {
 	defer func() {
 		// On-going operations may fail with a context canceled error if the manager is stopped. This is
@@ -2233,7 +2188,7 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 		if transaction.repositoryCreation != nil && repositoryExists {
 			return ErrRepositoryAlreadyExists
 		} else if transaction.repositoryCreation == nil && !repositoryExists {
-			return ErrRepositoryNotFound
+			return storage.ErrRepositoryNotFound
 		}
 
 		alternateRelativePath, err := mgr.verifyAlternateUpdate(ctx, transaction)
@@ -2443,8 +2398,8 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 // Close stops the transaction processing causing Run to return.
 func (mgr *TransactionManager) Close() { mgr.close() }
 
-// isClosing returns whether closing of the manager was initiated.
-func (mgr *TransactionManager) isClosing() bool {
+// IsClosing returns whether closing of the manager was initiated.
+func (mgr *TransactionManager) IsClosing() bool {
 	select {
 	case <-mgr.closing:
 		return true
@@ -2478,7 +2433,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("create snapshot manager directory: %w", err)
 	}
 
-	mgr.snapshotManager = snapshot.NewManager(mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot)
+	mgr.snapshotManager = snapshot.NewManager(mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot.Scope(mgr.storageName))
 
 	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
 	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there
@@ -2721,7 +2676,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 
 	alternateRelativePath := filepath.Dir(alternateObjectsDir)
 	if alternateRelativePath == transaction.relativePath {
-		return "", errAlternatePointsToSelf
+		return "", storage.ErrAlternatePointsToSelf
 	}
 
 	// Check that the alternate repository exists. This works as a basic conflict check
@@ -2734,7 +2689,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 	if _, err := gitstorage.ReadAlternatesFile(alternateRepositoryPath); !errors.Is(err, gitstorage.ErrNoAlternate) {
 		if err == nil {
 			// We don't support chaining alternates like repo-1 > repo-2 > repo-3.
-			return "", errAlternateHasAlternate
+			return "", storage.ErrAlternateHasAlternate
 		}
 
 		return "", fmt.Errorf("read alternates file: %w", err)

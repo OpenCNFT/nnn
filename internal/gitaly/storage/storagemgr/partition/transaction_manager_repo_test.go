@@ -1,4 +1,4 @@
-package storagemgr
+package partition
 
 import (
 	"testing"
@@ -379,7 +379,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -429,7 +429,7 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: ErrTransactionProcessingStopped,
+					ExpectedError: storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -804,7 +804,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID:    2,
 					DeleteRepository: true,
-					ExpectedError:    ErrRepositoryNotFound,
+					ExpectedError:    storage.ErrRepositoryNotFound,
 				},
 			},
 			expectedState: StateAssertion{
@@ -833,7 +833,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID:     2,
 					CustomHooksUpdate: &CustomHooksUpdate{CustomHooksTAR: validCustomHooks(t)},
-					ExpectedError:     ErrRepositoryNotFound,
+					ExpectedError:     storage.ErrRepositoryNotFound,
 				},
 			},
 			expectedState: StateAssertion{
@@ -864,7 +864,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					ExpectedError: ErrRepositoryNotFound,
+					ExpectedError: storage.ErrRepositoryNotFound,
 				},
 			},
 			expectedState: StateAssertion{
@@ -895,7 +895,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					DefaultBranchUpdate: &DefaultBranchUpdate{
 						Reference: "refs/heads/new-default",
 					},
-					ExpectedError: ErrRepositoryNotFound,
+					ExpectedError: storage.ErrRepositoryNotFound,
 				},
 			},
 			expectedState: StateAssertion{
@@ -923,7 +923,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID:    1,
 					DeleteRepository: true,
-					ExpectedError:    ErrTransactionProcessingStopped,
+					ExpectedError:    storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -967,7 +967,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID:    1,
 					DeleteRepository: true,
-					ExpectedError:    ErrTransactionProcessingStopped,
+					ExpectedError:    storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
