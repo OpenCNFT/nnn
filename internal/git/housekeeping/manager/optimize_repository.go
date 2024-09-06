@@ -67,15 +67,15 @@ func (m *RepositoryManager) OptimizeRepository(
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "housekeeping.OptimizeRepository", nil)
 	defer span.Finish()
 
-	ok, cleanup := m.repositoryStates.tryRunningHousekeeping(repo)
-	// If we didn't succeed to set the state to "running" because of a concurrent housekeeping run
-	// we exit early.
-	if !ok {
-		return nil
-	}
-	defer cleanup()
-
 	if err := m.maybeStartTransaction(ctx, cfg.UseExistingTransaction, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+		ok, cleanup := m.repositoryStates.tryRunningHousekeeping(repo)
+		// If we didn't succeed to set the state to "running" because of a concurrent housekeeping run
+		// we exit early.
+		if !ok {
+			return nil
+		}
+		defer cleanup()
+
 		if m.optimizeFunc != nil {
 			strategy, err := m.validate(ctx, repo, cfg)
 			if err != nil {
