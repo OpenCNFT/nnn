@@ -149,11 +149,6 @@ func (m *RepositoryManager) validate(
 	repo *localrepo.Repo,
 	cfg OptimizeRepositoryConfig,
 ) (housekeeping.OptimizationStrategy, error) {
-	gitVersion, err := repo.GitVersion(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	repositoryInfo, err := stats.RepositoryInfoForRepository(ctx, repo)
 	if err != nil {
 		return nil, fmt.Errorf("deriving repository info: %w", err)
@@ -164,7 +159,7 @@ func (m *RepositoryManager) validate(
 
 	var strategy housekeeping.OptimizationStrategy
 	if cfg.StrategyConstructor == nil {
-		strategy = housekeeping.NewHeuristicalOptimizationStrategy(gitVersion, repositoryInfo)
+		strategy = housekeeping.NewHeuristicalOptimizationStrategy(repositoryInfo)
 	} else {
 		strategy = cfg.StrategyConstructor(repositoryInfo)
 	}

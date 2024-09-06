@@ -44,7 +44,7 @@ type HeuristicalOptimizationStrategy struct {
 // NewHeuristicalOptimizationStrategy constructs a heuristicalOptimizationStrategy for the given
 // repository info. It derives all data from the repository so that the heuristics used by this
 // repository can be decided without further disk reads.
-func NewHeuristicalOptimizationStrategy(gitVersion git.Version, info stats.RepositoryInfo) HeuristicalOptimizationStrategy {
+func NewHeuristicalOptimizationStrategy(info stats.RepositoryInfo) HeuristicalOptimizationStrategy {
 	return HeuristicalOptimizationStrategy{
 		info:         info,
 		expireBefore: time.Now().Add(stats.StaleObjectsGracePeriod),
