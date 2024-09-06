@@ -60,7 +60,7 @@ func TestDiffBlobs(t *testing.T) {
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
 						fmt.Sprintf(
-							"validating right blob: validating blob ID: invalid object ID: \"\", expected length %d, got 0",
+							"getting right blob info: validating blob ID: invalid object ID: \"\", expected length %d, got 0",
 							gittest.DefaultObjectHash.EncodedLen(),
 						)).WithMetadata("revision", ""),
 					),
@@ -86,7 +86,7 @@ func TestDiffBlobs(t *testing.T) {
 						},
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
-						"validating right blob: revision is not blob").WithMetadata("revision", string(commitID)),
+						"getting right blob info: revision is not blob").WithMetadata("revision", string(commitID)),
 					),
 				}
 			},
@@ -109,7 +109,7 @@ func TestDiffBlobs(t *testing.T) {
 						},
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
-						"validating left blob: getting revision info: object not found").WithMetadata("revision", "HEAD:foo"),
+						"getting left blob info: getting revision info: object not found").WithMetadata("revision", "HEAD:foo"),
 					),
 				}
 			},
@@ -614,7 +614,101 @@ func TestDiffBlobs(t *testing.T) {
 							},
 						},
 					},
-					expectedErr: structerr.NewInvalidArgument("left and right blob cannot both be null OIDs"),
+					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
+						"left and right blob revisions resolve to same OID").WithMetadataItems(
+						structerr.MetadataItem{Key: "left_revision", Value: blobID1.String()},
+						structerr.MetadataItem{Key: "right_revision", Value: blobID2.String()},
+					)),
+				}
+			},
+		},
+		{
+			desc: "matching blob IDs",
+			setup: func() setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				blobID := gittest.WriteBlob(t, cfg, repoPath, []byte("foo"))
+
+				return setupData{
+					request: &gitalypb.DiffBlobsRequest{
+						Repository: repoProto,
+						BlobPairs: []*gitalypb.DiffBlobsRequest_BlobPair{
+							{
+								LeftBlob:  []byte(blobID),
+								RightBlob: []byte(blobID),
+							},
+						},
+					},
+					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
+						"left and right blob revisions resolve to same OID").WithMetadataItems(
+						structerr.MetadataItem{Key: "left_revision", Value: blobID.String()},
+						structerr.MetadataItem{Key: "right_revision", Value: blobID.String()},
+					)),
+				}
+			},
+		},
+		{
+			desc: "left and right revisions resolve to same OID",
+			setup: func() setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				blobID1 := gittest.WriteBlob(t, cfg, repoPath, []byte("foo\n"))
+				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+					gittest.TreeEntry{
+						OID:  blobID1,
+						Mode: "100644",
+						Path: "foo",
+					},
+				))
+				revision := fmt.Sprintf("%s:foo", commitID.String())
+
+				return setupData{
+					request: &gitalypb.DiffBlobsRequest{
+						Repository: repoProto,
+						BlobPairs: []*gitalypb.DiffBlobsRequest_BlobPair{
+							{
+								LeftBlob:  []byte(blobID1),
+								RightBlob: []byte(fmt.Sprintf("%s:foo", commitID.String())),
+							},
+						},
+					},
+					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
+						"left and right blob revisions resolve to same OID").WithMetadataItems(
+						structerr.MetadataItem{Key: "left_revision", Value: blobID1.String()},
+						structerr.MetadataItem{Key: "right_revision", Value: revision},
+					)),
+				}
+			},
+		},
+		{
+			desc: "empty file added",
+			setup: func() setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				// Gitaly rewrites NULL OIDs to an empty blob ID. This allows addition/deletion
+				// diffs to be generated through git-diff(1). If the added/deleted blob is also
+				// empty, there is no diff according to Git because the pre-image and post-image
+				// are identical.
+				blobID1 := gittest.DefaultObjectHash.ZeroOID
+				blobID2 := gittest.WriteBlob(t, cfg, repoPath, []byte(""))
+
+				return setupData{
+					request: &gitalypb.DiffBlobsRequest{
+						Repository: repoProto,
+						BlobPairs: []*gitalypb.DiffBlobsRequest_BlobPair{
+							{
+								LeftBlob:  []byte(blobID1),
+								RightBlob: []byte(blobID2),
+							},
+						},
+					},
+					expectedResponses: []*gitalypb.DiffBlobsResponse{
+						{
+							LeftBlobId:  blobID1.String(),
+							RightBlobId: blobID2.String(),
+							Status:      gitalypb.DiffBlobsResponse_STATUS_END_OF_PATCH,
+						},
+					},
 				}
 			},
 		},
