@@ -203,7 +203,7 @@ type Transaction struct {
 	// repositoryExists indicates whether the target repository existed when this transaction began.
 	repositoryExists bool
 	// metrics stores metric reporters inherited from the manager.
-	metrics transactionMetrics
+	metrics ManagerMetrics
 
 	// state records whether the transaction is still open. Transaction is open until either Commit()
 	// or Rollback() is called on it.
@@ -332,7 +332,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 		snapshotLSN:  mgr.appendedLSN,
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
-		metrics:      transactionMetrics{housekeeping: mgr.metrics.housekeeping},
+		metrics:      mgr.metrics,
 	}
 
 	mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Add(1)
