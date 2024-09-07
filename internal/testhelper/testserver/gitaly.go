@@ -355,7 +355,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 				partition.NewFactory(
 					gsd.gitCmdFactory,
 					localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
-					partition.NewTransactionManagerMetrics(
+					partition.NewMetrics(
 						housekeeping.NewMetrics(cfg.Prometheus),
 						snapshot.NewMetrics(),
 					),

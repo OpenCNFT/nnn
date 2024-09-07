@@ -382,7 +382,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
 	snapshotMetrics := snapshot.NewMetrics()
 	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics, storageMetrics)
-	txManagerMetrics := partition.NewTransactionManagerMetrics(housekeepingMetrics, snapshotMetrics)
+	txManagerMetrics := partition.NewMetrics(housekeepingMetrics, snapshotMetrics)
 
 	var txMiddleware server.TransactionMiddleware
 	var node *nodeimpl.Manager

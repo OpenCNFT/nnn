@@ -16,7 +16,7 @@ import (
 type Factory struct {
 	cmdFactory  gitcmd.CommandFactory
 	repoFactory localrepo.Factory
-	metrics     TransactionManagerMetrics
+	metrics     Metrics
 }
 
 // New returns a new Partition instance.
@@ -52,7 +52,7 @@ func (f Factory) New(
 		stagingDir,
 		f.cmdFactory,
 		repoFactory,
-		f.metrics,
+		f.metrics.Scope(storageName),
 		logConsumer,
 	)
 }
@@ -61,7 +61,7 @@ func (f Factory) New(
 func NewFactory(
 	cmdFactory gitcmd.CommandFactory,
 	repoFactory localrepo.Factory,
-	metrics TransactionManagerMetrics,
+	metrics Metrics,
 ) Factory {
 	return Factory{
 		cmdFactory:  cmdFactory,

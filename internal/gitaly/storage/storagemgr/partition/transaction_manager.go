@@ -196,10 +196,6 @@ const (
 	transactionStateCommit
 )
 
-type transactionMetrics struct {
-	housekeeping *housekeeping.Metrics
-}
-
 // Transaction is a unit-of-work that contains reference changes to perform on the repository.
 type Transaction struct {
 	// write denotes whether or not this transaction is a write transaction.
@@ -883,20 +879,6 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 	p.position = pos
 }
 
-// TransactionManagerMetrics contains the metrics collected by a TransactionManager.
-type TransactionManagerMetrics struct {
-	housekeeping *housekeeping.Metrics
-	snapshot     snapshot.Metrics
-}
-
-// NewTransactionManagerMetrics returns a new TransactionManagerMetrics instance.
-func NewTransactionManagerMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) TransactionManagerMetrics {
-	return TransactionManagerMetrics{
-		housekeeping: housekeeping,
-		snapshot:     snapshot,
-	}
-}
-
 // TransactionManager is responsible for transaction management of a single repository. Each repository has
 // a single TransactionManager; it is the repository's single-writer. It accepts writes one at a time from
 // the admissionQueue. Each admitted write is processed in three steps:
@@ -1023,7 +1005,7 @@ type TransactionManager struct {
 	testHooks testHooks
 
 	// metrics stores reporters which facilitate metric recording of transactional operations.
-	metrics TransactionManagerMetrics
+	metrics ManagerMetrics
 }
 
 type testHooks struct {
@@ -1046,7 +1028,7 @@ func NewTransactionManager(
 	stagingDir string,
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
-	metrics TransactionManagerMetrics,
+	metrics ManagerMetrics,
 	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2423,7 +2405,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("create snapshot manager directory: %w", err)
 	}
 
-	mgr.snapshotManager = snapshot.NewManager(mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot.Scope(mgr.storageName))
+	mgr.snapshotManager = snapshot.NewManager(mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot)
 
 	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
 	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there

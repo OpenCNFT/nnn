@@ -1055,11 +1055,11 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	stagingDir := filepath.Join(storagePath, "staging")
 	require.NoError(t, os.Mkdir(stagingDir, mode.Directory))
 
-	newMetrics := func() TransactionManagerMetrics {
-		return NewTransactionManagerMetrics(
+	newMetrics := func() ManagerMetrics {
+		return NewMetrics(
 			housekeeping.NewMetrics(setup.Config.Prometheus),
 			snapshot.NewMetrics(),
-		)
+		).Scope(storageName)
 	}
 
 	var (
