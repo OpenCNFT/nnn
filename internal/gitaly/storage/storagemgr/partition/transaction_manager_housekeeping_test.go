@@ -1231,12 +1231,13 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
 						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
 					},
+					ExpectedError: gittest.FilesOrReftables[error](errConcurrentReferencePacking, nil),
 				},
 				assertPackRefsMetrics,
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(keyAppliedLSN): storage.LSN(gittest.FilesOrReftables(2, 3)).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1245,9 +1246,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 							&ReferencesState{
 								FilesBackend: &FilesBackendState{
 									PackedReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1":   setup.Commits.Second.OID,
 										"refs/heads/branch-2":   setup.Commits.Third.OID,
 										"refs/heads/main":       setup.Commits.First.OID,
 										"refs/heads/new-branch": setup.Commits.First.OID,
+										"refs/tags/v1.0.0":      lightweightTag,
 										"refs/tags/v2.0.0":      annotatedTag.OID,
 									},
 									LooseReferences: map[git.ReferenceName]git.ObjectID{},

@@ -30,4 +30,8 @@ func TestGetInode(t *testing.T) {
 
 	require.Equal(t, file1Inode, linkInode)
 	require.NotEqual(t, file1Inode, file2Inode)
+
+	nonExistentInode, err := getInode(filepath.Join(tempDir, "non-existent"))
+	require.NoError(t, err)
+	require.EqualValues(t, nonExistentInode, 0)
 }
