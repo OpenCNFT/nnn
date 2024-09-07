@@ -16,6 +16,7 @@ type Metrics struct {
 	commitQueueDepth                           *prometheus.GaugeVec
 	commitQueueWaitSeconds                     *prometheus.HistogramVec
 	transactionControlStatementDurationSeconds *prometheus.HistogramVec
+	transactionProcessingDurationSeconds       *prometheus.HistogramVec
 }
 
 // NewMetrics returns a new Metrics instance.
@@ -42,6 +43,11 @@ func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) M
 			Help:    "Records the time taken to execute a transaction control statement.",
 			Buckets: buckets,
 		}, append(storageAccessMode, "control_statement")),
+		transactionProcessingDurationSeconds: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "gitaly_transaction_processing_duration_seconds",
+			Help:    "Records the time taken to process a transaction.",
+			Buckets: buckets,
+		}, append(storage, "stage")),
 	}
 }
 
@@ -55,6 +61,7 @@ func (m Metrics) Collect(out chan<- prometheus.Metric) {
 	m.commitQueueDepth.Collect(out)
 	m.commitQueueWaitSeconds.Collect(out)
 	m.transactionControlStatementDurationSeconds.Collect(out)
+	m.transactionProcessingDurationSeconds.Collect(out)
 }
 
 // Scope scopes the metrics to a TransactionManager.
@@ -78,6 +85,8 @@ func (m Metrics) Scope(storageName string) ManagerMetrics {
 		writeTransactionCommitDurationSeconds:   m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, write, commit),
 		readTransactionRollbackDurationSeconds:  m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, read, rollback),
 		writeTransactionRollbackDurationSeconds: m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, write, rollback),
+		transactionProcessingDurationSeconds:    m.transactionProcessingDurationSeconds.WithLabelValues(storageName, "verification"),
+		transactionApplicationDurationSeconds:   m.transactionProcessingDurationSeconds.WithLabelValues(storageName, "application"),
 	}
 }
 
@@ -93,6 +102,8 @@ type ManagerMetrics struct {
 	writeTransactionCommitDurationSeconds   prometheus.Observer
 	readTransactionRollbackDurationSeconds  prometheus.Observer
 	writeTransactionRollbackDurationSeconds prometheus.Observer
+	transactionProcessingDurationSeconds    prometheus.Observer
+	transactionApplicationDurationSeconds   prometheus.Observer
 }
 
 func (m ManagerMetrics) beginDuration(write bool) prometheus.Observer {

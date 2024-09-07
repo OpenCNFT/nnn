@@ -2149,6 +2149,8 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 	var transaction *Transaction
 	select {
 	case transaction = <-mgr.admissionQueue:
+		defer prometheus.NewTimer(mgr.metrics.transactionProcessingDurationSeconds).ObserveDuration()
+
 		// The Transaction does not finish itself anymore once it has been admitted for
 		// processing. This avoids the Transaction concurrently removing the staged state
 		// while the manager is still operating on it. We thus need to defer its finishing.
@@ -3441,6 +3443,8 @@ func (mgr *TransactionManager) appendLogEntry(objectDependencies map[git.ObjectI
 
 // applyLogEntry reads a log entry at the given LSN and applies it to the repository.
 func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LSN) error {
+	defer prometheus.NewTimer(mgr.metrics.transactionApplicationDurationSeconds).ObserveDuration()
+
 	logEntry, err := mgr.readLogEntry(lsn)
 	if err != nil {
 		return fmt.Errorf("read log entry: %w", err)
