@@ -13,18 +13,27 @@ type Metrics struct {
 	housekeeping *housekeeping.Metrics
 	snapshot     snapshot.Metrics
 
-	commitQueueDepth *prometheus.GaugeVec
+	commitQueueDepth       *prometheus.GaugeVec
+	commitQueueWaitSeconds *prometheus.HistogramVec
 }
 
 // NewMetrics returns a new Metrics instance.
 func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) Metrics {
 	storage := []string{"storage"}
+
+	buckets := prometheus.ExponentialBuckets(0.01, 2, 10)
+
 	return Metrics{
 		housekeeping: housekeeping,
 		snapshot:     snapshot,
 		commitQueueDepth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "gitaly_transaction_commit_queue_depth",
 			Help: "Records the number transactions waiting in the commit queue.",
+		}, storage),
+		commitQueueWaitSeconds: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "gitaly_transaction_commit_queue_wait_seconds",
+			Help:    "Records the duration transactions are waiting in the commit queue.",
+			Buckets: buckets,
 		}, storage),
 	}
 }
@@ -37,20 +46,23 @@ func (m Metrics) Describe(out chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 func (m Metrics) Collect(out chan<- prometheus.Metric) {
 	m.commitQueueDepth.Collect(out)
+	m.commitQueueWaitSeconds.Collect(out)
 }
 
 // Scope scopes the metrics to a TransactionManager.
 func (m Metrics) Scope(storageName string) ManagerMetrics {
 	return ManagerMetrics{
-		housekeeping:     m.housekeeping,
-		snapshot:         m.snapshot.Scope(storageName),
-		commitQueueDepth: m.commitQueueDepth.WithLabelValues(storageName),
+		housekeeping:           m.housekeeping,
+		snapshot:               m.snapshot.Scope(storageName),
+		commitQueueDepth:       m.commitQueueDepth.WithLabelValues(storageName),
+		commitQueueWaitSeconds: m.commitQueueWaitSeconds.WithLabelValues(storageName),
 	}
 }
 
 // ManagerMetrics contains the metrics collected by a TransactionManager.
 type ManagerMetrics struct {
-	housekeeping     *housekeeping.Metrics
-	snapshot         snapshot.ManagerMetrics
-	commitQueueDepth prometheus.Gauge
+	housekeeping           *housekeeping.Metrics
+	snapshot               snapshot.ManagerMetrics
+	commitQueueDepth       prometheus.Gauge
+	commitQueueWaitSeconds prometheus.Observer
 }

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -1212,6 +1213,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	if err := func() error {
 		transaction.metrics.commitQueueDepth.Inc()
 		defer transaction.metrics.commitQueueDepth.Dec()
+		defer prometheus.NewTimer(mgr.metrics.commitQueueWaitSeconds).ObserveDuration()
 
 		select {
 		case mgr.admissionQueue <- transaction:
