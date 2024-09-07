@@ -381,8 +381,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	storageMetrics := storagemgr.NewMetrics(cfg.Prometheus)
 	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
 	snapshotMetrics := snapshot.NewMetrics()
-	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics, storageMetrics)
-	txManagerMetrics := partition.NewMetrics(housekeepingMetrics, snapshotMetrics)
+	partitionMetrics := partition.NewMetrics(housekeepingMetrics, snapshotMetrics)
+	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics, storageMetrics, partitionMetrics)
 
 	var txMiddleware server.TransactionMiddleware
 	var node *nodeimpl.Manager
@@ -424,7 +424,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				partition.NewFactory(
 					gitCmdFactory,
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-					txManagerMetrics,
+					partitionMetrics,
 				),
 				storageMetrics,
 			),
@@ -486,7 +486,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 					partition.NewFactory(
 						gitCmdFactory,
 						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-						txManagerMetrics,
+						partitionMetrics,
 					),
 					storageMetrics,
 				),

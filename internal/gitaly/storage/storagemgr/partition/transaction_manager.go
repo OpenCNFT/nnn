@@ -1209,21 +1209,29 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	select {
-	case mgr.admissionQueue <- transaction:
-		transaction.admitted = true
+	if err := func() error {
+		transaction.metrics.commitQueueDepth.Inc()
+		defer transaction.metrics.commitQueueDepth.Dec()
 
 		select {
-		case err := <-transaction.result:
-			return unwrapExpectedError(err)
+		case mgr.admissionQueue <- transaction:
+			transaction.admitted = true
+			return nil
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-mgr.closed:
+		case <-mgr.closing:
 			return storage.ErrTransactionProcessingStopped
 		}
+	}(); err != nil {
+		return err
+	}
+
+	select {
+	case err := <-transaction.result:
+		return unwrapExpectedError(err)
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-mgr.closing:
+	case <-mgr.closed:
 		return storage.ErrTransactionProcessingStopped
 	}
 }
