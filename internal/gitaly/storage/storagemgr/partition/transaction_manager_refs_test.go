@@ -1381,19 +1381,22 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-2": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
+					ExpectedError: errConcurrentPackedRefsWrite,
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(4).ToProto(),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
 						References: &ReferencesState{
 							FilesBackend: &FilesBackendState{
-								PackedReferences: map[git.ReferenceName]git.ObjectID{},
-								LooseReferences:  map[git.ReferenceName]git.ObjectID{},
+								PackedReferences: map[git.ReferenceName]git.ObjectID{
+									"refs/heads/branch-2": setup.Commits.First.OID,
+								},
+								LooseReferences: map[git.ReferenceName]git.ObjectID{},
 							},
 						},
 					},
