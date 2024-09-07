@@ -13,13 +13,15 @@ type Metrics struct {
 	housekeeping *housekeeping.Metrics
 	snapshot     snapshot.Metrics
 
-	commitQueueDepth       *prometheus.GaugeVec
-	commitQueueWaitSeconds *prometheus.HistogramVec
+	commitQueueDepth                           *prometheus.GaugeVec
+	commitQueueWaitSeconds                     *prometheus.HistogramVec
+	transactionControlStatementDurationSeconds *prometheus.HistogramVec
 }
 
 // NewMetrics returns a new Metrics instance.
 func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) Metrics {
 	storage := []string{"storage"}
+	storageAccessMode := append(storage, "access_mode")
 
 	buckets := prometheus.ExponentialBuckets(0.01, 2, 10)
 
@@ -35,6 +37,11 @@ func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) M
 			Help:    "Records the duration transactions are waiting in the commit queue.",
 			Buckets: buckets,
 		}, storage),
+		transactionControlStatementDurationSeconds: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "gitaly_transaction_control_statement_duration_seconds",
+			Help:    "Records the time taken to execute a transaction control statement.",
+			Buckets: buckets,
+		}, append(storageAccessMode, "control_statement")),
 	}
 }
 
@@ -47,22 +54,67 @@ func (m Metrics) Describe(out chan<- *prometheus.Desc) {
 func (m Metrics) Collect(out chan<- prometheus.Metric) {
 	m.commitQueueDepth.Collect(out)
 	m.commitQueueWaitSeconds.Collect(out)
+	m.transactionControlStatementDurationSeconds.Collect(out)
 }
 
 // Scope scopes the metrics to a TransactionManager.
 func (m Metrics) Scope(storageName string) ManagerMetrics {
+	const (
+		read     = "read"
+		write    = "write"
+		begin    = "begin"
+		commit   = "commit"
+		rollback = "rollback"
+	)
+
 	return ManagerMetrics{
-		housekeeping:           m.housekeeping,
-		snapshot:               m.snapshot.Scope(storageName),
-		commitQueueDepth:       m.commitQueueDepth.WithLabelValues(storageName),
-		commitQueueWaitSeconds: m.commitQueueWaitSeconds.WithLabelValues(storageName),
+		housekeeping:                            m.housekeeping,
+		snapshot:                                m.snapshot.Scope(storageName),
+		commitQueueDepth:                        m.commitQueueDepth.WithLabelValues(storageName),
+		commitQueueWaitSeconds:                  m.commitQueueWaitSeconds.WithLabelValues(storageName),
+		readBeginDurationSeconds:                m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, read, begin),
+		writeBeginDurationSeconds:               m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, write, begin),
+		readTransactionCommitDurationSeconds:    m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, read, commit),
+		writeTransactionCommitDurationSeconds:   m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, write, commit),
+		readTransactionRollbackDurationSeconds:  m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, read, rollback),
+		writeTransactionRollbackDurationSeconds: m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, write, rollback),
 	}
 }
 
 // ManagerMetrics contains the metrics collected by a TransactionManager.
 type ManagerMetrics struct {
-	housekeeping           *housekeeping.Metrics
-	snapshot               snapshot.ManagerMetrics
-	commitQueueDepth       prometheus.Gauge
-	commitQueueWaitSeconds prometheus.Observer
+	housekeeping                            *housekeeping.Metrics
+	snapshot                                snapshot.ManagerMetrics
+	commitQueueDepth                        prometheus.Gauge
+	commitQueueWaitSeconds                  prometheus.Observer
+	readBeginDurationSeconds                prometheus.Observer
+	writeBeginDurationSeconds               prometheus.Observer
+	readTransactionCommitDurationSeconds    prometheus.Observer
+	writeTransactionCommitDurationSeconds   prometheus.Observer
+	readTransactionRollbackDurationSeconds  prometheus.Observer
+	writeTransactionRollbackDurationSeconds prometheus.Observer
+}
+
+func (m ManagerMetrics) beginDuration(write bool) prometheus.Observer {
+	if write {
+		return m.writeBeginDurationSeconds
+	}
+
+	return m.readBeginDurationSeconds
+}
+
+func (m ManagerMetrics) commitDuration(write bool) prometheus.Observer {
+	if write {
+		return m.writeTransactionCommitDurationSeconds
+	}
+
+	return m.readTransactionCommitDurationSeconds
+}
+
+func (m ManagerMetrics) rollbackDuration(write bool) prometheus.Observer {
+	if write {
+		return m.writeTransactionRollbackDurationSeconds
+	}
+
+	return m.readTransactionRollbackDurationSeconds
 }

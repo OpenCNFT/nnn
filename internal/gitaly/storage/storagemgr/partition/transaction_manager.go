@@ -299,6 +299,8 @@ type Transaction struct {
 // The returned Transaction's read snapshot includes all writes that were committed prior to the
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
 func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (_ storage.Transaction, returnedErr error) {
+	defer prometheus.NewTimer(mgr.metrics.beginDuration(opts.Write)).ObserveDuration()
+
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
 	select {
@@ -541,6 +543,8 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 		return err
 	}
 
+	defer prometheus.NewTimer(txn.metrics.commitDuration(txn.write)).ObserveDuration()
+
 	defer func() {
 		if err := txn.finishUnadmitted(); err != nil && returnedErr == nil {
 			returnedErr = err
@@ -579,6 +583,8 @@ func (txn *Transaction) Rollback() error {
 	if err := txn.updateState(transactionStateRollback); err != nil {
 		return err
 	}
+
+	defer prometheus.NewTimer(txn.metrics.rollbackDuration(txn.write)).ObserveDuration()
 
 	return txn.finishUnadmitted()
 }
