@@ -466,24 +466,6 @@ func (cf *ExecCommandFactory) newCommand(ctx context.Context, repo storage.Repos
 		return nil, fmt.Errorf("getting Git version: %w", err)
 	}
 
-	// Starting with Git version 2.45.1, 2.44.1, 2.43.4, and 2.42.2 the `symlinkPointsToGitDir` fsck
-	// check was added which warns if a repository contains symlinks pointing inside the Git
-	// directory. While by default these are only supposed to be warnings, because Gitaly sets
-	//`transfer.fsckObjects=true` the warnings are upgraded to errors and consequently can break
-	// existing repositories. To avoid this, the fsck check is disabled. Since we support versions
-	// of Git that do not contain this option, we apply the configuration to the corresponding
-	// versions to avoid an unknown config warning.
-	//
-	// This Git configuration has been reverted in versions 2.45.2, 2.44.2, 2.43.5, and 2.42.3. Once
-	// these versions are no longer supported by Gitaly, these options can be removed.
-	if (cmdGitVersion.GreaterOrEqual(git.NewVersion(2, 45, 1, 0))) && cmdGitVersion.LessThan(git.NewVersion(2, 45, 2, 0)) {
-		config.globals = append(config.globals,
-			ConfigPair{Key: "fsck.symlinkPointsToGitDir", Value: "ignore"},
-			ConfigPair{Key: "fetch.fsck.symlinkPointsToGitDir", Value: "ignore"},
-			ConfigPair{Key: "receive.fsck.symlinkPointsToGitDir", Value: "ignore"},
-		)
-	}
-
 	args, err := cf.combineArgs(ctx, sc, config)
 	if err != nil {
 		return nil, err
