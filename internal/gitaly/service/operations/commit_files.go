@@ -134,7 +134,9 @@ func (s *Server) UserCommitFiles(stream gitalypb.OperationService_UserCommitFile
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	objectHash, err := gitcmd.DetectObjectHash(ctx, s.gitCmdFactory, header.GetRepository())
+	repo := s.localrepo(header.GetRepository())
+
+	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
 		return fmt.Errorf("detecting object hash: %w", err)
 	}

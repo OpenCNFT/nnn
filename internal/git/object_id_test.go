@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -97,7 +97,6 @@ func TestDetectObjectHash(t *testing.T) {
 
 	cfg := testcfg.Build(t)
 	ctx := testhelper.Context(t)
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg)
 
 	for _, tc := range []struct {
 		desc         string
@@ -194,8 +193,9 @@ func TestDetectObjectHash(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			repoProto := tc.setup(t)
+			repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
-			hash, err := gitcmd.DetectObjectHash(ctx, gitCmdFactory, repoProto)
+			hash, err := repo.ObjectHash(ctx)
 			if tc.expectedErr != nil {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.expectedErr.Error())

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/auth"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -184,9 +184,11 @@ func TestCreateRepository_withObjectFormat(t *testing.T) {
 				return
 			}
 
+			repo := localrepo.NewTestRepo(t, cfg, repoProto)
+
 			// If the repository was created we can check whether the object format of
 			// the created repository matches our expectations.
-			objectHash, err := gitcmd.DetectObjectHash(ctx, gitCmdFactory, gittest.RewrittenRepository(t, ctx, cfg, repoProto))
+			objectHash, err := repo.ObjectHash(ctx)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedObjectHash.Format, objectHash.Format)
 		})
