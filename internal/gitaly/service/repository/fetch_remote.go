@@ -154,10 +154,12 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 
 	var tagsChanged, repoChanged bool
 
+	// If the request does not specify to check if tags changed, set true as the default value.
 	if !req.GetCheckTagsChanged() {
 		tagsChanged = true
 	}
 
+	// If the request does not specify to check if repo changed, set true as the default value.
 	if !req.GetCheckRepoChanged() {
 		repoChanged = true
 	}
@@ -223,7 +225,6 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		return false, false, fmt.Errorf("committing reference update: %w", err)
 	}
 
-	// If the request does not specify to check if tags or repo changed, return true as the default value.
 	return tagsChanged, repoChanged, nil
 }
 
