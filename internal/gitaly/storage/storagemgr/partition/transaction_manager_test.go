@@ -333,13 +333,6 @@ func testTransactionManager(t *testing.T, ctx context.Context) {
 
 	if featureflag.SymrefUpdate.IsDisabled(ctx) {
 		testhelper.SkipWithReftable(t, "reftable tests can only be run with symref-updates feature")
-	} else {
-		// We use context.Background here, because we don't want to rely
-		// on Git versions which are behind a feature flag, since the
-		// transaction manager doesn't have access to that context.
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		gittest.SkipIfGitVersionLessThan(t, ctx, testcfg.Build(t), git.NewVersion(2, 46, 0, 0), "symref-update support missing")
 	}
 
 	// testPartitionID is the partition ID used in the tests for the TransactionManager.
