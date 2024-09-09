@@ -105,7 +105,7 @@ workflow:
   services:
     - name: postgres:${POSTGRES_VERSION}
       alias: postgres
-      command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=256MB"]
+      command: ["postgres", "-c", "max_connections=800", "-c", "shared_buffers=1GB"]
   variables: &test_variables
     PGHOST: postgres
     PGPORT: 5432
@@ -251,7 +251,7 @@ test:pgbouncer:
   services:
     - name: postgres:${POSTGRES_VERSION}
       alias: postgres
-      command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=256MB"]
+      command: ["postgres", "-c", "max_connections=500", "-c", "shared_buffers=1GB"]
     - name: bitnami/pgbouncer:${PGBOUNCER_VERSION}
       alias: pgbouncer
   variables:
