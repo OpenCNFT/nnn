@@ -11,7 +11,6 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -140,7 +139,12 @@ func (m *GitLabHookManager) PostReceiveHook(ctx context.Context, repo *gitalypb.
 			return fmt.Errorf("commit transaction: %w", err)
 		}
 
-		tx, err = m.partitionManager.Begin(ctx, originalRepo.GetStorageName(), 0, storagemgr.TransactionOptions{
+		storageHandle, err := m.node.GetStorage(originalRepo.GetStorageName())
+		if err != nil {
+			return fmt.Errorf("get storage: %w", err)
+		}
+
+		tx, err = storageHandle.Begin(ctx, 0, storage.TransactionOptions{
 			ReadOnly:     true,
 			RelativePath: originalRepo.GetRelativePath(),
 		})

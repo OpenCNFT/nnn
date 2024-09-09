@@ -11,6 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -35,15 +36,27 @@ func TestDbForMetadataGroup(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
-		cmdFactory,
-		localRepoFactory,
-		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
-	), nil)
+	node, err := nodeimpl.NewManager(
+		cfg.Storages,
+		storagemgr.NewFactory(
+			logger,
+			dbMgr,
+			partition.NewFactory(
+				cmdFactory,
+				localRepoFactory,
+				partition.NewTransactionManagerMetrics(
+					housekeeping.NewMetrics(cfg.Prometheus),
+					snapshot.NewMetrics(),
+				),
+			),
+			storagemgr.NewMetrics(cfg.Prometheus),
+		),
+		nil,
+	)
 	require.NoError(t, err)
-	t.Cleanup(partitionManager.Close)
+	t.Cleanup(node.Close)
 
-	db := dbForMetadataGroup(partitionManager, "node-1")
+	db := dbForMetadataGroup(node, "node-1")
 	require.NoError(t, db.write(ctx, func(txn keyvalue.ReadWriter) error {
 		require.NoError(t, txn.Set([]byte("data-1"), []byte("one")))
 		return nil
@@ -112,13 +125,25 @@ func TestDbForStorage(t *testing.T) {
 
 	localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
-	partitionManager, err := storagemgr.NewPartitionManager(testhelper.Context(t), cfg.Storages, logger, dbMgr, cfg.Prometheus, partition.NewFactory(
-		cmdFactory,
-		localRepoFactory,
-		partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
-	), nil)
+	node, err := nodeimpl.NewManager(
+		cfg.Storages,
+		storagemgr.NewFactory(
+			logger,
+			dbMgr,
+			partition.NewFactory(
+				cmdFactory,
+				localRepoFactory,
+				partition.NewTransactionManagerMetrics(
+					housekeeping.NewMetrics(cfg.Prometheus),
+					snapshot.NewMetrics(),
+				),
+			),
+			storagemgr.NewMetrics(cfg.Prometheus),
+		),
+		nil,
+	)
 	require.NoError(t, err)
-	t.Cleanup(partitionManager.Close)
+	t.Cleanup(node.Close)
 
 	storageInfo := &gitalypb.Storage{
 		StorageId:         1,
@@ -128,7 +153,7 @@ func TestDbForStorage(t *testing.T) {
 		ReplicaGroups:     []uint64{2, 3},
 	}
 
-	db := dbForStorage(partitionManager, "node-1")
+	db := dbForStorage(node, "node-1")
 	require.NoError(t, db.write(ctx, func(txn keyvalue.ReadWriter) error {
 		storage, err := proto.Marshal(storageInfo)
 		require.NoError(t, err)

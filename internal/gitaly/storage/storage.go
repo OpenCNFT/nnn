@@ -34,6 +34,9 @@ var (
 	// ErrAlternateHasAlternate is returned when a repository's alternate itself has an
 	// alternate listed.
 	ErrAlternateHasAlternate = errors.New("repository's alternate has an alternate itself")
+	// ErrPartitionAssignmentNotFound is returned when attempting to access a
+	// partition assignment in the database that doesn't yet exist.
+	ErrPartitionAssignmentNotFound = errors.New("partition assignment not found")
 )
 
 // Transaction is a single unit-of-work that executes as a whole.
@@ -130,4 +133,39 @@ type Partition interface {
 	Begin(context.Context, BeginOptions) (Transaction, error)
 	// Close closes the partition handle to signal the caller is done using it.
 	Close()
+}
+
+// TransactionOptions are used to pass transaction options into Begin.
+type TransactionOptions struct {
+	// ReadOnly indicates whether this is a read-only transaction. Read-only transactions are not
+	// configured with a quarantine directory and do not commit a log entry.
+	ReadOnly bool
+	// RelativePath specifies which repository in the partition will be the target.
+	RelativePath string
+	// AlternateRelativePath specifies a repository to include in the transaction's snapshot as well.
+	AlternateRelativePath string
+	// AllowPartitionAssignmentWithoutRepository determines whether a partition assignment should be
+	// written out even if repository does not exist.
+	AllowPartitionAssignmentWithoutRepository bool
+	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
+	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
+	ForceExclusiveSnapshot bool
+	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
+	// path is provided.
+	KVOnly bool
+}
+
+// Storage is the interface of a storage.
+type Storage interface {
+	// GetAssignedPartitionID returns the assigned ID of the partition the relative path
+	// has been assigned to.
+	GetAssignedPartitionID(relativePath string) (PartitionID, error)
+	// Begin begins a transaction against a partition.
+	Begin(context.Context, PartitionID, TransactionOptions) (Transaction, error)
+}
+
+// Node is the interface of a node. Each Node may have zero or more storages.
+type Node interface {
+	// GetStorage retrieves a handle to a Storage by its name.
+	GetStorage(storageName string) (Storage, error)
 }

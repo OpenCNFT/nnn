@@ -17,6 +17,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
+	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -420,21 +421,22 @@ func testWithAndWithoutTransaction(t *testing.T, testFunc func(*testing.T, confi
 		defer dbMgr.Close()
 
 		localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
-		partitionManager, err := storagemgr.NewPartitionManager(
-			testhelper.Context(t),
+		node, err := nodeimpl.NewManager(
 			cfg.Storages,
-			logger,
-			dbMgr,
-			cfg.Prometheus,
-			partition.NewFactory(
-				cmdFactory,
-				localRepoFactory,
-				partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+			storagemgr.NewFactory(
+				logger,
+				dbMgr,
+				partition.NewFactory(
+					cmdFactory,
+					localRepoFactory,
+					partition.NewTransactionManagerMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+				),
+				storagemgr.NewMetrics(cfg.Prometheus),
 			),
 			nil,
 		)
 		require.NoError(t, err)
-		defer partitionManager.Close()
+		defer node.Close()
 
 		testFunc(t, cfg, localRepoFactory.Build)
 	})

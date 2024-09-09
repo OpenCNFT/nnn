@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -57,13 +58,9 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 	cache := catfile.NewCache(cfg)
 	defer cache.Stop()
 
-	ptnMgr, err := NewPartitionManager(ctx, cfg.Storages,
-		logger,
-		dbMgr,
-		cfg.Prometheus,
-		newStubPartitionFactory(),
-		nil,
-	)
+	ptnMgr, err := node.NewManager(cfg.Storages, NewFactory(
+		logger, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus),
+	), nil)
 	require.NoError(t, err)
 	defer ptnMgr.Close()
 

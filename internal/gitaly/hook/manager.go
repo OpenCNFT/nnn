@@ -84,7 +84,7 @@ type GitLabHookManager struct {
 	gitlabClient        gitlab.Client
 	txRegistry          TransactionRegistry
 	procReceiveRegistry *ProcReceiveRegistry
-	partitionManager    *storagemgr.PartitionManager
+	node                storage.Node
 }
 
 // ProcReceiveRegistry provides the ProcReceiveRegistry assigned to the Manager. The registry
@@ -103,7 +103,7 @@ func NewManager(
 	gitlabClient gitlab.Client,
 	txRegistry TransactionRegistry,
 	procReceiveRegistry *ProcReceiveRegistry,
-	partitionManager *storagemgr.PartitionManager,
+	node storage.Node,
 ) *GitLabHookManager {
 	return &GitLabHookManager{
 		cfg:                 cfg,
@@ -114,6 +114,6 @@ func NewManager(
 		gitlabClient:        gitlabClient,
 		txRegistry:          txRegistry,
 		procReceiveRegistry: procReceiveRegistry,
-		partitionManager:    partitionManager,
+		node:                node,
 	}
 }

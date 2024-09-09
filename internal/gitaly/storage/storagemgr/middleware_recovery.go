@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"google.golang.org/grpc"
@@ -46,15 +47,15 @@ func MayHavePendingWAL(storagePaths []string) (bool, error) {
 // without transactions.
 type TransactionRecoveryMiddleware struct {
 	registry        *protoregistry.Registry
-	mgr             *PartitionManager
+	node            storage.Node
 	readyPartitions *sync.Map
 }
 
 // NewTransactionRecoveryMiddleware returns a new TransactionRecoveryMiddleware.
-func NewTransactionRecoveryMiddleware(registry *protoregistry.Registry, mgr *PartitionManager) *TransactionRecoveryMiddleware {
+func NewTransactionRecoveryMiddleware(registry *protoregistry.Registry, node storage.Node) *TransactionRecoveryMiddleware {
 	return &TransactionRecoveryMiddleware{
 		registry:        registry,
-		mgr:             mgr,
+		node:            node,
 		readyPartitions: &sync.Map{},
 	}
 }
@@ -139,16 +140,20 @@ func (mw *TransactionRecoveryMiddleware) applyPendingWAL(ctx context.Context, me
 		return fmt.Errorf("target repo: %w", err)
 	}
 
-	storageMgr, ok := mw.mgr.storages[targetRepo.GetStorageName()]
-	if !ok {
-		// This request was for a storage that isn't configured, and wouldn't thus target a repository
-		// with a pending WAL entry.
-		return nil
+	storageHandle, err := mw.node.GetStorage(targetRepo.GetStorageName())
+	if err != nil {
+		if errors.Is(err, storage.ErrStorageNotFound) {
+			// This request was for a storage that isn't configured, and wouldn't thus target a repository
+			// with a pending WAL entry.
+			return nil
+		}
+
+		return fmt.Errorf("get storage: %w", err)
 	}
 
-	ptnID, err := storageMgr.partitionAssigner.partitionAssignmentTable.getPartitionID(targetRepo.GetRelativePath())
+	ptnID, err := storageHandle.GetAssignedPartitionID(targetRepo.GetRelativePath())
 	if err != nil {
-		if errors.Is(err, errPartitionAssignmentNotFound) {
+		if errors.Is(err, storage.ErrPartitionAssignmentNotFound) {
 			// The repository wasn't yet assigned to a partition. It thus hasn't been accessed with transactions
 			// and can't have pending WAL entries.
 			return nil
@@ -165,7 +170,7 @@ func (mw *TransactionRecoveryMiddleware) applyPendingWAL(ctx context.Context, me
 
 	// Start a transaction against the repository. The partition's WAL is applied before beginning
 	// transactions which ensures the WAL is fully applied.
-	tx, err := mw.mgr.Begin(ctx, targetRepo.GetStorageName(), 0, TransactionOptions{
+	tx, err := storageHandle.Begin(ctx, 0, storage.TransactionOptions{
 		ReadOnly:     true,
 		RelativePath: targetRepo.GetRelativePath(),
 	})

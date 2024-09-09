@@ -9,7 +9,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -58,11 +57,16 @@ func (s *server) FetchIntoObjectPool(ctx context.Context, req *gitalypb.FetchInt
 }
 
 func (s *server) executeMaybeWithTransaction(ctx context.Context, repo *localrepo.Repo, execute func(*localrepo.Repo) error) (returnedErr error) {
-	if s.walPartitionManager == nil {
+	if s.node == nil {
 		return execute(repo)
 	}
 
-	transaction, err := s.walPartitionManager.Begin(ctx, repo.GetStorageName(), 0, storagemgr.TransactionOptions{
+	storageHandle, err := s.node.GetStorage(repo.GetStorageName())
+	if err != nil {
+		return fmt.Errorf("get storage: %w", err)
+	}
+
+	transaction, err := storageHandle.Begin(ctx, 0, storage.TransactionOptions{
 		ReadOnly:     true,
 		RelativePath: repo.GetRelativePath(),
 	})

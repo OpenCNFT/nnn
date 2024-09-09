@@ -44,7 +44,7 @@ func (s *server) PruneUnreachableObjects(
 		return nil, structerr.NewInvalidArgument("pruning objects for object pool")
 	}
 
-	if s.walPartitionManager != nil {
+	if s.node != nil {
 		if tx := storage.ExtractTransaction(ctx); tx != nil {
 			tx.Repack(housekeepingcfg.RepackObjectsConfig{
 				Strategy:            housekeepingcfg.RepackObjectsStrategyFullWithCruft,

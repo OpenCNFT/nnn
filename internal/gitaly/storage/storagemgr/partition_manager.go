@@ -14,7 +14,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	gitalycfgprom "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
@@ -27,15 +26,10 @@ import (
 // ErrPartitionManagerClosed is returned when the PartitionManager stops processing transactions.
 var ErrPartitionManagerClosed = errors.New("partition manager closed")
 
-// LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
-// a function to close the LogConsumer.
-type LogConsumerFactory func(storage.LogManagerAccessor) (_ storage.LogConsumer, cleanup func())
-
 // Partition extends the typical Partition interface with methods needed by PartitionManager.
 type Partition interface {
 	storage.Partition
 	Run() error
-	IsClosing() bool
 }
 
 // PartitionFactory is factory type that can create new partitions.
@@ -53,30 +47,13 @@ type PartitionFactory interface {
 	) Partition
 }
 
-// PartitionManager is responsible for managing the lifecycle of each TransactionManager.
-type PartitionManager struct {
-	// storages are the storages configured in this Gitaly server. The map is keyed by the storage name.
-	storages map[string]*storageManager
-	// partitionFactory is a factory to create Partitions. This shouldn't ever be changed
-	// during normal operation, but can be used to adjust the partition's behaviour in tests.
-	partitionFactory PartitionFactory
-	// consumer consumes the WAL from the partitions.
-	consumer storage.LogConsumer
-	// consumerCleanup closes the LogConsumer.
-	consumerCleanup func()
-	// metrics accounts for all metrics of transaction operations. It will be
-	// passed down to each partition and is shared between them. The
-	// metrics must be registered to be collected by prometheus collector.
-	metrics *metrics
-}
-
 type storageManagerMetrics struct {
 	partitionsStarted prometheus.Counter
 	partitionsStopped prometheus.Counter
 }
 
-// storageManager represents a single storage.
-type storageManager struct {
+// StorageManager represents a single storage.
+type StorageManager struct {
 	// mu synchronizes access to the fields of storageManager.
 	mu sync.Mutex
 	// logger handles all logging for storageManager.
@@ -99,12 +76,64 @@ type storageManager struct {
 	partitions map[storage.PartitionID]*partition
 	// activePartitions keeps track of active partitions.
 	activePartitions sync.WaitGroup
+	// partitionFactory is a factory to create Partitions.
+	partitionFactory PartitionFactory
+	// consumer consumes the WAL from the partitions.
+	consumer storage.LogConsumer
 
 	// metrics are the metrics gathered from the storage manager.
 	metrics storageManagerMetrics
 }
 
-func (sm *storageManager) close() {
+// NewStorageManager instantiates a new StorageManager.
+func NewStorageManager(
+	logger log.Logger,
+	name string,
+	path string,
+	dbMgr *databasemgr.DBManager,
+	partitionFactory PartitionFactory,
+	consumer storage.LogConsumer,
+	metrics *Metrics,
+) (*StorageManager, error) {
+	internalDir := internalDirectoryPath(path)
+	stagingDir := stagingDirectoryPath(internalDir)
+	// Remove a possible already existing staging directory as it may contain stale files
+	// if the previous process didn't shutdown gracefully.
+	if err := clearStagingDirectory(stagingDir); err != nil {
+		return nil, fmt.Errorf("failed clearing storage's staging directory: %w", err)
+	}
+
+	if err := os.MkdirAll(stagingDir, mode.Directory); err != nil {
+		return nil, fmt.Errorf("create storage's staging directory: %w", err)
+	}
+
+	storageLogger := logger.WithField("storage", name)
+	db, err := dbMgr.GetDB(name)
+	if err != nil {
+		return nil, err
+	}
+
+	pa, err := newPartitionAssigner(db, path)
+	if err != nil {
+		return nil, fmt.Errorf("new partition assigner: %w", err)
+	}
+
+	return &StorageManager{
+		logger:            storageLogger,
+		name:              name,
+		path:              path,
+		stagingDirectory:  stagingDir,
+		database:          db,
+		partitionAssigner: pa,
+		partitions:        map[storage.PartitionID]*partition{},
+		partitionFactory:  partitionFactory,
+		consumer:          consumer,
+		metrics:           metrics.storageManagerMetrics(name),
+	}, nil
+}
+
+// Close closes the manager for further access and waits for all partitions to stop.
+func (sm *StorageManager) Close() {
 	sm.mu.Lock()
 	// Mark the storage as closed so no new transactions can begin anymore. This
 	// also means no more partitions are spawned.
@@ -125,7 +154,7 @@ func (sm *storageManager) close() {
 
 // finalizeTransaction decrements the partition's pending transaction count and closes it if there are no more
 // transactions pending.
-func (sm *storageManager) finalizeTransaction(ptn *partition) {
+func (sm *StorageManager) finalizeTransaction(ptn *partition) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -157,7 +186,7 @@ func (tx *finalizableTransaction) Rollback() error {
 
 // newFinalizableTransaction returns a wrapped transaction that executes finalizeTransaction when the transaction
 // is committed or rolled back.
-func (sm *storageManager) newFinalizableTransaction(ptn *partition, tx storage.Transaction) *finalizableTransaction {
+func (sm *StorageManager) newFinalizableTransaction(ptn *partition, tx storage.Transaction) *finalizableTransaction {
 	var finalizeOnce sync.Once
 	return &finalizableTransaction{
 		finalize: func() {
@@ -228,68 +257,6 @@ func clearStagingDirectory(stagingDir string) error {
 	return nil
 }
 
-// NewPartitionManager returns a new PartitionManager.
-func NewPartitionManager(
-	ctx context.Context,
-	configuredStorages []config.Storage,
-	logger log.Logger,
-	dbMgr *databasemgr.DBManager,
-	promCfg gitalycfgprom.Config,
-	partitionFactory PartitionFactory,
-	consumerFactory LogConsumerFactory,
-) (*PartitionManager, error) {
-	metrics := newMetrics(promCfg)
-
-	storages := make(map[string]*storageManager, len(configuredStorages))
-	for _, configuredStorage := range configuredStorages {
-		internalDir := internalDirectoryPath(configuredStorage.Path)
-		stagingDir := stagingDirectoryPath(internalDir)
-		// Remove a possible already existing staging directory as it may contain stale files
-		// if the previous process didn't shutdown gracefully.
-		if err := clearStagingDirectory(stagingDir); err != nil {
-			return nil, fmt.Errorf("failed clearing storage's staging directory: %w", err)
-		}
-
-		if err := os.MkdirAll(stagingDir, mode.Directory); err != nil {
-			return nil, fmt.Errorf("create storage's staging directory: %w", err)
-		}
-
-		storageLogger := logger.WithField("storage", configuredStorage.Name)
-		db, err := dbMgr.GetDB(configuredStorage.Name)
-		if err != nil {
-			return nil, err
-		}
-
-		pa, err := newPartitionAssigner(db, configuredStorage.Path)
-		if err != nil {
-			return nil, fmt.Errorf("new partition assigner: %w", err)
-		}
-
-		storages[configuredStorage.Name] = &storageManager{
-			logger:            storageLogger,
-			name:              configuredStorage.Name,
-			path:              configuredStorage.Path,
-			stagingDirectory:  stagingDir,
-			database:          db,
-			partitionAssigner: pa,
-			partitions:        map[storage.PartitionID]*partition{},
-			metrics:           metrics.storageManagerMetrics(configuredStorage.Name),
-		}
-	}
-
-	pm := &PartitionManager{
-		storages:         storages,
-		metrics:          metrics,
-		partitionFactory: partitionFactory,
-	}
-
-	if consumerFactory != nil {
-		pm.consumer, pm.consumerCleanup = consumerFactory(pm)
-	}
-
-	return pm, nil
-}
-
 func keyPrefixPartition(ptnID storage.PartitionID) []byte {
 	return []byte(fmt.Sprintf("p/%s/", ptnID.MarshalBinary()))
 }
@@ -303,39 +270,12 @@ func stagingDirectoryPath(storagePath string) string {
 	return filepath.Join(storagePath, "staging")
 }
 
-// TransactionOptions are used to pass transaction options into Begin.
-type TransactionOptions struct {
-	// ReadOnly indicates whether this is a read-only transaction. Read-only transactions are not
-	// configured with a quarantine directory and do not commit a log entry.
-	ReadOnly bool
-	// RelativePath specifies which repository in the partition will be the target.
-	RelativePath string
-	// AlternateRelativePath specifies a repository to include in the transaction's snapshot as well.
-	AlternateRelativePath string
-	// AllowPartitionAssignmentWithoutRepository determines whether a partition assignment should be
-	// written out even if repository does not exist.
-	AllowPartitionAssignmentWithoutRepository bool
-	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
-	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
-	ForceExclusiveSnapshot bool
-	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
-	// path is provided.
-	KVOnly bool
-}
-
 // Begin gets the Partition for the specified repository and starts a transaction. If a
 // Partition is not already running, a new one is created and used. The partition tracks
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
 //
-// Specifying storageName and partitionID will begin a transaction targeting an
-// entire partition. If the partitionID is zero, then the partition is detected
-// from opts.RelativePath.
-func (pm *PartitionManager) Begin(ctx context.Context, storageName string, partitionID storage.PartitionID, opts TransactionOptions) (*finalizableTransaction, error) {
-	storageMgr, ok := pm.storages[storageName]
-	if !ok {
-		return nil, structerr.NewNotFound("unknown storage: %q", storageName)
-	}
-
+// If the partitionID is zero, then the partition is detected from opts.RelativePath.
+func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts storage.TransactionOptions) (storage.Transaction, error) {
 	var relativePaths []string
 
 	if opts.KVOnly {
@@ -343,12 +283,12 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		relativePaths = []string{}
 	} else if opts.RelativePath != "" {
 		var err error
-		opts.RelativePath, err = storage.ValidateRelativePath(storageMgr.path, opts.RelativePath)
+		opts.RelativePath, err = storage.ValidateRelativePath(sm.path, opts.RelativePath)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
 		}
 
-		repoPartitionID, err := storageMgr.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+		repoPartitionID, err := sm.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
 		if err != nil {
 			if errors.Is(err, badger.ErrDBClosed) {
 				// The database is closed when PartitionManager is closing. Return a more
@@ -368,16 +308,16 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 	}
 
 	relativeStateDir := deriveStateDirectory(partitionID)
-	absoluteStateDir := filepath.Join(storageMgr.path, relativeStateDir)
+	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncHierarchy(storageMgr.path, filepath.Dir(relativeStateDir)); err != nil {
+	if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
 		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
 	}
 
-	ptn, err := pm.startPartition(ctx, storageMgr, partitionID)
+	ptn, err := sm.startPartition(ctx, partitionID)
 	if err != nil {
 		return nil, err
 	}
@@ -396,27 +336,22 @@ func (pm *PartitionManager) Begin(ctx context.Context, storageName string, parti
 		// inflight. A transaction failing does not necessarily mean the transaction manager has
 		// stopped running. Consequently, if there are no other pending transactions the partition
 		// should be closed.
-		storageMgr.finalizeTransaction(ptn)
+		sm.finalizeTransaction(ptn)
 
 		return nil, err
 	}
 
-	return storageMgr.newFinalizableTransaction(ptn, transaction), nil
+	return sm.newFinalizableTransaction(ptn, transaction), nil
 }
 
 // CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
-	storageMgr, ok := pm.storages[storageName]
-	if !ok {
-		return structerr.NewNotFound("unknown storage: %q", storageName)
-	}
-
-	ptn, err := pm.startPartition(ctx, storageMgr, partitionID)
+func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
+	ptn, err := sm.startPartition(ctx, partitionID)
 	if err != nil {
 		return err
 	}
 
-	defer storageMgr.finalizeTransaction(ptn)
+	defer sm.finalizeTransaction(ptn)
 
 	logManager, ok := ptn.partition.(storage.LogManager)
 	if !ok {
@@ -428,26 +363,26 @@ func (pm *PartitionManager) CallLogManager(ctx context.Context, storageName stri
 	return nil
 }
 
-// startPartition starts the TransactionManager for a partition.
-func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *storageManager, partitionID storage.PartitionID) (*partition, error) {
+// startPartition starts a partition.
+func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partition, error) {
 	relativeStateDir := deriveStateDirectory(partitionID)
-	absoluteStateDir := filepath.Join(storageMgr.path, relativeStateDir)
+	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncHierarchy(storageMgr.path, filepath.Dir(relativeStateDir)); err != nil {
+	if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
 		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
 	}
 
 	for {
-		storageMgr.mu.Lock()
-		if storageMgr.closed {
-			storageMgr.mu.Unlock()
+		sm.mu.Lock()
+		if sm.closed {
+			sm.mu.Unlock()
 			return nil, ErrPartitionManagerClosed
 		}
 
-		ptn, ok := storageMgr.partitions[partitionID]
+		ptn, ok := sm.partitions[partitionID]
 		if !ok {
 			ptn = &partition{
 				closing:         make(chan struct{}),
@@ -455,31 +390,31 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				partitionClosed: make(chan struct{}),
 			}
 
-			stagingDir, err := os.MkdirTemp(storageMgr.stagingDirectory, "")
+			stagingDir, err := os.MkdirTemp(sm.stagingDirectory, "")
 			if err != nil {
-				storageMgr.mu.Unlock()
+				sm.mu.Unlock()
 				return nil, fmt.Errorf("create staging directory: %w", err)
 			}
 
-			logger := storageMgr.logger.WithField("partition_id", partitionID)
+			logger := sm.logger.WithField("partition_id", partitionID)
 
-			mgr := pm.partitionFactory.New(
+			mgr := sm.partitionFactory.New(
 				logger,
 				partitionID,
-				keyvalue.NewPrefixedTransactioner(storageMgr.database, keyPrefixPartition(partitionID)),
-				storageMgr.name,
-				storageMgr.path,
+				keyvalue.NewPrefixedTransactioner(sm.database, keyPrefixPartition(partitionID)),
+				sm.name,
+				sm.path,
 				absoluteStateDir,
 				stagingDir,
-				pm.consumer,
+				sm.consumer,
 			)
 
 			ptn.partition = mgr
 
-			storageMgr.partitions[partitionID] = ptn
+			sm.partitions[partitionID] = ptn
 
-			storageMgr.metrics.partitionsStarted.Inc()
-			storageMgr.activePartitions.Add(1)
+			sm.metrics.partitionsStarted.Inc()
+			sm.activePartitions.Add(1)
 			go func() {
 				if err := mgr.Run(); err != nil {
 					logger.WithError(err).WithField("partition_state_directory", relativeStateDir).Error("partition failed")
@@ -489,9 +424,9 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 				// need to be started in order to continue processing transactions. The partition instance
 				// is deleted allowing the next transaction for the repository to create a new partition
 				// instance.
-				storageMgr.mu.Lock()
-				delete(storageMgr.partitions, partitionID)
-				storageMgr.mu.Unlock()
+				sm.mu.Lock()
+				delete(sm.partitions, partitionID)
+				sm.mu.Unlock()
 
 				close(ptn.partitionClosed)
 
@@ -507,9 +442,9 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 					logger.WithError(err).Error("failed removing partition's staging directory")
 				}
 
-				storageMgr.metrics.partitionsStopped.Inc()
+				sm.metrics.partitionsStopped.Inc()
 				close(ptn.closed)
-				storageMgr.activePartitions.Done()
+				sm.activePartitions.Done()
 			}()
 		}
 
@@ -518,7 +453,7 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 			// used. The lock is released while waiting for the partition to complete closing as to
 			// not block other partitions from processing transactions. Once closing is complete, a
 			// new attempt is made to get a valid partition.
-			storageMgr.mu.Unlock()
+			sm.mu.Unlock()
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -529,10 +464,15 @@ func (pm *PartitionManager) startPartition(ctx context.Context, storageMgr *stor
 		}
 
 		ptn.pendingTransactionCount++
-		storageMgr.mu.Unlock()
+		sm.mu.Unlock()
 
 		return ptn, nil
 	}
+}
+
+// GetAssignedPartitionID returns the ID of the partition the relative path has been assigned to.
+func (sm *StorageManager) GetAssignedPartitionID(relativePath string) (storage.PartitionID, error) {
+	return sm.partitionAssigner.partitionAssignmentTable.getPartitionID(relativePath)
 }
 
 // deriveStateDirectory hashes the partition ID and returns the state
@@ -551,33 +491,4 @@ func deriveStateDirectory(id storage.PartitionID) string {
 		hash[2:4],
 		id.String(),
 	)
-}
-
-// Close closes transaction processing for all storages and waits for closing completion.
-func (pm *PartitionManager) Close() {
-	var activeStorages sync.WaitGroup
-	for _, storageMgr := range pm.storages {
-		activeStorages.Add(1)
-		storageMgr := storageMgr
-		go func() {
-			storageMgr.close()
-			activeStorages.Done()
-		}()
-	}
-
-	if pm.consumerCleanup != nil {
-		pm.consumerCleanup()
-	}
-
-	activeStorages.Wait()
-}
-
-// Describe is used to describe Prometheus metrics.
-func (pm *PartitionManager) Describe(metrics chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(pm, metrics)
-}
-
-// Collect is used to collect Prometheus metrics.
-func (pm *PartitionManager) Collect(metrics chan<- prometheus.Metric) {
-	pm.metrics.Collect(metrics)
 }

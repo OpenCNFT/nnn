@@ -14,14 +14,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 )
 
-var (
-	// errPartitionAssignmentNotFound is returned when attempting to access a
-	// partition assignment in the database that doesn't yet exist.
-	errPartitionAssignmentNotFound = errors.New("partition assignment not found")
-	// ErrRepositoriesAreInDifferentPartitions is returned when attempting to begin a transaction spanning
-	// repositories that are in different partitions.
-	ErrRepositoriesAreInDifferentPartitions = errors.New("repositories are in different partitions")
-)
+// ErrRepositoriesAreInDifferentPartitions is returned when attempting to begin a transaction spanning
+// repositories that are in different partitions.
+var ErrRepositoriesAreInDifferentPartitions = errors.New("repositories are in different partitions")
 
 const prefixPartitionAssignment = "partition_assignment/"
 const (
@@ -59,7 +54,7 @@ func (pt *partitionAssignmentTable) getPartitionID(relativePath string) (storage
 		item, err := txn.Get(pt.key(relativePath))
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
-				return errPartitionAssignmentNotFound
+				return storage.ErrPartitionAssignmentNotFound
 			}
 
 			return fmt.Errorf("get: %w", err)
@@ -159,7 +154,7 @@ func (pa *partitionAssigner) getPartitionID(ctx context.Context, relativePath, p
 		// See if the target repository itself is already in a partition. If so, we should assign the other repository
 		// in the same partition if it is not yet partitioned.
 		if partitionHint, err = pa.partitionAssignmentTable.getPartitionID(relativePath); err != nil {
-			if !errors.Is(err, errPartitionAssignmentNotFound) {
+			if !errors.Is(err, storage.ErrPartitionAssignmentNotFound) {
 				return 0, fmt.Errorf("get possible partition id: %w", err)
 			}
 
@@ -234,7 +229,7 @@ func (pa *partitionAssigner) getPartitionIDRecursive(ctx context.Context, relati
 	// Check first whether the repository is already assigned into a partition. If so, just return the assignment.
 	ptnID, err := pa.partitionAssignmentTable.getPartitionID(relativePath)
 	if err != nil {
-		if !errors.Is(err, errPartitionAssignmentNotFound) {
+		if !errors.Is(err, storage.ErrPartitionAssignmentNotFound) {
 			return 0, fmt.Errorf("get partition: %w", err)
 		}
 
@@ -252,7 +247,7 @@ func (pa *partitionAssigner) getPartitionIDRecursive(ctx context.Context, relati
 		// while we weren't holding the lock between the first failed attempt getting the assignment
 		// and locking the repository.
 		ptnID, err = pa.partitionAssignmentTable.getPartitionID(relativePath)
-		if !errors.Is(err, errPartitionAssignmentNotFound) {
+		if !errors.Is(err, storage.ErrPartitionAssignmentNotFound) {
 			if err != nil {
 				return 0, fmt.Errorf("recheck partition: %w", err)
 			}

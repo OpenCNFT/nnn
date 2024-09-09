@@ -72,7 +72,9 @@ func TestBackupPartition(t *testing.T) {
 					partitionID: 2,
 				}
 			},
-			expectedErr: structerr.NewNotFound("begin transaction: unknown storage: %q", "non-existent"),
+			expectedErr: testhelper.WithInterceptedMetadata(
+				structerr.NewInvalidArgument("get storage: storage name not found"), "storage_name", "non-existent",
+			),
 		},
 		{
 			desc: "no backup sink",

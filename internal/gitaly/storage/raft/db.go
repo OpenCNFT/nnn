@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lni/dragonboat/v4/statemachine"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 )
@@ -30,10 +31,15 @@ func (a *namespacedDBAccessor) write(ctx context.Context, fn func(keyvalue.ReadW
 	return a.access(ctx, false, fn)
 }
 
-func newNamespacedDBAccessor(ptnMgr *storagemgr.PartitionManager, storageName string, namespace []byte) *namespacedDBAccessor {
+func newNamespacedDBAccessor(node storage.Node, storageName string, namespace []byte) *namespacedDBAccessor {
 	return &namespacedDBAccessor{
 		access: func(ctx context.Context, readOnly bool, fn func(keyvalue.ReadWriter) error) (returnedErr error) {
-			tx, err := ptnMgr.Begin(ctx, storageName, storagemgr.MetadataPartitionID, storagemgr.TransactionOptions{
+			storageHandle, err := node.GetStorage(storageName)
+			if err != nil {
+				return fmt.Errorf("get storage: %w", err)
+			}
+
+			tx, err := storageHandle.Begin(ctx, storagemgr.MetadataPartitionID, storage.TransactionOptions{
 				ReadOnly: readOnly,
 				KVOnly:   true,
 			})
@@ -63,15 +69,15 @@ func newNamespacedDBAccessor(ptnMgr *storagemgr.PartitionManager, storageName st
 
 // dbForStorage returns a namedspaced DB accessor function for specific information of a storage in
 // Raft cluster such as allocated storage ID, last applied replica groups, etc.
-func dbForStorage(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/self/"))
+func dbForStorage(node storage.Node, storageName string) dbAccessor {
+	return newNamespacedDBAccessor(node, storageName, []byte("raft/self/"))
 }
 
 // dbForMetadataGroup returns a namedspaced DB accessfor function to store the data of metadata Raft
 // group. Those data consists of cluster-wide information such as list of registered storages and
 // their replication groups, etc.
-func dbForMetadataGroup(ptnMgr *storagemgr.PartitionManager, storageName string) dbAccessor {
-	return newNamespacedDBAccessor(ptnMgr, storageName, []byte("raft/cluster/"))
+func dbForMetadataGroup(node storage.Node, storageName string) dbAccessor {
+	return newNamespacedDBAccessor(node, storageName, []byte("raft/cluster/"))
 }
 
 var keyLastApplied = []byte("applied_lsn")

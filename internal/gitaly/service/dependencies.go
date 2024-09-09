@@ -43,7 +43,7 @@ type Dependencies struct {
 	UpdaterWithHooks    *updateref.UpdaterWithHooks
 	HousekeepingManager housekeepingmgr.Manager
 	TransactionRegistry *storagemgr.TransactionRegistry
-	PartitionManager    *storagemgr.PartitionManager
+	Node                storage.Node
 	BackupSink          backup.Sink
 	BackupLocator       backup.Locator
 	BundleURISink       *bundleuri.Sink
@@ -140,9 +140,9 @@ func (dc *Dependencies) GetTransactionRegistry() *storagemgr.TransactionRegistry
 	return dc.TransactionRegistry
 }
 
-// GetPartitionManager returns the PartitionManager.
-func (dc *Dependencies) GetPartitionManager() *storagemgr.PartitionManager {
-	return dc.PartitionManager
+// GetNode returns the Node.
+func (dc *Dependencies) GetNode() storage.Node {
+	return dc.Node
 }
 
 // GetBackupSink returns the backup.Sink.

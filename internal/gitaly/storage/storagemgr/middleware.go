@@ -74,7 +74,7 @@ var forceExclusiveSnapshot = map[string]bool{
 // NewUnaryInterceptor returns an unary interceptor that manages a unary RPC's transaction. It starts a transaction
 // on the target repository of the request and rewrites the request to point to the transaction's snapshot repository.
 // The transaction is committed if the handler doesn't return an error and rolled back otherwise.
-func NewUnaryInterceptor(logger log.Logger, registry *protoregistry.Registry, txRegistry *TransactionRegistry, mgr *PartitionManager, locator storage.Locator) grpc.UnaryServerInterceptor {
+func NewUnaryInterceptor(logger log.Logger, registry *protoregistry.Registry, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (_ interface{}, returnedErr error) {
 		if _, ok := NonTransactionalRPCs[info.FullMethod]; ok {
 			return handler(ctx, req)
@@ -85,7 +85,7 @@ func NewUnaryInterceptor(logger log.Logger, registry *protoregistry.Registry, tx
 			return nil, fmt.Errorf("lookup method: %w", err)
 		}
 
-		txReq, err := transactionalizeRequest(ctx, logger, txRegistry, mgr, locator, methodInfo, req.(proto.Message))
+		txReq, err := transactionalizeRequest(ctx, logger, txRegistry, node, locator, methodInfo, req.(proto.Message))
 		if err != nil {
 			if errors.Is(err, storage.ErrRepositoryNotFound) {
 				// Beginning a transaction fails if a repository is not yet assigned into a partition, and the repository does not exist
@@ -163,7 +163,7 @@ func (ps *peekedStream) RecvMsg(dst interface{}) error {
 // NewStreamInterceptor returns a stream interceptor that manages a streaming RPC's transaction. It starts a transaction
 // on the target repository of the first request and rewrites the request to point to the transaction's snapshot repository.
 // The transaction is committed if the handler doesn't return an error and rolled back otherwise.
-func NewStreamInterceptor(logger log.Logger, registry *protoregistry.Registry, txRegistry *TransactionRegistry, mgr *PartitionManager, locator storage.Locator) grpc.StreamServerInterceptor {
+func NewStreamInterceptor(logger log.Logger, registry *protoregistry.Registry, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (returnedErr error) {
 		if _, ok := NonTransactionalRPCs[info.FullMethod]; ok {
 			return handler(srv, ss)
@@ -188,7 +188,7 @@ func NewStreamInterceptor(logger log.Logger, registry *protoregistry.Registry, t
 			})
 		}
 
-		txReq, err := transactionalizeRequest(ss.Context(), logger, txRegistry, mgr, locator, methodInfo, req)
+		txReq, err := transactionalizeRequest(ss.Context(), logger, txRegistry, node, locator, methodInfo, req)
 		if err != nil {
 			return err
 		}
@@ -229,18 +229,18 @@ func nonTransactionalRequest(ctx context.Context, firstMessage proto.Message) tr
 // transactionalizeRequest begins a transaction for the repository targeted in the request. It returns the context and the request that the handler should
 // be invoked with. In addition, it returns a function that must be called with the error returned from the handler to either commit or rollback the
 // transaction. The returned values are valid even if the request should not run transactionally.
-func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (_ transactionalizedRequest, returnedErr error) {
+func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (_ transactionalizedRequest, returnedErr error) {
 	switch methodInfo.Scope {
 	case protoregistry.ScopeRepository:
-		return beginTransactionForRepository(ctx, logger, txRegistry, mgr, locator, methodInfo, req)
+		return beginTransactionForRepository(ctx, logger, txRegistry, node, locator, methodInfo, req)
 	case protoregistry.ScopePartition:
-		return beginTransactionForPartition(ctx, logger, txRegistry, mgr, methodInfo, req)
+		return beginTransactionForPartition(ctx, logger, txRegistry, node, methodInfo, req)
 	default:
 		return nonTransactionalRequest(ctx, req), nil
 	}
 }
 
-func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
+func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
 	targetStorage, err := methodInfo.Storage(req)
 	if err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("extract target storage: %w", err)
@@ -255,18 +255,18 @@ func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegi
 		ctx,
 		logger,
 		txRegistry,
-		mgr,
+		node,
 		methodInfo,
 		req,
 		targetStorage,
 		storage.PartitionID(targetPartition),
-		TransactionOptions{
+		storage.TransactionOptions{
 			ReadOnly: methodInfo.Operation == protoregistry.OpAccessor,
 		},
 	)
 }
 
-func beginTransactionForRepository(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
+func beginTransactionForRepository(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
 	targetRepo, err := methodInfo.TargetRepo(req)
 	if err != nil {
 		if errors.Is(err, protoregistry.ErrRepositoryFieldNotFound) {
@@ -384,12 +384,12 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		ctx,
 		logger,
 		txRegistry,
-		mgr,
+		node,
 		methodInfo,
 		req,
 		targetRepo.StorageName,
 		0,
-		TransactionOptions{
+		storage.TransactionOptions{
 			ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
 			RelativePath:          targetRepo.RelativePath,
 			AlternateRelativePath: alternateRelativePath,
@@ -399,10 +399,15 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 	)
 }
 
-func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, mgr *PartitionManager, methodInfo protoregistry.MethodInfo, req proto.Message, storageName string, partitionID storage.PartitionID, transactionOptions TransactionOptions) (_ transactionalizedRequest, returnedErr error) {
+func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, methodInfo protoregistry.MethodInfo, req proto.Message, storageName string, partitionID storage.PartitionID, transactionOptions storage.TransactionOptions) (_ transactionalizedRequest, returnedErr error) {
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.transactionalizeRequest", nil)
 
-	tx, err := mgr.Begin(ctx, storageName, partitionID, transactionOptions)
+	storageHandle, err := node.GetStorage(storageName)
+	if err != nil {
+		return transactionalizedRequest{}, fmt.Errorf("get storage: %w", err)
+	}
+
+	tx, err := storageHandle.Begin(ctx, partitionID, transactionOptions)
 	if err != nil {
 		var relativePath relativePathNotFoundError
 		if errors.As(err, &relativePath) {
@@ -417,7 +422,7 @@ func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *Transa
 
 	ctx = storage.ContextWithTransaction(ctx, tx)
 
-	txID := txRegistry.register(tx.Transaction)
+	txID := txRegistry.register(tx)
 	ctx = storage.ContextWithTransactionID(ctx, txID)
 
 	// If the proc-receive or post-receive hook is invoked, the transaction may already be committed
@@ -490,7 +495,7 @@ func restoreSnapshotRelativePath(ctx context.Context, methodInfo protoregistry.M
 	return rewrittenReq, nil
 }
 
-func rewriteRequest(tx *finalizableTransaction, methodInfo protoregistry.MethodInfo, req proto.Message) (proto.Message, error) {
+func rewriteRequest(tx storage.Transaction, methodInfo protoregistry.MethodInfo, req proto.Message) (proto.Message, error) {
 	if methodInfo.Scope != protoregistry.ScopeRepository {
 		return req, nil
 	}
