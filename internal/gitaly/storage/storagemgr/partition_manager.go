@@ -1,6 +1,7 @@
 package storagemgr
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -258,7 +259,7 @@ func clearStagingDirectory(stagingDir string) error {
 }
 
 func keyPrefixPartition(ptnID storage.PartitionID) []byte {
-	return []byte(fmt.Sprintf("p/%s/", ptnID.MarshalBinary()))
+	return []byte(fmt.Sprintf("%s%s/", prefixPartition, ptnID.MarshalBinary()))
 }
 
 // internalDirectoryPath returns the full path of Gitaly's internal data directory for the storage.
@@ -491,4 +492,93 @@ func deriveStateDirectory(id storage.PartitionID) string {
 		hash[2:4],
 		id.String(),
 	)
+}
+
+// ListPartitions returns a partition iterator for listing the partitions.
+func (sm *StorageManager) ListPartitions(partitionID storage.PartitionID) (storage.PartitionIterator, error) {
+	txn := sm.database.NewTransaction(false)
+	iter := txn.NewIterator(keyvalue.IteratorOptions{
+		Prefix: []byte(prefixPartition),
+	})
+
+	pi := &partitionIterator{
+		txn:  txn,
+		it:   iter,
+		seek: keyPrefixPartition(partitionID),
+	}
+
+	return pi, nil
+}
+
+type partitionIterator struct {
+	txn     keyvalue.Transaction
+	it      keyvalue.Iterator
+	current storage.PartitionID
+	seek    []byte
+	err     error
+}
+
+// Next advances the iterator to the next valid partition ID.
+// It returns true if a new, valid partition ID was found, and false otherwise.
+// The method ensures that:
+//  1. If a seek value is set, it seeks to that position first.
+//  2. It skips over any duplicate or lesser partition IDs.
+//  3. It stops when it finds a partition ID greater than the last one,
+//     or when it reaches the end of the iterator.
+//
+// If an error occurs during extraction of the partition ID, it returns false
+// and the error can be retrieved using the Err() method.
+func (pi *partitionIterator) Next() bool {
+	if pi.seek != nil {
+		pi.it.Seek(pi.seek)
+		pi.seek = nil
+	} else {
+		pi.it.Next()
+	}
+
+	for ; pi.it.Valid(); pi.it.Next() {
+		last := pi.current
+
+		pi.current, pi.err = pi.extractPartitionID()
+		if pi.err != nil {
+			return false
+		}
+
+		if pi.current > last {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetPartitionID returns the current partition ID of the iterator.
+func (pi *partitionIterator) GetPartitionID() storage.PartitionID {
+	return pi.current
+}
+
+// Err returns the error of the iterator.
+func (pi *partitionIterator) Err() error {
+	return pi.err
+}
+
+// Close closes the iterator and discards the underlying transaction
+func (pi *partitionIterator) Close() {
+	pi.it.Close()
+	pi.txn.Discard()
+}
+
+// extractPartitionID returns the partition ID by extracting it from the key.
+// If key structure is different than expected, it returns error.
+func (pi *partitionIterator) extractPartitionID() (storage.PartitionID, error) {
+	key := pi.it.Item().Key()
+	keyParts := bytes.Split(key, []byte("/"))
+	if len(keyParts) < 2 || len(keyParts[1]) != 8 {
+		return invalidPartitionID, fmt.Errorf("invalid partition key")
+	}
+
+	var partitionID storage.PartitionID
+	partitionID.UnmarshalBinary(keyParts[1])
+
+	return partitionID, nil
 }

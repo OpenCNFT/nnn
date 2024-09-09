@@ -240,3 +240,9 @@ enum SortDirection {
   // DESCENDING sorts by the sort key in descending order.
   DESCENDING = 1; // protolint:disable:this ENUM_FIELD_NAMES_PREFIX
 }
+
+// Partition represents storage partition
+message Partition {
+  // id is the identifier of a partition within the storage
+  string id = 1;
+}

@@ -1139,3 +1139,111 @@ func TestStorageManager_callLogManager(t *testing.T) {
 	blockOnPartitionClosing(t, storageMgr, true)
 	requirePartitionOpen(t, storageMgr, ptnID, false)
 }
+
+func TestStorageManager_ListPartitions(t *testing.T) {
+	t.Parallel()
+
+	logger := testhelper.SharedLogger(t)
+	cfg := testcfg.Build(t)
+
+	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	require.NoError(t, err)
+	t.Cleanup(dbMgr.Close)
+
+	storageMgr, err := NewStorageManager(
+		logger,
+		cfg.Storages[0].Name,
+		cfg.Storages[0].Path,
+		dbMgr,
+		newStubPartitionFactory(),
+		nil,
+		NewMetrics(cfg.Prometheus),
+	)
+	require.NoError(t, err)
+	t.Cleanup(storageMgr.Close)
+
+	// Creating multiple partition keys with duplicates
+	require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
+		for i := initialPartitionID; i < 4; i++ {
+			require.NoError(t, tx.Set(append(keyPrefixPartition(storage.PartitionID(i)), []byte("key1")...), nil))
+			require.NoError(t, tx.Set(append(keyPrefixPartition(storage.PartitionID(i)), []byte("key2")...), nil))
+		}
+		return nil
+	}))
+
+	t.Run("faulty key", func(t *testing.T) {
+		require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
+			require.NoError(t, tx.Set([]byte("p/\x00\x00\x00\x00\x05/applied_lsn"), nil))
+			return nil
+		}))
+
+		iterator, err := storageMgr.ListPartitions(storage.PartitionID(invalidPartitionID))
+		require.NoError(t, err)
+		defer iterator.Close()
+
+		require.True(t, iterator.Next())
+		require.Equal(t, storage.PartitionID(2), iterator.GetPartitionID())
+		require.NoError(t, iterator.Err())
+
+		require.True(t, iterator.Next())
+		require.Equal(t, storage.PartitionID(3), iterator.GetPartitionID())
+		require.NoError(t, iterator.Err())
+
+		// Next key will return error
+		require.False(t, iterator.Next())
+		require.Error(t, iterator.Err())
+
+		// Removing the faulty key to prevent being seen from other tests below
+		require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
+			require.NoError(t, tx.Delete([]byte("p/\x00\x00\x00\x00\x05/applied_lsn")))
+			return nil
+		}))
+	})
+
+	t.Run("out of bound key", func(t *testing.T) {
+		t.Parallel()
+
+		iterator, err := storageMgr.ListPartitions(storage.PartitionID(10))
+		require.NoError(t, err)
+		defer iterator.Close()
+
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+	})
+
+	t.Run("successful call without start partition id", func(t *testing.T) {
+		t.Parallel()
+
+		iterator, err := storageMgr.ListPartitions(storage.PartitionID(invalidPartitionID))
+		require.NoError(t, err)
+		defer iterator.Close()
+
+		require.True(t, iterator.Next())
+		require.Equal(t, storage.PartitionID(2), iterator.GetPartitionID())
+		require.NoError(t, iterator.Err())
+
+		require.True(t, iterator.Next())
+		require.Equal(t, storage.PartitionID(3), iterator.GetPartitionID())
+		require.NoError(t, iterator.Err())
+
+		// No more partitions left
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+	})
+
+	t.Run("successful call with start partition id", func(t *testing.T) {
+		t.Parallel()
+
+		iterator, err := storageMgr.ListPartitions(storage.PartitionID(3))
+		require.NoError(t, err)
+		defer iterator.Close()
+
+		require.True(t, iterator.Next())
+		require.Equal(t, storage.PartitionID(3), iterator.GetPartitionID())
+		require.NoError(t, iterator.Err())
+
+		// No more partitions left
+		require.False(t, iterator.Next())
+		require.NoError(t, iterator.Err())
+	})
+}

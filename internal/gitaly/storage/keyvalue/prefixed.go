@@ -139,6 +139,10 @@ func (p prefixedIterator) Close() {
 	p.iterator.Close()
 }
 
+func (p prefixedIterator) Seek(key []byte) {
+	p.iterator.Seek(addPrefix(p.prefix, key))
+}
+
 type prefixedItem struct {
 	item   Item
 	prefix []byte

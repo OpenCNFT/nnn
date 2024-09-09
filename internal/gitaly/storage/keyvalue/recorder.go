@@ -105,3 +105,7 @@ func (r recordingIterator) Valid() bool {
 func (r recordingIterator) Close() {
 	r.iterator.Close()
 }
+
+func (r recordingIterator) Seek(key []byte) {
+	r.iterator.Seek(key)
+}

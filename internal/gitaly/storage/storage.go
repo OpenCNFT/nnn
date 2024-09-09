@@ -39,6 +39,18 @@ var (
 	ErrPartitionAssignmentNotFound = errors.New("partition assignment not found")
 )
 
+// PartitionIterator provides an interface for iterating over partition IDs.
+type PartitionIterator interface {
+	// Next advances the iterator to the next valid partition ID.
+	Next() bool
+	// GetPartitionID returns the current partition ID of the iterator.
+	GetPartitionID() PartitionID
+	// Err returns the error of the iterator.
+	Err() error
+	// Close closes the iterator and discards the underlying transaction
+	Close()
+}
+
 // Transaction is a single unit-of-work that executes as a whole.
 type Transaction interface {
 	// Commit commits the transaction. It returns once the transaction's
@@ -157,6 +169,8 @@ type TransactionOptions struct {
 
 // Storage is the interface of a storage.
 type Storage interface {
+	// ListPartitions returns a partition iterator for listing the partitions.
+	ListPartitions(partitionID PartitionID) (PartitionIterator, error)
 	// GetAssignedPartitionID returns the assigned ID of the partition the relative path
 	// has been assigned to.
 	GetAssignedPartitionID(relativePath string) (PartitionID, error)
