@@ -176,17 +176,20 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 			if err := prunedUpdater.Delete(git.ReferenceName(status.Reference)); err != nil {
 				return false, false, fmt.Errorf("queueing pruned ref for deletion: %w", err)
 			}
-			repoChanged = true
 		// Queue all other reference updates in the same transaction.
 		default:
 			if err := refUpdater.Update(git.ReferenceName(status.Reference), status.NewOID, status.OldOID); err != nil {
 				return false, false, fmt.Errorf("queueing ref to be updated: %w", err)
 			}
-			repoChanged = true
 
 			// While scanning reference updates, check if any tags changed.
-			if status.Type == gitcmd.RefUpdateTypeTagUpdate || (status.Type == gitcmd.RefUpdateTypeFetched && strings.HasPrefix(status.Reference, "refs/tags")) {
+			if wasTagsChanged(status) {
 				tagsChanged = true
+			}
+
+			// While scanning reference updates, check if repo was changed.
+			if wasRepoChanged(status) {
+				repoChanged = true
 			}
 		}
 	}
@@ -222,6 +225,19 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 
 	// If the request does not specify to check if tags or repo changed, return true as the default value.
 	return tagsChanged, repoChanged, nil
+}
+
+func wasTagsChanged(status gitcmd.FetchPorcelainStatusLine) bool {
+	return status.Type == gitcmd.RefUpdateTypeTagUpdate || (status.Type == gitcmd.RefUpdateTypeFetched && strings.HasPrefix(status.Reference, "refs/tags"))
+}
+
+func wasRepoChanged(status gitcmd.FetchPorcelainStatusLine) bool {
+	switch status.Type {
+	case gitcmd.RefUpdateTypeFastForwardUpdate, gitcmd.RefUpdateTypeFetched, gitcmd.RefUpdateTypeForcedUpdate:
+		return true
+	default:
+		return false
+	}
 }
 
 func buildCommandOpts(opts *localrepo.FetchOpts, req *gitalypb.FetchRemoteRequest) error {
