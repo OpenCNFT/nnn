@@ -152,8 +152,15 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 		return false, false, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	tagsChanged := false
-	repoChanged := false
+	var tagsChanged, repoChanged bool
+
+	if !req.GetCheckTagsChanged() {
+		tagsChanged = true
+	}
+
+	if !req.GetCheckRepoChanged() {
+		repoChanged = true
+	}
 
 	// Parse stdout to identify required reference updates. Reference updates are queued to the
 	// respective updater based on type.
@@ -211,14 +218,6 @@ func (s *server) fetchRemoteAtomic(ctx context.Context, req *gitalypb.FetchRemot
 	// Commit the remaining queued reference updates so the changes get applied.
 	if err := refUpdater.Commit(); err != nil {
 		return false, false, fmt.Errorf("committing reference update: %w", err)
-	}
-
-	if !req.GetCheckTagsChanged() {
-		tagsChanged = true
-	}
-
-	if !req.GetCheckRepoChanged() {
-		repoChanged = true
 	}
 
 	// If the request does not specify to check if tags or repo changed, return true as the default value.
