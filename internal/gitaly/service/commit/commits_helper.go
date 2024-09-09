@@ -24,7 +24,7 @@ func (s *server) sendCommits(
 		revisions[i] = git.Revision(revision)
 	}
 
-	cmd, err := gitlog.GitLogCommand(ctx, s.gitCmdFactory, repo, revisions, paths, options, extraArgs...)
+	cmd, err := gitlog.GitLogCommand(ctx, repo, revisions, paths, options, extraArgs...)
 	if err != nil {
 		return err
 	}

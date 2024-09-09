@@ -109,7 +109,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		defer cancel()
 
 		worktreeName := filepath.Base(worktreePath)
-		if err := s.removeWorktree(ctx, header.Repository, worktreeName); err != nil {
+		if err := s.removeWorktree(ctx, repo, worktreeName); err != nil {
 			s.logger.WithField("worktree_name", worktreeName).WithError(err).ErrorContext(ctx, "failed to remove worktree")
 		}
 	}()
@@ -251,8 +251,8 @@ func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktree
 	return nil
 }
 
-func (s *Server) removeWorktree(ctx context.Context, repo *gitalypb.Repository, worktreeName string) error {
-	cmd, err := s.gitCmdFactory.New(ctx, repo,
+func (s *Server) removeWorktree(ctx context.Context, repo gitcmd.RepositoryExecutor, worktreeName string) error {
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:   "worktree",
 			Action: "remove",

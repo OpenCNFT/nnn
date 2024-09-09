@@ -68,7 +68,8 @@ func TestGetCommitWithTrailers(t *testing.T) {
 	ctx := testhelper.Context(t)
 	ctx = metadata.NewIncomingContext(ctx, metadata.MD{})
 
-	cfg, objectReader, repo, repoPath := setupObjectReader(t, ctx)
+	cfg, objectReader, repoProto, repoPath := setupObjectReader(t, ctx)
+	repo := newRepoExecutor(t, cfg, repoProto)
 
 	commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage(
 		"some header\n"+
@@ -79,7 +80,7 @@ func TestGetCommitWithTrailers(t *testing.T) {
 			"Signed-off-by: Jane Doe <jane.doe@example.com>\n",
 	))
 
-	commit, err := GetCommitWithTrailers(ctx, gittest.NewCommandFactory(t, cfg), repo, objectReader, commitID.Revision())
+	commit, err := GetCommitWithTrailers(ctx, repo, objectReader, commitID.Revision())
 
 	require.NoError(t, err)
 

@@ -103,7 +103,7 @@ func (repo *Repo) FetchRemote(ctx context.Context, remoteName string, opts Fetch
 	}
 	commandOptions = append(commandOptions, opts.CommandOptions...)
 
-	cmd, err := repo.gitCmdFactory.New(ctx, repo,
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:  "fetch",
 			Flags: opts.buildFlags(),

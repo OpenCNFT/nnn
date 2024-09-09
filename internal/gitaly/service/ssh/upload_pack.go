@@ -74,13 +74,15 @@ type sshUploadPackRequest interface {
 }
 
 func (s *server) sshUploadPack(ctx context.Context, req sshUploadPackRequest, stdin io.Reader, stdout, stderr io.Writer) (negotiation *stats.PackfileNegotiation, _ int, _ error) {
-	repo := req.GetRepository()
-	repoPath, err := s.locator.GetRepoPath(ctx, repo)
+	repoProto := req.GetRepository()
+
+	repo := s.localrepo(repoProto)
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repo.StorageName, repoPath)
+	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repoProto.StorageName, repoPath)
 
 	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
@@ -124,7 +126,7 @@ func (s *server) sshUploadPack(ctx context.Context, req sshUploadPackRequest, st
 	commandOpts := []gitcmd.CmdOpt{
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
-		gitcmd.WithPackObjectsHookEnv(repo, "ssh"),
+		gitcmd.WithPackObjectsHookEnv(repoProto, "ssh"),
 	}
 
 	timeoutTicker := s.uploadPackRequestTimeoutTickerFactory()

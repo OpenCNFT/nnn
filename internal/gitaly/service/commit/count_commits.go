@@ -44,8 +44,10 @@ func (s *server) CountCommits(ctx context.Context, in *gitalypb.CountCommitsRequ
 		subCmd.PostSepArgs = []string{string(path)}
 	}
 
+	repo := s.localrepo(in.GetRepository())
+
 	opts := gitcmd.ConvertGlobalOptions(in.GetGlobalOptions())
-	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, subCmd, append(opts, gitcmd.WithSetupStdout())...)
+	cmd, err := repo.Exec(ctx, subCmd, append(opts, gitcmd.WithSetupStdout())...)
 	if err != nil {
 		return nil, structerr.NewInternal("cmd: %w", err)
 	}

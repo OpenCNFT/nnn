@@ -28,8 +28,7 @@ func GetCommit(ctx context.Context, objectReader ObjectContentReader, revision g
 // includes Git trailers in the returned commit.
 func GetCommitWithTrailers(
 	ctx context.Context,
-	gitCmdFactory gitcmd.CommandFactory,
-	repo storage.Repository,
+	repo gitcmd.RepositoryExecutor,
 	objectReader ObjectContentReader,
 	revision git.Revision,
 ) (*gitalypb.GitCommit, error) {
@@ -40,7 +39,7 @@ func GetCommitWithTrailers(
 
 	// We use the commit ID here instead of revision. This way we still get
 	// trailers if the revision is not a SHA but e.g. a tag name.
-	showCmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
+	showCmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "show",
 		Args: []string{commit.Id},
 		Flags: []gitcmd.Option{

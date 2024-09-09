@@ -40,8 +40,10 @@ func (s *server) RawBlame(in *gitalypb.RawBlameRequest, stream gitalypb.CommitSe
 		return stream.Send(&gitalypb.RawBlameResponse{Data: p})
 	})
 
+	repo := s.localrepo(in.GetRepository())
+
 	var stderr strings.Builder
-	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:        "blame",
 		Flags:       flags,
 		Args:        []string{revision},

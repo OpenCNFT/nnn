@@ -14,17 +14,18 @@ import (
 )
 
 func (s *server) CalculateChecksum(ctx context.Context, in *gitalypb.CalculateChecksumRequest) (*gitalypb.CalculateChecksumResponse, error) {
-	repository := in.GetRepository()
-	if err := s.locator.ValidateRepository(ctx, repository); err != nil {
+	repoProto := in.GetRepository()
+	if err := s.locator.ValidateRepository(ctx, repoProto); err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
-	repo := repository
-	repoPath, err := s.locator.GetRepoPath(ctx, repo)
+
+	repo := s.localrepo(repoProto)
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, repo, gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "show-ref",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--head"},
@@ -56,9 +57,9 @@ func (s *server) CalculateChecksum(ctx context.Context, in *gitalypb.CalculateCh
 	return &gitalypb.CalculateChecksumResponse{Checksum: hex.EncodeToString(checksum.Bytes())}, nil
 }
 
-func (s *server) isValidRepo(ctx context.Context, repo *gitalypb.Repository) bool {
+func (s *server) isValidRepo(ctx context.Context, repo gitcmd.RepositoryExecutor) bool {
 	stdout := &bytes.Buffer{}
-	cmd, err := s.gitCmdFactory.New(ctx, repo,
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name: "rev-parse",
 			Flags: []gitcmd.Option{

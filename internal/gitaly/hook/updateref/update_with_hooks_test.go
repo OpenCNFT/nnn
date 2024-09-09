@@ -134,7 +134,7 @@ func TestUpdaterWithHooks_UpdateReference(t *testing.T) {
 		expectedPayload.FeatureFlagsWithValue = nil
 		actualPayload.FeatureFlagsWithValue = nil
 
-		require.Equal(t, expectedPayload, actualPayload)
+		testhelper.ProtoEqual(t, expectedPayload, actualPayload)
 	}
 
 	referenceTransactionCalls := 0

@@ -130,7 +130,8 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 		gitcmd.WithPackObjectsHookEnv(req.GetRepository(), "http"),
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
+	repo := s.localrepo(req.GetRepository())
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "upload-pack",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},
 		Args:  []string{repoPath},

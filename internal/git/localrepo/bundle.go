@@ -118,7 +118,7 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 	// When cloning a repository, the remote repository is automatically set up as "origin". As this
 	// is unnecessary, remove the configured "origin" remote.
 	var remoteErr bytes.Buffer
-	remoteCmd, err := repo.gitCmdFactory.New(ctx, repo,
+	remoteCmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name: "remote",
 			Args: []string{"remove", "origin"},

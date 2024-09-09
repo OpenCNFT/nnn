@@ -134,7 +134,6 @@ func TestCreateRepository_withObjectFormat(t *testing.T) {
 
 	cfg, client := setupRepositoryService(t)
 	ctx := testhelper.Context(t)
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg)
 
 	for _, tc := range []struct {
 		desc               string

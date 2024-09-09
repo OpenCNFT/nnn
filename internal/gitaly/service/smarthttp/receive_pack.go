@@ -76,7 +76,9 @@ func (s *server) postReceivePack(
 		return stream.Send(&gitalypb.PostReceivePackResponse{Data: p})
 	})
 
-	repoPath, err := s.locator.GetRepoPath(ctx, req.Repository)
+	repo := s.localrepo(req.GetRepository())
+
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return err
 	}
@@ -89,7 +91,6 @@ func (s *server) postReceivePack(
 	transactionID := storage.ExtractTransactionID(ctx)
 	transactionsEnabled := transactionID > 0
 	if transactionsEnabled {
-		repo := s.localrepo(req.GetRepository())
 		procReceiveCleanup, err := receivepack.RegisterProcReceiveHook(
 			ctx, s.logger, s.cfg, req, repo, s.hookManager, hook.NewTransactionRegistry(s.txRegistry), transactionID,
 		)
@@ -103,7 +104,7 @@ func (s *server) postReceivePack(
 		}()
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(),
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:  "receive-pack",
 			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},

@@ -36,7 +36,9 @@ func (s *server) SearchFilesByContent(req *gitalypb.SearchFilesByContentRequest,
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
+	repo := s.localrepo(req.GetRepository())
+
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "grep",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--ignore-case"},
@@ -131,7 +133,7 @@ func (s *server) SearchFilesByName(req *gitalypb.SearchFilesByNameRequest, strea
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "ls-tree",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--full-tree"},

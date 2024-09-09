@@ -119,10 +119,11 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 		_ = pw.Close()
 	}()
 
+	repo := s.localrepo(req.GetRepository())
+
 	transactionID := storage.ExtractTransactionID(ctx)
 	transactionsEnabled := transactionID > 0
 	if transactionsEnabled {
-		repo := s.localrepo(req.GetRepository())
 		procReceiveCleanup, err := receivepack.RegisterProcReceiveHook(
 			ctx, s.logger, s.cfg, req, repo, s.hookManager, hook.NewTransactionRegistry(s.txRegistry), transactionID,
 		)
@@ -136,11 +137,7 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 		}()
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(),
-		gitcmd.Command{
-			Name: "receive-pack",
-			Args: []string{repoPath},
-		},
+	cmd, err := repo.Exec(ctx, gitcmd.Command{Name: "receive-pack", Args: []string{repoPath}},
 		gitcmd.WithStdin(pr),
 		gitcmd.WithStdout(stdout),
 		gitcmd.WithStderr(stderr),
