@@ -165,7 +165,7 @@ func (repo *Repo) SetDefaultBranch(ctx context.Context, txManager transaction.Ma
 	// To ensure we stay backward compatible, we should only use the new mechanism
 	// once all nodes have been updated to contain the code for symref updates.
 	// This is the reason we use a feature flag to propagate this change.
-	if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
+	if featureflag.SymrefUpdate.IsEnabled(ctx) {
 		return repo.setDefaultBranchWithUpdateRef(ctx, reference, version)
 	}
 

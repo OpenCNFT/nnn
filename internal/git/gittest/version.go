@@ -41,17 +41,9 @@ func SkipIfGitVersion(tb testing.TB, ctx context.Context, cfg config.Cfg, expect
 	}
 }
 
-// IfSymrefUpdateSupported returns the appropriate value based on if symref updates are
-// supported or not in the current git version.
+// IfSymrefUpdateSupported returns the appropriate value based on if symref updates are enabled.
 func IfSymrefUpdateSupported[T any](tb testing.TB, ctx context.Context, cfg config.Cfg, yes, no T) T {
-	cmdFactory, clean, err := gitcmd.NewExecCommandFactory(cfg, testhelper.SharedLogger(tb))
-	require.NoError(tb, err)
-	defer clean()
-
-	actual, err := cmdFactory.GitVersion(ctx)
-	require.NoError(tb, err)
-
-	if actual.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
+	if featureflag.SymrefUpdate.IsEnabled(ctx) {
 		return yes
 	}
 

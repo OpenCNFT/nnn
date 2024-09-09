@@ -1236,10 +1236,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				if step.DefaultBranchUpdate != nil {
 					transaction.MarkDefaultBranchUpdated()
 
-					version, err := repo.GitVersion(ctx)
-					require.NoError(t, err)
-
-					if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
+					if featureflag.SymrefUpdate.IsEnabled(ctx) {
 						transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
 							"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
 						})

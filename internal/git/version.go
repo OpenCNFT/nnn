@@ -76,12 +76,6 @@ func ParseVersionOutput(versionOutput []byte) (Version, error) {
 	return version, nil
 }
 
-// SupportSymrefUpdates validates if the version supports 'symref-update' subcommands
-// in 'git-update-ref'.
-func (v Version) SupportSymrefUpdates() bool {
-	return v.GreaterOrEqual(NewVersion(2, 46, 0, 0))
-}
-
 // String returns the string representation of the version.
 func (v Version) String() string {
 	return v.versionString
