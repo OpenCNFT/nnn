@@ -129,7 +129,7 @@ func WithReceivePackHooks(req ReceivePackRequest, protocol string, enableProcRec
 // options to successfully execute hooks.
 func (cc *cmdCfg) configureHooks(
 	ctx context.Context,
-	repo *gitalypb.Repository,
+	repo storage.Repository,
 	cfg config.Cfg,
 	gitCmdFactory CommandFactory,
 	userDetails *UserDetails,
