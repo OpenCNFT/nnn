@@ -19,7 +19,7 @@ Gitaly is a layer that brings horizontal scaling and higher availability to mass
 - **ACID Isolation** - by design Git allows concurrent update access to the same repository as much as possible, in the area of updating Git Refs, record locking is necessary and implemented by Git.
 - **Wide ranging burst memory / CPU / disk IO requirements** - assumes significant available memory headroom for operations that intensify depending on the content size.
 
-#### Specific Git Workload Characteristics That Make Remote File Systems and Containerization of Gitaly Challenging
+#### Git Workload Characteristics That Make Remote File Systems and Containerization of Gitaly Challenging
 
 **IMPORTANT:** The above characteristics and assumptions combined with specific Git workloads create challenging compute characteristics - high burst CPU utilization, high burst memory utilization and high burst storage channel utilization. Bursts in these compute needs are based on Git usage patterns - how much content, how dense (e.g. binaries) and how often.
 
