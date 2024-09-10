@@ -362,7 +362,7 @@ test:fips:
 test:macos:
   image: !reference [.versions, macos]
   tags:
-    - saas-macos-medium-m1
+    - saas-macos-large-m2pro
   needs: []
   stage: test
   cache:
