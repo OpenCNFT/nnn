@@ -1,5 +1,11 @@
 # Gitaly changelog
 
+## 16.11.9 (2024-09-10)
+
+### Fixed (1 change)
+
+- [repository: Add empty vote in ApplyGitattributes](gitlab-org/gitaly@6286204f66126c68126ad3f0d8daefea1221eb19) ([merge request](gitlab-org/gitaly!7203))
+
 ## 16.11.8 (2024-08-05)
 
 No changes.
