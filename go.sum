@@ -722,8 +722,8 @@ github.com/yusufpapurcu/wmi v1.2.2 h1:KBNDSne4vP5mbSWnJbO+51IMOXJB67QiYCSBrubbPR
 github.com/yusufpapurcu/wmi v1.2.2/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
 gitlab.com/gitlab-org/labkit v1.21.0 h1:hLmdBDtXjD1yOmZ+uJOac3a5Tlo83QaezwhES4IYik4=
 gitlab.com/gitlab-org/labkit v1.21.0/go.mod h1:zeATDAaSBelPcPLbTTq8J3ZJEHyPTLVBM1q3nva+/W4=
-gitlab.com/gl-gitaly/dragonboat/v4 v4.0.0-20240704102653-8b407058bff6 h1:/qdcdzm+4u68d7eO8svjbYtIVGi1epJgk47oTMjwzAE=
-gitlab.com/gl-gitaly/dragonboat/v4 v4.0.0-20240704102653-8b407058bff6/go.mod h1:5JuDWlViMsT7npwgggqUXT8ICKWty3GpjWgm8ZvG5g0=
+gitlab.com/gl-gitaly/dragonboat/v4 v4.0.0-20240829092220-c2ed2743ead2 h1:UAnl1CKTwV8ID6ccEpZ3uoI3ZzTMR8yH6d1uapFScpE=
+gitlab.com/gl-gitaly/dragonboat/v4 v4.0.0-20240829092220-c2ed2743ead2/go.mod h1:5JuDWlViMsT7npwgggqUXT8ICKWty3GpjWgm8ZvG5g0=
 gitlab.com/gl-gitaly/vfs v0.2.1-0.20240704101814-7fa01f8fb89b h1:mLlt8JDFwbIEsHkeM6+aFSh0FiZPfGvZNOBftNGELIw=
 gitlab.com/gl-gitaly/vfs v0.2.1-0.20240704101814-7fa01f8fb89b/go.mod h1:CBBfEt4D1eutp+W+FRV3cZQsg9BEV1UVRS+5mP37rUE=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
