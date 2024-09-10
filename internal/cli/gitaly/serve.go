@@ -478,7 +478,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			}
 			defer dbMgr.Close()
 
-			node, err = nodeimpl.NewManager(
+			nodeMgr, err := nodeimpl.NewManager(
 				cfg.Storages,
 				storagemgr.NewFactory(
 					logger,
@@ -495,9 +495,9 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			if err != nil {
 				return fmt.Errorf("new node: %w", err)
 			}
-			defer node.Close()
+			defer nodeMgr.Close()
 
-			recoveryMiddleware := storagemgr.NewTransactionRecoveryMiddleware(protoregistry.GitalyProtoPreregistered, node)
+			recoveryMiddleware := storagemgr.NewTransactionRecoveryMiddleware(protoregistry.GitalyProtoPreregistered, nodeMgr)
 			txMiddleware = server.TransactionMiddleware{
 				UnaryInterceptor:  recoveryMiddleware.UnaryServerInterceptor(),
 				StreamInterceptor: recoveryMiddleware.StreamServerInterceptor(),
