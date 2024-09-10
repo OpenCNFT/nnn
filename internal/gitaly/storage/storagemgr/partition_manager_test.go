@@ -183,6 +183,23 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 	}
 }
 
+// checkExpectedState validates that the storage manager contains the correct partitions and
+// associated reference counts at the point of execution.
+func checkExpectedState(t *testing.T, mgr *StorageManager, expectedState map[storage.PartitionID]uint) {
+	t.Helper()
+
+	actualState := map[storage.PartitionID]uint{}
+	for ptnID, partition := range mgr.partitions {
+		actualState[ptnID] = partition.referenceCount
+	}
+
+	if expectedState == nil {
+		expectedState = map[storage.PartitionID]uint{}
+	}
+
+	require.Equal(t, expectedState, actualState)
+}
+
 func TestStorageManager(t *testing.T) {
 	t.Parallel()
 
@@ -254,23 +271,6 @@ func TestStorageManager(t *testing.T) {
 	type assertMetrics struct {
 		partitionsStartedTotal uint64
 		partitionsStoppedTotal uint64
-	}
-
-	// checkExpectedState validates that the partition manager contains the correct partitions and
-	// associated transaction count at the point of execution.
-	checkExpectedState := func(t *testing.T, cfg config.Cfg, mgr *StorageManager, expectedState map[storage.PartitionID]uint) {
-		t.Helper()
-
-		actualState := map[storage.PartitionID]uint{}
-		for ptnID, partition := range mgr.partitions {
-			actualState[ptnID] = partition.referenceCount
-		}
-
-		if expectedState == nil {
-			expectedState = map[storage.PartitionID]uint{}
-		}
-
-		require.Equal(t, expectedState, actualState)
 	}
 
 	setupRepository := func(t *testing.T, cfg config.Cfg, storage config.Storage) storage.Repository {
@@ -962,7 +962,7 @@ func TestStorageManager(t *testing.T) {
 					require.Equal(t, step.expectedError, err)
 
 					blockOnPartitionClosing(t, storageMgr, true)
-					checkExpectedState(t, cfg, storageMgr, step.expectedState)
+					checkExpectedState(t, storageMgr, step.expectedState)
 
 					if err != nil {
 						continue
@@ -998,7 +998,7 @@ func TestStorageManager(t *testing.T) {
 					require.ErrorIs(t, data.txn.Commit(commitCtx), step.expectedError)
 
 					blockOnPartitionClosing(t, storageMgr, true)
-					checkExpectedState(t, cfg, storageMgr, step.expectedState)
+					checkExpectedState(t, storageMgr, step.expectedState)
 				case rollback:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction rolled back before being started")
 
@@ -1006,7 +1006,7 @@ func TestStorageManager(t *testing.T) {
 					require.ErrorIs(t, data.txn.Rollback(), step.expectedError)
 
 					blockOnPartitionClosing(t, storageMgr, true)
-					checkExpectedState(t, cfg, storageMgr, step.expectedState)
+					checkExpectedState(t, storageMgr, step.expectedState)
 				case closePartition:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction manager stopped before being started")
 
@@ -1038,6 +1038,62 @@ gitaly_partitions_stopped_total{storage="default"} %d
 			}
 		})
 	}
+}
+
+func TestStorageManager_getPartition(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+
+	cfg := testcfg.Build(t)
+	logger := testhelper.SharedLogger(t)
+
+	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	require.NoError(t, err)
+	defer dbMgr.Close()
+
+	storageName := cfg.Storages[0].Name
+	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	ptn1, err := mgr.GetPartition(ctx, 1)
+	require.NoError(t, err)
+
+	ptn2Handle1, err := mgr.GetPartition(ctx, 2)
+	require.NoError(t, err)
+
+	ptn2Handle2, err := mgr.GetPartition(ctx, 2)
+	require.NoError(t, err)
+
+	require.Same(t, ptn2Handle1.(*partitionHandle).Partition, ptn2Handle2.(*partitionHandle).Partition)
+	require.NotSame(t, ptn1.(*partitionHandle).Partition, ptn2Handle1.(*partitionHandle).Partition)
+
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		1: 1,
+		2: 2,
+	})
+
+	// Closing the only handle to a partition should clean it up.
+	ptn1.Close()
+	blockOnPartitionClosing(t, mgr, false)
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		2: 2,
+	})
+
+	// Closing a handle shouldn't clean up a partition if there are
+	// further open handles to it. Closing is idempotent.
+	for i := 0; i < 2; i++ {
+		ptn2Handle1.Close()
+		blockOnPartitionClosing(t, mgr, false)
+		checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+			2: 1,
+		})
+	}
+
+	// Closing cleans up all remaining partitions.
+	mgr.Close()
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
 }
 
 func TestStorageManager_concurrentClose(t *testing.T) {

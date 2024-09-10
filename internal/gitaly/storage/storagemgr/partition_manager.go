@@ -376,6 +376,11 @@ func (p *partitionHandle) Close() {
 	})
 }
 
+// GetPartition returns a new handle to a partition.
+func (sm *StorageManager) GetPartition(ctx context.Context, partitionID storage.PartitionID) (storage.Partition, error) {
+	return sm.startPartition(ctx, partitionID)
+}
+
 // startPartition starts a partition.
 func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partitionHandle, error) {
 	relativeStateDir := deriveStateDirectory(partitionID)

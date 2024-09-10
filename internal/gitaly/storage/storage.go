@@ -176,6 +176,9 @@ type Storage interface {
 	GetAssignedPartitionID(relativePath string) (PartitionID, error)
 	// Begin begins a transaction against a partition.
 	Begin(context.Context, PartitionID, TransactionOptions) (Transaction, error)
+	// GetPartition returns a new handle to a given partition. The caller must call
+	// Partition.Close() when the Partition is no longer needed.
+	GetPartition(context.Context, PartitionID) (Partition, error)
 }
 
 // Node is the interface of a node. Each Node may have zero or more storages.
