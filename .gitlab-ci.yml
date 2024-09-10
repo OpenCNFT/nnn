@@ -14,7 +14,7 @@ default:
 .versions:
   debian: "bookworm"
   git_default: "default"
-  git_minimum: "v2.45.0"
+  git_minimum: "v2.46.0"
   go_default: "1.22"
   go_supported: ["1.22", "1.23"]
   macos: "macos-14-xcode-15"

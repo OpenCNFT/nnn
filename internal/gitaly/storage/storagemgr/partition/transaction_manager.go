@@ -3339,10 +3339,6 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 
 	for _, change := range changes {
 		if len(change.NewTarget) > 0 {
-			if !version.SupportSymrefUpdates() {
-				return fmt.Errorf("incompatible version for symref-updates")
-			}
-
 			if err := updater.UpdateSymbolicReference(
 				version,
 				git.ReferenceName(change.ReferenceName),

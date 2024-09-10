@@ -175,7 +175,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		updater, err := updateref.New(ctx, repo)
 		require.NoError(t, err)
 
-		if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
+		if featureflag.SymrefUpdate.IsEnabled(ctx) {
 			require.NoError(t, updater.Start())
 			require.NoError(t, updater.UpdateSymbolicReference(version, "HEAD", "refs/heads/temp"))
 			require.NoError(t, updater.Prepare())
@@ -262,10 +262,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		err = repo.SetDefaultBranch(ctx, failingTxManager, "refs/heads/branch")
 		require.Error(t, err)
 
-		version, vErr := repo.GitVersion(ctx)
-		require.NoError(t, vErr)
-
-		if version.SupportSymrefUpdates() && featureflag.SymrefUpdate.IsEnabled(ctx) {
+		if featureflag.SymrefUpdate.IsEnabled(ctx) {
 			var sErr structerr.Error
 			require.ErrorAs(t, err, &sErr)
 			require.Equal(t, "error executing git hook\nfatal: ref updates aborted by hook\n", sErr.Metadata()["stderr"])

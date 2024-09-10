@@ -198,9 +198,8 @@ func TestVersion_IsSupported(t *testing.T) {
 		{"2.43.0", false},
 		{"2.44.0", false},
 		{"2.45.0-rc0", false},
-		{"2.45.0", true},
-		{"2.45.1", true},
-		{"2.45.2", true},
+		{"2.45.0", false},
+		{"2.46.0", true},
 		{"3.0.0", true},
 		{"3.0.0.gl5", true},
 	} {

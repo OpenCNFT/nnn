@@ -14,9 +14,9 @@ import (
 // - https://docs.gitlab.com/ee/install/installation.html#software-requirements
 // - https://docs.gitlab.com/ee/update/ (see e.g. https://docs.gitlab.com/ee/update/#1440)
 var minimumVersion = Version{
-	versionString: "2.45.0",
+	versionString: "2.46.0",
 	major:         2,
-	minor:         45,
+	minor:         46,
 	patch:         0,
 	rc:            false,
 
@@ -74,12 +74,6 @@ func ParseVersionOutput(versionOutput []byte) (Version, error) {
 	}
 
 	return version, nil
-}
-
-// SupportSymrefUpdates validates if the version supports 'symref-update' subcommands
-// in 'git-update-ref'.
-func (v Version) SupportSymrefUpdates() bool {
-	return v.GreaterOrEqual(NewVersion(2, 46, 0, 0))
 }
 
 // String returns the string representation of the version.
