@@ -246,13 +246,6 @@ func TestStorageManager(t *testing.T) {
 		transactionID int
 	}
 
-	// finalizeTransaction runs the transaction finalizer for the specified repository. This is used
-	// to simulate finalizers executing after a transaction manager has been stopped.
-	type finalizeTransaction struct {
-		// transactionID identifies the transaction to finalize.
-		transactionID int
-	}
-
 	// closeManager closes the partition manager. This is done to simulate errors for transactions
 	// being processed without a running partition manager.
 	type closeManager struct{}
@@ -270,7 +263,7 @@ func TestStorageManager(t *testing.T) {
 
 		actualState := map[storage.PartitionID]uint{}
 		for ptnID, partition := range mgr.partitions {
-			actualState[ptnID] = partition.pendingTransactionCount
+			actualState[ptnID] = partition.referenceCount
 		}
 
 		if expectedState == nil {
@@ -549,8 +542,11 @@ func TestStorageManager(t *testing.T) {
 								2: 1,
 							},
 						},
-						finalizeTransaction{
+						rollback{
 							transactionID: 1,
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
+							},
 						},
 						commit{
 							transactionID: 2,
@@ -1021,12 +1017,6 @@ func TestStorageManager(t *testing.T) {
 					data.ptn.Partition.Close()
 
 					blockOnPartitionClosing(t, storageMgr, false)
-				case finalizeTransaction:
-					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction finalized before being started")
-
-					data := openTransactionData[step.transactionID]
-
-					data.storageMgr.finalizeTransaction(data.ptn)
 				case closeManager:
 					require.False(t, storageManagerStopped, "test error: storage manager already stopped")
 					storageManagerStopped = true
