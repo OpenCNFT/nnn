@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -409,14 +410,12 @@ func TestFindFieldsByExtension(t *testing.T) {
 func TestMethodInfo_Partition(t *testing.T) {
 	t.Parallel()
 
-	testPartitionID := uint64(1)
-
 	testcases := []struct {
 		desc              string
 		svc               string
 		method            string
 		pbMsg             proto.Message
-		expectPartitionID uint64
+		expectPartitionID storage.PartitionID
 		expectErr         error
 	}{
 		{
@@ -425,9 +424,9 @@ func TestMethodInfo_Partition(t *testing.T) {
 			method: "BackupPartition",
 			pbMsg: &gitalypb.BackupPartitionRequest{
 				StorageName: "default",
-				PartitionId: testPartitionID,
+				PartitionId: storage.PartitionID(1).String(),
 			},
-			expectPartitionID: testPartitionID,
+			expectPartitionID: storage.PartitionID(1),
 		},
 		{
 			desc:      "target partition id is 0",

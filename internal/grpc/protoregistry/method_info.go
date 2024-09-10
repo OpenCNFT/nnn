@@ -3,8 +3,10 @@ package protoregistry
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/protoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -199,13 +201,18 @@ func (mi MethodInfo) getStorageField(msg proto.Message) (valueField, error) {
 }
 
 // Partition returns the partition id for a protobuf message if it exists
-func (mi MethodInfo) Partition(msg proto.Message) (uint64, error) {
+func (mi MethodInfo) Partition(msg proto.Message) (storage.PartitionID, error) {
 	field, err := mi.getPartitionField(msg)
 	if err != nil {
 		return 0, err
 	}
 
-	return field.value.Uint(), nil
+	value, err := strconv.ParseUint(field.value.String(), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return storage.PartitionID(value), nil
 }
 
 func (mi MethodInfo) getPartitionField(msg proto.Message) (valueField, error) {
@@ -224,8 +231,8 @@ func (mi MethodInfo) getPartitionField(msg proto.Message) (valueField, error) {
 		return valueField{}, err
 	}
 
-	if field.desc.Kind() != protoreflect.Uint64Kind {
-		return valueField{}, fmt.Errorf("expected uint64, got %s", field.desc.Kind().String())
+	if field.desc.Kind() != protoreflect.StringKind {
+		return valueField{}, fmt.Errorf("expected string, got %s", field.desc.Kind().String())
 	}
 
 	return field, nil

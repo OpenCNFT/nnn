@@ -259,7 +259,7 @@ func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegi
 		methodInfo,
 		req,
 		targetStorage,
-		storage.PartitionID(targetPartition),
+		targetPartition,
 		storage.TransactionOptions{
 			ReadOnly: methodInfo.Operation == protoregistry.OpAccessor,
 		},

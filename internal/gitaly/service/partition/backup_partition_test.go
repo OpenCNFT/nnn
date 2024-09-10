@@ -2,7 +2,6 @@ package partition_test
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -33,7 +32,7 @@ func TestBackupPartition(t *testing.T) {
 		ptnClient   gitalypb.PartitionServiceClient
 		repoClient  gitalypb.RepositoryServiceClient
 		storageName string
-		partitionID uint64
+		partitionID string
 	}
 
 	for _, tc := range []struct {
@@ -53,7 +52,7 @@ func TestBackupPartition(t *testing.T) {
 					ptnClient:   ptnClient,
 					repoClient:  repoClient,
 					storageName: "default",
-					partitionID: 2,
+					partitionID: "2",
 				}
 			},
 		},
@@ -69,7 +68,7 @@ func TestBackupPartition(t *testing.T) {
 					ptnClient:   ptnClient,
 					repoClient:  repoClient,
 					storageName: "non-existent",
-					partitionID: 2,
+					partitionID: "2",
 				}
 			},
 			expectedErr: testhelper.WithInterceptedMetadata(
@@ -86,7 +85,7 @@ func TestBackupPartition(t *testing.T) {
 					ptnClient:   ptnClient,
 					repoClient:  repoClient,
 					storageName: "default",
-					partitionID: 2,
+					partitionID: "2",
 				}
 			},
 			expectedErr: structerr.NewFailedPrecondition("backup partition: server-side backups are not configured"),
@@ -139,7 +138,7 @@ func TestBackupPartition(t *testing.T) {
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
 			lsn := storage.LSN(2)
-			tarPath := filepath.Join(backupRoot, data.storageName, fmt.Sprintf("%d", data.partitionID), lsn.String()) + ".tar"
+			tarPath := filepath.Join(backupRoot, data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tar, err := os.Open(tarPath)
 			require.NoError(t, err)
 			defer testhelper.MustClose(t, tar)
@@ -170,7 +169,7 @@ func TestBackupPartition_BackupExists(t *testing.T) {
 
 	_, err = ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 		StorageName: "default",
-		PartitionId: 1,
+		PartitionId: "1",
 	})
 
 	if testhelper.IsWALEnabled() {
@@ -185,7 +184,7 @@ func TestBackupPartition_BackupExists(t *testing.T) {
 	// Calling the same backup again should fail as it already exists
 	_, err = ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 		StorageName: "default",
-		PartitionId: 1,
+		PartitionId: "1",
 	})
 
 	testhelper.RequireGrpcError(t, structerr.NewAlreadyExists("there is an up-to-date backup for the given partition"), err)
