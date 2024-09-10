@@ -300,6 +300,7 @@ type Transaction struct {
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
 func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (_ storage.Transaction, returnedErr error) {
 	defer prometheus.NewTimer(mgr.metrics.beginDuration(opts.Write)).ObserveDuration()
+	transactionDurationTimer := prometheus.NewTimer(mgr.metrics.transactionDuration(opts.Write))
 
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
@@ -353,6 +354,8 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 
 	txn.finish = func() error {
 		defer close(txn.finished)
+		defer transactionDurationTimer.ObserveDuration()
+
 		defer func() {
 			if txn.db != nil {
 				txn.db.Discard()

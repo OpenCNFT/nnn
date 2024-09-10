@@ -17,6 +17,7 @@ type Metrics struct {
 	commitQueueWaitSeconds                     *prometheus.HistogramVec
 	transactionControlStatementDurationSeconds *prometheus.HistogramVec
 	transactionProcessingDurationSeconds       *prometheus.HistogramVec
+	transactionTotalDurationSeconds            *prometheus.HistogramVec
 }
 
 // NewMetrics returns a new Metrics instance.
@@ -48,6 +49,11 @@ func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) M
 			Help:    "Records the time taken to process a transaction.",
 			Buckets: buckets,
 		}, append(storage, "stage")),
+		transactionTotalDurationSeconds: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "gitaly_transaction_total_duration_seconds",
+			Help:    "Records the total time a transaction was open.",
+			Buckets: prometheus.ExponentialBuckets(0.01, 2, 15),
+		}, storageAccessMode),
 	}
 }
 
@@ -62,6 +68,7 @@ func (m Metrics) Collect(out chan<- prometheus.Metric) {
 	m.commitQueueWaitSeconds.Collect(out)
 	m.transactionControlStatementDurationSeconds.Collect(out)
 	m.transactionProcessingDurationSeconds.Collect(out)
+	m.transactionTotalDurationSeconds.Collect(out)
 }
 
 // Scope scopes the metrics to a TransactionManager.
@@ -87,6 +94,8 @@ func (m Metrics) Scope(storageName string) ManagerMetrics {
 		writeTransactionRollbackDurationSeconds: m.transactionControlStatementDurationSeconds.WithLabelValues(storageName, write, rollback),
 		transactionProcessingDurationSeconds:    m.transactionProcessingDurationSeconds.WithLabelValues(storageName, "verification"),
 		transactionApplicationDurationSeconds:   m.transactionProcessingDurationSeconds.WithLabelValues(storageName, "application"),
+		readTransactionTotalDurationSeconds:     m.transactionTotalDurationSeconds.WithLabelValues(storageName, read),
+		writeTransactionTotalDurationSeconds:    m.transactionTotalDurationSeconds.WithLabelValues(storageName, write),
 	}
 }
 
@@ -104,6 +113,8 @@ type ManagerMetrics struct {
 	writeTransactionRollbackDurationSeconds prometheus.Observer
 	transactionProcessingDurationSeconds    prometheus.Observer
 	transactionApplicationDurationSeconds   prometheus.Observer
+	readTransactionTotalDurationSeconds     prometheus.Observer
+	writeTransactionTotalDurationSeconds    prometheus.Observer
 }
 
 func (m ManagerMetrics) beginDuration(write bool) prometheus.Observer {
@@ -128,4 +139,12 @@ func (m ManagerMetrics) rollbackDuration(write bool) prometheus.Observer {
 	}
 
 	return m.readTransactionRollbackDurationSeconds
+}
+
+func (m ManagerMetrics) transactionDuration(write bool) prometheus.Observer {
+	if write {
+		return m.writeTransactionTotalDurationSeconds
+	}
+
+	return m.readTransactionTotalDurationSeconds
 }
