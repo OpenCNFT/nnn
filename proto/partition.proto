@@ -10,7 +10,7 @@ option go_package = "gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb";
 // PartitionService is a service providing RPCs accessing partitions as a whole.
 service PartitionService {
 
-  // BackupPartition backs up an entire partition and saves it to 
+  // BackupPartition backs up an entire partition and saves it to
   // the configured backup sink (filesystem or object storage).
   rpc BackupPartition(BackupPartitionRequest) returns (BackupPartitionResponse) {
     option (op_type) = {
@@ -33,9 +33,9 @@ service PartitionService {
 message BackupPartitionRequest {
   // storage_name is the name of the storage containing the partition to be backed up.
   string storage_name = 1 [(gitaly.storage)=true];
-  // partition_id is the identifier of the specific partition within the storage to 
+  // partition_id is the identifier of the specific partition within the storage to
   // be backed up, which may contain one or more repositories and associated data.
-  uint64 partition_id = 2 [(gitaly.partition_id)=true];
+  string partition_id = 2 [(gitaly.partition_id)=true];
 }
 
 // BackupPartitionResponse is a response for the BackupPartition RPC.

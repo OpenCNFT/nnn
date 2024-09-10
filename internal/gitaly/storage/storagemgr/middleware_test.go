@@ -446,7 +446,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
 				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 					StorageName: "default",
-					PartitionId: 1,
+					PartitionId: "1",
 				})
 				require.NoError(t, err)
 				testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
@@ -457,7 +457,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			desc: "partition scoped rpc with missing storage name",
 			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
 				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
-					PartitionId: 1,
+					PartitionId: "1",
 				})
 				require.ErrorContains(t, err, "extract target storage: target storage field not found")
 				require.Nil(t, resp)
@@ -468,7 +468,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			performRequest: func(t *testing.T, ctx context.Context, cc *grpc.ClientConn) {
 				resp, err := gitalypb.NewPartitionServiceClient(cc).BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 					StorageName: "fake",
-					PartitionId: 1,
+					PartitionId: "1",
 				})
 				require.ErrorContains(t, err, `get storage: storage name not found`)
 				require.Nil(t, resp)
