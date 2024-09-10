@@ -121,6 +121,12 @@ No changes.
 
 - [config: Don't allow storages to share a path](gitlab-org/gitaly@1f2789d97fd7b7d104a1ebaabbea90f9e5e4bff8) ([merge request](gitlab-org/gitaly!6849))
 
+## 16.11.9 (2024-09-10)
+
+### Fixed (1 change)
+
+- [repository: Add empty vote in ApplyGitattributes](gitlab-org/gitaly@6286204f66126c68126ad3f0d8daefea1221eb19) ([merge request](gitlab-org/gitaly!7203))
+
 ## 16.11.8 (2024-08-05)
 
 No changes.
