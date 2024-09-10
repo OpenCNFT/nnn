@@ -209,10 +209,10 @@ type partition struct {
 	// Clients stumbling on the partition when it is closing wait on this channel to know when the previous
 	// partition instance has closed and it is safe to start another one.
 	partitionClosed chan struct{}
-	// partition manages all transactions for the partition.
-	partition Partition
 	// pendingTransactionCount holds the current number of in flight transactions being processed by the manager.
 	pendingTransactionCount uint
+	// Partition is the wrapped partition handle.
+	Partition
 }
 
 // close closes the partition's transaction manager.
@@ -226,7 +226,7 @@ func (ptn *partition) close() {
 	}
 
 	close(ptn.closing)
-	ptn.partition.Close()
+	ptn.Close()
 }
 
 // isClosing returns whether partition is closing.
@@ -327,7 +327,7 @@ func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.Partiti
 		relativePaths = append(relativePaths, opts.AlternateRelativePath)
 	}
 
-	transaction, err := ptn.partition.Begin(ctx, storage.BeginOptions{
+	transaction, err := ptn.Begin(ctx, storage.BeginOptions{
 		Write:                  !opts.ReadOnly,
 		RelativePaths:          relativePaths,
 		ForceExclusiveSnapshot: opts.ForceExclusiveSnapshot,
@@ -354,7 +354,7 @@ func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storag
 
 	defer sm.finalizeTransaction(ptn)
 
-	logManager, ok := ptn.partition.(storage.LogManager)
+	logManager, ok := ptn.Partition.(storage.LogManager)
 	if !ok {
 		return fmt.Errorf("expected LogManager, got %T", logManager)
 	}
@@ -410,7 +410,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				sm.consumer,
 			)
 
-			ptn.partition = mgr
+			ptn.Partition = mgr
 
 			sm.partitions[partitionID] = ptn
 

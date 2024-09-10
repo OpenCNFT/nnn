@@ -167,7 +167,7 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 	for _, ptn := range mgr.partitions {
 		// The closePartition step closes the transaction manager directly without calling close
 		// on the partition, so we check the manager directly here as well.
-		if ptn.isClosing() || ptn.partition.(*mockPartition).closeCalled.Load() {
+		if ptn.isClosing() || ptn.Partition.(*mockPartition).closeCalled.Load() {
 			waiter := ptn.partitionClosed
 			if waitForFullClose {
 				waiter = ptn.closed
@@ -1018,7 +1018,7 @@ func TestStorageManager(t *testing.T) {
 					// Close the Partition instance directly. Closing through the partition wrapper would change
 					// the state used to sync which should only be changed when the closing is initiated through
 					// the normal means.
-					data.ptn.partition.Close()
+					data.ptn.Partition.Close()
 
 					blockOnPartitionClosing(t, storageMgr, false)
 				case finalizeTransaction:
@@ -1093,7 +1093,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	}()
 
 	// The Partition may return if it errors out.
-	txMgr := storageMgr.partitions[2].partition
+	txMgr := storageMgr.partitions[2].Partition
 	go func() {
 		defer wg.Done()
 		<-start
