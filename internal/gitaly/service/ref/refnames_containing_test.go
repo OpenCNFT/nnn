@@ -1,7 +1,6 @@
 package ref
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,7 +49,7 @@ func TestListTagNamesContainingCommit(t *testing.T) {
 				CommitId:   "invalid",
 			},
 			expectedErr: structerr.NewInvalidArgument(
-				fmt.Sprintf(`invalid object ID: "invalid", expected length %v, got 7`, gittest.DefaultObjectHash.EncodedLen()),
+				`invalid object ID: "invalid", expected length %v, got 7`, gittest.DefaultObjectHash.EncodedLen(),
 			),
 		},
 		{
@@ -154,7 +153,7 @@ func TestListBranchNamesContainingCommit(t *testing.T) {
 				CommitId:   "invalid",
 			},
 			expectedErr: structerr.NewInvalidArgument(
-				fmt.Sprintf(`invalid object ID: "invalid", expected length %v, got 7`, gittest.DefaultObjectHash.EncodedLen()),
+				`invalid object ID: "invalid", expected length %v, got 7`, gittest.DefaultObjectHash.EncodedLen(),
 			),
 		},
 		{
@@ -164,7 +163,7 @@ func TestListBranchNamesContainingCommit(t *testing.T) {
 				CommitId:   "",
 			},
 			expectedErr: structerr.NewInvalidArgument(
-				fmt.Sprintf(`invalid object ID: "", expected length %v, got 0`, gittest.DefaultObjectHash.EncodedLen()),
+				`invalid object ID: "", expected length %v, got 0`, gittest.DefaultObjectHash.EncodedLen(),
 			),
 		},
 		{

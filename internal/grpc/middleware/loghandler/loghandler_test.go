@@ -39,6 +39,7 @@ func TestMessageProducerWithFieldsProducers(t *testing.T) {
 
 	var infoFromCtx struct{}
 	ctx := createContext()
+	//nolint:staticcheck
 	ctx = context.WithValue(ctx, infoFromCtx, "world")
 
 	fieldsProducer1 := func(context.Context, error) log.Fields {

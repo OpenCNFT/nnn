@@ -3,7 +3,6 @@ package operations
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -257,7 +256,7 @@ func testUserRebaseToRefConflict(t *testing.T, ctx context.Context) {
 	response, err := client.UserRebaseToRef(ctx, request)
 
 	require.Nil(t, response)
-	testhelper.RequireGrpcError(t, structerr.NewFailedPrecondition(fmt.Sprintf("failed to rebase %s on %s while preparing %s due to conflict", sourceOID, firstParentRefOID, targetRef)), err)
+	testhelper.RequireGrpcError(t, structerr.NewFailedPrecondition("failed to rebase %s on %s while preparing %s due to conflict", sourceOID, firstParentRefOID, targetRef), err)
 
 	currentTargetRefOID := gittest.ResolveRevision(t, cfg, repoPath, targetRef)
 	require.Equal(t, targetRefOID, currentTargetRefOID, "target ref should not change when the rebase fails due to GitError")

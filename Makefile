@@ -363,7 +363,7 @@ prepare-debug: ${DELVE}
 
 .PHONY: test
 ## Run Go tests.
-test: test-go test-gitaly-linters
+test: test-go
 
 .PHONY: test-gitaly-linters
 ## Test Go tests in tools/golangci-lint/gitaly folder

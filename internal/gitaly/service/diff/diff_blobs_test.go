@@ -59,10 +59,8 @@ func TestDiffBlobs(t *testing.T) {
 						},
 					},
 					expectedErr: testhelper.ToInterceptedMetadata(structerr.NewInvalidArgument(
-						fmt.Sprintf(
-							"getting right blob info: validating blob ID: invalid object ID: \"\", expected length %d, got 0",
-							gittest.DefaultObjectHash.EncodedLen(),
-						)).WithMetadata("revision", ""),
+						"getting right blob info: validating blob ID: invalid object ID: \"\", expected length %d, got 0",
+						gittest.DefaultObjectHash.EncodedLen()).WithMetadata("revision", ""),
 					),
 				}
 			},

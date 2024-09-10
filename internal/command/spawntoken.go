@@ -130,7 +130,7 @@ func (m *SpawnTokenManager) GetSpawnToken(ctx context.Context) (putToken func(),
 		m.spawnTimeoutCount.Inc()
 
 		msg := fmt.Sprintf("process spawn timed out after %v", m.spawnConfig.Timeout)
-		return nil, structerr.NewResourceExhausted(msg).WithDetail(&gitalypb.LimitError{
+		return nil, structerr.NewResourceExhausted("%s", msg).WithDetail(&gitalypb.LimitError{
 			ErrorMessage: msg,
 			RetryAfter:   durationpb.New(0),
 		})

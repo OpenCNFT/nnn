@@ -381,7 +381,7 @@ func TestUserApplyPatch(t *testing.T) {
 			expected: func(t *testing.T, repoPath string) expected {
 				return expected{
 					oldOID: "foo",
-					err:    structerr.NewInternal(fmt.Sprintf(`expected old object id not expected SHA format: invalid object ID: "foo", expected length %v, got 3`, gittest.DefaultObjectHash.EncodedLen())),
+					err:    structerr.NewInternal(`expected old object id not expected SHA format: invalid object ID: "foo", expected length %v, got 3`, gittest.DefaultObjectHash.EncodedLen()),
 				}
 			},
 		},
