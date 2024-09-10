@@ -162,9 +162,6 @@ type TransactionOptions struct {
 	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
 	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
 	ForceExclusiveSnapshot bool
-	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
-	// path is provided.
-	KVOnly bool
 }
 
 // Storage is the interface of a storage.

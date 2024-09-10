@@ -262,10 +262,7 @@ func stagingDirectoryPath(storagePath string) string {
 func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts storage.TransactionOptions) (_ storage.Transaction, returnedErr error) {
 	var relativePaths []string
 
-	if opts.KVOnly {
-		// Don't snapshot any repositories and only start a KV transaction.
-		relativePaths = []string{}
-	} else if opts.RelativePath != "" {
+	if opts.RelativePath != "" {
 		var err error
 		opts.RelativePath, err = storage.ValidateRelativePath(sm.path, opts.RelativePath)
 		if err != nil {
