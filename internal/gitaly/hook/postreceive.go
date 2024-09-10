@@ -144,7 +144,7 @@ func (m *GitLabHookManager) PostReceiveHook(ctx context.Context, repo *gitalypb.
 			return fmt.Errorf("get storage: %w", err)
 		}
 
-		tx, err = storageHandle.Begin(ctx, 0, storage.TransactionOptions{
+		tx, err = storageHandle.Begin(ctx, storage.TransactionOptions{
 			ReadOnly:     true,
 			RelativePath: originalRepo.GetRelativePath(),
 		})

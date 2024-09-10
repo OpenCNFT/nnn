@@ -218,9 +218,6 @@ func TestStorageManager(t *testing.T) {
 		ctx context.Context
 		// repo is the repository that the transaction belongs to.
 		repo storage.Repository
-		// partitionID is the partition that the transaction belongs to.
-		// Overwritten by the repo partition ID if repo is set.
-		partitionID storage.PartitionID
 		// alternateRelativePath is the relative path of the alternate repository.
 		alternateRelativePath string
 		// readOnly indicates if the transaction is read-only.
@@ -748,18 +745,14 @@ func TestStorageManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "transaction committed for partition",
+			desc: "beginning a transaction without a relative path fails",
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
 				return setupData{
 					steps: steps{
 						begin{
-							partitionID: 2,
-							readOnly:    true,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-							},
+							transactionID: 1,
+							expectedError: fmt.Errorf("target relative path unset"),
 						},
-						commit{},
 					},
 				}
 			},
@@ -786,48 +779,14 @@ func TestStorageManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "transaction committed for partition with relative path filter",
-			setup: func(t *testing.T, cfg config.Cfg) setupData {
-				repo := setupRepository(t, cfg, cfg.Storages[0])
-
-				return setupData{
-					steps: steps{
-						begin{
-							partitionID: 2,
-							repo:        repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-							},
-						},
-						commit{},
-					},
-				}
-			},
-		},
-		{
-			desc: "beginning transaction on partition with relative path filter on different partition fails",
-			setup: func(t *testing.T, cfg config.Cfg) setupData {
-				repo := setupRepository(t, cfg, cfg.Storages[0])
-
-				return setupData{
-					steps: steps{
-						begin{
-							partitionID:   100,
-							repo:          repo,
-							expectedError: fmt.Errorf("partition ID does not match repository partition"),
-						},
-					},
-				}
-			},
-		},
-		{
 			desc: "records metrics correctly",
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo1 := setupRepository(t, cfg, cfg.Storages[0])
 				return setupData{
 					steps: steps{
 						begin{
 							transactionID: 1,
-							partitionID:   2,
+							repo:          repo1,
 							readOnly:      true,
 							expectedState: map[storage.PartitionID]uint{
 								2: 1,
@@ -838,7 +797,7 @@ func TestStorageManager(t *testing.T) {
 						},
 						begin{
 							transactionID: 2,
-							partitionID:   2,
+							repo:          repo1,
 							readOnly:      true,
 							expectedState: map[storage.PartitionID]uint{
 								2: 2,
@@ -860,7 +819,7 @@ func TestStorageManager(t *testing.T) {
 						},
 						begin{
 							transactionID: 3,
-							partitionID:   2,
+							repo:          repo1,
 							readOnly:      true,
 							expectedState: map[storage.PartitionID]uint{
 								2: 1,
@@ -954,7 +913,7 @@ func TestStorageManager(t *testing.T) {
 					if step.repo != nil {
 						relativePath = step.repo.GetRelativePath()
 					}
-					txn, err := storageMgr.Begin(beginCtx, step.partitionID, storage.TransactionOptions{
+					txn, err := storageMgr.Begin(beginCtx, storage.TransactionOptions{
 						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
 						ReadOnly:              step.readOnly,
@@ -970,12 +929,8 @@ func TestStorageManager(t *testing.T) {
 
 					storageMgr.mu.Lock()
 
-					ptnID := step.partitionID
-					if step.repo != nil {
-						var err error
-						ptnID, err = storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, "", false)
-						require.NoError(t, err)
-					}
+					ptnID, err := storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, "", false)
+					require.NoError(t, err)
 
 					ptn := storageMgr.partitions[ptnID]
 					storageMgr.mu.Unlock()
@@ -1113,7 +1068,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
-	tx, err := storageMgr.Begin(ctx, 0, storage.TransactionOptions{
+	tx, err := storageMgr.Begin(ctx, storage.TransactionOptions{
 		RelativePath: "relative-path",
 		AllowPartitionAssignmentWithoutRepository: true,
 	})

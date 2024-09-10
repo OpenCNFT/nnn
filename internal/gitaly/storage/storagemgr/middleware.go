@@ -400,7 +400,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		return transactionalizedRequest{}, fmt.Errorf("get storage: %w", err)
 	}
 
-	tx, err := storageHandle.Begin(ctx, 0, storage.TransactionOptions{
+	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
 		ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
 		RelativePath:          targetRepo.RelativePath,
 		AlternateRelativePath: alternateRelativePath,

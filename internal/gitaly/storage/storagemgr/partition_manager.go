@@ -257,37 +257,28 @@ func stagingDirectoryPath(storagePath string) string {
 // Begin gets the Partition for the specified repository and starts a transaction. If a
 // Partition is not already running, a new one is created and used. The partition tracks
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
-//
-// If the partitionID is zero, then the partition is detected from opts.RelativePath.
-func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts storage.TransactionOptions) (_ storage.Transaction, returnedErr error) {
-	var relativePaths []string
-
-	if opts.RelativePath != "" {
-		var err error
-		opts.RelativePath, err = storage.ValidateRelativePath(sm.path, opts.RelativePath)
-		if err != nil {
-			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
-		}
-
-		repoPartitionID, err := sm.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
-		if err != nil {
-			if errors.Is(err, badger.ErrDBClosed) {
-				// The database is closed when PartitionManager is closing. Return a more
-				// descriptive error of what happened.
-				return nil, ErrPartitionManagerClosed
-			}
-
-			return nil, fmt.Errorf("get partition: %w", err)
-		}
-
-		if partitionID != invalidPartitionID && repoPartitionID != partitionID {
-			return nil, errors.New("partition ID does not match repository partition")
-		}
-
-		relativePaths = []string{opts.RelativePath}
-		partitionID = repoPartitionID
+func (sm *StorageManager) Begin(ctx context.Context, opts storage.TransactionOptions) (_ storage.Transaction, returnedErr error) {
+	if opts.RelativePath == "" {
+		return nil, fmt.Errorf("target relative path unset")
 	}
 
+	relativePath, err := storage.ValidateRelativePath(sm.path, opts.RelativePath)
+	if err != nil {
+		return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
+	}
+
+	partitionID, err := sm.partitionAssigner.getPartitionID(ctx, relativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+	if err != nil {
+		if errors.Is(err, badger.ErrDBClosed) {
+			// The database is closed when PartitionManager is closing. Return a more
+			// descriptive error of what happened.
+			return nil, ErrPartitionManagerClosed
+		}
+
+		return nil, fmt.Errorf("get partition: %w", err)
+	}
+
+	relativePaths := []string{relativePath}
 	relativeStateDir := deriveStateDirectory(partitionID)
 	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
