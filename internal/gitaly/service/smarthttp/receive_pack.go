@@ -3,6 +3,7 @@ package smarthttp
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -104,6 +105,11 @@ func (s *server) postReceivePack(
 		}()
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:  "receive-pack",
@@ -112,7 +118,7 @@ func (s *server) postReceivePack(
 		},
 		gitcmd.WithStdin(stdin),
 		gitcmd.WithStdout(stdout),
-		gitcmd.WithReceivePackHooks(req, "http", transactionsEnabled),
+		gitcmd.WithReceivePackHooks(objectHash, req, "http", transactionsEnabled),
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
 	)

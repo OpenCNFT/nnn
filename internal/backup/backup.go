@@ -216,7 +216,7 @@ func NewManagerLocal(
 		repositoryFactory: func(ctx context.Context, repo *gitalypb.Repository, server storage.ServerInfo) (Repository, error) {
 			localRepo := localrepo.New(logger, storageLocator, gitCmdFactory, catfileCache, repo)
 
-			return NewLocalRepository(logger, storageLocator, gitCmdFactory, txManager, repoCounter, localRepo), nil
+			return NewLocalRepository(logger, storageLocator, gitCmdFactory, txManager, repoCounter, catfileCache, localRepo), nil
 		},
 		logger: logger,
 	}

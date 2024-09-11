@@ -103,6 +103,7 @@ func TestLocalRepository_ResetRefs(t *testing.T) {
 		gitCmdFactory,
 		txManager,
 		repoCounter,
+		catfileCache,
 		lr)
 
 	// Create some commits
@@ -191,6 +192,7 @@ func TestLocalRepository_SetHeadReference(t *testing.T) {
 		gitCmdFactory,
 		txManager,
 		repoCounter,
+		catfileCache,
 		localrepo.New(testhelper.SharedLogger(t), locator, gitCmdFactory, catfileCache, repo))
 
 	c0 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(git.DefaultBranch))

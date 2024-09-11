@@ -137,11 +137,16 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 		}()
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	cmd, err := repo.Exec(ctx, gitcmd.Command{Name: "receive-pack", Args: []string{repoPath}},
 		gitcmd.WithStdin(pr),
 		gitcmd.WithStdout(stdout),
 		gitcmd.WithStderr(stderr),
-		gitcmd.WithReceivePackHooks(req, "ssh", transactionsEnabled),
+		gitcmd.WithReceivePackHooks(objectHash, req, "ssh", transactionsEnabled),
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
 	)

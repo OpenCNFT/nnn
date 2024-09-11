@@ -115,6 +115,11 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 		return structerr.New("waiting for git-clone: %w", err).WithMetadata("stderr", cloneErr.String())
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	// When cloning a repository, the remote repository is automatically set up as "origin". As this
 	// is unnecessary, remove the configured "origin" remote.
 	var remoteErr bytes.Buffer
@@ -124,7 +129,7 @@ func (repo *Repo) CloneBundle(ctx context.Context, reader io.Reader) error {
 			Args: []string{"remove", "origin"},
 		},
 		gitcmd.WithStderr(&remoteErr),
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(objectHash, repo),
 	)
 	if err != nil {
 		return fmt.Errorf("spawning git-remote: %w", err)

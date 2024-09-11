@@ -122,15 +122,21 @@ func (s *server) runUploadPack(ctx context.Context, req *gitalypb.PostUploadPack
 		gitConfig = append(gitConfig, uploadPackConfig...)
 	}
 
+	repo := s.localrepo(req.GetRepository())
+
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	commandOpts := []gitcmd.CmdOpt{
 		gitcmd.WithStdin(stdin),
 		gitcmd.WithSetupStdout(),
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(gitConfig...),
-		gitcmd.WithPackObjectsHookEnv(req.GetRepository(), "http"),
+		gitcmd.WithPackObjectsHookEnv(objectHash, req.GetRepository(), "http"),
 	}
 
-	repo := s.localrepo(req.GetRepository())
 	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "upload-pack",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},

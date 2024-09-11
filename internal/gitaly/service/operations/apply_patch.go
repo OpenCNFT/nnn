@@ -134,7 +134,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		})),
 		gitcmd.WithStdout(&stdout),
 		gitcmd.WithStderr(&stderr),
-		gitcmd.WithRefTxHook(header.Repository),
+		gitcmd.WithRefTxHook(objectHash, repo),
 		gitcmd.WithWorktree(worktreePath),
 	); err != nil {
 		// The Ruby implementation doesn't include stderr in errors, which makes
@@ -238,13 +238,18 @@ func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktree
 		flags = append(flags, gitcmd.Flag{Name: "--no-checkout"})
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	var stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "add",
 		Flags:  flags,
 		Args:   args,
-	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(repo)); err != nil {
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(objectHash, repo)); err != nil {
 		return fmt.Errorf("adding worktree: %w", gitError{ErrMsg: stderr.String(), Err: err})
 	}
 
@@ -252,6 +257,11 @@ func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktree
 }
 
 func (s *Server) removeWorktree(ctx context.Context, repo gitcmd.RepositoryExecutor, worktreeName string) error {
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:   "worktree",
@@ -259,7 +269,7 @@ func (s *Server) removeWorktree(ctx context.Context, repo gitcmd.RepositoryExecu
 			Flags:  []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 			Args:   []string{worktreeName},
 		},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(objectHash, repo),
 	)
 	if err != nil {
 		return fmt.Errorf("creation of 'worktree remove': %w", err)

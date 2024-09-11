@@ -100,14 +100,19 @@ func cleanStaleWorktrees(ctx context.Context, repo *localrepo.Repo, threshold ti
 var errUnknownWorktree = errors.New("unknown worktree")
 
 func removeWorktree(ctx context.Context, repo *localrepo.Repo, name string) error {
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	var stderr bytes.Buffer
-	err := repo.ExecAndWait(ctx, gitcmd.Command{
+	err = repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "remove",
 		Flags:  []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 		Args:   []string{name},
 	},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(objectHash, repo),
 		gitcmd.WithStderr(&stderr),
 	)
 	if isExitWithCode(err, 128) && strings.HasPrefix(stderr.String(), "fatal: '"+name+"' is not a working tree") {
@@ -164,8 +169,13 @@ func cleanDisconnectedWorktrees(ctx context.Context, repo *localrepo.Repo) error
 		return nil
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	return repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "prune",
-	}, gitcmd.WithRefTxHook(repo))
+	}, gitcmd.WithRefTxHook(objectHash, repo))
 }

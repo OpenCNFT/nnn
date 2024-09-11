@@ -8,7 +8,18 @@ import (
 )
 
 func (s *server) removeOriginInRepo(ctx context.Context, repository gitcmd.RepositoryExecutor) error {
-	cmd, err := repository.Exec(ctx, gitcmd.Command{Name: "remote", Args: []string{"remove", "origin"}}, gitcmd.WithRefTxHook(repository))
+	objectHash, err := repository.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
+	cmd, err := repository.Exec(
+		ctx,
+		gitcmd.Command{
+			Name: "remote",
+			Args: []string{"remove", "origin"},
+		},
+		gitcmd.WithRefTxHook(objectHash, repository))
 	if err != nil {
 		return fmt.Errorf("remote cmd start: %w", err)
 	}

@@ -123,10 +123,15 @@ func (s *server) sshUploadPack(ctx context.Context, req sshUploadPackRequest, st
 		config = append(config, uploadPackConfig...)
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	commandOpts := []gitcmd.CmdOpt{
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
-		gitcmd.WithPackObjectsHookEnv(repoProto, "ssh"),
+		gitcmd.WithPackObjectsHookEnv(objectHash, repoProto, "ssh"),
 	}
 
 	timeoutTicker := s.uploadPackRequestTimeoutTickerFactory()
