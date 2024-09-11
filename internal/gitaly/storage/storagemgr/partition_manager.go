@@ -153,18 +153,6 @@ func (sm *StorageManager) Close() {
 	}
 }
 
-// finalizeTransaction decrements the partition's pending transaction count and closes it if there are no more
-// transactions pending.
-func (sm *StorageManager) finalizeTransaction(ptn *partition) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	ptn.pendingTransactionCount--
-	if ptn.pendingTransactionCount == 0 {
-		ptn.close()
-	}
-}
-
 // finalizableTransaction wraps a transaction to track the number of in-flight transactions for a Partition.
 type finalizableTransaction struct {
 	// finalize is called when the transaction is either committed or rolled back.
@@ -185,16 +173,11 @@ func (tx *finalizableTransaction) Rollback() error {
 	return tx.Transaction.Rollback()
 }
 
-// newFinalizableTransaction returns a wrapped transaction that executes finalizeTransaction when the transaction
-// is committed or rolled back.
-func (sm *StorageManager) newFinalizableTransaction(ptn *partition, tx storage.Transaction) *finalizableTransaction {
-	var finalizeOnce sync.Once
+// newFinalizableTransaction returns a wrapped transaction that executes finalize when the transaction
+// is committed or rollbacked.
+func newFinalizableTransaction(tx storage.Transaction, finalize func()) *finalizableTransaction {
 	return &finalizableTransaction{
-		finalize: func() {
-			finalizeOnce.Do(func() {
-				sm.finalizeTransaction(ptn)
-			})
-		},
+		finalize:    finalize,
 		Transaction: tx,
 	}
 }
@@ -209,10 +192,10 @@ type partition struct {
 	// Clients stumbling on the partition when it is closing wait on this channel to know when the previous
 	// partition instance has closed and it is safe to start another one.
 	partitionClosed chan struct{}
-	// partition manages all transactions for the partition.
-	partition Partition
-	// pendingTransactionCount holds the current number of in flight transactions being processed by the manager.
-	pendingTransactionCount uint
+	// referenceCount holds the current number of references held to the partition.
+	referenceCount uint
+	// Partition is the wrapped partition handle.
+	Partition
 }
 
 // close closes the partition's transaction manager.
@@ -226,7 +209,7 @@ func (ptn *partition) close() {
 	}
 
 	close(ptn.closing)
-	ptn.partition.Close()
+	ptn.Close()
 }
 
 // isClosing returns whether partition is closing.
@@ -274,40 +257,28 @@ func stagingDirectoryPath(storagePath string) string {
 // Begin gets the Partition for the specified repository and starts a transaction. If a
 // Partition is not already running, a new one is created and used. The partition tracks
 // the number of pending transactions and this counter gets incremented when Begin is invoked.
-//
-// If the partitionID is zero, then the partition is detected from opts.RelativePath.
-func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.PartitionID, opts storage.TransactionOptions) (storage.Transaction, error) {
-	var relativePaths []string
-
-	if opts.KVOnly {
-		// Don't snapshot any repositories and only start a KV transaction.
-		relativePaths = []string{}
-	} else if opts.RelativePath != "" {
-		var err error
-		opts.RelativePath, err = storage.ValidateRelativePath(sm.path, opts.RelativePath)
-		if err != nil {
-			return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
-		}
-
-		repoPartitionID, err := sm.partitionAssigner.getPartitionID(ctx, opts.RelativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
-		if err != nil {
-			if errors.Is(err, badger.ErrDBClosed) {
-				// The database is closed when PartitionManager is closing. Return a more
-				// descriptive error of what happened.
-				return nil, ErrPartitionManagerClosed
-			}
-
-			return nil, fmt.Errorf("get partition: %w", err)
-		}
-
-		if partitionID != invalidPartitionID && repoPartitionID != partitionID {
-			return nil, errors.New("partition ID does not match repository partition")
-		}
-
-		relativePaths = []string{opts.RelativePath}
-		partitionID = repoPartitionID
+func (sm *StorageManager) Begin(ctx context.Context, opts storage.TransactionOptions) (_ storage.Transaction, returnedErr error) {
+	if opts.RelativePath == "" {
+		return nil, fmt.Errorf("target relative path unset")
 	}
 
+	relativePath, err := storage.ValidateRelativePath(sm.path, opts.RelativePath)
+	if err != nil {
+		return nil, structerr.NewInvalidArgument("validate relative path: %w", err)
+	}
+
+	partitionID, err := sm.partitionAssigner.getPartitionID(ctx, relativePath, opts.AlternateRelativePath, opts.AllowPartitionAssignmentWithoutRepository)
+	if err != nil {
+		if errors.Is(err, badger.ErrDBClosed) {
+			// The database is closed when PartitionManager is closing. Return a more
+			// descriptive error of what happened.
+			return nil, ErrPartitionManagerClosed
+		}
+
+		return nil, fmt.Errorf("get partition: %w", err)
+	}
+
+	relativePaths := []string{relativePath}
 	relativeStateDir := deriveStateDirectory(partitionID)
 	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
@@ -323,26 +294,28 @@ func (sm *StorageManager) Begin(ctx context.Context, partitionID storage.Partiti
 		return nil, err
 	}
 
+	defer func() {
+		if returnedErr != nil {
+			// Close the partition handle on error as the caller wouldn't do so anymore by
+			// committing/rollbacking the transaction.
+			ptn.Close()
+		}
+	}()
+
 	if opts.AlternateRelativePath != "" {
 		relativePaths = append(relativePaths, opts.AlternateRelativePath)
 	}
 
-	transaction, err := ptn.partition.Begin(ctx, storage.BeginOptions{
+	transaction, err := ptn.Begin(ctx, storage.BeginOptions{
 		Write:                  !opts.ReadOnly,
 		RelativePaths:          relativePaths,
 		ForceExclusiveSnapshot: opts.ForceExclusiveSnapshot,
 	})
 	if err != nil {
-		// The pending transaction count needs to be decremented since the transaction is no longer
-		// inflight. A transaction failing does not necessarily mean the transaction manager has
-		// stopped running. Consequently, if there are no other pending transactions the partition
-		// should be closed.
-		sm.finalizeTransaction(ptn)
-
 		return nil, err
 	}
 
-	return sm.newFinalizableTransaction(ptn, transaction), nil
+	return newFinalizableTransaction(transaction, ptn.Close), nil
 }
 
 // CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
@@ -352,9 +325,9 @@ func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storag
 		return err
 	}
 
-	defer sm.finalizeTransaction(ptn)
+	defer ptn.Close()
 
-	logManager, ok := ptn.partition.(storage.LogManager)
+	logManager, ok := ptn.Partition.(storage.LogManager)
 	if !ok {
 		return fmt.Errorf("expected LogManager, got %T", logManager)
 	}
@@ -364,8 +337,40 @@ func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storag
 	return nil
 }
 
+// partitionHandle is a handle to a partition. It wraps the close method of a partition with reference
+// counting and only closes the partition if there are no other remaining references to it.
+type partitionHandle struct {
+	*partition
+	sm   *StorageManager
+	once sync.Once
+}
+
+// newPartitionHandle creates a new handle to the partition. `sm.mu.Lock()` must be held while calling this.
+func newPartitionHandle(sm *StorageManager, ptn *partition) *partitionHandle {
+	ptn.referenceCount++
+	return &partitionHandle{sm: sm, partition: ptn}
+}
+
+// Close decrements the partition's reference count and closes it if there are no more references to it.
+func (p *partitionHandle) Close() {
+	p.once.Do(func() {
+		p.sm.mu.Lock()
+		defer p.sm.mu.Unlock()
+
+		p.partition.referenceCount--
+		if p.partition.referenceCount == 0 {
+			p.partition.close()
+		}
+	})
+}
+
+// GetPartition returns a new handle to a partition.
+func (sm *StorageManager) GetPartition(ctx context.Context, partitionID storage.PartitionID) (storage.Partition, error) {
+	return sm.startPartition(ctx, partitionID)
+}
+
 // startPartition starts a partition.
-func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partition, error) {
+func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partitionHandle, error) {
 	relativeStateDir := deriveStateDirectory(partitionID)
 	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
 	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
@@ -410,7 +415,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				sm.consumer,
 			)
 
-			ptn.partition = mgr
+			ptn.Partition = mgr
 
 			sm.partitions[partitionID] = ptn
 
@@ -464,10 +469,9 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			continue
 		}
 
-		ptn.pendingTransactionCount++
-		sm.mu.Unlock()
+		defer sm.mu.Unlock()
 
-		return ptn, nil
+		return newPartitionHandle(sm, ptn), nil
 	}
 }
 

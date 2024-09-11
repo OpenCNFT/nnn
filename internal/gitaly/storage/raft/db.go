@@ -39,9 +39,16 @@ func newNamespacedDBAccessor(node storage.Node, storageName string, namespace []
 				return fmt.Errorf("get storage: %w", err)
 			}
 
-			tx, err := storageHandle.Begin(ctx, storagemgr.MetadataPartitionID, storage.TransactionOptions{
-				ReadOnly: readOnly,
-				KVOnly:   true,
+			partition, err := storageHandle.GetPartition(ctx, storagemgr.MetadataPartitionID)
+			if err != nil {
+				return fmt.Errorf("get partition: %w", err)
+			}
+			defer partition.Close()
+
+			tx, err := partition.Begin(ctx, storage.BeginOptions{
+				Write: !readOnly,
+				// Filter out the disk state entirely as we're only interested in doing KV operations here.
+				RelativePaths: []string{},
 			})
 			if err != nil {
 				return fmt.Errorf("begin: %w", err)

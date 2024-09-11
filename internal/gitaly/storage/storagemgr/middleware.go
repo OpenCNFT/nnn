@@ -230,6 +230,9 @@ func nonTransactionalRequest(ctx context.Context, firstMessage proto.Message) tr
 // be invoked with. In addition, it returns a function that must be called with the error returned from the handler to either commit or rollback the
 // transaction. The returned values are valid even if the request should not run transactionally.
 func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (_ transactionalizedRequest, returnedErr error) {
+	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.transactionalizeRequest", nil)
+	defer span.Finish()
+
 	switch methodInfo.Scope {
 	case protoregistry.ScopeRepository:
 		return beginTransactionForRepository(ctx, logger, txRegistry, node, locator, methodInfo, req)
@@ -240,7 +243,7 @@ func transactionalizeRequest(ctx context.Context, logger log.Logger, txRegistry 
 	}
 }
 
-func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
+func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, methodInfo protoregistry.MethodInfo, req proto.Message) (_ transactionalizedRequest, returnedErr error) {
 	targetStorage, err := methodInfo.Storage(req)
 	if err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("extract target storage: %w", err)
@@ -251,22 +254,34 @@ func beginTransactionForPartition(ctx context.Context, logger log.Logger, txRegi
 		return transactionalizedRequest{}, fmt.Errorf("extract target partition: %w", err)
 	}
 
-	return beginTransaction(
-		ctx,
-		logger,
-		txRegistry,
-		node,
-		methodInfo,
-		req,
-		targetStorage,
-		targetPartition,
-		storage.TransactionOptions{
-			ReadOnly: methodInfo.Operation == protoregistry.OpAccessor,
-		},
-	)
+	storageHandle, err := node.GetStorage(targetStorage)
+	if err != nil {
+		return transactionalizedRequest{}, fmt.Errorf("get storage: %w", err)
+	}
+
+	partition, err := storageHandle.GetPartition(ctx, targetPartition)
+	if err != nil {
+		return transactionalizedRequest{}, fmt.Errorf("get partition: %w", err)
+	}
+	defer func() {
+		if returnedErr != nil {
+			// Close the partition if we fail to start a transaction. Otherwise we wrap the transaction to close
+			// the partition when it finishes.
+			partition.Close()
+		}
+	}()
+
+	tx, err := partition.Begin(ctx, storage.BeginOptions{
+		Write: methodInfo.Operation == protoregistry.OpMutator || methodInfo.Operation == protoregistry.OpMaintenance,
+	})
+	if err != nil {
+		return transactionalizedRequest{}, fmt.Errorf("begin: %w", err)
+	}
+
+	return newTransactionalizedRequest(ctx, logger, txRegistry, req, newFinalizableTransaction(tx, partition.Close)), nil
 }
 
-func beginTransactionForRepository(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (transactionalizedRequest, error) {
+func beginTransactionForRepository(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, locator storage.Locator, methodInfo protoregistry.MethodInfo, req proto.Message) (_ transactionalizedRequest, returnedErr error) {
 	targetRepo, err := methodInfo.TargetRepo(req)
 	if err != nil {
 		if errors.Is(err, protoregistry.ErrRepositoryFieldNotFound) {
@@ -380,75 +395,34 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 	// See issue: https://gitlab.com/gitlab-org/gitaly/-/issues/5957
 	_, isRepositoryCreation := repositoryCreatingRPCs[methodInfo.FullMethodName()]
 
-	return beginTransaction(
-		ctx,
-		logger,
-		txRegistry,
-		node,
-		methodInfo,
-		req,
-		targetRepo.StorageName,
-		0,
-		storage.TransactionOptions{
-			ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
-			RelativePath:          targetRepo.RelativePath,
-			AlternateRelativePath: alternateRelativePath,
-			AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,
-			ForceExclusiveSnapshot:                    forceExclusiveSnapshot[methodInfo.FullMethodName()],
-		},
-	)
-}
-
-func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, node storage.Node, methodInfo protoregistry.MethodInfo, req proto.Message, storageName string, partitionID storage.PartitionID, transactionOptions storage.TransactionOptions) (_ transactionalizedRequest, returnedErr error) {
-	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.transactionalizeRequest", nil)
-
-	storageHandle, err := node.GetStorage(storageName)
+	storageHandle, err := node.GetStorage(targetRepo.StorageName)
 	if err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("get storage: %w", err)
 	}
 
-	tx, err := storageHandle.Begin(ctx, partitionID, transactionOptions)
+	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
+		ReadOnly:              methodInfo.Operation == protoregistry.OpAccessor,
+		RelativePath:          targetRepo.RelativePath,
+		AlternateRelativePath: alternateRelativePath,
+		AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,
+		ForceExclusiveSnapshot:                    forceExclusiveSnapshot[methodInfo.FullMethodName()],
+	})
 	if err != nil {
 		var relativePath relativePathNotFoundError
 		if errors.As(err, &relativePath) {
 			// The partition assigner does not have the storage available and returns thus just an error with the
 			// relative path. Convert the error to the usual repository not found error that the RPCs are returning
 			// to conform to the API.
-			return transactionalizedRequest{}, storage.NewRepositoryNotFoundError(storageName, string(relativePath))
+			return transactionalizedRequest{}, storage.NewRepositoryNotFoundError(targetRepo.StorageName, string(relativePath))
 		}
 
 		return transactionalizedRequest{}, fmt.Errorf("begin transaction: %w", err)
 	}
-
-	ctx = storage.ContextWithTransaction(ctx, tx)
-
-	txID := txRegistry.register(tx)
-	ctx = storage.ContextWithTransactionID(ctx, txID)
-
-	// If the proc-receive or post-receive hook is invoked, the transaction may already be committed
-	// to ensure the new data is readable. Ignore the already committed errors here.
-	finishTX := func(handlerErr error) error {
-		defer span.Finish()
-		defer txRegistry.unregister(txID)
-
-		if handlerErr != nil {
-			if err := tx.Rollback(); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
-				logger.WithError(err).ErrorContext(ctx, "failed rolling back transaction")
-			}
-
-			return handlerErr
-		}
-
-		if err := tx.Commit(ctx); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
-			return fmt.Errorf("commit: %w", err)
-		}
-
-		return nil
-	}
-
 	defer func() {
 		if returnedErr != nil {
-			returnedErr = finishTX(returnedErr)
+			if err := tx.Rollback(); err != nil {
+				returnedErr = errors.Join(returnedErr, fmt.Errorf("rollback: %w", err))
+			}
 		}
 	}()
 
@@ -457,11 +431,36 @@ func beginTransaction(ctx context.Context, logger log.Logger, txRegistry *Transa
 		return transactionalizedRequest{}, fmt.Errorf("rewrite request: %w", err)
 	}
 
+	return newTransactionalizedRequest(ctx, logger, txRegistry, rewrittenReq, tx), nil
+}
+
+func newTransactionalizedRequest(ctx context.Context, logger log.Logger, txRegistry *TransactionRegistry, firstMessage proto.Message, tx storage.Transaction) transactionalizedRequest {
+	txID := txRegistry.register(tx)
 	return transactionalizedRequest{
-		ctx:               ctx,
-		firstMessage:      rewrittenReq,
-		finishTransaction: finishTX,
-	}, nil
+		ctx: storage.ContextWithTransactionID(
+			storage.ContextWithTransaction(ctx, tx),
+			txID,
+		),
+		firstMessage: firstMessage,
+		finishTransaction: func(handlerErr error) error {
+			defer txRegistry.unregister(txID)
+			if handlerErr != nil {
+				if err := tx.Rollback(); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
+					logger.WithError(err).ErrorContext(ctx, "failed rolling back transaction")
+				}
+
+				return handlerErr
+			}
+
+			// If the proc-receive or post-receive hook is invoked, the transaction may already be committed
+			// to ensure the new data is readable. Ignore the already committed errors here.
+			if err := tx.Commit(ctx); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
+				return fmt.Errorf("commit: %w", err)
+			}
+
+			return nil
+		},
+	}
 }
 
 func rewritableRequest(methodInfo protoregistry.MethodInfo, req proto.Message) (proto.Message, *gitalypb.Repository, error) {

@@ -108,7 +108,7 @@ func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExisti
 			return fmt.Errorf("get storage: %w", err)
 		}
 
-		tx, err = storageHandle.Begin(ctx, 0, storage.TransactionOptions{
+		tx, err = storageHandle.Begin(ctx, storage.TransactionOptions{
 			RelativePath: repo.GetRelativePath(),
 		})
 		if err != nil {
