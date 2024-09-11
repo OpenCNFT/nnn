@@ -66,7 +66,7 @@ func (s *server) executeMaybeWithTransaction(ctx context.Context, repo *localrep
 		return fmt.Errorf("get storage: %w", err)
 	}
 
-	transaction, err := storageHandle.Begin(ctx, 0, storage.TransactionOptions{
+	transaction, err := storageHandle.Begin(ctx, storage.TransactionOptions{
 		ReadOnly:     true,
 		RelativePath: repo.GetRelativePath(),
 	})

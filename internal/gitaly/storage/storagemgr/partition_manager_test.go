@@ -167,7 +167,7 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 	for _, ptn := range mgr.partitions {
 		// The closePartition step closes the transaction manager directly without calling close
 		// on the partition, so we check the manager directly here as well.
-		if ptn.isClosing() || ptn.partition.(*mockPartition).closeCalled.Load() {
+		if ptn.isClosing() || ptn.Partition.(*mockPartition).closeCalled.Load() {
 			waiter := ptn.partitionClosed
 			if waitForFullClose {
 				waiter = ptn.closed
@@ -181,6 +181,23 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 	for _, closed := range waitFor {
 		<-closed
 	}
+}
+
+// checkExpectedState validates that the storage manager contains the correct partitions and
+// associated reference counts at the point of execution.
+func checkExpectedState(t *testing.T, mgr *StorageManager, expectedState map[storage.PartitionID]uint) {
+	t.Helper()
+
+	actualState := map[storage.PartitionID]uint{}
+	for ptnID, partition := range mgr.partitions {
+		actualState[ptnID] = partition.referenceCount
+	}
+
+	if expectedState == nil {
+		expectedState = map[storage.PartitionID]uint{}
+	}
+
+	require.Equal(t, expectedState, actualState)
 }
 
 func TestStorageManager(t *testing.T) {
@@ -201,9 +218,6 @@ func TestStorageManager(t *testing.T) {
 		ctx context.Context
 		// repo is the repository that the transaction belongs to.
 		repo storage.Repository
-		// partitionID is the partition that the transaction belongs to.
-		// Overwritten by the repo partition ID if repo is set.
-		partitionID storage.PartitionID
 		// alternateRelativePath is the relative path of the alternate repository.
 		alternateRelativePath string
 		// readOnly indicates if the transaction is read-only.
@@ -246,13 +260,6 @@ func TestStorageManager(t *testing.T) {
 		transactionID int
 	}
 
-	// finalizeTransaction runs the transaction finalizer for the specified repository. This is used
-	// to simulate finalizers executing after a transaction manager has been stopped.
-	type finalizeTransaction struct {
-		// transactionID identifies the transaction to finalize.
-		transactionID int
-	}
-
 	// closeManager closes the partition manager. This is done to simulate errors for transactions
 	// being processed without a running partition manager.
 	type closeManager struct{}
@@ -261,23 +268,6 @@ func TestStorageManager(t *testing.T) {
 	type assertMetrics struct {
 		partitionsStartedTotal uint64
 		partitionsStoppedTotal uint64
-	}
-
-	// checkExpectedState validates that the partition manager contains the correct partitions and
-	// associated transaction count at the point of execution.
-	checkExpectedState := func(t *testing.T, cfg config.Cfg, mgr *StorageManager, expectedState map[storage.PartitionID]uint) {
-		t.Helper()
-
-		actualState := map[storage.PartitionID]uint{}
-		for ptnID, partition := range mgr.partitions {
-			actualState[ptnID] = partition.pendingTransactionCount
-		}
-
-		if expectedState == nil {
-			expectedState = map[storage.PartitionID]uint{}
-		}
-
-		require.Equal(t, expectedState, actualState)
 	}
 
 	setupRepository := func(t *testing.T, cfg config.Cfg, storage config.Storage) storage.Repository {
@@ -549,8 +539,11 @@ func TestStorageManager(t *testing.T) {
 								2: 1,
 							},
 						},
-						finalizeTransaction{
+						rollback{
 							transactionID: 1,
+							expectedState: map[storage.PartitionID]uint{
+								2: 1,
+							},
 						},
 						commit{
 							transactionID: 2,
@@ -752,18 +745,14 @@ func TestStorageManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "transaction committed for partition",
+			desc: "beginning a transaction without a relative path fails",
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
 				return setupData{
 					steps: steps{
 						begin{
-							partitionID: 2,
-							readOnly:    true,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-							},
+							transactionID: 1,
+							expectedError: fmt.Errorf("target relative path unset"),
 						},
-						commit{},
 					},
 				}
 			},
@@ -790,48 +779,14 @@ func TestStorageManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "transaction committed for partition with relative path filter",
-			setup: func(t *testing.T, cfg config.Cfg) setupData {
-				repo := setupRepository(t, cfg, cfg.Storages[0])
-
-				return setupData{
-					steps: steps{
-						begin{
-							partitionID: 2,
-							repo:        repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-							},
-						},
-						commit{},
-					},
-				}
-			},
-		},
-		{
-			desc: "beginning transaction on partition with relative path filter on different partition fails",
-			setup: func(t *testing.T, cfg config.Cfg) setupData {
-				repo := setupRepository(t, cfg, cfg.Storages[0])
-
-				return setupData{
-					steps: steps{
-						begin{
-							partitionID:   100,
-							repo:          repo,
-							expectedError: fmt.Errorf("partition ID does not match repository partition"),
-						},
-					},
-				}
-			},
-		},
-		{
 			desc: "records metrics correctly",
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo1 := setupRepository(t, cfg, cfg.Storages[0])
 				return setupData{
 					steps: steps{
 						begin{
 							transactionID: 1,
-							partitionID:   2,
+							repo:          repo1,
 							readOnly:      true,
 							expectedState: map[storage.PartitionID]uint{
 								2: 1,
@@ -842,7 +797,7 @@ func TestStorageManager(t *testing.T) {
 						},
 						begin{
 							transactionID: 2,
-							partitionID:   2,
+							repo:          repo1,
 							readOnly:      true,
 							expectedState: map[storage.PartitionID]uint{
 								2: 2,
@@ -864,7 +819,7 @@ func TestStorageManager(t *testing.T) {
 						},
 						begin{
 							transactionID: 3,
-							partitionID:   2,
+							repo:          repo1,
 							readOnly:      true,
 							expectedState: map[storage.PartitionID]uint{
 								2: 1,
@@ -958,7 +913,7 @@ func TestStorageManager(t *testing.T) {
 					if step.repo != nil {
 						relativePath = step.repo.GetRelativePath()
 					}
-					txn, err := storageMgr.Begin(beginCtx, step.partitionID, storage.TransactionOptions{
+					txn, err := storageMgr.Begin(beginCtx, storage.TransactionOptions{
 						RelativePath:          relativePath,
 						AlternateRelativePath: step.alternateRelativePath,
 						ReadOnly:              step.readOnly,
@@ -966,7 +921,7 @@ func TestStorageManager(t *testing.T) {
 					require.Equal(t, step.expectedError, err)
 
 					blockOnPartitionClosing(t, storageMgr, true)
-					checkExpectedState(t, cfg, storageMgr, step.expectedState)
+					checkExpectedState(t, storageMgr, step.expectedState)
 
 					if err != nil {
 						continue
@@ -974,12 +929,8 @@ func TestStorageManager(t *testing.T) {
 
 					storageMgr.mu.Lock()
 
-					ptnID := step.partitionID
-					if step.repo != nil {
-						var err error
-						ptnID, err = storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, "", false)
-						require.NoError(t, err)
-					}
+					ptnID, err := storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, "", false)
+					require.NoError(t, err)
 
 					ptn := storageMgr.partitions[ptnID]
 					storageMgr.mu.Unlock()
@@ -1002,7 +953,7 @@ func TestStorageManager(t *testing.T) {
 					require.ErrorIs(t, data.txn.Commit(commitCtx), step.expectedError)
 
 					blockOnPartitionClosing(t, storageMgr, true)
-					checkExpectedState(t, cfg, storageMgr, step.expectedState)
+					checkExpectedState(t, storageMgr, step.expectedState)
 				case rollback:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction rolled back before being started")
 
@@ -1010,7 +961,7 @@ func TestStorageManager(t *testing.T) {
 					require.ErrorIs(t, data.txn.Rollback(), step.expectedError)
 
 					blockOnPartitionClosing(t, storageMgr, true)
-					checkExpectedState(t, cfg, storageMgr, step.expectedState)
+					checkExpectedState(t, storageMgr, step.expectedState)
 				case closePartition:
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction manager stopped before being started")
 
@@ -1018,15 +969,9 @@ func TestStorageManager(t *testing.T) {
 					// Close the Partition instance directly. Closing through the partition wrapper would change
 					// the state used to sync which should only be changed when the closing is initiated through
 					// the normal means.
-					data.ptn.partition.Close()
+					data.ptn.Partition.Close()
 
 					blockOnPartitionClosing(t, storageMgr, false)
-				case finalizeTransaction:
-					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction finalized before being started")
-
-					data := openTransactionData[step.transactionID]
-
-					data.storageMgr.finalizeTransaction(data.ptn)
 				case closeManager:
 					require.False(t, storageManagerStopped, "test error: storage manager already stopped")
 					storageManagerStopped = true
@@ -1050,6 +995,62 @@ gitaly_partitions_stopped_total{storage="default"} %d
 	}
 }
 
+func TestStorageManager_getPartition(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+
+	cfg := testcfg.Build(t)
+	logger := testhelper.SharedLogger(t)
+
+	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	require.NoError(t, err)
+	defer dbMgr.Close()
+
+	storageName := cfg.Storages[0].Name
+	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	ptn1, err := mgr.GetPartition(ctx, 1)
+	require.NoError(t, err)
+
+	ptn2Handle1, err := mgr.GetPartition(ctx, 2)
+	require.NoError(t, err)
+
+	ptn2Handle2, err := mgr.GetPartition(ctx, 2)
+	require.NoError(t, err)
+
+	require.Same(t, ptn2Handle1.(*partitionHandle).Partition, ptn2Handle2.(*partitionHandle).Partition)
+	require.NotSame(t, ptn1.(*partitionHandle).Partition, ptn2Handle1.(*partitionHandle).Partition)
+
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		1: 1,
+		2: 2,
+	})
+
+	// Closing the only handle to a partition should clean it up.
+	ptn1.Close()
+	blockOnPartitionClosing(t, mgr, false)
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		2: 2,
+	})
+
+	// Closing a handle shouldn't clean up a partition if there are
+	// further open handles to it. Closing is idempotent.
+	for i := 0; i < 2; i++ {
+		ptn2Handle1.Close()
+		blockOnPartitionClosing(t, mgr, false)
+		checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+			2: 1,
+		})
+	}
+
+	// Closing cleans up all remaining partitions.
+	mgr.Close()
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
+}
+
 func TestStorageManager_concurrentClose(t *testing.T) {
 	t.Parallel()
 
@@ -1067,7 +1068,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
-	tx, err := storageMgr.Begin(ctx, 0, storage.TransactionOptions{
+	tx, err := storageMgr.Begin(ctx, storage.TransactionOptions{
 		RelativePath: "relative-path",
 		AllowPartitionAssignmentWithoutRepository: true,
 	})
@@ -1093,7 +1094,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	}()
 
 	// The Partition may return if it errors out.
-	txMgr := storageMgr.partitions[2].partition
+	txMgr := storageMgr.partitions[2].Partition
 	go func() {
 		defer wg.Done()
 		<-start

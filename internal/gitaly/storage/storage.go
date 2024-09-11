@@ -162,9 +162,6 @@ type TransactionOptions struct {
 	// ForceExclusiveSnapshot forces the transactions to use an exclusive snapshot. This is a temporary
 	// workaround for some RPCs that do not work well with shared read-only snapshots yet.
 	ForceExclusiveSnapshot bool
-	// KVOnly is an option that starts only a key-value transaction against the partition when no relative
-	// path is provided.
-	KVOnly bool
 }
 
 // Storage is the interface of a storage.
@@ -175,7 +172,10 @@ type Storage interface {
 	// has been assigned to.
 	GetAssignedPartitionID(relativePath string) (PartitionID, error)
 	// Begin begins a transaction against a partition.
-	Begin(context.Context, PartitionID, TransactionOptions) (Transaction, error)
+	Begin(context.Context, TransactionOptions) (Transaction, error)
+	// GetPartition returns a new handle to a given partition. The caller must call
+	// Partition.Close() when the Partition is no longer needed.
+	GetPartition(context.Context, PartitionID) (Partition, error)
 }
 
 // Node is the interface of a node. Each Node may have zero or more storages.
