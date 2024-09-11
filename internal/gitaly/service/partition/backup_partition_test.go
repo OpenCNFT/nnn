@@ -25,8 +25,6 @@ func TestBackupPartition(t *testing.T) {
 		t.Skip(`Praefect currently doesn't support routing the PARTITION scoped RPC messages.`)
 	}
 
-	ctx := testhelper.Context(t)
-
 	type setupData struct {
 		cfg         config.Cfg
 		ptnClient   gitalypb.PartitionServiceClient
@@ -94,6 +92,8 @@ func TestBackupPartition(t *testing.T) {
 		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
+
+			ctx := testhelper.Context(t)
 
 			backupRoot := testhelper.TempDir(t)
 			backupSink, err := backup.ResolveSink(ctx, backupRoot)
