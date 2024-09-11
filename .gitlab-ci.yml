@@ -101,6 +101,8 @@ workflow:
 .test_template: &test_definition
   needs: []
   stage: test
+  tags:
+    - saas-linux-2xlarge-amd64
   cache:
     - *cache_deps_configuration
     - *cache_go_configuration
