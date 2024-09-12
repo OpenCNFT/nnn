@@ -141,7 +141,6 @@ type BeginOptions struct {
 
 // Partition is responsible for a single partition of data.
 type Partition interface {
-	LogManager
 	// Begin begins a transaction against the partition.
 	Begin(context.Context, BeginOptions) (Transaction, error)
 	// Close closes the partition handle to signal the caller is done using it.

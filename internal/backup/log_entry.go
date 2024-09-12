@@ -81,6 +81,16 @@ type partitionInfo struct {
 	partitionID storage.PartitionID
 }
 
+// LogManager is the interface used on the consumer side of the integration. The consumer
+// has the ability to acknowledge transactions as having been processed with AcknowledgeTransaction.
+type LogManager interface {
+	// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
+	// for the specified LogConsumer.
+	AcknowledgeTransaction(lsn storage.LSN)
+	// GetTransactionPath returns the path of the log entry's root directory.
+	GetTransactionPath(lsn storage.LSN) string
+}
+
 // LogEntryArchiver is used to backup applied log entries. It has a configurable number of
 // worker goroutines that will perform backups. Each partition may only have one backup
 // executing at a time, entries are always processed in-order. Backup failures will trigger
@@ -293,7 +303,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// We have already backed up all entries sent by the LogManager, but the manager is
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
-			if err := la.callLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storage.LogManager) {
+			if err := la.callLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm LogManager) {
 				lm.AcknowledgeTransaction(state.nextLSN - 1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
@@ -327,7 +337,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 	}
 }
 
-func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, callback func(lm storage.LogManager)) error {
+func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, callback func(lm LogManager)) error {
 	storageHandle, err := (*la.node).GetStorage(storageName)
 	if err != nil {
 		return fmt.Errorf("get storage: %w", err)
@@ -339,7 +349,12 @@ func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName stri
 	}
 	defer partition.Close()
 
-	callback(partition)
+	logManager, ok := partition.(LogManager)
+	if !ok {
+		return fmt.Errorf("expected LogManager, got %T", logManager)
+	}
+
+	callback(logManager)
 
 	return nil
 }
@@ -375,7 +390,7 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 		la.waitDur = minRetryWait
 	}
 
-	if err := la.callLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
+	if err := la.callLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm LogManager) {
 		lm.AcknowledgeTransaction(entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
@@ -404,7 +419,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 	})
 
 	var entryPath string
-	if err := la.callLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
+	if err := la.callLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm LogManager) {
 		entryPath = lm.GetTransactionPath(entry.lsn)
 	}); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)
