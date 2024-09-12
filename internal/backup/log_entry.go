@@ -90,8 +90,8 @@ type LogEntryArchiver struct {
 	logger log.Logger
 	// archiveSink is the Sink used to backup log entries.
 	archiveSink Sink
-	// logManagerAccessor is the LogManagerAccessor used to access LogManagers.
-	logManagerAccessor *storage.LogManagerAccessor
+	// node is used to access the LogManagers.
+	node *storage.Node
 
 	// notificationCh is the channel used to signal that a new notification has arrived.
 	notificationCh chan struct{}
@@ -129,30 +129,30 @@ type LogEntryArchiver struct {
 }
 
 // NewLogEntryArchiver constructs a new LogEntryArchiver.
-func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr *storage.LogManagerAccessor) *LogEntryArchiver {
-	return newLogEntryArchiver(logger, archiveSink, workerCount, partitionMgr, helper.NewTimerTicker)
+func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, node *storage.Node) *LogEntryArchiver {
+	return newLogEntryArchiver(logger, archiveSink, workerCount, node, helper.NewTimerTicker)
 }
 
 // newLogEntryArchiver constructs a new LogEntryArchiver with a configurable ticker function.
-func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, logManagerAccessor *storage.LogManagerAccessor, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
+func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, node *storage.Node, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
 	if workerCount < 1 {
 		workerCount = 1
 	}
 
 	archiver := &LogEntryArchiver{
-		logger:             logger,
-		archiveSink:        archiveSink,
-		logManagerAccessor: logManagerAccessor,
-		notificationCh:     make(chan struct{}, 1),
-		workCh:             make(chan struct{}, 1),
-		closingCh:          make(chan struct{}),
-		closedCh:           make(chan struct{}),
-		notifications:      list.New(),
-		partitionStates:    make(map[partitionInfo]*partitionState),
-		activePartitions:   make(map[partitionInfo]struct{}),
-		workerCount:        workerCount,
-		tickerFunc:         tickerFunc,
-		waitDur:            minRetryWait,
+		logger:           logger,
+		archiveSink:      archiveSink,
+		node:             node,
+		notificationCh:   make(chan struct{}, 1),
+		workCh:           make(chan struct{}, 1),
+		closingCh:        make(chan struct{}),
+		closedCh:         make(chan struct{}),
+		notifications:    list.New(),
+		partitionStates:  make(map[partitionInfo]*partitionState),
+		activePartitions: make(map[partitionInfo]struct{}),
+		workerCount:      workerCount,
+		tickerFunc:       tickerFunc,
+		waitDur:          minRetryWait,
 		backupCounter: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "gitaly_wal_backup_count",
@@ -328,9 +328,18 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 }
 
 func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, callback func(lm storage.LogManager)) error {
-	(*la.logManagerAccessor).CallLogManager(ctx, storageName, partitionID, func(lm storage.LogManager) {
-		callback(lm)
-	})
+	storageHandle, err := (*la.node).GetStorage(storageName)
+	if err != nil {
+		return fmt.Errorf("get storage: %w", err)
+	}
+
+	partition, err := storageHandle.GetPartition(ctx, partitionID)
+	if err != nil {
+		return fmt.Errorf("get partition: %w", err)
+	}
+	defer partition.Close()
+
+	callback(partition)
 
 	return nil
 }

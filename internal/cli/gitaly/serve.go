@@ -385,7 +385,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics, storageMetrics, partitionMetrics)
 
 	var txMiddleware server.TransactionMiddleware
-	var node *nodeimpl.Manager
+	var node storage.Node
 	if cfg.Transactions.Enabled {
 		logger.WarnContext(ctx, "Transactions enabled. Transactions are an experimental feature. The feature is not production ready yet and might lead to various issues including data loss.")
 
@@ -401,14 +401,13 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		defer dbMgr.Close()
 
 		var logConsumer storage.LogConsumer
-		var logManagerAccessor storage.LogManagerAccessor
 		if cfg.Backup.WALGoCloudURL != "" {
 			walSink, err := backup.ResolveSink(ctx, cfg.Backup.WALGoCloudURL)
 			if err != nil {
 				return fmt.Errorf("resolving write-ahead log backup sink: %w", err)
 			}
 
-			walArchiver := backup.NewLogEntryArchiver(logger, walSink, cfg.Backup.WALWorkerCount, &logManagerAccessor)
+			walArchiver := backup.NewLogEntryArchiver(logger, walSink, cfg.Backup.WALWorkerCount, &node)
 			prometheus.MustRegister(walArchiver)
 			walArchiver.Run()
 			defer walArchiver.Close()
@@ -416,7 +415,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			logConsumer = walArchiver
 		}
 
-		node, err := nodeimpl.NewManager(
+		nodeMgr, err := nodeimpl.NewManager(
 			cfg.Storages,
 			storagemgr.NewFactory(
 				logger,
@@ -433,8 +432,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		if err != nil {
 			return fmt.Errorf("new node: %w", err)
 		}
-		defer node.Close()
-		logManagerAccessor = node
+		defer nodeMgr.Close()
+		node = nodeMgr
 
 		txMiddleware = server.TransactionMiddleware{
 			UnaryInterceptor:  storagemgr.NewUnaryInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, node, locator),
