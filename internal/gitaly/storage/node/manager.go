@@ -1,7 +1,6 @@
 package node
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -21,8 +20,6 @@ type Storage interface {
 	// Close closes the Storage for further access and waits it to
 	// shutdown completely.
 	Close()
-	// CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-	CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error
 }
 
 // Manager is responsible for setting up the Gitaly node's storages and
@@ -59,26 +56,12 @@ func NewManager(
 
 // GetStorage retrieves a Storage by its name.
 func (mgr *Manager) GetStorage(storageName string) (storage.Storage, error) {
-	return mgr.getStorage(storageName)
-}
-
-func (mgr *Manager) getStorage(storageName string) (Storage, error) {
 	handle, ok := mgr.storages[storageName]
 	if !ok {
 		return nil, storage.NewStorageNotFoundError(storageName)
 	}
 
 	return handle, nil
-}
-
-// CallLogManager implements storage.LogManagerAccessor by relaying the call to the correct storage.
-func (mgr *Manager) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
-	handle, err := mgr.getStorage(storageName)
-	if err != nil {
-		return err
-	}
-
-	return handle.CallLogManager(ctx, partitionID, fn)
 }
 
 // Close closes the storages. It waits for the storages to fully close

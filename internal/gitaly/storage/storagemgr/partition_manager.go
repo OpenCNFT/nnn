@@ -313,25 +313,6 @@ func (sm *StorageManager) Begin(ctx context.Context, opts storage.TransactionOpt
 	return newFinalizableTransaction(transaction, ptn.Close), nil
 }
 
-// CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
-	ptn, err := sm.startPartition(ctx, partitionID)
-	if err != nil {
-		return err
-	}
-
-	defer ptn.Close()
-
-	logManager, ok := ptn.Partition.(storage.LogManager)
-	if !ok {
-		return fmt.Errorf("expected LogManager, got %T", logManager)
-	}
-
-	fn(logManager)
-
-	return nil
-}
-
 // partitionHandle is a handle to a partition. It wraps the close method of a partition with reference
 // counting and only closes the partition if there are no other remaining references to it.
 type partitionHandle struct {
