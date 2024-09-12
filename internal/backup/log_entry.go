@@ -294,7 +294,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
 			if err := la.callLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storage.LogManager) {
-				lm.AcknowledgeTransaction(la, state.nextLSN-1)
+				lm.AcknowledgeTransaction(state.nextLSN - 1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
 			}
@@ -376,7 +376,7 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 	}
 
 	if err := la.callLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
-		lm.AcknowledgeTransaction(la, entry.lsn)
+		lm.AcknowledgeTransaction(entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
 			log.Fields{

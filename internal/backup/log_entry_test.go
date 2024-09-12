@@ -66,7 +66,7 @@ type mockLogManager struct {
 
 func (lm *mockLogManager) Close() {}
 
-func (lm *mockLogManager) AcknowledgeTransaction(_ storage.LogConsumer, lsn storage.LSN) {
+func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
 	lm.Lock()
 	defer lm.Unlock()
 

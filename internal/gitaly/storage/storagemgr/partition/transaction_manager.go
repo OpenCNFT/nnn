@@ -853,7 +853,7 @@ type committedEntry struct {
 // AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
 // for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
 // completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(consumer storage.LogConsumer, lsn storage.LSN) {
+func (mgr *TransactionManager) AcknowledgeTransaction(lsn storage.LSN) {
 	mgr.consumerPos.setPosition(lsn)
 
 	// Alert the manager. If it has a pending acknowledgement already no action is required.

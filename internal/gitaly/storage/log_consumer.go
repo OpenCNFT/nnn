@@ -18,7 +18,7 @@ type LogConsumer interface {
 type LogManager interface {
 	// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
 	// for the specified LogConsumer.
-	AcknowledgeTransaction(consumer LogConsumer, lsn LSN)
+	AcknowledgeTransaction(lsn LSN)
 	// GetTransactionPath returns the path of the log entry's root directory.
 	GetTransactionPath(lsn LSN) string
 }
