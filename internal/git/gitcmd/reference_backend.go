@@ -14,6 +14,9 @@ import (
 // DetectReferenceBackend detects the reference backend used by the repository.
 // If the git version doesn't support `--show-ref-format`, it'll simply echo
 // '--show-ref-format'. We fallback to files backend in such situations.
+//
+// Note: It is recommended to use localrepo.ReferenceBackend since that value is
+// cached for a given repository.
 func DetectReferenceBackend(ctx context.Context, gitCmdFactory CommandFactory, repository storage.Repository) (git.ReferenceBackend, error) {
 	var stdout, stderr bytes.Buffer
 

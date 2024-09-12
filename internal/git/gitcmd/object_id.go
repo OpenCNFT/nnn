@@ -12,6 +12,9 @@ import (
 )
 
 // DetectObjectHash detects the object-hash used by the given repository.
+//
+// Note: It is recommended to use localrepo.ObjectHash since that value is
+// cached for a given repository.
 func DetectObjectHash(ctx context.Context, gitCmdFactory CommandFactory, repository storage.Repository) (git.ObjectHash, error) {
 	var stdout, stderr bytes.Buffer
 
