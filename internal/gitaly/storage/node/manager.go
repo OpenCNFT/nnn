@@ -9,14 +9,10 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
 
-// LogConsumerFactory returns a LogConsumer that requires a LogManagerAccessor for construction and
-// a function to close the LogConsumer.
-type LogConsumerFactory func(storage.LogManagerAccessor) (_ storage.LogConsumer, cleanup func())
-
 // StorageFactory is responsible for instantiating a Storage.
 type StorageFactory interface {
 	// New sets up a new Storage instance.
-	New(storageName, storagePath string, consumer storage.LogConsumer) (Storage, error)
+	New(storageName, storagePath string) (Storage, error)
 }
 
 // Storage extends the general Storage interface.
@@ -35,33 +31,22 @@ type Manager struct {
 	// storages contains all of the the configured storages. It's keyed
 	// by the storage name and the value is the Storage itself.
 	storages map[string]Storage
-	// consumerCleanup cleans up the log consumer.
-	consumerCleanup func()
 }
 
 // NewManager returns a new Manager.
 func NewManager(
 	configuredStorages []config.Storage,
 	storageFactory StorageFactory,
-	consumerFactory LogConsumerFactory,
 ) (_ *Manager, returnedErr error) {
-	mgr := &Manager{
-		storages:        make(map[string]Storage, len(configuredStorages)),
-		consumerCleanup: func() {},
-	}
+	mgr := &Manager{storages: make(map[string]Storage, len(configuredStorages))}
 	defer func() {
 		if returnedErr != nil {
 			mgr.Close()
 		}
 	}()
 
-	var consumer storage.LogConsumer
-	if consumerFactory != nil {
-		consumer, mgr.consumerCleanup = consumerFactory(mgr)
-	}
-
 	for _, cfgStorage := range configuredStorages {
-		storage, err := storageFactory.New(cfgStorage.Name, cfgStorage.Path, consumer)
+		storage, err := storageFactory.New(cfgStorage.Name, cfgStorage.Path)
 		if err != nil {
 			return nil, fmt.Errorf("new storage %q: %w", cfgStorage.Name, err)
 		}
@@ -111,6 +96,4 @@ func (mgr *Manager) Close() {
 	}
 
 	active.Wait()
-
-	mgr.consumerCleanup()
 }

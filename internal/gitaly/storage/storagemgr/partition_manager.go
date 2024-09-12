@@ -44,7 +44,6 @@ type PartitionFactory interface {
 		storagePath string,
 		absoluteStateDir string,
 		stagingDir string,
-		logConsumer storage.LogConsumer,
 	) Partition
 }
 
@@ -79,8 +78,6 @@ type StorageManager struct {
 	activePartitions sync.WaitGroup
 	// partitionFactory is a factory to create Partitions.
 	partitionFactory PartitionFactory
-	// consumer consumes the WAL from the partitions.
-	consumer storage.LogConsumer
 
 	// metrics are the metrics gathered from the storage manager.
 	metrics storageManagerMetrics
@@ -93,7 +90,6 @@ func NewStorageManager(
 	path string,
 	dbMgr *databasemgr.DBManager,
 	partitionFactory PartitionFactory,
-	consumer storage.LogConsumer,
 	metrics *Metrics,
 ) (*StorageManager, error) {
 	internalDir := internalDirectoryPath(path)
@@ -128,7 +124,6 @@ func NewStorageManager(
 		partitionAssigner: pa,
 		partitions:        map[storage.PartitionID]*partition{},
 		partitionFactory:  partitionFactory,
-		consumer:          consumer,
 		metrics:           metrics.storageManagerMetrics(name),
 	}, nil
 }
@@ -412,7 +407,6 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				sm.path,
 				absoluteStateDir,
 				stagingDir,
-				sm.consumer,
 			)
 
 			ptn.Partition = mgr

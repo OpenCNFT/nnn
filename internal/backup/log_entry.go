@@ -90,8 +90,8 @@ type LogEntryArchiver struct {
 	logger log.Logger
 	// archiveSink is the Sink used to backup log entries.
 	archiveSink Sink
-	// partitionMgr is the LogManagerAccessor used to access LogManagers.
-	partitionMgr storage.LogManagerAccessor
+	// logManagerAccessor is the LogManagerAccessor used to access LogManagers.
+	logManagerAccessor *storage.LogManagerAccessor
 
 	// notificationCh is the channel used to signal that a new notification has arrived.
 	notificationCh chan struct{}
@@ -129,30 +129,30 @@ type LogEntryArchiver struct {
 }
 
 // NewLogEntryArchiver constructs a new LogEntryArchiver.
-func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storage.LogManagerAccessor) *LogEntryArchiver {
+func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr *storage.LogManagerAccessor) *LogEntryArchiver {
 	return newLogEntryArchiver(logger, archiveSink, workerCount, partitionMgr, helper.NewTimerTicker)
 }
 
 // newLogEntryArchiver constructs a new LogEntryArchiver with a configurable ticker function.
-func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storage.LogManagerAccessor, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
+func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, logManagerAccessor *storage.LogManagerAccessor, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
 	if workerCount < 1 {
 		workerCount = 1
 	}
 
 	archiver := &LogEntryArchiver{
-		logger:           logger,
-		archiveSink:      archiveSink,
-		partitionMgr:     partitionMgr,
-		notificationCh:   make(chan struct{}, 1),
-		workCh:           make(chan struct{}, 1),
-		closingCh:        make(chan struct{}),
-		closedCh:         make(chan struct{}),
-		notifications:    list.New(),
-		partitionStates:  make(map[partitionInfo]*partitionState),
-		activePartitions: make(map[partitionInfo]struct{}),
-		workerCount:      workerCount,
-		tickerFunc:       tickerFunc,
-		waitDur:          minRetryWait,
+		logger:             logger,
+		archiveSink:        archiveSink,
+		logManagerAccessor: logManagerAccessor,
+		notificationCh:     make(chan struct{}, 1),
+		workCh:             make(chan struct{}, 1),
+		closingCh:          make(chan struct{}),
+		closedCh:           make(chan struct{}),
+		notifications:      list.New(),
+		partitionStates:    make(map[partitionInfo]*partitionState),
+		activePartitions:   make(map[partitionInfo]struct{}),
+		workerCount:        workerCount,
+		tickerFunc:         tickerFunc,
+		waitDur:            minRetryWait,
 		backupCounter: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "gitaly_wal_backup_count",
@@ -293,7 +293,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// We have already backed up all entries sent by the LogManager, but the manager is
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
-			if err := la.partitionMgr.CallLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storage.LogManager) {
+			if err := la.callLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storage.LogManager) {
 				lm.AcknowledgeTransaction(la, state.nextLSN-1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
@@ -327,6 +327,14 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 	}
 }
 
+func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, callback func(lm storage.LogManager)) error {
+	(*la.logManagerAccessor).CallLogManager(ctx, storageName, partitionID, func(lm storage.LogManager) {
+		callback(lm)
+	})
+
+	return nil
+}
+
 // receiveEntry handles the result of a backup job. If the backup failed, then it
 // will block for la.waitDur to allow the conditions that caused the failure to resolve
 // themselves. Continued failure results in an exponential backoff.
@@ -358,7 +366,7 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 		la.waitDur = minRetryWait
 	}
 
-	if err := la.partitionMgr.CallLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
+	if err := la.callLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
 		lm.AcknowledgeTransaction(la, entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
@@ -387,7 +395,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 	})
 
 	var entryPath string
-	if err := la.partitionMgr.CallLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
+	if err := la.callLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
 		entryPath = lm.GetTransactionPath(entry.lsn)
 	}); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)

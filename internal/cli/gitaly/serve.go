@@ -400,23 +400,23 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		}
 		defer dbMgr.Close()
 
-		var consumerFactory nodeimpl.LogConsumerFactory
+		var logConsumer storage.LogConsumer
+		var logManagerAccessor storage.LogManagerAccessor
 		if cfg.Backup.WALGoCloudURL != "" {
 			walSink, err := backup.ResolveSink(ctx, cfg.Backup.WALGoCloudURL)
 			if err != nil {
 				return fmt.Errorf("resolving write-ahead log backup sink: %w", err)
 			}
 
-			consumerFactory = func(lma storage.LogManagerAccessor) (storage.LogConsumer, func()) {
-				walArchiver := backup.NewLogEntryArchiver(logger, walSink, cfg.Backup.WALWorkerCount, lma)
-				prometheus.MustRegister(walArchiver)
-				walArchiver.Run()
+			walArchiver := backup.NewLogEntryArchiver(logger, walSink, cfg.Backup.WALWorkerCount, &logManagerAccessor)
+			prometheus.MustRegister(walArchiver)
+			walArchiver.Run()
+			defer walArchiver.Close()
 
-				return walArchiver, walArchiver.Close
-			}
+			logConsumer = walArchiver
 		}
 
-		node, err = nodeimpl.NewManager(
+		node, err := nodeimpl.NewManager(
 			cfg.Storages,
 			storagemgr.NewFactory(
 				logger,
@@ -425,15 +425,16 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 					gitCmdFactory,
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 					partitionMetrics,
+					logConsumer,
 				),
 				storageMetrics,
 			),
-			consumerFactory,
 		)
 		if err != nil {
 			return fmt.Errorf("new node: %w", err)
 		}
 		defer node.Close()
+		logManagerAccessor = node
 
 		txMiddleware = server.TransactionMiddleware{
 			UnaryInterceptor:  storagemgr.NewUnaryInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, node, locator),
@@ -487,10 +488,10 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 						gitCmdFactory,
 						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 						partitionMetrics,
+						nil,
 					),
 					storageMetrics,
 				),
-				nil,
 			)
 			if err != nil {
 				return fmt.Errorf("new node: %w", err)

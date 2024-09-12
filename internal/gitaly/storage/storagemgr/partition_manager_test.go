@@ -34,7 +34,6 @@ type mockPartitionFactory struct {
 		storagePath string,
 		absoluteStateDir string,
 		stagingDir string,
-		logConsumer storage.LogConsumer,
 	) Partition
 }
 
@@ -50,7 +49,6 @@ func newStubPartitionFactory() PartitionFactory {
 			storagePath string,
 			absoluteStateDir string,
 			stagingDir string,
-			logConsumer storage.LogConsumer,
 		) Partition {
 			var closeOnce sync.Once
 			closing := make(chan struct{})
@@ -100,7 +98,6 @@ func (m mockPartitionFactory) New(
 	storagePath string,
 	absoluteStateDir string,
 	stagingDir string,
-	logConsumer storage.LogConsumer,
 ) Partition {
 	return m.new(
 		logger,
@@ -110,7 +107,6 @@ func (m mockPartitionFactory) New(
 		storagePath,
 		absoluteStateDir,
 		stagingDir,
-		logConsumer,
 	)
 }
 
@@ -871,7 +867,6 @@ func TestStorageManager(t *testing.T) {
 				cfg.Storages[0].Path,
 				dbMgr,
 				partitionFactory,
-				nil,
 				metrics,
 			)
 			require.NoError(t, err)
@@ -1008,7 +1003,7 @@ func TestStorageManager_getPartition(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer mgr.Close()
 
@@ -1064,7 +1059,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
@@ -1118,7 +1113,7 @@ func TestStorageManager_callLogManager(t *testing.T) {
 	require.NoError(t, err)
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 
 	defer func() {
@@ -1157,7 +1152,6 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
-		nil,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)

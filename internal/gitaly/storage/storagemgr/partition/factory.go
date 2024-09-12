@@ -17,6 +17,7 @@ type Factory struct {
 	cmdFactory  gitcmd.CommandFactory
 	repoFactory localrepo.Factory
 	metrics     Metrics
+	logConsumer storage.LogConsumer
 }
 
 // New returns a new Partition instance.
@@ -28,7 +29,6 @@ func (f Factory) New(
 	storagePath string,
 	absoluteStateDir string,
 	stagingDir string,
-	logConsumer storage.LogConsumer,
 ) storagemgr.Partition {
 	// ScopeByStorage takes in context to pass it to the locator. This may be useful in the
 	// RPC handlers to rewrite the storage in the future but never here. Requiring a context
@@ -53,7 +53,7 @@ func (f Factory) New(
 		f.cmdFactory,
 		repoFactory,
 		f.metrics.Scope(storageName),
-		logConsumer,
+		f.logConsumer,
 	)
 }
 
@@ -62,10 +62,12 @@ func NewFactory(
 	cmdFactory gitcmd.CommandFactory,
 	repoFactory localrepo.Factory,
 	metrics Metrics,
+	logConsumer storage.LogConsumer,
 ) Factory {
 	return Factory{
 		cmdFactory:  cmdFactory,
 		repoFactory: repoFactory,
 		metrics:     metrics,
+		logConsumer: logConsumer,
 	}
 }

@@ -288,7 +288,8 @@ func TestLogEntryArchiver(t *testing.T) {
 				t:        t,
 			}
 
-			archiver := NewLogEntryArchiver(logger, archiveSink, tc.workerCount, accessor)
+			logManagerAccessor := storage.LogManagerAccessor(accessor)
+			archiver := NewLogEntryArchiver(logger, archiveSink, tc.workerCount, &logManagerAccessor)
 			archiver.Run()
 
 			const storageName = "default"
@@ -411,7 +412,8 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 		t:        t,
 	}
 
-	archiver := newLogEntryArchiver(logger, archiveSink, workerCount, accessor, tickerFunc)
+	logManagerAccessor := storage.LogManagerAccessor(accessor)
+	archiver := newLogEntryArchiver(logger, archiveSink, workerCount, &logManagerAccessor, tickerFunc)
 	archiver.Run()
 	defer archiver.Close()
 

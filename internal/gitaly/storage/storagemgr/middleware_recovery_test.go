@@ -60,7 +60,7 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 
 	ptnMgr, err := node.NewManager(cfg.Storages, NewFactory(
 		logger, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus),
-	), nil)
+	))
 	require.NoError(t, err)
 	defer ptnMgr.Close()
 
