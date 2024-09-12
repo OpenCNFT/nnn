@@ -400,7 +400,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		}
 		defer dbMgr.Close()
 
-		var logConsumer storage.LogConsumer
+		var logConsumer partition.LogConsumer
 		if cfg.Backup.WALGoCloudURL != "" {
 			walSink, err := backup.ResolveSink(ctx, cfg.Backup.WALGoCloudURL)
 			if err != nil {

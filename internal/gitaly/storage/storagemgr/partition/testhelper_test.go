@@ -697,7 +697,7 @@ type testTransactionSetup struct {
 	NonExistentOID    git.ObjectID
 	Commits           testTransactionCommits
 	AnnotatedTags     []testTransactionTag
-	Consumer          storage.LogConsumer
+	Consumer          LogConsumer
 }
 
 type testTransactionHooks struct {
@@ -994,7 +994,7 @@ type ConsumerState struct {
 }
 
 // RequireConsumer asserts the consumer log position is correct.
-func RequireConsumer(t *testing.T, consumer storage.LogConsumer, consumerPos *consumerPosition, expected ConsumerState) {
+func RequireConsumer(t *testing.T, consumer LogConsumer, consumerPos *consumerPosition, expected ConsumerState) {
 	t.Helper()
 
 	require.Equal(t, expected.ManagerPosition, consumerPos.getPosition(), "expected and actual manager position don't match")
