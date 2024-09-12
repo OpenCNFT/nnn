@@ -88,6 +88,10 @@ func (s *server) ListCommits(
 		revlistOptions = append(revlistOptions, gitpipe.WithIgnoreCase(request.GetIgnoreCase()))
 	}
 
+	if request.GetSkip() > 0 {
+		revlistOptions = append(revlistOptions, gitpipe.WithSkip(uint(request.GetSkip())))
+	}
+
 	if len(request.GetCommitMessagePatterns()) > 0 {
 		revlistOptions = append(revlistOptions, gitpipe.WithCommitMessagePatterns(request.GetCommitMessagePatterns()))
 	}
