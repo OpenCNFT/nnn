@@ -367,7 +367,7 @@ test:fips:
 test:macos:
   image: !reference [.versions, macos]
   tags:
-    - saas-macos-medium-m1
+    - saas-macos-large-m2pro
   needs: []
   stage: test
   cache:
@@ -384,6 +384,9 @@ test:macos:
     TEST_TMP_DIR: /Volumes/RAMDisk
     # Disable code coverage generation as it is too slow on macOS.
     TEST_WITH_COVERAGE: ""
+    # Homebrew tries to clean up old packages during installation of new packages. The
+    # runner is ephemeral so we don't need this.
+    HOMEBREW_NO_INSTALL_CLEANUP: 1
   before_script:
     # Disable Gatekeeper to speed up spawning executables.
     - sudo spctl --master-disable
