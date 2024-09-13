@@ -3,6 +3,7 @@ package manager
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -22,10 +23,6 @@ import (
 // applying all the OptimizeRepositoryOption modifiers.
 type OptimizeRepositoryConfig struct {
 	StrategyConstructor OptimizationStrategyConstructor
-	// UseExistingTransaction is set when transaction management is done by the caller. When set,
-	// OptimizeRepository doesn't start a transaction on its own but directly operates on the
-	// repository.
-	UseExistingTransaction bool
 }
 
 // OptimizeRepositoryOption is an option that can be passed to OptimizeRepository.
@@ -44,14 +41,6 @@ func WithOptimizationStrategyConstructor(strategyConstructor OptimizationStrateg
 	}
 }
 
-// WithUseExistingTransaction instructs OptimizeRepository to not start a transaction on its own and instead
-// use the existing transaction from the context.
-func WithUseExistingTransaction() OptimizeRepositoryOption {
-	return func(cfg *OptimizeRepositoryConfig) {
-		cfg.UseExistingTransaction = true
-	}
-}
-
 // OptimizeRepository performs optimizations on the repository. Whether optimizations are performed
 // or not depends on a set of heuristics.
 func (m *RepositoryManager) OptimizeRepository(
@@ -67,15 +56,27 @@ func (m *RepositoryManager) OptimizeRepository(
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "housekeeping.OptimizeRepository", nil)
 	defer span.Finish()
 
-	ok, cleanup := m.repositoryStates.tryRunningHousekeeping(repo)
-	// If we didn't succeed to set the state to "running" because of a concurrent housekeeping run
-	// we exit early.
-	if !ok {
-		return nil
-	}
-	defer cleanup()
+	if err := m.maybeStartTransaction(ctx, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+		originalRepo := &gitalypb.Repository{
+			StorageName:  repo.GetStorageName(),
+			RelativePath: repo.GetRelativePath(),
+		}
+		if tx != nil {
+			originalRepo = tx.OriginalRepository(originalRepo)
+		}
 
-	if err := m.maybeStartTransaction(ctx, cfg.UseExistingTransaction, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+		// tryRunningHousekeeping acquires a lock on the repository to prevent other concurrent housekeeping calls on the repository.
+		// As we may be in a transaction, the repository's relative path may have been rewritten. We use the original unrewritten relative
+		// path here to ensure we hit the same key regardless if we run in different transactions where the snapshot prefixes in the
+		// relative paths may differ.
+		ok, cleanup := m.repositoryStates.tryRunningHousekeeping(originalRepo)
+		// If we didn't succeed to set the state to "running" because of a concurrent housekeeping run
+		// we exit early.
+		if !ok {
+			return nil
+		}
+		defer cleanup()
+
 		if m.optimizeFunc != nil {
 			strategy, err := m.validate(ctx, repo, cfg)
 			if err != nil {
@@ -85,7 +86,7 @@ func (m *RepositoryManager) OptimizeRepository(
 		}
 
 		if tx != nil {
-			return m.optimizeRepositoryWithTransaction(ctx, tx, repo, cfg)
+			return m.optimizeRepositoryWithTransaction(ctx, repo, cfg)
 		}
 
 		return m.optimizeRepository(ctx, repo, cfg)
@@ -96,49 +97,53 @@ func (m *RepositoryManager) OptimizeRepository(
 	return nil
 }
 
-func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, useExistingTransaction bool, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedError error) {
+func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) error {
 	if m.node == nil {
 		return run(ctx, nil, repo)
 	}
 
-	tx := storage.ExtractTransaction(ctx)
-	if !useExistingTransaction {
-		storageHandle, err := m.node.GetStorage(repo.GetStorageName())
-		if err != nil {
-			return fmt.Errorf("get storage: %w", err)
-		}
+	return m.runInTransaction(ctx, true, repo, run)
+}
 
-		tx, err = storageHandle.Begin(ctx, storage.TransactionOptions{
-			RelativePath: repo.GetRelativePath(),
-		})
-		if err != nil {
-			return fmt.Errorf("initializing WAL transaction: %w", err)
-		}
-		defer func() {
-			if returnedError != nil {
-				// We prioritize actual housekeeping error and log rollback error.
-				if err := tx.Rollback(); err != nil {
-					m.logger.WithError(err).Error("could not rollback housekeeping transaction")
-				}
-			}
-		}()
-
-		repo = localrepo.NewFrom(repo, tx.RewriteRepository(&gitalypb.Repository{
-			StorageName:                   repo.GetStorageName(),
-			GitAlternateObjectDirectories: repo.GetGitAlternateObjectDirectories(),
-			GitObjectDirectory:            repo.GetGitObjectDirectory(),
-			RelativePath:                  repo.GetRelativePath(),
-		}))
-
-		ctx = storage.ContextWithTransaction(ctx, tx)
+func (m *RepositoryManager) runInTransaction(ctx context.Context, readOnly bool, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) (returnedErr error) {
+	originalRepo := &gitalypb.Repository{
+		StorageName:  repo.GetStorageName(),
+		RelativePath: repo.GetRelativePath(),
+	}
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		originalRepo = tx.OriginalRepository(originalRepo)
 	}
 
-	if err := run(ctx, tx, repo); err != nil {
+	storageHandle, err := m.node.GetStorage(repo.GetStorageName())
+	if err != nil {
+		return fmt.Errorf("get storage: %w", err)
+	}
+
+	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
+		ReadOnly:     readOnly,
+		RelativePath: originalRepo.GetRelativePath(),
+	})
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer func() {
+		if returnedErr != nil {
+			if err := tx.Rollback(); err != nil {
+				returnedErr = errors.Join(err, fmt.Errorf("rollback: %w", err))
+			}
+		}
+	}()
+
+	if err := run(
+		storage.ContextWithTransaction(ctx, tx),
+		tx,
+		localrepo.NewFrom(repo, tx.RewriteRepository(originalRepo)),
+	); err != nil {
 		return fmt.Errorf("run: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("committing housekeeping transaction: %w", err)
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil
@@ -149,11 +154,6 @@ func (m *RepositoryManager) validate(
 	repo *localrepo.Repo,
 	cfg OptimizeRepositoryConfig,
 ) (housekeeping.OptimizationStrategy, error) {
-	gitVersion, err := repo.GitVersion(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	repositoryInfo, err := stats.RepositoryInfoForRepository(ctx, repo)
 	if err != nil {
 		return nil, fmt.Errorf("deriving repository info: %w", err)
@@ -164,7 +164,7 @@ func (m *RepositoryManager) validate(
 
 	var strategy housekeeping.OptimizationStrategy
 	if cfg.StrategyConstructor == nil {
-		strategy = housekeeping.NewHeuristicalOptimizationStrategy(gitVersion, repositoryInfo)
+		strategy = housekeeping.NewHeuristicalOptimizationStrategy(repositoryInfo)
 	} else {
 		strategy = cfg.StrategyConstructor(repositoryInfo)
 	}
@@ -274,69 +274,100 @@ func (m *RepositoryManager) optimizeRepository(
 }
 
 // optimizeRepositoryWithTransaction performs optimizations in the context of WAL transaction.
+//
+// Reference repacking and object repacking are run in two different transactions. This decreases the chance of conflicts as it
+// allow reference repacking to commit faster. Reference repacking conflicts with reference deletions but runs relatively fast.
+// Object repacking is slower but is conflict-free if no pruning is done.
+//
+// Note that the strategy is selected in a parent transaction. The repository's state may change in the meanwhile but this shouldn't
+// really change things too much. RepositoryManager itself prevents concurrent housekeeping. Even if there was a housekeeping operation
+// committed in between, we'd just do redundant repacks.
 func (m *RepositoryManager) optimizeRepositoryWithTransaction(
 	ctx context.Context,
-	transaction storage.Transaction,
 	repo *localrepo.Repo,
 	cfg OptimizeRepositoryConfig,
-) (returnedError error) {
+) error {
 	strategy, err := m.validate(ctx, repo, cfg)
 	if err != nil {
 		return err
 	}
 
 	repackNeeded, repackCfg := strategy.ShouldRepackObjects(ctx)
-	if repackNeeded {
-		transaction.Repack(repackCfg)
-	}
-
 	packRefsNeeded := strategy.ShouldRepackReferences(ctx)
-	if packRefsNeeded {
-		transaction.PackRefs()
-	}
 
 	writeCommitGraphNeeded, writeCommitGraphCfg, err := strategy.ShouldWriteCommitGraph(ctx)
 	if err != nil {
 		return fmt.Errorf("checking commit graph writing eligibility: %w", err)
 	}
+
+	var errPackReferences error
+	if packRefsNeeded {
+		if err := m.runInTransaction(ctx, false, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+			tx.PackRefs()
+			return nil
+		}); err != nil {
+			errPackReferences = fmt.Errorf("run reference packing: %w", err)
+		}
+	}
+
+	var errRepackObjects error
+	if repackNeeded || writeCommitGraphNeeded {
+		if err := m.runInTransaction(ctx, false, repo, func(ctx context.Context, tx storage.Transaction, repo *localrepo.Repo) error {
+			if repackNeeded {
+				tx.Repack(repackCfg)
+			}
+
+			if writeCommitGraphNeeded {
+				tx.WriteCommitGraphs(writeCommitGraphCfg)
+			}
+			return nil
+		}); err != nil {
+			errRepackObjects = fmt.Errorf("run object repacking: %w", err)
+		}
+	}
+
+	getStatus := func(err error) string {
+		if err != nil {
+			return "failure"
+		}
+
+		return "success"
+	}
+
+	repackObjectsStatus := getStatus(errRepackObjects)
+
+	optimizations := make(map[string]string)
+	if repackNeeded {
+		optimizations["packed_objects_"+string(repackCfg.Strategy)] = repackObjectsStatus
+		if repackCfg.WriteBitmap {
+			optimizations["written_bitmap"] = repackObjectsStatus
+		}
+		if repackCfg.WriteMultiPackIndex {
+			optimizations["written_multi_pack_index"] = repackObjectsStatus
+		}
+	}
+
+	if packRefsNeeded {
+		optimizations["packed_refs"] = getStatus(errPackReferences)
+	}
+
 	if writeCommitGraphNeeded {
-		transaction.WriteCommitGraphs(writeCommitGraphCfg)
+		if writeCommitGraphCfg.ReplaceChain {
+			optimizations["written_commit_graph_full"] = repackObjectsStatus
+		} else {
+			optimizations["written_commit_graph_incremental"] = repackObjectsStatus
+		}
 	}
 
-	logResult := func(status string) {
-		optimizations := make(map[string]string)
-
-		if repackNeeded {
-			optimizations["packed_objects_"+string(repackCfg.Strategy)] = status
-			if repackCfg.WriteBitmap {
-				optimizations["written_bitmap"] = status
-			}
-			if repackCfg.WriteMultiPackIndex {
-				optimizations["written_multi_pack_index"] = status
-			}
-		}
-
-		if packRefsNeeded {
-			optimizations["packed_refs"] = status
-		}
-
-		if writeCommitGraphNeeded {
-			if writeCommitGraphCfg.ReplaceChain {
-				optimizations["written_commit_graph_full"] = status
-			} else {
-				optimizations["written_commit_graph_incremental"] = status
-			}
-		}
-
-		m.logger.WithField("optimizations", optimizations).Info("optimized repository with WAL")
-		for task, status := range optimizations {
-			m.metrics.TasksTotal.WithLabelValues(task, status).Inc()
-		}
-		m.metrics.TasksTotal.WithLabelValues("total", status).Add(1)
+	m.logger.WithField("optimizations", optimizations).Info("optimized repository with WAL")
+	for task, status := range optimizations {
+		m.metrics.TasksTotal.WithLabelValues(task, status).Inc()
 	}
 
-	logResult("success")
-	return nil
+	errCombined := errors.Join(errPackReferences, errRepackObjects)
+	m.metrics.TasksTotal.WithLabelValues("total", getStatus(errCombined)).Add(1)
+
+	return errCombined
 }
 
 // repackIfNeeded repacks the repository according to the strategy.

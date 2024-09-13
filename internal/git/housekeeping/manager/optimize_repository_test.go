@@ -1135,12 +1135,17 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 		})
 		repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
+		firstCall := true
 		manager := New(gitalycfgprom.Config{}, testhelper.NewLogger(t), nil, node)
 		manager.optimizeFunc = func(context.Context, *localrepo.Repo, housekeeping.OptimizationStrategy) error {
-			reqReceivedCh <- struct{}{}
-			ch <- struct{}{}
+			if firstCall {
+				firstCall = false
+				reqReceivedCh <- struct{}{}
+				ch <- struct{}{}
+				return nil
+			}
 
-			return nil
+			return fmt.Errorf("unexpected second optimize call")
 		}
 
 		var wg sync.WaitGroup
@@ -1149,15 +1154,17 @@ func TestOptimizeRepository_ConcurrencyLimit(t *testing.T) {
 			defer wg.Done()
 			assert.NoError(t, manager.OptimizeRepository(ctx, repo))
 		}()
+		defer func() {
+			<-ch
+			wg.Wait()
+		}()
 
 		<-reqReceivedCh
+
 		// When repository optimizations are performed for a specific repository already,
 		// then any subsequent calls to the same repository should just return immediately
 		// without doing any optimizations at all.
 		require.NoError(t, manager.OptimizeRepository(ctx, repo))
-
-		<-ch
-		wg.Wait()
 	})
 	// We want to confirm that even if a state exists, the housekeeping shall run as
 	// long as the state doesn't state that there is another housekeeping running
