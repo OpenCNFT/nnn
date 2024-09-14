@@ -31,42 +31,42 @@ var (
 			Name: "gitaly_command_cpu_seconds_total",
 			Help: "Sum of CPU time spent by shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "mode", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "mode", "git_version", "reference_backend"},
 	)
 	realSecondsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_real_seconds_total",
 			Help: "Sum of real time spent by shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	minorPageFaultsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_minor_page_faults_total",
 			Help: "Sum of minor page faults performed while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	majorPageFaultsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_major_page_faults_total",
 			Help: "Sum of major page faults performed while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	signalsReceivedTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_signals_received_total",
 			Help: "Sum of signals received while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	contextSwitchesTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_context_switches_total",
 			Help: "Sum of context switches performed while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "ctxswitchtype", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "ctxswitchtype", "git_version", "reference_backend"},
 	)
 
 	// exportedEnvVars contains a list of environment variables
@@ -164,6 +164,7 @@ type Command struct {
 	metricsSubCmd string
 	cgroupPath    string
 	cmdGitVersion string
+	refBackend    string
 }
 
 // New creates a Command from the given executable name and arguments On success, the Command
@@ -248,6 +249,7 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 		metricsCmd:           cfg.commandName,
 		metricsSubCmd:        cfg.subcommandName,
 		cmdGitVersion:        cfg.gitVersion,
+		refBackend:           cfg.refBackend,
 		subprocessLoggerDone: make(chan struct{}),
 		processExitedCh:      make(chan struct{}),
 	}
@@ -623,15 +625,15 @@ func (c *Command) logProcessComplete() {
 	if c.metricsCmd != "" {
 		cmdName = c.metricsCmd
 	}
-	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "system", c.cmdGitVersion).Add(systemTime.Seconds())
-	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "user", c.cmdGitVersion).Add(userTime.Seconds())
-	realSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(realTime.Seconds())
+	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "system", c.cmdGitVersion, c.refBackend).Add(systemTime.Seconds())
+	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "user", c.cmdGitVersion, c.refBackend).Add(userTime.Seconds())
+	realSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(realTime.Seconds())
 	if ok {
-		minorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(float64(rusage.Minflt))
-		majorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(float64(rusage.Majflt))
-		signalsReceivedTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(float64(rusage.Nsignals))
-		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "voluntary", c.cmdGitVersion).Add(float64(rusage.Nvcsw))
-		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "nonvoluntary", c.cmdGitVersion).Add(float64(rusage.Nivcsw))
+		minorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(float64(rusage.Minflt))
+		majorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(float64(rusage.Majflt))
+		signalsReceivedTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(float64(rusage.Nsignals))
+		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "voluntary", c.cmdGitVersion, c.refBackend).Add(float64(rusage.Nvcsw))
+		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "nonvoluntary", c.cmdGitVersion, c.refBackend).Add(float64(rusage.Nivcsw))
 	}
 
 	c.span.SetTag("pid", cmd.ProcessState.Pid())
