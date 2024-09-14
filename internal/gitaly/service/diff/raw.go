@@ -25,7 +25,9 @@ func (s *server) RawDiff(in *gitalypb.RawDiffRequest, stream gitalypb.DiffServic
 		return stream.Send(&gitalypb.RawDiffResponse{Data: p})
 	})
 
-	return sendRawOutput(stream.Context(), s.gitCmdFactory, in.Repository, sw, subCmd)
+	repo := s.localrepo(in.GetRepository())
+
+	return sendRawOutput(stream.Context(), repo, sw, subCmd)
 }
 
 func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffService_RawPatchServer) error {
@@ -43,11 +45,13 @@ func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffServ
 		return stream.Send(&gitalypb.RawPatchResponse{Data: p})
 	})
 
-	return sendRawOutput(stream.Context(), s.gitCmdFactory, in.Repository, sw, subCmd)
+	repo := s.localrepo(in.GetRepository())
+
+	return sendRawOutput(stream.Context(), repo, sw, subCmd)
 }
 
-func sendRawOutput(ctx context.Context, gitCmdFactory gitcmd.CommandFactory, repo *gitalypb.Repository, sender io.Writer, subCmd gitcmd.Command) error {
-	cmd, err := gitCmdFactory.New(ctx, repo, subCmd, gitcmd.WithSetupStdout())
+func sendRawOutput(ctx context.Context, repo gitcmd.RepositoryExecutor, sender io.Writer, subCmd gitcmd.Command) error {
+	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}
