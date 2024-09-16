@@ -67,6 +67,10 @@ No changes.
 - [Ensure page token is for the same tree](gitlab-org/gitaly@1ab723e39f5b7921e2ec7343fb2c0e55a7b45954) ([merge request](gitlab-org/gitaly!7068))
 - [git: Allow reading the attributes for 'git-merge-tree(1)'](gitlab-org/gitaly@2635c20f5a062507aee3282f87df797193e1c1aa) ([merge request](gitlab-org/gitaly!7066))
 
+## 17.1.8 (2024-09-16)
+
+No changes.
+
 ## 17.1.7 (2024-09-11)
 
 No changes.
