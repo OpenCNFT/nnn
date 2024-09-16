@@ -438,7 +438,7 @@ FROM (
 			return fmt.Errorf("repository id %d already in use", repositoryID)
 		}
 
-		if glsql.IsUniqueViolation(err, "storage_repositories_pkey") {
+		if glsql.IsUniqueViolation(err, "storage_repositories_pkey") || glsql.IsUniqueViolation(err, "storage_repositories_new_pkey") {
 			return ErrRepositoryAlreadyExists
 		}
 
