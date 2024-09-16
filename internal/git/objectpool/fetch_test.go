@@ -430,10 +430,10 @@ func testWithAndWithoutTransaction(t *testing.T, testFunc func(*testing.T, confi
 					cmdFactory,
 					localRepoFactory,
 					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+					nil,
 				),
 				storagemgr.NewMetrics(cfg.Prometheus),
 			),
-			nil,
 		)
 		require.NoError(t, err)
 		defer node.Close()

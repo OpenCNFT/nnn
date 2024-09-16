@@ -110,10 +110,10 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 							housekeeping.NewMetrics(cfg.Prometheus),
 							snapshot.NewMetrics(),
 						),
+						nil,
 					),
 					storagemgr.NewMetrics(cfg.Prometheus),
 				),
-				nil,
 			)
 			require.NoError(t, err)
 			defer node.Close()

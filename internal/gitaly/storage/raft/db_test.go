@@ -48,10 +48,10 @@ func TestDbForMetadataGroup(t *testing.T) {
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
 				),
+				nil,
 			),
 			storagemgr.NewMetrics(cfg.Prometheus),
 		),
-		nil,
 	)
 	require.NoError(t, err)
 	t.Cleanup(node.Close)
@@ -137,10 +137,10 @@ func TestDbForStorage(t *testing.T) {
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
 				),
+				nil,
 			),
 			storagemgr.NewMetrics(cfg.Prometheus),
 		),
-		nil,
 	)
 	require.NoError(t, err)
 	t.Cleanup(node.Close)

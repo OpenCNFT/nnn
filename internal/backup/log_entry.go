@@ -81,6 +81,16 @@ type partitionInfo struct {
 	partitionID storage.PartitionID
 }
 
+// LogManager is the interface used on the consumer side of the integration. The consumer
+// has the ability to acknowledge transactions as having been processed with AcknowledgeTransaction.
+type LogManager interface {
+	// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
+	// for the specified LogConsumer.
+	AcknowledgeTransaction(lsn storage.LSN)
+	// GetTransactionPath returns the path of the log entry's root directory.
+	GetTransactionPath(lsn storage.LSN) string
+}
+
 // LogEntryArchiver is used to backup applied log entries. It has a configurable number of
 // worker goroutines that will perform backups. Each partition may only have one backup
 // executing at a time, entries are always processed in-order. Backup failures will trigger
@@ -90,8 +100,8 @@ type LogEntryArchiver struct {
 	logger log.Logger
 	// archiveSink is the Sink used to backup log entries.
 	archiveSink Sink
-	// partitionMgr is the LogManagerAccessor used to access LogManagers.
-	partitionMgr storage.LogManagerAccessor
+	// node is used to access the LogManagers.
+	node *storage.Node
 
 	// notificationCh is the channel used to signal that a new notification has arrived.
 	notificationCh chan struct{}
@@ -129,12 +139,12 @@ type LogEntryArchiver struct {
 }
 
 // NewLogEntryArchiver constructs a new LogEntryArchiver.
-func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storage.LogManagerAccessor) *LogEntryArchiver {
-	return newLogEntryArchiver(logger, archiveSink, workerCount, partitionMgr, helper.NewTimerTicker)
+func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, node *storage.Node) *LogEntryArchiver {
+	return newLogEntryArchiver(logger, archiveSink, workerCount, node, helper.NewTimerTicker)
 }
 
 // newLogEntryArchiver constructs a new LogEntryArchiver with a configurable ticker function.
-func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, partitionMgr storage.LogManagerAccessor, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
+func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, node *storage.Node, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
 	if workerCount < 1 {
 		workerCount = 1
 	}
@@ -142,7 +152,7 @@ func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, 
 	archiver := &LogEntryArchiver{
 		logger:           logger,
 		archiveSink:      archiveSink,
-		partitionMgr:     partitionMgr,
+		node:             node,
 		notificationCh:   make(chan struct{}, 1),
 		workCh:           make(chan struct{}, 1),
 		closingCh:        make(chan struct{}),
@@ -293,8 +303,8 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// We have already backed up all entries sent by the LogManager, but the manager is
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
-			if err := la.partitionMgr.CallLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm storage.LogManager) {
-				lm.AcknowledgeTransaction(la, state.nextLSN-1)
+			if err := la.callLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm LogManager) {
+				lm.AcknowledgeTransaction(state.nextLSN - 1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
 			}
@@ -325,6 +335,28 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 
 		la.notifyNewEntries()
 	}
+}
+
+func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, callback func(lm LogManager)) error {
+	storageHandle, err := (*la.node).GetStorage(storageName)
+	if err != nil {
+		return fmt.Errorf("get storage: %w", err)
+	}
+
+	partition, err := storageHandle.GetPartition(ctx, partitionID)
+	if err != nil {
+		return fmt.Errorf("get partition: %w", err)
+	}
+	defer partition.Close()
+
+	logManager, ok := partition.(LogManager)
+	if !ok {
+		return fmt.Errorf("expected LogManager, got %T", logManager)
+	}
+
+	callback(logManager)
+
+	return nil
 }
 
 // receiveEntry handles the result of a backup job. If the backup failed, then it
@@ -358,8 +390,8 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 		la.waitDur = minRetryWait
 	}
 
-	if err := la.partitionMgr.CallLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
-		lm.AcknowledgeTransaction(la, entry.lsn)
+	if err := la.callLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm LogManager) {
+		lm.AcknowledgeTransaction(entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
 			log.Fields{
@@ -387,7 +419,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 	})
 
 	var entryPath string
-	if err := la.partitionMgr.CallLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm storage.LogManager) {
+	if err := la.callLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm LogManager) {
 		entryPath = lm.GetTransactionPath(entry.lsn)
 	}); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)

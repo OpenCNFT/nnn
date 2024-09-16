@@ -359,10 +359,10 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, cfg config.Cfg) *
 						housekeeping.NewMetrics(cfg.Prometheus),
 						snapshot.NewMetrics(),
 					),
+					nil,
 				),
 				storagemgr.NewMetrics(cfg.Prometheus),
 			),
-			nil,
 		)
 		require.NoError(tb, err)
 		tb.Cleanup(nodeMgr.Close)

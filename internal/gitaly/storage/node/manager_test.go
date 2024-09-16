@@ -10,10 +10,10 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
 
-type StorageFactoryFunc func(storageName, storagePath string, consumer storage.LogConsumer) (Storage, error)
+type StorageFactoryFunc func(storageName, storagePath string) (Storage, error)
 
-func (fn StorageFactoryFunc) New(storageName, storagePath string, consumer storage.LogConsumer) (Storage, error) {
-	return fn(storageName, storagePath, consumer)
+func (fn StorageFactoryFunc) New(storageName, storagePath string) (Storage, error) {
+	return fn(storageName, storagePath)
 }
 
 type mockStorage struct {
@@ -38,7 +38,7 @@ func TestManager(t *testing.T) {
 			close: func() { storage2Closed = true },
 		}
 
-		mgr, err := NewManager(cfg.Storages, StorageFactoryFunc(func(storageName, storagePath string, consumer storage.LogConsumer) (Storage, error) {
+		mgr, err := NewManager(cfg.Storages, StorageFactoryFunc(func(storageName, storagePath string) (Storage, error) {
 			switch storageName {
 			case "storage-1":
 				require.Equal(t, cfg.Storages[0].Path, storagePath)
@@ -49,7 +49,7 @@ func TestManager(t *testing.T) {
 			default:
 				return nil, fmt.Errorf("unexpected storage: %q", storageName)
 			}
-		}), nil)
+		}))
 		require.NoError(t, err)
 
 		defer func() {
@@ -81,7 +81,7 @@ func TestManager(t *testing.T) {
 		closeCalled := false
 
 		errSetup := errors.New("setup error")
-		mgr, err := NewManager(cfg.Storages, StorageFactoryFunc(func(storageName, storagePath string, consumer storage.LogConsumer) (Storage, error) {
+		mgr, err := NewManager(cfg.Storages, StorageFactoryFunc(func(storageName, storagePath string) (Storage, error) {
 			switch storageName {
 			case "storage-1":
 				require.Equal(t, cfg.Storages[0].Path, storagePath)
@@ -92,7 +92,7 @@ func TestManager(t *testing.T) {
 			default:
 				return nil, fmt.Errorf("unexpected storage: %q", storageName)
 			}
-		}), nil)
+		}))
 
 		require.Equal(t, fmt.Errorf(`new storage "storage-2": %w`, errSetup), err)
 		require.Nil(t, mgr)

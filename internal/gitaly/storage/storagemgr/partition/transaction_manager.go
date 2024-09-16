@@ -853,7 +853,7 @@ type committedEntry struct {
 // AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
 // for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
 // completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(consumer storage.LogConsumer, lsn storage.LSN) {
+func (mgr *TransactionManager) AcknowledgeTransaction(lsn storage.LSN) {
 	mgr.consumerPos.setPosition(lsn)
 
 	// Alert the manager. If it has a pending acknowledgement already no action is required.
@@ -1004,7 +1004,7 @@ type TransactionManager struct {
 
 	// consumer is an the external caller that may perform read-only operations against applied
 	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
-	consumer storage.LogConsumer
+	consumer LogConsumer
 	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
 	consumerPos *consumerPosition
 	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
@@ -1039,7 +1039,7 @@ func NewTransactionManager(
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics ManagerMetrics,
-	consumer storage.LogConsumer,
+	consumer LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
