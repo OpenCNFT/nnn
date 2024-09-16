@@ -183,8 +183,6 @@ func TestSearchFilesByContent(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -525,8 +523,6 @@ func TestSearchFilesByName(t *testing.T) {
 			expectedFiles: []string{"-dashed"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

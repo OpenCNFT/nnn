@@ -116,8 +116,6 @@ func TestResolveSink(t *testing.T) {
 			errMsg: `unsupported sink URI scheme: "minio"`,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			for k, v := range tc.envs {
 				t.Setenv(k, v)
@@ -209,8 +207,6 @@ func TestStorageServiceSink_SignedURL_notImplemented(t *testing.T) {
 			bucketURL: tmpDir,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

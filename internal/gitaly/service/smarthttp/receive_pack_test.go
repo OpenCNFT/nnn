@@ -226,8 +226,6 @@ func TestPostReceivePack_hiddenRefs(t *testing.T) {
 		"refs/merge-requests/1/merge",
 		"refs/pipelines/1",
 	} {
-		ref := ref
-
 		t.Run(ref, func(t *testing.T) {
 			t.Parallel()
 
@@ -579,8 +577,6 @@ func TestPostReceivePack_invalidObjects(t *testing.T) {
 			expectObject: true,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

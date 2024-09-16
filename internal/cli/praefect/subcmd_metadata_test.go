@@ -83,8 +83,6 @@ func TestMetadataSubcommand(t *testing.T) {
 			args: []string{"-virtual-storage=virtual-storage", "-relative-path=relative-path"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

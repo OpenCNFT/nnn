@@ -400,7 +400,6 @@ sleep %v
 		errChan := make(chan error)
 
 		for i := 0; i < 2; i++ {
-			i := i
 			go func() {
 				_, err := client.UserCreateTag(ctx, &gitalypb.UserCreateTagRequest{
 					Repository:     repo,

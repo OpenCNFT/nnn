@@ -247,8 +247,6 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1150,8 +1148,6 @@ func testUserMergeBranchAllowed(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

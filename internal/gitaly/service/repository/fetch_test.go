@@ -470,8 +470,6 @@ func TestFetchSourceBranch(t *testing.T) {
 			expectedResponse: &gitalypb.FetchSourceBranchResponse{Result: false},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			data := tc.setup(t)
 

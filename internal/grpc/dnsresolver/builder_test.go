@@ -22,7 +22,6 @@ func TestBuildDNSBuilder_withBuiltInResolver(t *testing.T) {
 		{desc: "with triple slashes", target: "dns:///localhost:50051"},
 		{desc: "without triple slashes", target: "dns:localhost:50051"},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -107,7 +106,6 @@ func TestBuildDNSBuilder_staticIPAddress(t *testing.T) {
 			addr: "[::3]:50051",
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

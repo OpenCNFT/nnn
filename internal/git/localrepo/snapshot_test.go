@@ -358,7 +358,6 @@ doesn't seem to test a realistic scenario.`)
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

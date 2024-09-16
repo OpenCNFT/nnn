@@ -76,8 +76,6 @@ func TestGetArchive(t *testing.T) {
 		gitalypb.GetArchiveRequest_TAR_GZ,
 		gitalypb.GetArchiveRequest_TAR_BZ2,
 	} {
-		format := format
-
 		t.Run(format.String(), func(t *testing.T) {
 			t.Parallel()
 
@@ -421,8 +419,6 @@ func TestGetArchive(t *testing.T) {
 					},
 				},
 			} {
-				tc := tc
-
 				t.Run(tc.desc, func(t *testing.T) {
 					t.Parallel()
 

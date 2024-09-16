@@ -31,7 +31,6 @@ func StartWorkers(
 	ctx, cancel := context.WithCancel(ctx)
 
 	for _, worker := range workers {
-		worker := worker
 		go func() {
 			errQ <- worker(ctx, l)
 		}()

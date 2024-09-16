@@ -151,8 +151,6 @@ func TestFindAllCommits(t *testing.T) {
 			expectedCommits: nil,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -35,8 +35,6 @@ func (s *Server) ServerInfo(ctx context.Context, in *gitalypb.ServerInfoRequest)
 	for virtualStorage, storages := range s.conns {
 		wg.Add(1)
 
-		virtualStorage := virtualStorage
-		storages := storages
 		var storage string
 		var conn *grpc.ClientConn
 

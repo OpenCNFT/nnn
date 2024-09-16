@@ -184,8 +184,6 @@ func TestDiffStats_failures(t *testing.T) {
 			expectedErr: structerr.NewFailedPrecondition("exit status 128"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

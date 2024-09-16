@@ -283,8 +283,6 @@ func TestServerFactory(t *testing.T) {
 				secure:  false,
 			},
 		} {
-			cfg := cfg
-
 			listener, err := net.Listen(cfg.network, cfg.address)
 			require.NoError(t, err)
 

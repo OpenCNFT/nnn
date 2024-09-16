@@ -126,7 +126,6 @@ func TestFetchScannerScan(t *testing.T) {
 			success:  true,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -301,7 +300,6 @@ func TestFetchPorcelainScannerScan(t *testing.T) {
 			expectedError:  errors.New("validating reference: reference is not fully qualified"),
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -736,7 +736,6 @@ func TestUpdater_packRefsLocked(t *testing.T) {
 		{desc: "commit", runMethod: func(u *Updater) error { return u.Commit() }},
 		{desc: "prepare", runMethod: func(u *Updater) error { return u.Prepare() }},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -744,7 +743,6 @@ func TestUpdater_packRefsLocked(t *testing.T) {
 			expectedErr := gittest.FilesOrReftables[error](ErrPackedRefsLocked, AlreadyLockedError{})
 
 			for _, lockFile := range files {
-				lockFile := lockFile
 				t.Run(lockFile, func(t *testing.T) {
 					t.Parallel()
 

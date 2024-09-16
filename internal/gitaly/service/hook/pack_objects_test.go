@@ -507,7 +507,6 @@ func testServerPackObjectsHookWithSidechannelWithRuntimeDir(t *testing.T, runtim
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -881,8 +880,6 @@ func TestPackObjects_concurrencyLimit(t *testing.T) {
 				shouldLimit: false,
 			},
 		} {
-			tc := tc
-
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 

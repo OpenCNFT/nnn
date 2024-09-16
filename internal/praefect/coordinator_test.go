@@ -642,7 +642,6 @@ func TestStreamDirectorMutator_SecondaryErrorHandling(t *testing.T) {
 
 	for _, secondary := range streamParams.Secondaries() {
 		wg.Add(1)
-		secondary := secondary
 		go func() {
 			err := secondary.ErrHandler(errors.New("node RPC failure"))
 			require.NoError(t, err)
@@ -2165,8 +2164,6 @@ func TestCoordinator_grpcErrorHandling(t *testing.T) {
 			var wg sync.WaitGroup
 			gitalies := make(map[string]gitalyNode)
 			for _, gitaly := range []string{"primary", "secondary-1", "secondary-2"} {
-				gitaly := gitaly
-
 				cfg := testcfg.Build(t, testcfg.WithStorages(gitaly))
 
 				_, _ = gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -2969,8 +2966,6 @@ func TestNewRequestFinalizer_enqueueErrorPropagation(t *testing.T) {
 			expectedErr: nil,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

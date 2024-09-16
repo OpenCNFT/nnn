@@ -101,8 +101,6 @@ func TestCountStorages(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := testhelper.Context(t)
@@ -227,8 +225,6 @@ func TestCounter(t *testing.T) {
 			suppress: true,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

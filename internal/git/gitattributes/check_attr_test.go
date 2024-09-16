@@ -145,8 +145,6 @@ func TestCheckAttrCmd_Check(t *testing.T) {
 			expectedAttr: Attributes{Attribute{Name: "foo", State: "bar"}},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

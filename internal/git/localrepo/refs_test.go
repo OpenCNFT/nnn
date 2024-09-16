@@ -51,8 +51,6 @@ func TestRepo_ContainsRef(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 			contained, err := repo.HasRevision(ctx, git.Revision(tc.ref))
@@ -117,8 +115,6 @@ func TestRepo_ResolveRevision(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -177,8 +173,6 @@ func TestRepo_GetReference(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -292,8 +286,6 @@ func TestRepo_GetReferences(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -561,8 +553,6 @@ func TestRepo_UpdateRef(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -674,8 +664,6 @@ func TestGuessHead(t *testing.T) {
 			expectedErr: fmt.Errorf("guess head: %w", git.ErrReferenceNotFound),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

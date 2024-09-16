@@ -54,8 +54,6 @@ func TestLogMatcher(t *testing.T) {
 			shouldLogMethods: []string{"Check"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Setenv("GITALY_LOG_REQUEST_METHOD_DENY_PATTERN", tc.skip)
 			t.Setenv("GITALY_LOG_REQUEST_METHOD_ALLOW_PATTERN", tc.only)

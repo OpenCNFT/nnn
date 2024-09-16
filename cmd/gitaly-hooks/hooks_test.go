@@ -415,8 +415,6 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -690,9 +688,6 @@ func TestRequestedHooks(t *testing.T) {
 		gitcmd.PostReceiveHook:          {"post-receive"},
 		gitcmd.PackObjectsHook:          {"gitaly-hooks", "git"},
 	} {
-		hook := hook
-		hookArgs := hookArgs
-
 		t.Run(hookArgs[0], func(t *testing.T) {
 			t.Run("unrequested hook is ignored", func(t *testing.T) {
 				t.Parallel()
@@ -873,8 +868,6 @@ func TestGitalyServerReturnsError(t *testing.T) {
 			expectedStderr: "error executing git hook\n",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.hook, func(t *testing.T) {
 			t.Parallel()
 
@@ -985,8 +978,6 @@ func TestGitalyServerReturnsError_packObjects(t *testing.T) {
 			expectedLogs: `RPC failed: rpc error: code = Unavailable desc = server is not available`,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

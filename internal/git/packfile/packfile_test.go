@@ -47,8 +47,6 @@ func TestList(t *testing.T) {
 			expectedPacks: 1,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

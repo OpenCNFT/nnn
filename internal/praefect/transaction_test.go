@@ -629,8 +629,6 @@ func TestTransactionCancellation(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

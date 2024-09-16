@@ -126,8 +126,6 @@ func TestDial(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			if emitProxyWarning() {
 				t.Log("WARNING. Proxy configuration detected from environment settings. This test failure may be related to proxy configuration. Please process with caution")
@@ -222,8 +220,6 @@ func TestDialSidechannel(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.envSSLCertFile != "" {
 				t.Setenv(gitalyx509.SSLCertFile, tc.envSSLCertFile)
@@ -703,7 +699,6 @@ func TestWithGitalyDNSResolver_resolvableDomain(t *testing.T) {
 	// This scheme uses our DNS resolver
 	url := fmt.Sprintf("dns://%s/grpc.test:%s", dnsServer.Addr(), serverPort)
 	for _, dialFunc := range dialFuncs {
-		dialFunc := dialFunc
 		t.Run(fmt.Sprintf("dial via %s, url = %s", dialFunc.name, url), func(t *testing.T) {
 			t.Parallel()
 			verifyDNSConnection(t, dialFunc.dial, url)
@@ -727,8 +722,6 @@ func TestWithGitalyDNSResolver_loopbackAddresses(t *testing.T) {
 
 	for _, url := range urls {
 		for _, dialFunc := range dialFuncs {
-			url := url
-			dialFunc := dialFunc
 			t.Run(fmt.Sprintf("dial via %s, url = %s", dialFunc.name, url), func(t *testing.T) {
 				t.Parallel()
 				verifyDNSConnection(t, dialFunc.dial, url)
@@ -760,7 +753,6 @@ func TestWithGitalyDNSResolver_zeroAddresses(t *testing.T) {
 	t.Parallel()
 
 	for _, dialFunc := range dialFuncs {
-		dialFunc := dialFunc
 		t.Run(fmt.Sprintf("dial via %s", dialFunc.name), func(t *testing.T) {
 			t.Parallel()
 

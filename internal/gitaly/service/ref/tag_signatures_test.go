@@ -170,8 +170,6 @@ iJwEAAEIAAYFAlmmbf0ACgkQv52SX5Ee/WVv1gP/WrjclOc3CYiTrTgNuxs/vyXl
 			expectedSignatures: nil,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -900,8 +900,6 @@ func testUserCommitFiles(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1304,8 +1302,6 @@ func testSuccessfulUserCommitFilesRequest(t *testing.T, ctx context.Context) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1406,8 +1402,6 @@ func testUserCommitFilesMove(t *testing.T, ctx context.Context) {
 			expectedContent: fileContent,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1567,8 +1561,6 @@ func testUserCommitFilesRemoteRepository(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1802,8 +1794,6 @@ func testFailedUserCommitFilesRequestDueToIndexError(t *testing.T, ctx context.C
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -248,7 +248,6 @@ func receiveSecondaryStreams(srcs []streamAndDestination) chan error {
 	go func() {
 		var g errgroup.Group
 		for _, src := range srcs {
-			src := src // rescoping for goroutine
 			g.Go(func() error {
 				for {
 					if err := src.RecvMsg(&frame{}); err != nil {
@@ -336,7 +335,6 @@ func forwardClientToServers(src grpc.ServerStream, dsts []streamAndDestination) 
 		frameChans := make([]chan<- *frame, 0, len(dsts))
 
 		for _, dst := range dsts {
-			dst := dst
 			frameChan := make(chan *frame, 16)
 			frameChan <- &frame{payload: dst.destination.Msg} // send re-written message
 			frameChans = append(frameChans, frameChan)

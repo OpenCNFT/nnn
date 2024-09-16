@@ -383,8 +383,6 @@ func TestObjectHash_HashData(t *testing.T) {
 			expectedSHA256OID: "1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Run("sha1", func(t *testing.T) {
 				require.Equal(t, tc.expectedSHA1OID, git.ObjectHashSHA1.HashData(tc.data))

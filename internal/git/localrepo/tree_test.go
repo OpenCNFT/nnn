@@ -183,7 +183,6 @@ func TestTreeEntry_Write(t *testing.T) {
 			expectedErrString: "hasDotgit: contains '.git'",
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 			tree := &TreeEntry{
@@ -610,7 +609,6 @@ func TestReadTree(t *testing.T) {
 			expectedErr: git.ErrReferenceNotFound,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -771,7 +769,6 @@ func TestWriteTreeRecursively(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -948,7 +945,6 @@ func TestReadTree_WithRecursive(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

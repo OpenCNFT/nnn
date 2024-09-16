@@ -188,8 +188,6 @@ func TestMapGRPCLogLevel(t *testing.T) {
 			expectedLevel:    "warning",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", tc.environmentLevel)
 			require.Equal(t, tc.expectedLevel, mapGRPCLogLevel(tc.level))

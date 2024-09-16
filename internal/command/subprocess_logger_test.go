@@ -85,7 +85,6 @@ func TestSubprocessLogger(t *testing.T) {
 
 				start := make(chan struct{})
 				for i := 0; i < 5; i++ {
-					i := i
 					cmd := newSubprocess()
 					wg.Add(1)
 					go func() {
@@ -143,7 +142,6 @@ func TestSubprocessLogger(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -69,8 +69,6 @@ func (mgr *Manager) GetStorage(storageName string) (storage.Storage, error) {
 func (mgr *Manager) Close() {
 	var active sync.WaitGroup
 	for _, storage := range mgr.storages {
-		storage := storage
-
 		active.Add(1)
 		go func() {
 			defer active.Done()

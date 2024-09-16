@@ -438,8 +438,6 @@ func TestUserApplyPatch(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -790,8 +788,6 @@ func TestUserApplyPatch_validation(t *testing.T) {
 			expectedErr: status.Error(codes.InvalidArgument, "missing User"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
