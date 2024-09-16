@@ -188,7 +188,7 @@ func testUnaryLimitHandlerQueueStrategy(b *testing.B, ctx context.Context, numRe
 
 	// Collect metrics
 	droppedRequestFamily := GatherMetrics(lh, "gitaly_requests_dropped_total")
-	concurrencyAquiringSecondsFamily := GatherMetrics(lh, "gitaly_concurrency_limiting_acquiring_seconds")
+	concurrencyAcquiringSecondsFamily := GatherMetrics(lh, "gitaly_concurrency_limiting_acquiring_seconds")
 
 	// Create map to store gathered metrics
 	m := make(map[string]float64)
@@ -197,7 +197,7 @@ func testUnaryLimitHandlerQueueStrategy(b *testing.B, ctx context.Context, numRe
 	extractCounterMetric(droppedRequestFamily, m)
 
 	// Extract histogram results from metric
-	extractHistogramMetric(concurrencyAquiringSecondsFamily, m)
+	extractHistogramMetric(concurrencyAcquiringSecondsFamily, m)
 
 	assert.GreaterOrEqual(b, int(s.queueTestServer.requestCount), 0)
 }
