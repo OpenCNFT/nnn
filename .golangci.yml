@@ -8,12 +8,19 @@ run:
 linters:
   disable-all: true
   enable:
-    - bidichk
-    - depguard
+    # These are enabled by default, but since we disable-all, worthwhile to re-enable them.
     - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # Rest of the checks which we enable.
+    - bidichk
+    - copyloopvar
+    - depguard
     - errname
     - errorlint
-    - copyloopvar
     - forbidigo
     - gci
     - gitaly-linters
@@ -22,9 +29,6 @@ linters:
     - gofmt
     - gofumpt
     - goimports
-    - gosimple
-    - govet
-    - ineffassign
     - makezero
     - misspell
     - noctx
@@ -33,12 +37,10 @@ linters:
     - revive
     - rowserrcheck
     - sqlclosecheck
-    - staticcheck
     - stylecheck
     - tenv
     - thelper
     - unconvert
-    - unused
     - wastedassign
 
 linters-settings:
@@ -123,7 +125,7 @@ linters-settings:
   stylecheck:
     # ST1000 checks for missing package comments. We don't use these for most
     # packages, so let's disable this check.
-    checks: [ "all", "-ST1000" ]
+    checks: ["all", "-ST1000"]
   thelper:
     test:
       # The following linter would check whether we always call `t.Helper()` in
