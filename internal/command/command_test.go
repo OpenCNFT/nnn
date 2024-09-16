@@ -363,6 +363,24 @@ func TestCommand_stderr(t *testing.T) {
 			expectedLevel:  logrus.ErrorLevel,
 		},
 		{
+			name: "stderr with exit code 0",
+			script: `#!/usr/bin/env bash
+				echo "warning message" >&2
+				exit 0
+			`,
+			expectedLevel:  logrus.WarnLevel,
+			expectedOutput: "warning message\n",
+		},
+		{
+			name: "stderr with non-zero exit code",
+			script: `#!/usr/bin/env bash
+				echo "error message" >&2
+				exit 1
+			`,
+			expectedLevel:  logrus.ErrorLevel,
+			expectedOutput: "error message\n",
+		},
+		{
 			name: "stderr logging long line",
 			script: `#!/usr/bin/env bash
 				printf 'a%.0s' {1..8192} >&2
