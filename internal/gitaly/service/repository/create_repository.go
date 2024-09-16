@@ -26,6 +26,7 @@ func (s *server) CreateRepository(ctx context.Context, req *gitalypb.CreateRepos
 		s.logger,
 		s.locator,
 		s.gitCmdFactory,
+		s.catfileCache,
 		s.txManager,
 		s.repositoryCounter,
 		repository,

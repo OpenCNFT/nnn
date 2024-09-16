@@ -547,6 +547,7 @@ func (r *localRepository) Create(ctx context.Context, hash git.ObjectHash, defau
 		r.logger,
 		r.locator,
 		r.gitCmdFactory,
+		r.catfileCache,
 		r.txManager,
 		r.repoCounter,
 		r.repo,

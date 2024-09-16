@@ -38,7 +38,7 @@ func (s *server) CreateObjectPool(ctx context.Context, in *gitalypb.CreateObject
 	// the disk when committing it, so it's not necessary to capture the updates from the reference-transaction hook. This avoids the
 	// problem for now, and later with transactions enabled by default we can stop creating repositories in unexpected locations.
 	ctxWithoutTransaction := storage.ContextWithTransactionID(ctx, 0)
-	if err := repoutil.Create(ctxWithoutTransaction, s.logger, s.locator, s.gitCmdFactory, s.txManager, s.repositoryCounter, poolRepo, func(poolRepo *gitalypb.Repository) error {
+	if err := repoutil.Create(ctxWithoutTransaction, s.logger, s.locator, s.gitCmdFactory, s.catfileCache, s.txManager, s.repositoryCounter, poolRepo, func(poolRepo *gitalypb.Repository) error {
 		if _, err := objectpool.Create(
 			ctxWithoutTransaction,
 			s.logger,

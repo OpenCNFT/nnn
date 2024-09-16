@@ -81,8 +81,14 @@ func TestFsck(t *testing.T) {
 
 				setupData := setupData{
 					repo: repo,
-					requireResponse: func(actual *gitalypb.FsckResponse) {
-						require.Regexp(t, "^fatal: not a git repository: '.+'\n$", string(actual.Error))
+					requireError: func(actual error) {
+						testhelper.RequireStatusWithErrorMetadataRegexp(t,
+							structerr.NewInternal("reading reference backend: exit status 128"),
+							actual,
+							map[string]string{
+								"stderr": "fatal: not a git repository: .+",
+							},
+						)
 					},
 				}
 

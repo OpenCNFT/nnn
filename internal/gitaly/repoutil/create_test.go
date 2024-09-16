@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
@@ -42,6 +43,8 @@ func TestCreate(t *testing.T) {
 	txManager := &transaction.MockManager{}
 	locator := config.NewLocator(cfg)
 	gitCmdFactory := gittest.NewCommandFactory(t, cfg)
+	catfileCache := catfile.NewCache(cfg)
+	defer catfileCache.Stop()
 
 	var votesByPhase map[voting.Phase]int
 
@@ -390,7 +393,7 @@ func TestCreate(t *testing.T) {
 
 			var tempRepo *gitalypb.Repository
 
-			err = Create(ctx, logger, locator, gitCmdFactory, txManager, repoCounter, repo, func(tr *gitalypb.Repository) error {
+			err = Create(ctx, logger, locator, gitCmdFactory, catfileCache, txManager, repoCounter, repo, func(tr *gitalypb.Repository) error {
 				tempRepo = tr
 
 				// The temporary repository must have been created in Gitaly's
