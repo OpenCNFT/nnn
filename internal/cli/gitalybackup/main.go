@@ -29,6 +29,7 @@ func NewApp() *cli.App {
 		Commands: []*cli.Command{
 			newCreateCommand(),
 			newRestoreCommand(),
+			newPartitionCommand(),
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
