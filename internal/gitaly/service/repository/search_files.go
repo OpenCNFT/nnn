@@ -65,7 +65,7 @@ func (s *server) SearchFilesByContent(req *gitalypb.SearchFilesByContentRequest,
 
 func sendMatchInChunks(buf []byte, stream gitalypb.RepositoryService_SearchFilesByContentServer) error {
 	sw := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.SearchFilesByContentResponse{MatchData: p})
+		return stream.Send(&gitalypb.SearchFilesByContentResponse{MatchData: bytes.Clone(p)})
 	})
 
 	if _, err := io.Copy(sw, bytes.NewReader(buf)); err != nil {
