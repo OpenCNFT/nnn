@@ -106,7 +106,7 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 					partition.NewFactory(
 						cmdFactory,
 						localRepoFactory,
-						partition.NewTransactionManagerMetrics(
+						partition.NewMetrics(
 							housekeeping.NewMetrics(cfg.Prometheus),
 							snapshot.NewMetrics(),
 						),

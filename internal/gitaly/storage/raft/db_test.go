@@ -44,7 +44,7 @@ func TestDbForMetadataGroup(t *testing.T) {
 			partition.NewFactory(
 				cmdFactory,
 				localRepoFactory,
-				partition.NewTransactionManagerMetrics(
+				partition.NewMetrics(
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
 				),
@@ -133,7 +133,7 @@ func TestDbForStorage(t *testing.T) {
 			partition.NewFactory(
 				cmdFactory,
 				localRepoFactory,
-				partition.NewTransactionManagerMetrics(
+				partition.NewMetrics(
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
 				),

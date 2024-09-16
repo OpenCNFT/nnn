@@ -2458,10 +2458,10 @@ func BenchmarkTransactionManager(b *testing.B) {
 				stagingDir := filepath.Join(storagePath, "staging", strconv.Itoa(i))
 				require.NoError(b, os.MkdirAll(stagingDir, mode.Directory))
 
-				m := NewTransactionManagerMetrics(
+				m := NewMetrics(
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
-				)
+				).Scope(storageName)
 
 				// Valid partition IDs are >=1.
 				testPartitionID := storage.PartitionID(i + 1)

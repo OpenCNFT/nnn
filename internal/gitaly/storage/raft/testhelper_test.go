@@ -378,7 +378,7 @@ func setupTestPartitionManager(t *testing.T, cfg config.Cfg) *nodeimpl.Manager {
 			partition.NewFactory(
 				cmdFactory,
 				localRepoFactory,
-				partition.NewTransactionManagerMetrics(
+				partition.NewMetrics(
 					housekeeping.NewMetrics(cfg.Prometheus),
 					snapshot.NewMetrics(),
 				),

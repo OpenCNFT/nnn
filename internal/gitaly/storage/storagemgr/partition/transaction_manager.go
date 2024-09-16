@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -196,10 +197,6 @@ const (
 	transactionStateCommit
 )
 
-type transactionMetrics struct {
-	housekeeping *housekeeping.Metrics
-}
-
 // Transaction is a unit-of-work that contains reference changes to perform on the repository.
 type Transaction struct {
 	// write denotes whether or not this transaction is a write transaction.
@@ -207,7 +204,7 @@ type Transaction struct {
 	// repositoryExists indicates whether the target repository existed when this transaction began.
 	repositoryExists bool
 	// metrics stores metric reporters inherited from the manager.
-	metrics transactionMetrics
+	metrics ManagerMetrics
 
 	// state records whether the transaction is still open. Transaction is open until either Commit()
 	// or Rollback() is called on it.
@@ -302,6 +299,9 @@ type Transaction struct {
 // The returned Transaction's read snapshot includes all writes that were committed prior to the
 // Begin call. Begin blocks until the committed writes have been applied to the repository.
 func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOptions) (_ storage.Transaction, returnedErr error) {
+	defer prometheus.NewTimer(mgr.metrics.beginDuration(opts.Write)).ObserveDuration()
+	transactionDurationTimer := prometheus.NewTimer(mgr.metrics.transactionDuration(opts.Write))
+
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
 	select {
@@ -336,7 +336,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 		snapshotLSN:  mgr.appendedLSN,
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
-		metrics:      transactionMetrics{housekeeping: mgr.metrics.housekeeping},
+		metrics:      mgr.metrics,
 	}
 
 	mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Add(1)
@@ -354,6 +354,8 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 
 	txn.finish = func() error {
 		defer close(txn.finished)
+		defer transactionDurationTimer.ObserveDuration()
+
 		defer func() {
 			if txn.db != nil {
 				txn.db.Discard()
@@ -544,6 +546,8 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 		return err
 	}
 
+	defer prometheus.NewTimer(txn.metrics.commitDuration(txn.write)).ObserveDuration()
+
 	defer func() {
 		if err := txn.finishUnadmitted(); err != nil && returnedErr == nil {
 			returnedErr = err
@@ -582,6 +586,8 @@ func (txn *Transaction) Rollback() error {
 	if err := txn.updateState(transactionStateRollback); err != nil {
 		return err
 	}
+
+	defer prometheus.NewTimer(txn.metrics.rollbackDuration(txn.write)).ObserveDuration()
 
 	return txn.finishUnadmitted()
 }
@@ -883,20 +889,6 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 	p.position = pos
 }
 
-// TransactionManagerMetrics contains the metrics collected by a TransactionManager.
-type TransactionManagerMetrics struct {
-	housekeeping *housekeeping.Metrics
-	snapshot     snapshot.Metrics
-}
-
-// NewTransactionManagerMetrics returns a new TransactionManagerMetrics instance.
-func NewTransactionManagerMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) TransactionManagerMetrics {
-	return TransactionManagerMetrics{
-		housekeeping: housekeeping,
-		snapshot:     snapshot,
-	}
-}
-
 // TransactionManager is responsible for transaction management of a single repository. Each repository has
 // a single TransactionManager; it is the repository's single-writer. It accepts writes one at a time from
 // the admissionQueue. Each admitted write is processed in three steps:
@@ -1023,7 +1015,7 @@ type TransactionManager struct {
 	testHooks testHooks
 
 	// metrics stores reporters which facilitate metric recording of transactional operations.
-	metrics TransactionManagerMetrics
+	metrics ManagerMetrics
 }
 
 type testHooks struct {
@@ -1046,7 +1038,7 @@ func NewTransactionManager(
 	stagingDir string,
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
-	metrics TransactionManagerMetrics,
+	metrics ManagerMetrics,
 	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1227,21 +1219,30 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	select {
-	case mgr.admissionQueue <- transaction:
-		transaction.admitted = true
+	if err := func() error {
+		transaction.metrics.commitQueueDepth.Inc()
+		defer transaction.metrics.commitQueueDepth.Dec()
+		defer prometheus.NewTimer(mgr.metrics.commitQueueWaitSeconds).ObserveDuration()
 
 		select {
-		case err := <-transaction.result:
-			return unwrapExpectedError(err)
+		case mgr.admissionQueue <- transaction:
+			transaction.admitted = true
+			return nil
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-mgr.closed:
+		case <-mgr.closing:
 			return storage.ErrTransactionProcessingStopped
 		}
+	}(); err != nil {
+		return err
+	}
+
+	select {
+	case err := <-transaction.result:
+		return unwrapExpectedError(err)
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-mgr.closing:
+	case <-mgr.closed:
 		return storage.ErrTransactionProcessingStopped
 	}
 }
@@ -2151,6 +2152,8 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 	var transaction *Transaction
 	select {
 	case transaction = <-mgr.admissionQueue:
+		defer prometheus.NewTimer(mgr.metrics.transactionProcessingDurationSeconds).ObserveDuration()
+
 		// The Transaction does not finish itself anymore once it has been admitted for
 		// processing. This avoids the Transaction concurrently removing the staged state
 		// while the manager is still operating on it. We thus need to defer its finishing.
@@ -2423,7 +2426,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("create snapshot manager directory: %w", err)
 	}
 
-	mgr.snapshotManager = snapshot.NewManager(mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot.Scope(mgr.storageName))
+	mgr.snapshotManager = snapshot.NewManager(mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot)
 
 	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
 	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there
@@ -3443,6 +3446,8 @@ func (mgr *TransactionManager) appendLogEntry(objectDependencies map[git.ObjectI
 
 // applyLogEntry reads a log entry at the given LSN and applies it to the repository.
 func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LSN) error {
+	defer prometheus.NewTimer(mgr.metrics.transactionApplicationDurationSeconds).ObserveDuration()
+
 	logEntry, err := mgr.readLogEntry(lsn)
 	if err != nil {
 		return fmt.Errorf("read log entry: %w", err)
