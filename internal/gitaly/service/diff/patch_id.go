@@ -18,7 +18,9 @@ func (s *server) GetPatchID(ctx context.Context, in *gitalypb.GetPatchIDRequest)
 
 	var diffCmdStderr strings.Builder
 
-	diffCmd, err := s.gitCmdFactory.New(ctx, in.Repository,
+	repo := s.localrepo(in.GetRepository())
+
+	diffCmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name: "diff",
 			Args: []string{string(in.GetOldRevision()), string(in.GetNewRevision())},

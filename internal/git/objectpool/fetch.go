@@ -66,6 +66,11 @@ func (o *ObjectPool) FetchFromOrigin(ctx context.Context, origin *localrepo.Repo
 		return fmt.Errorf("pruning references: %w", err)
 	}
 
+	objectHash, err := o.Repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	var stderr bytes.Buffer
 	if err := o.Repo.ExecAndWait(ctx,
 		gitcmd.Command{
@@ -88,7 +93,7 @@ func (o *ObjectPool) FetchFromOrigin(ctx context.Context, origin *localrepo.Repo
 			},
 			Args: []string{originPath, objectPoolRefspec},
 		},
-		gitcmd.WithRefTxHook(o.Repo),
+		gitcmd.WithRefTxHook(objectHash, o.Repo),
 		gitcmd.WithStderr(&stderr),
 		gitcmd.WithConfig(gitcmd.ConfigPair{
 			// Git is so kind to point out that we asked it to not show forced updates

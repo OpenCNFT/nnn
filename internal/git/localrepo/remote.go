@@ -86,6 +86,11 @@ func (repo *Repo) FetchRemote(ctx context.Context, remoteName string, opts Fetch
 		opts.Stderr = &stderr
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	commandOptions := []gitcmd.CmdOpt{
 		gitcmd.WithEnv(opts.Env...),
 		gitcmd.WithStdout(opts.Stdout),
@@ -99,11 +104,11 @@ func (repo *Repo) FetchRemote(ctx context.Context, remoteName string, opts Fetch
 	if opts.DisableTransactions {
 		commandOptions = append(commandOptions, gitcmd.WithDisabledHooks())
 	} else {
-		commandOptions = append(commandOptions, gitcmd.WithRefTxHook(repo))
+		commandOptions = append(commandOptions, gitcmd.WithRefTxHook(objectHash, repo))
 	}
 	commandOptions = append(commandOptions, opts.CommandOptions...)
 
-	cmd, err := repo.gitCmdFactory.New(ctx, repo,
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:  "fetch",
 			Flags: opts.buildFlags(),
@@ -156,10 +161,15 @@ func (repo *Repo) FetchInternal(
 		}),
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	if opts.DisableTransactions {
 		commandOptions = append(commandOptions, gitcmd.WithDisabledHooks())
 	} else {
-		commandOptions = append(commandOptions, gitcmd.WithRefTxHook(repo))
+		commandOptions = append(commandOptions, gitcmd.WithRefTxHook(objectHash, repo))
 	}
 	commandOptions = append(commandOptions, opts.CommandOptions...)
 

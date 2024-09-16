@@ -233,7 +233,9 @@ func (s *server) handleArchive(ctx context.Context, p archiveParams) error {
 		config = append(config, smudgeGitConfig)
 	}
 
-	archiveCommand, err := s.gitCmdFactory.New(ctx, p.in.GetRepository(), gitcmd.Command{
+	repo := s.localrepo(p.in.GetRepository())
+
+	archiveCommand, err := repo.Exec(ctx, gitcmd.Command{
 		Name:        "archive",
 		Flags:       []gitcmd.Option{gitcmd.ValueFlag{Name: "--format", Value: p.format}, gitcmd.ValueFlag{Name: "--prefix", Value: p.in.GetPrefix() + "/"}},
 		Args:        args,

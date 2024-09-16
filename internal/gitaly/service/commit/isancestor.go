@@ -29,18 +29,20 @@ func (s *server) CommitIsAncestor(ctx context.Context, in *gitalypb.CommitIsAnce
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	ret, err := s.commitIsAncestorName(ctx, in.Repository, in.AncestorId, in.ChildId)
+	repo := s.localrepo(in.GetRepository())
+
+	ret, err := s.commitIsAncestorName(ctx, repo, in.AncestorId, in.ChildId)
 	return &gitalypb.CommitIsAncestorResponse{Value: ret}, err
 }
 
 // Assumes that `path`, `ancestorID` and `childID` are populated :trollface:
-func (s *server) commitIsAncestorName(ctx context.Context, repo *gitalypb.Repository, ancestorID, childID string) (bool, error) {
+func (s *server) commitIsAncestorName(ctx context.Context, repo gitcmd.RepositoryExecutor, ancestorID, childID string) (bool, error) {
 	s.logger.WithFields(log.Fields{
 		"ancestorSha": ancestorID,
 		"childSha":    childID,
 	}).DebugContext(ctx, "commitIsAncestor")
 
-	cmd, err := s.gitCmdFactory.New(ctx, repo, gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "merge-base",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--is-ancestor"}}, Args: []string{ancestorID, childID},
 	})

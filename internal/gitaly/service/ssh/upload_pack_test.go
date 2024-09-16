@@ -846,7 +846,14 @@ func testUploadPackGitFailure(t *testing.T, ctx context.Context) {
 	require.NoError(t, stream.CloseSend())
 
 	err = recvUntilError(t, stream)
-	testhelper.RequireGrpcError(t, structerr.NewInternal(`running upload-pack: cmd wait: exit status 128, stderr: "fatal: bad config line 1 in file ./config\n"`), err)
+
+	testhelper.RequireStatusWithErrorMetadataRegexp(t,
+		structerr.NewInternal(`detecting object hash: reading object format: exit status 128`),
+		err,
+		map[string]string{
+			"stderr": "fatal: bad config line 1 in file .+",
+		},
+	)
 }
 
 func recvUntilError(t *testing.T, stream gitalypb.SSHService_SSHUploadPackClient) error {

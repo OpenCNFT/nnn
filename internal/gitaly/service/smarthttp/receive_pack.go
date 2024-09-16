@@ -3,6 +3,7 @@ package smarthttp
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -76,7 +77,9 @@ func (s *server) postReceivePack(
 		return stream.Send(&gitalypb.PostReceivePackResponse{Data: p})
 	})
 
-	repoPath, err := s.locator.GetRepoPath(ctx, req.Repository)
+	repo := s.localrepo(req.GetRepository())
+
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return err
 	}
@@ -89,7 +92,6 @@ func (s *server) postReceivePack(
 	transactionID := storage.ExtractTransactionID(ctx)
 	transactionsEnabled := transactionID > 0
 	if transactionsEnabled {
-		repo := s.localrepo(req.GetRepository())
 		procReceiveCleanup, err := receivepack.RegisterProcReceiveHook(
 			ctx, s.logger, s.cfg, req, repo, s.hookManager, hook.NewTransactionRegistry(s.txRegistry), transactionID,
 		)
@@ -103,7 +105,12 @@ func (s *server) postReceivePack(
 		}()
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(),
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:  "receive-pack",
 			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},
@@ -111,7 +118,7 @@ func (s *server) postReceivePack(
 		},
 		gitcmd.WithStdin(stdin),
 		gitcmd.WithStdout(stdout),
-		gitcmd.WithReceivePackHooks(req, "http", transactionsEnabled),
+		gitcmd.WithReceivePackHooks(objectHash, req, "http", transactionsEnabled),
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
 	)

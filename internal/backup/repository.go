@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -453,6 +454,7 @@ type localRepository struct {
 	gitCmdFactory gitcmd.CommandFactory
 	txManager     transaction.Manager
 	repoCounter   *counter.RepositoryCounter
+	catfileCache  catfile.Cache
 	repo          *localrepo.Repo
 }
 
@@ -464,6 +466,7 @@ func NewLocalRepository(
 	gitCmdFactory gitcmd.CommandFactory,
 	txManager transaction.Manager,
 	repoCounter *counter.RepositoryCounter,
+	catfileCache catfile.Cache,
 	repo *localrepo.Repo,
 ) *localRepository {
 	return &localRepository{
@@ -472,6 +475,7 @@ func NewLocalRepository(
 		gitCmdFactory: gitCmdFactory,
 		txManager:     txManager,
 		repoCounter:   repoCounter,
+		catfileCache:  catfileCache,
 		repo:          repo,
 	}
 }
@@ -552,6 +556,11 @@ func (r *localRepository) Create(ctx context.Context, hash git.ObjectHash, defau
 	); err != nil {
 		return fmt.Errorf("local repository: create: %w", err)
 	}
+
+	// Recreate the local repository, since the cache of object hash and ref-format needs
+	// to be invalidated.
+	r.repo = localrepo.New(r.logger, r.locator, r.gitCmdFactory, r.catfileCache, r.repo)
+
 	return nil
 }
 

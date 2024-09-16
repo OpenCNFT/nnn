@@ -66,6 +66,11 @@ func parseTagLine(ctx context.Context, objectReader catfile.ObjectContentReader,
 }
 
 func (s *server) findTag(ctx context.Context, repo gitcmd.RepositoryExecutor, tagName []byte) (*gitalypb.Tag, error) {
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	tagCmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name: "tag",
@@ -75,7 +80,7 @@ func (s *server) findTag(ctx context.Context, repo gitcmd.RepositoryExecutor, ta
 			},
 			Args: []string{string(tagName)},
 		},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(objectHash, repo),
 		gitcmd.WithSetupStdout(),
 	)
 	if err != nil {

@@ -11,10 +11,11 @@ import (
 )
 
 func (s *server) FindMergeBase(ctx context.Context, req *gitalypb.FindMergeBaseRequest) (*gitalypb.FindMergeBaseResponse, error) {
-	repository := req.GetRepository()
-	if err := s.locator.ValidateRepository(ctx, repository); err != nil {
+	repoProto := req.GetRepository()
+	if err := s.locator.ValidateRepository(ctx, repoProto); err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
+
 	var revisions []string
 	for _, rev := range req.GetRevisions() {
 		revisions = append(revisions, string(rev))
@@ -24,7 +25,9 @@ func (s *server) FindMergeBase(ctx context.Context, req *gitalypb.FindMergeBaseR
 		return nil, structerr.NewInvalidArgument("at least 2 revisions are required")
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, repository,
+	repo := s.localrepo(repoProto)
+
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name: "merge-base",
 			Args: revisions,

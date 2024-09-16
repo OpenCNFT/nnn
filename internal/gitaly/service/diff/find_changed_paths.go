@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -98,7 +97,9 @@ func (s *server) FindChangedPaths(in *gitalypb.FindChangedPathsRequest, stream g
 		flags = append(flags, gitcmd.Flag{Name: "-c"})
 	}
 
-	cmd, err := s.gitCmdFactory.New(stream.Context(), in.Repository, gitcmd.Command{
+	repo := s.localrepo(in.GetRepository())
+
+	cmd, err := repo.Exec(stream.Context(), gitcmd.Command{
 		Name:  "diff-tree",
 		Flags: flags,
 	}, gitcmd.WithStdin(strings.NewReader(strings.Join(requests, "\n")+"\n")), gitcmd.WithSetupStdout())
@@ -305,7 +306,6 @@ func (t *findChangedPathsSender) Send() error {
 
 func resolveObjectWithType(
 	ctx context.Context,
-	repo *localrepo.Repo,
 	objectInfoReader catfile.ObjectInfoReader,
 	revision string,
 	expectedType string,
@@ -361,7 +361,6 @@ func (s *server) validateFindChangedPathsRequestParams(ctx context.Context, in *
 		case *gitalypb.FindChangedPathsRequest_Request_CommitRequest_:
 			oid, err := resolveObjectWithType(
 				ctx,
-				gitRepo,
 				objectInfoReader,
 				t.CommitRequest.GetCommitRevision(),
 				"commit",
@@ -374,7 +373,6 @@ func (s *server) validateFindChangedPathsRequestParams(ctx context.Context, in *
 			for i, commit := range t.CommitRequest.GetParentCommitRevisions() {
 				oid, err := resolveObjectWithType(
 					ctx,
-					gitRepo,
 					objectInfoReader,
 					commit,
 					"commit",
@@ -387,7 +385,6 @@ func (s *server) validateFindChangedPathsRequestParams(ctx context.Context, in *
 		case *gitalypb.FindChangedPathsRequest_Request_TreeRequest_:
 			oid, err := resolveObjectWithType(
 				ctx,
-				gitRepo,
 				objectInfoReader,
 				t.TreeRequest.GetLeftTreeRevision(),
 				"tree",
@@ -399,7 +396,6 @@ func (s *server) validateFindChangedPathsRequestParams(ctx context.Context, in *
 
 			oid, err = resolveObjectWithType(
 				ctx,
-				gitRepo,
 				objectInfoReader,
 				t.TreeRequest.GetRightTreeRevision(),
 				"tree",

@@ -30,8 +30,8 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 	targetRepository := req.Repository
 	sourceRepository := req.SourceRepository
 
-	if err := repoutil.Create(ctx, s.logger, s.locator, s.gitCmdFactory, s.txManager, s.repositoryCounter, targetRepository, func(repo *gitalypb.Repository) error {
-		targetPath, err := s.locator.GetRepoPath(ctx, repo, storage.WithRepositoryVerificationSkipped())
+	if err := repoutil.Create(ctx, s.logger, s.locator, s.gitCmdFactory, s.txManager, s.repositoryCounter, targetRepository, func(repoProto *gitalypb.Repository) error {
+		targetPath, err := s.locator.GetRepoPath(ctx, repoProto, storage.WithRepositoryVerificationSkipped())
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,9 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 			return fmt.Errorf("fetching source repo: %w, stderr: %q", err, stderr.String())
 		}
 
-		if target, err := gitcmd.GetSymbolicRef(ctx, s.localrepo(repo), "HEAD"); err != nil {
+		repo := s.localrepo(repoProto)
+
+		if target, err := gitcmd.GetSymbolicRef(ctx, repo, "HEAD"); err != nil {
 			return fmt.Errorf("checking whether HEAD reference is sane: %w", err)
 		} else if req.GetRevision() != nil && target.Target != string(req.GetRevision()) {
 			return structerr.NewInternal("HEAD points to unexpected reference").WithMetadata("expected_target", string(req.GetRevision())).WithMetadata("actual_target", target)

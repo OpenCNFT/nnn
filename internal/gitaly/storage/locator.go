@@ -64,6 +64,8 @@ type Repository interface {
 	GetRelativePath() string
 	GetGitObjectDirectory() string
 	GetGitAlternateObjectDirectories() []string
+	GetGlRepository() string
+	GetGlProjectPath() string
 }
 
 // RepoPathEqual compares if two repositories are in the same location
