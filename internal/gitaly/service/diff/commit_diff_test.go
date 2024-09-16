@@ -549,7 +549,6 @@ func TestCommitDiff(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -747,8 +746,6 @@ func TestCommitDiff_ignoreWhitespaceChange(t *testing.T) {
 			expectedDiffs: []*diff.Diff{expectedNormalDiff, expectedWhitespaceDiff},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1031,7 +1028,6 @@ func TestCommitDiff_limits(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -73,8 +73,6 @@ func TestRepoCreateBundle(t *testing.T) {
 			expectedRefs: []git.ReferenceName{"refs/heads/feature"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -192,7 +190,6 @@ func TestRepo_CloneBundle(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -325,8 +322,6 @@ func TestRepo_FetchBundle(t *testing.T) {
 			expectedErrContains: "fetch bundle: exit status 128",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

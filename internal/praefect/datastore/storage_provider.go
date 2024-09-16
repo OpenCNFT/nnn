@@ -64,7 +64,6 @@ func NewCachingConsistentStoragesGetter(logger log.Logger, csg ConsistentStorage
 	}
 
 	for _, virtualStorage := range virtualStorages {
-		virtualStorage := virtualStorage
 		replicaInfoCache, err := lru.NewWithEvict(2<<20, func(key string, value cachedReplicaInfo) {
 			cached.cacheAccessTotal.WithLabelValues(virtualStorage, "evict").Inc()
 		})

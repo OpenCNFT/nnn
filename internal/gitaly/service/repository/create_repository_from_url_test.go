@@ -277,8 +277,6 @@ func TestServer_CloneFromURLCommand(t *testing.T) {
 			expectedCurloptResolveHeader: "gitlab.com:443:192.0.1.1",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

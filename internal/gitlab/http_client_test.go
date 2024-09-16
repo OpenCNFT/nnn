@@ -663,7 +663,6 @@ func TestNewHTTPClient_gitlabSecretConfig(t *testing.T) {
 			expectedToken: "secret_token",
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

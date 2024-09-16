@@ -456,8 +456,6 @@ func TestManager_Restore_latest(t *testing.T) {
 			},
 		},
 	} {
-		managerTC := managerTC
-
 		t.Run(managerTC.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -849,8 +847,6 @@ func TestManager_Restore_specific(t *testing.T) {
 			},
 		},
 	} {
-		managerTC := managerTC
-
 		t.Run(managerTC.desc, func(t *testing.T) {
 			t.Parallel()
 

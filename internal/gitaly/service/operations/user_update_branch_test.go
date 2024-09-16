@@ -194,8 +194,6 @@ func TestUserUpdateBranch(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -434,8 +432,6 @@ func TestUserUpdateBranch_failures(t *testing.T) {
 			expectedErr:      structerr.NewFailedPrecondition("Could not update %v. Please refresh and try again.", "refs/heads/branch"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

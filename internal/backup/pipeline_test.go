@@ -199,8 +199,6 @@ func testPipeline(t *testing.T, init func() *Pipeline) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			logger := testhelper.SharedLogger(t)
 			loggerHook := testhelper.AddLoggerHook(logger)

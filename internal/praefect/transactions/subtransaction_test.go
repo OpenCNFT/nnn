@@ -325,7 +325,6 @@ func TestSubtransaction_vote(t *testing.T) {
 
 			expectedVoterState := make(map[string]*Voter)
 			for _, voter := range tc.expectedVoterState {
-				voter := voter
 				expectedVoterState[voter.Name] = &voter
 			}
 

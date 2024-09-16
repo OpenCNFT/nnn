@@ -78,7 +78,6 @@ func TestBackchannel_concurrentRequestsFromMultipleClients(t *testing.T) {
 	// concurrently.
 	var wg sync.WaitGroup
 	for i := uint64(0); i < 25; i++ {
-		i := i
 		wg.Add(2)
 
 		go func() {

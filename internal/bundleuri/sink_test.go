@@ -40,8 +40,6 @@ func TestSink_Generate(t *testing.T) {
 			expectedErr: structerr.NewFailedPrecondition("ref %q does not exist: %w", "refs/heads/main", fmt.Errorf("create bundle: %w", localrepo.ErrEmptyBundle)),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -108,8 +106,6 @@ func TestSink_SignedURL(t *testing.T) {
 			expectedErr: structerr.NewNotFound("no bundle available"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

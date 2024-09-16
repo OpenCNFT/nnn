@@ -1508,7 +1508,6 @@ func testResolveConflicts(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
 		ctx := ctx
 
 		t.Run(tc.desc, func(t *testing.T) {

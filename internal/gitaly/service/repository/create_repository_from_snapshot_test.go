@@ -228,8 +228,6 @@ func TestCreateRepositoryFromSnapshot_invalidArguments(t *testing.T) {
 			expectedErrSubstring: "Bad HTTP URL",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

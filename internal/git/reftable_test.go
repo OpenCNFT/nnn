@@ -239,8 +239,6 @@ func TestParseReftable(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -320,8 +318,6 @@ func TestParseReftableName(t *testing.T) {
 			expectedMaxIndex: 262709978263278,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

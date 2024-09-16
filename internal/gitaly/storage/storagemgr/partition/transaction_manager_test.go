@@ -363,7 +363,6 @@ func testTransactionManager(t *testing.T, ctx context.Context) {
 
 	for desc, tests := range subTests {
 		for _, tc := range tests {
-			tc := tc
 			t.Run(fmt.Sprintf("%s/%s", desc, tc.desc), func(t *testing.T) {
 				t.Parallel()
 
@@ -2493,7 +2492,6 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionChan := make(chan struct{})
 
 			for i, manager := range managers {
-				manager := manager
 				relativePath := relativePaths[i]
 				for i := 0; i < tc.concurrentUpdaters; i++ {
 

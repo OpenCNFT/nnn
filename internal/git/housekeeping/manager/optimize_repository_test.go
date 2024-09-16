@@ -415,8 +415,6 @@ func TestPackRefsIfNeeded(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1072,8 +1070,6 @@ func TestOptimizeRepository(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		testRepoAndPool(t, tc.desc, func(t *testing.T, relativePath string) {
 			testWithAndWithoutTransaction(t, tc.desc, func(t *testing.T, cfg gitalycfg.Cfg, node storage.Node) {
 				t.Parallel()
@@ -1659,8 +1655,6 @@ func TestRepositoryManager_CleanStaleData(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1722,8 +1716,6 @@ func TestRepositoryManager_CleanStaleData_reftable(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1830,8 +1822,6 @@ func TestRepositoryManager_CleanStaleData_references(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1926,8 +1916,6 @@ func TestRepositoryManager_CleanStaleData_infoattributes(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2045,8 +2033,6 @@ func TestRepositoryManager_CleanStaleData_emptyRefDirs(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -2186,8 +2172,6 @@ func TestRepositoryManager_CleanStaleData_withSpecificFile(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -2401,8 +2385,6 @@ func TestRepositoryManager_CleanStaleData_referenceLocks(t *testing.T) {
 			cfg:         housekeeping.DefaultStaleDataCleanup(),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

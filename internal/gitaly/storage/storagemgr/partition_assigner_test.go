@@ -198,7 +198,6 @@ func TestPartitionAssigner(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -286,7 +285,6 @@ func TestPartitionAssigner_alternates(t *testing.T) {
 			expectedError:           storage.ErrRelativePathEscapesRoot,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -389,7 +387,6 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 			withAlternate: true,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -418,7 +415,6 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 			})
 
 			for i := 0; i < repositoryCount; i++ {
-				i := i
 				collectedIDs[i] = make([]storage.PartitionID, goroutineCount)
 
 				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -444,7 +440,6 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 				}
 
 				for j := 0; j < goroutineCount; j++ {
-					j := j
 					wg.Add(1)
 					go func() {
 						defer wg.Done()

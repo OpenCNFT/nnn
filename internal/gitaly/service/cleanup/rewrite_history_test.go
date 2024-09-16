@@ -484,8 +484,6 @@ Object pools are not yet supported with transaction management.`)
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

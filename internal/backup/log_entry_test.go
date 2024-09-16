@@ -278,7 +278,6 @@ func TestLogEntryArchiver(t *testing.T) {
 			expectedLogMessage:  "log entry archiver: gap in log sequence",
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -333,8 +332,6 @@ func TestLogEntryArchiver(t *testing.T) {
 				accessor.Lock()
 				accessor.managers[info] = manager
 				accessor.Unlock()
-
-				partitionID := partitionID
 
 				// Send partitions in parallel to mimic real usage.
 				go func() {

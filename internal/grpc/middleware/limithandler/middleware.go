@@ -214,8 +214,6 @@ func WithConcurrencyLimiters(cfg config.Cfg) (map[string]*limiter.AdaptiveLimit,
 
 		result := make(map[string]limiter.Limiter)
 		for _, concurrency := range cfg.Concurrency {
-			concurrency := concurrency
-
 			result[concurrency.RPC] = limiter.NewConcurrencyLimiter(
 				perRPCLimits[concurrency.RPC],
 				concurrency.MaxQueueSize,

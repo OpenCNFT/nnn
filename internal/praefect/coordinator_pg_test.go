@@ -271,9 +271,6 @@ func TestStreamDirectorMutator_Transaction(t *testing.T) {
 					continue
 				}
 
-				i := i
-				node := node
-
 				voterWaitGroup.Add(1)
 				go func() {
 					defer voterWaitGroup.Done()

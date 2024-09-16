@@ -99,8 +99,6 @@ func TestServerSideAdapter_Create(t *testing.T) {
 			expectedErr: fmt.Errorf("server-side create: %w: rpc error: code = NotFound desc = repository not found", backup.ErrSkipped),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -212,8 +210,6 @@ func TestServerSideAdapter_Restore(t *testing.T) {
 			expectedErr: fmt.Errorf("server-side restore: %w: rpc error: code = FailedPrecondition desc = restore repository: manager: restore from bundle: repository skipped: read refs: storage service sink: new reader for \"@test/restore/latest/missing.refs\": doesn't exist", backup.ErrSkipped),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

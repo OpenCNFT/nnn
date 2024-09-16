@@ -80,8 +80,6 @@ func TestRepo_SetConfig(t *testing.T) {
 			expectedErr: fmt.Errorf("committing config: %w", fmt.Errorf("locking file: %w", safe.ErrFileAlreadyLocked)),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -252,8 +250,6 @@ func TestRepo_UnsetMatchingConfig(t *testing.T) {
 			expectedKeys: standardKeys,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

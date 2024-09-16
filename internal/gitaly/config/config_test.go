@@ -513,8 +513,6 @@ func TestLoadConfigCommand(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -2580,8 +2578,6 @@ func TestBackupConfig_Validate(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

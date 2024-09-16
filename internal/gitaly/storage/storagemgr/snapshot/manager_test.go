@@ -288,7 +288,6 @@ func TestManager(t *testing.T) {
 				startSnapshot := make(chan struct{})
 				takeSnapshots := func(relativePath string, snapshots []FileSystem) {
 					for i := 0; i < len(snapshots); i++ {
-						i := i
 						snapshotGroup.Go(func() error {
 							<-startSnapshot
 							var err error

@@ -481,7 +481,6 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 		}
 
 		for _, secondary := range route.Secondaries {
-			secondary := secondary
 			secondaryMsg, err := rewrittenRepositoryMessage(call.methodInfo, call.msg, secondary.Storage, route.ReplicaPath, route.AdditionalReplicaPath)
 			if err != nil {
 				return nil, err
@@ -583,8 +582,6 @@ func (c *Coordinator) maintenanceStreamParameters(ctx context.Context, call grpc
 	}
 
 	for _, node := range route.Nodes {
-		node := node
-
 		nodeMsg, err := rewrittenRepositoryMessage(call.methodInfo, call.msg, node.Storage, route.ReplicaPath, "")
 		if err != nil {
 			return nil, err

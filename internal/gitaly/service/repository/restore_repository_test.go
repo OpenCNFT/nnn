@@ -209,8 +209,6 @@ func TestRestoreRepository(t *testing.T) {
 			expectedErr: structerr.NewFailedPrecondition("restore repository: server-side backups are not configured"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

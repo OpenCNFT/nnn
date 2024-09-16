@@ -405,8 +405,6 @@ func TestListCommitsByRefName(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			setup := tc.setup(t, ctx, cfg)
 

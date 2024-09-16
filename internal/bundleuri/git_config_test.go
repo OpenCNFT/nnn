@@ -133,8 +133,6 @@ func testUploadPackGitConfig(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

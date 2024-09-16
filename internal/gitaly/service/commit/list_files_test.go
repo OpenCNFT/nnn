@@ -164,8 +164,6 @@ func TestListFiles(t *testing.T) {
 			expectedErr: structerr.NewFailedPrecondition("repository does not have a default branch"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

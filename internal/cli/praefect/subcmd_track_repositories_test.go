@@ -347,7 +347,6 @@ func TestTrackRepositoriesSubcommand(t *testing.T) {
 				trackedPath:   "already_tracked",
 			},
 		} {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				tempDir := testhelper.TempDir(t)

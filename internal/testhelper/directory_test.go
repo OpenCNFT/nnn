@@ -202,7 +202,6 @@ func testRequireState(t *testing.T, rootDir string, requireState func(testing.TB
 			expectedErrorMessage: `- 	"/does/not/exist/on/disk":     {}`,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -389,7 +388,6 @@ func TestContainsTarState(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

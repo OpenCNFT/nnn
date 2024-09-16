@@ -1086,8 +1086,6 @@ func TestPostgresReplicationEventQueue_DuplicateEvent(t *testing.T) {
 			expectedLock: &LockRow{ID: "praefect|gitaly-2|/project/path-2", Acquired: false},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

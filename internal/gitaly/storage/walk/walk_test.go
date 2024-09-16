@@ -38,8 +38,6 @@ func TestWalkStorage(t *testing.T) {
 			files: []string{"@cluster/bar/01/23/a_file"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

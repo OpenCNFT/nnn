@@ -133,10 +133,8 @@ func TestSetup_ParentCgroups(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			for _, version := range []int{1, 2} {
-				version := version
 				t.Run("cgroups-v"+strconv.Itoa(version), func(t *testing.T) {
 					t.Parallel()
 
@@ -231,10 +229,8 @@ func TestRepoCgroups(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			for _, version := range []int{1, 2} {
-				version := version
 				t.Run("cgroups-v"+strconv.Itoa(version), func(t *testing.T) {
 					t.Parallel()
 
@@ -441,10 +437,8 @@ gitaly_cgroup_procs_total{path="%s",subsystem="memory"} 1
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			for _, version := range []int{1, 2} {
-				version := version
 				t.Run("cgroups-v"+strconv.Itoa(version), func(t *testing.T) {
 					t.Parallel()
 					mock := newMock(t, version)

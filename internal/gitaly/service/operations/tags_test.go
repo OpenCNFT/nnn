@@ -278,7 +278,6 @@ func TestUserDeleteTag(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -300,8 +299,6 @@ func TestUserDeleteTag_hooks(t *testing.T) {
 	ctx, cfg, client := setupOperationsService(t, ctx)
 
 	for _, hookName := range GitlabHooks {
-		hookName := hookName
-
 		t.Run(hookName, func(t *testing.T) {
 			t.Parallel()
 
@@ -1479,9 +1476,6 @@ func TestTagHookOutput(t *testing.T) {
 				hookType: gitalypb.CustomHookError_HOOK_TYPE_UPDATE,
 			},
 		} {
-			tc := tc
-			hookTC := hookTC
-
 			t.Run(hookTC.hook+"/"+tc.desc, func(t *testing.T) {
 				t.Parallel()
 

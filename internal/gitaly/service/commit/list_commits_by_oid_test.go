@@ -94,8 +94,6 @@ func TestListCommitsByOid(t *testing.T) {
 			expectedErr: structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			c, err := client.ListCommitsByOid(ctx, tc.request)
 			require.NoError(t, err)
