@@ -28,6 +28,7 @@ linters:
     - gofmt
     - gofumpt
     - goimports
+    - importas
     - makezero
     - misspell
     - noctx
@@ -35,6 +36,7 @@ linters:
     - paralleltest
     - revive
     - rowserrcheck
+    - spancheck
     - sqlclosecheck
     - stylecheck
     - tenv
