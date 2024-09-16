@@ -26,6 +26,10 @@ No changes.
 - [Ensure page token is for the same tree](gitlab-org/gitaly@dc09bfc081125d97059358376a9960cea42f1dbb) ([merge request](gitlab-org/gitaly!7121))
 - [objectpool: Return already exists gRPC code from CreateObjectPool](gitlab-org/gitaly@cc8e1ca1f419dc3d976ee63917c6a518ff54df65) ([merge request](gitlab-org/gitaly!7104))
 
+## 17.2.7 (2024-09-16)
+
+No changes.
+
 ## 17.2.6 (2024-09-13)
 
 No changes.
