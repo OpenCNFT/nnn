@@ -98,6 +98,10 @@ func sendSearchFilesResultChunked(cmd *command.Command, stream gitalypb.Reposito
 		buf = append(buf, line...)
 	}
 
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan: %w", err)
+	}
+
 	if len(buf) > 0 {
 		return sendMatchInChunks(buf, stream)
 	}
