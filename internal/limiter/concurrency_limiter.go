@@ -22,51 +22,6 @@ type semaphorer interface {
 	Count() int
 }
 
-// staticSemaphore implements semaphorer interface. It is a wrapper for a buffer channel. When a caller wants to acquire
-// the semaphore, a token is pushed to the channel. In contrast, when it wants to release the semaphore, it pulls one
-// token from the channel.
-type staticSemaphore struct {
-	queue chan struct{}
-}
-
-// newStaticSemaphore initializes and returns a staticSemaphore instance.
-func newStaticSemaphore(size uint) *staticSemaphore {
-	return &staticSemaphore{queue: make(chan struct{}, size)}
-}
-
-// Acquire acquires the semaphore. The caller is blocked until there is a available resource or the context is cancelled.
-func (s *staticSemaphore) Acquire(ctx context.Context) error {
-	select {
-	case s.queue <- struct{}{}:
-		return nil
-	case <-ctx.Done():
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return ErrMaxQueueTime
-		}
-		return ctx.Err()
-	}
-}
-
-// TryAcquire tries to acquire the semaphore. If it fails to do so, it will immediately return ErrMaxQueueSize and no change is made to the semaphore.
-func (s *staticSemaphore) TryAcquire() error {
-	select {
-	case s.queue <- struct{}{}:
-		return nil
-	default:
-		return ErrMaxQueueSize
-	}
-}
-
-// Release releases the semaphore by pushing a token back to the underlying channel.
-func (s *staticSemaphore) Release() {
-	<-s.queue
-}
-
-// Count returns the amount of current concurrent access to the semaphore.
-func (s *staticSemaphore) Count() int {
-	return len(s.queue)
-}
-
 const (
 	// TypePerRPC is a concurrency limiter whose key is the full method of gRPC server. All
 	// requests of the same method shares the concurrency limit.
