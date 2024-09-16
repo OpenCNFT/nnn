@@ -122,8 +122,11 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 		})
 
 		t.Run("without transaction", func(t *testing.T) {
+			// Make sure to pass a nil struct rather than an explicit `nil` value to the housekeeping
+			// manager, as this exercises our nil interface check using reflection.
+			var node *nodeimpl.Manager
 			cfg := testcfg.Build(t)
-			testFunc(t, cfg, nil)
+			testFunc(t, cfg, node)
 		})
 	})
 }

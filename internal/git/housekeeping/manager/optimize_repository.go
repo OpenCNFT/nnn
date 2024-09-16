@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -98,7 +99,7 @@ func (m *RepositoryManager) OptimizeRepository(
 }
 
 func (m *RepositoryManager) maybeStartTransaction(ctx context.Context, repo *localrepo.Repo, run func(context.Context, storage.Transaction, *localrepo.Repo) error) error {
-	if m.node == nil {
+	if m.node == nil || reflect.ValueOf(m.node).IsNil() {
 		return run(ctx, nil, repo)
 	}
 

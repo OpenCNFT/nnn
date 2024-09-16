@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -1089,7 +1090,7 @@ func TestOptimizeRepository(t *testing.T) {
 				require.Equal(t, setup.expectedErr, err)
 
 				expectedMetrics := setup.expectedMetrics
-				if node != nil && setup.expectedMetricsForTransaction != nil {
+				if node != nil && !reflect.ValueOf(node).IsNil() && setup.expectedMetricsForTransaction != nil {
 					expectedMetrics = setup.expectedMetricsForTransaction
 				}
 				// If object pool is enabled, asserting transaction's metrics using
