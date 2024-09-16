@@ -93,7 +93,7 @@ func TestLimiter_static(t *testing.T) {
 	t.Parallel()
 
 	// Limiter works with static limits regardless of semaphore implementation
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, testLimiterStatic)
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, testLimiterStatic)
 }
 
 func testLimiterStatic(t *testing.T, ctx context.Context) {
@@ -239,12 +239,8 @@ func testLimiterStatic(t *testing.T, ctx context.Context) {
 func TestLimiter_dynamic(t *testing.T) {
 	t.Parallel()
 
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
-		if featureflag.UseResizableSemaphoreInConcurrencyLimiter.IsEnabled(ctx) {
-			testLimiterDynamic(t, ctx)
-		} else {
-			t.Skip("limiter.staticSemaphore does not support dynamic limiting")
-		}
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+		testLimiterDynamic(t, ctx)
 	})
 }
 
@@ -803,7 +799,7 @@ func (b *blockingQueueCounter) Queued(context.Context, string, int) {
 }
 
 func TestConcurrencyLimiter_queueLimit(t *testing.T) {
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		queueLimit := 10
 
 		monitorCh := make(chan struct{})
@@ -889,7 +885,7 @@ func (b *blockingDequeueCounter) Dequeued(context.Context) {
 func TestLimitConcurrency_queueWaitTime(t *testing.T) {
 	t.Parallel()
 
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		limiterCtx, cancel, simulateTimeout := testhelper.ContextWithSimulatedTimeout(ctx)
 		defer cancel()
 
@@ -951,7 +947,7 @@ func TestLimitConcurrency_queueWaitTime(t *testing.T) {
 
 func TestLimitConcurrency_queueWaitTimeRealTimeout(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		limiter := NewConcurrencyLimiter(
 			NewAdaptiveLimit("staticLimit", AdaptiveSetting{Initial: 1}),
 			0,

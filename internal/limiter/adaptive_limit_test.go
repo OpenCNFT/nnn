@@ -11,7 +11,7 @@ import (
 
 func TestAdaptiveLimit_New(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		setting := AdaptiveSetting{
 			Initial:       5,
 			Max:           10,
@@ -35,7 +35,7 @@ func TestAdaptiveLimit_New(t *testing.T) {
 
 func TestAdaptiveLimit_Update(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		newLimit := func() *AdaptiveLimit {
 			return NewAdaptiveLimit("testLimit", AdaptiveSetting{
 				Initial:       5,
