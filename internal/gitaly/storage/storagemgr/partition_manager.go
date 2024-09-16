@@ -44,7 +44,6 @@ type PartitionFactory interface {
 		storagePath string,
 		absoluteStateDir string,
 		stagingDir string,
-		logConsumer storage.LogConsumer,
 	) Partition
 }
 
@@ -79,8 +78,6 @@ type StorageManager struct {
 	activePartitions sync.WaitGroup
 	// partitionFactory is a factory to create Partitions.
 	partitionFactory PartitionFactory
-	// consumer consumes the WAL from the partitions.
-	consumer storage.LogConsumer
 
 	// metrics are the metrics gathered from the storage manager.
 	metrics storageManagerMetrics
@@ -93,7 +90,6 @@ func NewStorageManager(
 	path string,
 	dbMgr *databasemgr.DBManager,
 	partitionFactory PartitionFactory,
-	consumer storage.LogConsumer,
 	metrics *Metrics,
 ) (*StorageManager, error) {
 	internalDir := internalDirectoryPath(path)
@@ -128,7 +124,6 @@ func NewStorageManager(
 		partitionAssigner: pa,
 		partitions:        map[storage.PartitionID]*partition{},
 		partitionFactory:  partitionFactory,
-		consumer:          consumer,
 		metrics:           metrics.storageManagerMetrics(name),
 	}, nil
 }
@@ -318,25 +313,6 @@ func (sm *StorageManager) Begin(ctx context.Context, opts storage.TransactionOpt
 	return newFinalizableTransaction(transaction, ptn.Close), nil
 }
 
-// CallLogManager executes the provided function against the Partition for the specified partition, starting it if necessary.
-func (sm *StorageManager) CallLogManager(ctx context.Context, partitionID storage.PartitionID, fn func(lm storage.LogManager)) error {
-	ptn, err := sm.startPartition(ctx, partitionID)
-	if err != nil {
-		return err
-	}
-
-	defer ptn.Close()
-
-	logManager, ok := ptn.Partition.(storage.LogManager)
-	if !ok {
-		return fmt.Errorf("expected LogManager, got %T", logManager)
-	}
-
-	fn(logManager)
-
-	return nil
-}
-
 // partitionHandle is a handle to a partition. It wraps the close method of a partition with reference
 // counting and only closes the partition if there are no other remaining references to it.
 type partitionHandle struct {
@@ -412,7 +388,6 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				sm.path,
 				absoluteStateDir,
 				stagingDir,
-				sm.consumer,
 			)
 
 			ptn.Partition = mgr

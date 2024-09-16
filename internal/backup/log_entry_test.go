@@ -22,6 +22,34 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
+type mockNode struct {
+	managers map[partitionInfo]*mockLogManager
+	t        *testing.T
+
+	sync.Mutex
+}
+
+func (n *mockNode) GetStorage(storageName string) (storage.Storage, error) {
+	return mockStorage{storageName: storageName, node: n}, nil
+}
+
+type mockStorage struct {
+	storageName string
+	node        *mockNode
+	storage.Storage
+}
+
+func (m mockStorage) GetPartition(ctx context.Context, partitionID storage.PartitionID) (storage.Partition, error) {
+	m.node.Lock()
+	defer m.node.Unlock()
+
+	info := partitionInfo{m.storageName, partitionID}
+	mgr, ok := m.node.managers[info]
+	assert.True(m.node.t, ok)
+
+	return mgr, nil
+}
+
 type mockLogManager struct {
 	partitionInfo partitionInfo
 	archiver      *LogEntryArchiver
@@ -33,28 +61,12 @@ type mockLogManager struct {
 	finishCount   int
 
 	sync.Mutex
+	storage.Partition
 }
 
-type mockLogManagerAccessor struct {
-	managers map[partitionInfo]*mockLogManager
-	t        *testing.T
+func (lm *mockLogManager) Close() {}
 
-	sync.Mutex
-}
-
-func (lma *mockLogManagerAccessor) CallLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, fn func(storage.LogManager)) error {
-	lma.Lock()
-	defer lma.Unlock()
-
-	info := partitionInfo{storageName, partitionID}
-	mgr, ok := lma.managers[info]
-	assert.True(lma.t, ok)
-	fn(mgr)
-
-	return nil
-}
-
-func (lm *mockLogManager) AcknowledgeTransaction(_ storage.LogConsumer, lsn storage.LSN) {
+func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
 	lm.Lock()
 	defer lm.Unlock()
 
@@ -283,12 +295,13 @@ func TestLogEntryArchiver(t *testing.T) {
 			hook := testhelper.AddLoggerHook(logger)
 			var wg sync.WaitGroup
 
-			accessor := &mockLogManagerAccessor{
+			accessor := &mockNode{
 				managers: make(map[partitionInfo]*mockLogManager, len(tc.partitions)),
 				t:        t,
 			}
 
-			archiver := NewLogEntryArchiver(logger, archiveSink, tc.workerCount, accessor)
+			node := storage.Node(accessor)
+			archiver := NewLogEntryArchiver(logger, archiveSink, tc.workerCount, &node)
 			archiver.Run()
 
 			const storageName = "default"
@@ -406,12 +419,13 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	archiveSink, err := ResolveSink(ctx, archivePath)
 	require.NoError(t, err)
 
-	accessor := &mockLogManagerAccessor{
+	accessor := &mockNode{
 		managers: make(map[partitionInfo]*mockLogManager, 1),
 		t:        t,
 	}
 
-	archiver := newLogEntryArchiver(logger, archiveSink, workerCount, accessor, tickerFunc)
+	node := storage.Node(accessor)
+	archiver := newLogEntryArchiver(logger, archiveSink, workerCount, &node, tickerFunc)
 	archiver.Run()
 	defer archiver.Close()
 

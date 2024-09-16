@@ -34,7 +34,6 @@ type mockPartitionFactory struct {
 		storagePath string,
 		absoluteStateDir string,
 		stagingDir string,
-		logConsumer storage.LogConsumer,
 	) Partition
 }
 
@@ -50,7 +49,6 @@ func newStubPartitionFactory() PartitionFactory {
 			storagePath string,
 			absoluteStateDir string,
 			stagingDir string,
-			logConsumer storage.LogConsumer,
 		) Partition {
 			var closeOnce sync.Once
 			closing := make(chan struct{})
@@ -100,7 +98,6 @@ func (m mockPartitionFactory) New(
 	storagePath string,
 	absoluteStateDir string,
 	stagingDir string,
-	logConsumer storage.LogConsumer,
 ) Partition {
 	return m.new(
 		logger,
@@ -110,16 +107,15 @@ func (m mockPartitionFactory) New(
 		storagePath,
 		absoluteStateDir,
 		stagingDir,
-		logConsumer,
 	)
 }
 
 type mockPartition struct {
-	begin func(context.Context, storage.BeginOptions) (storage.Transaction, error)
-	run   func() error
-	close func()
-	storage.LogManager
+	begin       func(context.Context, storage.BeginOptions) (storage.Transaction, error)
+	run         func() error
+	close       func()
 	closeCalled atomic.Bool
+	storage.Partition
 }
 
 func (m *mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
@@ -146,15 +142,6 @@ func (m mockTransaction) Commit(ctx context.Context) error {
 }
 
 func (m mockTransaction) Rollback() error { return m.rollback() }
-
-func requirePartitionOpen(t *testing.T, storageMgr *StorageManager, ptnID storage.PartitionID, expectOpen bool) {
-	t.Helper()
-
-	storageMgr.mu.Lock()
-	defer storageMgr.mu.Unlock()
-	_, ptnOpen := storageMgr.partitions[ptnID]
-	require.Equal(t, expectOpen, ptnOpen)
-}
 
 // blockOnPartitionClosing checks if any partitions are currently in the process of
 // closing. If some are, the function waits for the closing process to complete before
@@ -871,7 +858,6 @@ func TestStorageManager(t *testing.T) {
 				cfg.Storages[0].Path,
 				dbMgr,
 				partitionFactory,
-				nil,
 				metrics,
 			)
 			require.NoError(t, err)
@@ -1008,7 +994,7 @@ func TestStorageManager_getPartition(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer mgr.Close()
 
@@ -1064,7 +1050,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
@@ -1106,41 +1092,6 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStorageManager_callLogManager(t *testing.T) {
-	t.Parallel()
-
-	ctx := testhelper.Context(t)
-
-	cfg := testcfg.Build(t)
-	logger := testhelper.SharedLogger(t)
-
-	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
-	require.NoError(t, err)
-
-	storageName := cfg.Storages[0].Name
-	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), nil, NewMetrics(cfg.Prometheus))
-	require.NoError(t, err)
-
-	defer func() {
-		storageMgr.Close()
-		dbMgr.Close()
-	}()
-
-	ptnID := storage.PartitionID(1)
-	requirePartitionOpen(t, storageMgr, ptnID, false)
-
-	require.NoError(t, storageMgr.CallLogManager(ctx, ptnID, func(lm storage.LogManager) {
-		requirePartitionOpen(t, storageMgr, ptnID, true)
-		tm, ok := lm.(Partition)
-		require.True(t, ok)
-
-		require.False(t, tm.(*mockPartition).closeCalled.Load())
-	}))
-
-	blockOnPartitionClosing(t, storageMgr, true)
-	requirePartitionOpen(t, storageMgr, ptnID, false)
-}
-
 func TestStorageManager_ListPartitions(t *testing.T) {
 	t.Parallel()
 
@@ -1157,7 +1108,6 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
-		nil,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)
