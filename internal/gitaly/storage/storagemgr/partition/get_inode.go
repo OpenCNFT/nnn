@@ -1,15 +1,23 @@
 package partition
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"syscall"
 )
 
 // getInode gets the inode of a file system object at the given path.
+// If the file does not exist, zero is returned as the inode number with
+// no error raised.
 func getInode(path string) (uint64, error) {
 	info, err := os.Stat(path)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return 0, nil
+		}
+
 		return 0, fmt.Errorf("stat: %w", err)
 	}
 
