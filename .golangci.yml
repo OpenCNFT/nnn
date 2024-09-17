@@ -39,6 +39,7 @@ linters:
     - spancheck
     - sqlclosecheck
     - stylecheck
+    - tagalign
     - tenv
     - thelper
     - unconvert
@@ -117,6 +118,33 @@ linters-settings:
     # ST1000 checks for missing package comments. We don't use these for most
     # packages, so let's disable this check.
     checks: ["all", "-ST1000"]
+  tagalign:
+    # Align and sort can be used together or separately.
+    #
+    # Whether enable align. If true, the struct tags will be aligned.
+    # e.g.:
+    # type FooBar struct {
+    #     Bar    string `json:"bar" validate:"required"`
+    #     FooFoo int8   `json:"foo_foo" validate:"required"`
+    # }
+    # will be formatted to:
+    # type FooBar struct {
+    #     Bar    string `json:"bar"     validate:"required"`
+    #     FooFoo int8   `json:"foo_foo" validate:"required"`
+    # }
+    # Default: true.
+    align: true
+    # Whether enable tags sort.
+    # If true, the tags will be sorted by name in ascending order.
+    # e.g.: `xml:"bar" json:"bar" validate:"required"` -> `json:"bar" validate:"required" xml:"bar"`
+    # Default: true
+    sort: true
+    # Whether enable strict style.
+    # In this style, the tags will be sorted and aligned in the dictionary order,
+    # and the tags with the same name will be aligned together.
+    # Note: This option will be ignored if 'align' or 'sort' is false.
+    # Default: false
+    strict: true
   thelper:
     test:
       # The following linter would check whether we always call `t.Helper()` in
