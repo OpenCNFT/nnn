@@ -30,6 +30,7 @@ linters:
     - goimports
     - importas
     - makezero
+    - mirror
     - misspell
     - noctx
     - nolintlint

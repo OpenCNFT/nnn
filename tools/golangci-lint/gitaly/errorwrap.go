@@ -60,7 +60,7 @@ func analyzeErrorInterpolation(pass *analysis.Pass, call *ast.CallExpr) {
 	}
 
 	if str, ok := call.Args[0].(*ast.BasicLit); ok && str.Kind == token.STRING {
-		verbs := formatPattern.FindAllIndex([]byte(str.Value), -1)
+		verbs := formatPattern.FindAllStringIndex(str.Value, -1)
 
 		if len(verbs) != len(call.Args)-1 {
 			// Mismatched format verbs and arguments; or our regexp is not correct

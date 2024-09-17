@@ -201,7 +201,7 @@ func Resolve(src io.Reader, ours, theirs git.ObjectID, path string, resolution R
 	var sectionID string
 
 	if len(resolution.Sections) == 0 {
-		resolvedContent.Write([]byte(resolution.Content))
+		resolvedContent.WriteString(resolution.Content)
 
 		return &resolvedContent, nil
 	}
@@ -244,10 +244,10 @@ func Resolve(src io.Reader, ours, theirs git.ObjectID, path string, resolution R
 		lineBreak = "\r\n"
 	}
 
-	resolvedContent.Write([]byte(strings.Join(resolvedLines, lineBreak)))
+	resolvedContent.WriteString(strings.Join(resolvedLines, lineBreak))
 
 	if appendNewLine {
-		resolvedContent.Write([]byte(lineBreak))
+		resolvedContent.WriteString(lineBreak)
 	}
 
 	return &resolvedContent, nil

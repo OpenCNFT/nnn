@@ -138,7 +138,7 @@ func TestReplicateRepository(t *testing.T) {
 				// replication is being used.
 				blobData, err := text.RandomHex(10)
 				require.NoError(t, err)
-				blobID := text.ChompBytes(gittest.ExecOpts(t, cfg, gittest.ExecConfig{Stdin: bytes.NewBuffer([]byte(blobData))},
+				blobID := text.ChompBytes(gittest.ExecOpts(t, cfg, gittest.ExecConfig{Stdin: bytes.NewBufferString(blobData)},
 					"-C", sourcePath, "hash-object", "-w", "--stdin",
 				))
 

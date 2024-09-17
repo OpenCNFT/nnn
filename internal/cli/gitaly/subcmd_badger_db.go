@@ -223,7 +223,7 @@ func getValue(ctx *cli.Context, db keyvalue.Store, key string) error {
 func decodeValue(ctx *cli.Context, key string, data []byte) (string, error) {
 	for prefix, decode := range decoders {
 		pattern := regexp.MustCompile(prefix)
-		if pattern.Match([]byte(key)) {
+		if pattern.MatchString(key) {
 			return decode(data)
 		}
 	}

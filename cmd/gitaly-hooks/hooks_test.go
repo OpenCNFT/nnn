@@ -499,7 +499,7 @@ func TestHooksPostReceiveFailed(t *testing.T) {
 				[]string{postReceivePath},
 				command.WithSubprocessLogger(cfg.Logging.Config),
 				command.WithEnvironment(env),
-				command.WithStdin(bytes.NewBuffer([]byte(changes))),
+				command.WithStdin(bytes.NewBufferString(changes)),
 				command.WithStdout(&stdout),
 				command.WithStderr(&stderr),
 				command.WithDir(repoPath),
