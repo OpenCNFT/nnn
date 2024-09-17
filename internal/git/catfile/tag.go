@@ -105,16 +105,16 @@ func TrimTagMessage(tag *gitalypb.Tag) {
 	// Remove trailing newline, if any, to preserve existing behavior the old GitLab tag finding code.
 	// See https://gitlab.com/gitlab-org/gitaly/blob/5e94dc966ac1900c11794b107a77496552591f9b/ruby/lib/gitlab/git/repository.rb#L211.
 	// Maybe this belongs in the FindAllTags handler, or even on the gitlab-ce client side, instead of here?
-	tag.Message = bytes.TrimRight(tag.Message, "\n")
+	tag.Message = bytes.TrimRight(tag.GetMessage(), "\n")
 
 	// It is intentional that we set the message size _before_ truncating the commit but after
 	// trimming trailing newlines: the caller likely doesn't care about trailing newlines, and
 	// as such we shouldn't tell the caller that we did truncate the message by having differing
 	// message length and message size. But we do want to tell the caller in case we truncated
 	// the message, in which case message length and message size must be different.
-	tag.MessageSize = int64(len(tag.Message))
+	tag.MessageSize = int64(len(tag.GetMessage()))
 
-	if max := helper.MaxCommitOrTagMessageSize; len(tag.Message) > max {
-		tag.Message = tag.Message[:max]
+	if max := helper.MaxCommitOrTagMessageSize; len(tag.GetMessage()) > max {
+		tag.Message = tag.GetMessage()[:max]
 	}
 }

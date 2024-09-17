@@ -74,10 +74,10 @@ func TestPoolManager_Vote(t *testing.T) {
 			vote:  voting.VoteFromData([]byte("foobar")),
 			phase: voting.UnknownPhase,
 			voteFn: func(t *testing.T, request *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-				require.Equal(t, uint64(1), request.TransactionId)
-				require.Equal(t, "node", request.Node)
-				require.Equal(t, request.ReferenceUpdatesHash, voting.VoteFromData([]byte("foobar")).Bytes())
-				require.Equal(t, gitalypb.VoteTransactionRequest_UNKNOWN_PHASE, request.Phase)
+				require.Equal(t, uint64(1), request.GetTransactionId())
+				require.Equal(t, "node", request.GetNode())
+				require.Equal(t, request.GetReferenceUpdatesHash(), voting.VoteFromData([]byte("foobar")).Bytes())
+				require.Equal(t, gitalypb.VoteTransactionRequest_UNKNOWN_PHASE, request.GetPhase())
 
 				return &gitalypb.VoteTransactionResponse{
 					State: gitalypb.VoteTransactionResponse_COMMIT,
@@ -94,10 +94,10 @@ func TestPoolManager_Vote(t *testing.T) {
 			vote:  voting.VoteFromData([]byte("foobar")),
 			phase: voting.Prepared,
 			voteFn: func(t *testing.T, request *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-				require.Equal(t, uint64(1), request.TransactionId)
-				require.Equal(t, "node", request.Node)
-				require.Equal(t, request.ReferenceUpdatesHash, voting.VoteFromData([]byte("foobar")).Bytes())
-				require.Equal(t, gitalypb.VoteTransactionRequest_PREPARED_PHASE, request.Phase)
+				require.Equal(t, uint64(1), request.GetTransactionId())
+				require.Equal(t, "node", request.GetNode())
+				require.Equal(t, request.GetReferenceUpdatesHash(), voting.VoteFromData([]byte("foobar")).Bytes())
+				require.Equal(t, gitalypb.VoteTransactionRequest_PREPARED_PHASE, request.GetPhase())
 
 				return &gitalypb.VoteTransactionResponse{
 					State: gitalypb.VoteTransactionResponse_COMMIT,
@@ -114,10 +114,10 @@ func TestPoolManager_Vote(t *testing.T) {
 			vote:  voting.VoteFromData([]byte("foobar")),
 			phase: voting.Committed,
 			voteFn: func(t *testing.T, request *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-				require.Equal(t, uint64(1), request.TransactionId)
-				require.Equal(t, "node", request.Node)
-				require.Equal(t, request.ReferenceUpdatesHash, voting.VoteFromData([]byte("foobar")).Bytes())
-				require.Equal(t, gitalypb.VoteTransactionRequest_COMMITTED_PHASE, request.Phase)
+				require.Equal(t, uint64(1), request.GetTransactionId())
+				require.Equal(t, "node", request.GetNode())
+				require.Equal(t, request.GetReferenceUpdatesHash(), voting.VoteFromData([]byte("foobar")).Bytes())
+				require.Equal(t, gitalypb.VoteTransactionRequest_COMMITTED_PHASE, request.GetPhase())
 
 				return &gitalypb.VoteTransactionResponse{
 					State: gitalypb.VoteTransactionResponse_COMMIT,
@@ -134,10 +134,10 @@ func TestPoolManager_Vote(t *testing.T) {
 			vote:  voting.VoteFromData([]byte("foobar")),
 			phase: voting.Synchronized,
 			voteFn: func(t *testing.T, request *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-				require.Equal(t, uint64(1), request.TransactionId)
-				require.Equal(t, "node", request.Node)
-				require.Equal(t, request.ReferenceUpdatesHash, voting.VoteFromData([]byte("foobar")).Bytes())
-				require.Equal(t, gitalypb.VoteTransactionRequest_SYNCHRONIZED_PHASE, request.Phase)
+				require.Equal(t, uint64(1), request.GetTransactionId())
+				require.Equal(t, "node", request.GetNode())
+				require.Equal(t, request.GetReferenceUpdatesHash(), voting.VoteFromData([]byte("foobar")).Bytes())
+				require.Equal(t, gitalypb.VoteTransactionRequest_SYNCHRONIZED_PHASE, request.GetPhase())
 
 				return &gitalypb.VoteTransactionResponse{
 					State: gitalypb.VoteTransactionResponse_COMMIT,
@@ -220,7 +220,7 @@ func TestPoolManager_Stop(t *testing.T) {
 				Node:          "node",
 			},
 			stopFn: func(t *testing.T, request *gitalypb.StopTransactionRequest) (*gitalypb.StopTransactionResponse, error) {
-				require.Equal(t, uint64(1), request.TransactionId)
+				require.Equal(t, uint64(1), request.GetTransactionId())
 				return &gitalypb.StopTransactionResponse{}, nil
 			},
 		},

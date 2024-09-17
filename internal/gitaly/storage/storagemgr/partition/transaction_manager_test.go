@@ -84,21 +84,21 @@ func buildReftableDirectory(data map[int][]git.ReferenceUpdates) testhelper.Dire
 
 				// If there are reftables being created, we need to account for
 				// N tables and +2 for the tables.list being updated.
-				require.Equal(tb, numTables+2, uint(len(logEntry.Operations)))
+				require.Equal(tb, numTables+2, uint(len(logEntry.GetOperations())))
 
 				// The reftables should only be created.
 				for i := uint(0); i < numTables; i++ {
-					create := logEntry.Operations[i].GetCreateHardLink()
+					create := logEntry.GetOperations()[i].GetCreateHardLink()
 					require.NotNil(tb, create)
-					require.True(tb, git.ReftableTableNameRegex.Match(create.DestinationPath))
+					require.True(tb, git.ReftableTableNameRegex.Match(create.GetDestinationPath()))
 				}
 
 				// The tables.list should be deleted and create (updated).
-				delete := logEntry.Operations[numTables].GetRemoveDirectoryEntry()
+				delete := logEntry.GetOperations()[numTables].GetRemoveDirectoryEntry()
 				require.NotNil(tb, delete)
 				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
 
-				create := logEntry.Operations[numTables].GetRemoveDirectoryEntry()
+				create := logEntry.GetOperations()[numTables].GetRemoveDirectoryEntry()
 				require.NotNil(tb, create)
 				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
 
@@ -1749,19 +1749,19 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				expectedEntry := expected[i].entry
 
 				if testhelper.IsReftableEnabled() {
-					for idx, op := range expectedEntry.Operations {
+					for idx, op := range expectedEntry.GetOperations() {
 						if chl := op.GetCreateHardLink(); chl != nil {
-							actualCHL := actualEntry.Operations[idx].GetCreateHardLink()
+							actualCHL := actualEntry.GetOperations()[idx].GetCreateHardLink()
 							require.NotNil(t, actualCHL)
 
-							if filepath.Base(string(actualCHL.DestinationPath)) == "tables.list" {
+							if filepath.Base(string(actualCHL.GetDestinationPath())) == "tables.list" {
 								continue
 							}
 
 							// We can't predict the table names, but we can verify
 							// the regex.
-							require.True(t, git.ReftableTableNameRegex.Match(actualCHL.DestinationPath))
-							chl.DestinationPath = actualCHL.DestinationPath
+							require.True(t, git.ReftableTableNameRegex.Match(actualCHL.GetDestinationPath()))
+							chl.DestinationPath = actualCHL.GetDestinationPath()
 						}
 					}
 				}
@@ -2439,7 +2439,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 				repo, repoPath := gittest.CreateRepository(b, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
 				})
-				relativePaths = append(relativePaths, repo.RelativePath)
+				relativePaths = append(relativePaths, repo.GetRelativePath())
 
 				// Set up two commits that the updaters update their references back and forth.
 				// The commit IDs are the same across all repositories as the parameters used to
@@ -2474,12 +2474,12 @@ func BenchmarkTransactionManager(b *testing.B) {
 					assert.NoError(b, manager.Run())
 				}()
 
-				objectHash, err := repositoryFactory.Build(repo.RelativePath).ObjectHash(ctx)
+				objectHash, err := repositoryFactory.Build(repo.GetRelativePath()).ObjectHash(ctx)
 				require.NoError(b, err)
 
 				for j := 0; j < tc.concurrentUpdaters; j++ {
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
-						RelativePaths: []string{repo.RelativePath},
+						RelativePaths: []string{repo.GetRelativePath()},
 					})
 					require.NoError(b, err)
 					transaction.UpdateReferences(getReferenceUpdates(j, objectHash.ZeroOID, commit1))

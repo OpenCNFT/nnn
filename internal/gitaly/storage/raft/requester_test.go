@@ -480,9 +480,9 @@ func TestRequester_SyncRead(t *testing.T) {
 					req, ok := m.(*gitalypb.RegisterStorageRequest)
 					require.True(t, ok)
 
-					newStorage := &gitalypb.Storage{StorageId: cluster.NextStorageId, Name: req.StorageName}
+					newStorage := &gitalypb.Storage{StorageId: cluster.GetNextStorageId(), Name: req.GetStorageName()}
 					cluster.NextStorageId++
-					cluster.Storages[newStorage.StorageId] = newStorage
+					cluster.Storages[newStorage.GetStorageId()] = newStorage
 
 					return 0, &gitalypb.RegisterStorageResponse{Storage: newStorage}, nil
 				}, func(m proto.Message) (proto.Message, error) {

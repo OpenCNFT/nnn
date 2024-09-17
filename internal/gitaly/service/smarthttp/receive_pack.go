@@ -25,10 +25,10 @@ func (s *server) PostReceivePack(stream gitalypb.SmartHTTPService_PostReceivePac
 	}
 
 	s.logger.WithFields(log.Fields{
-		"GlID":             req.GlId,
-		"GlRepository":     req.GlRepository,
-		"GlUsername":       req.GlUsername,
-		"GitConfigOptions": req.GitConfigOptions,
+		"GlID":             req.GetGlId(),
+		"GlRepository":     req.GetGlRepository(),
+		"GlUsername":       req.GetGlUsername(),
+		"GitConfigOptions": req.GetGitConfigOptions(),
 	}).DebugContext(ctx, "PostReceivePack")
 
 	if err := validateReceivePackRequest(ctx, s.locator, req); err != nil {
@@ -84,7 +84,7 @@ func (s *server) postReceivePack(
 		return err
 	}
 
-	config, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
+	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (s *server) postReceivePack(
 }
 
 func validateReceivePackRequest(ctx context.Context, locator storage.Locator, req *gitalypb.PostReceivePackRequest) error {
-	if req.GlId == "" {
+	if req.GetGlId() == "" {
 		return structerr.NewInvalidArgument("empty GlId")
 	}
 	if req.Data != nil {

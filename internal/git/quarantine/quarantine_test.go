@@ -58,14 +58,14 @@ func TestQuarantine_lifecycle(t *testing.T) {
 
 		require.Equal(t, repo, quarantine.repo)
 		testhelper.ProtoEqual(t, &gitalypb.Repository{
-			StorageName:        repo.StorageName,
-			RelativePath:       repo.RelativePath,
+			StorageName:        repo.GetStorageName(),
+			RelativePath:       repo.GetRelativePath(),
 			GitObjectDirectory: relativeQuarantinePath,
 			GitAlternateObjectDirectories: []string{
 				"objects",
 			},
-			GlRepository:  repo.GlRepository,
-			GlProjectPath: repo.GlProjectPath,
+			GlRepository:  repo.GetGlRepository(),
+			GlProjectPath: repo.GetGlProjectPath(),
 		}, quarantine.quarantinedRepo)
 		require.Equal(t, locator, quarantine.locator)
 
@@ -194,35 +194,35 @@ func TestApply(t *testing.T) {
 			desc:                          "default objects directory",
 			gitAlternateObjectDirectories: []string{"alternate_directory"},
 			expectedRepo: &gitalypb.Repository{
-				StorageName:                   repo.StorageName,
+				StorageName:                   repo.GetStorageName(),
 				GitObjectDirectory:            relPath,
 				GitAlternateObjectDirectories: []string{"objects", "alternate_directory"},
-				RelativePath:                  repo.RelativePath,
-				GlProjectPath:                 repo.GlProjectPath,
-				GlRepository:                  repo.GlRepository,
+				RelativePath:                  repo.GetRelativePath(),
+				GlProjectPath:                 repo.GetGlProjectPath(),
+				GlRepository:                  repo.GetGlRepository(),
 			},
 		},
 		{
 			desc: "default objects directory with alternates",
 			expectedRepo: &gitalypb.Repository{
-				StorageName:                   repo.StorageName,
+				StorageName:                   repo.GetStorageName(),
 				GitObjectDirectory:            relPath,
 				GitAlternateObjectDirectories: []string{"objects"},
-				RelativePath:                  repo.RelativePath,
-				GlProjectPath:                 repo.GlProjectPath,
-				GlRepository:                  repo.GlRepository,
+				RelativePath:                  repo.GetRelativePath(),
+				GlProjectPath:                 repo.GetGlProjectPath(),
+				GlRepository:                  repo.GetGlRepository(),
 			},
 		},
 		{
 			desc:               "custom objects directory",
 			gitObjectDirectory: "custom_directory",
 			expectedRepo: &gitalypb.Repository{
-				StorageName:                   repo.StorageName,
+				StorageName:                   repo.GetStorageName(),
 				GitObjectDirectory:            relPath,
 				GitAlternateObjectDirectories: []string{"custom_directory"},
-				RelativePath:                  repo.RelativePath,
-				GlProjectPath:                 repo.GlProjectPath,
-				GlRepository:                  repo.GlRepository,
+				RelativePath:                  repo.GetRelativePath(),
+				GlProjectPath:                 repo.GetGlProjectPath(),
+				GlRepository:                  repo.GetGlRepository(),
 			},
 		},
 		{
@@ -230,12 +230,12 @@ func TestApply(t *testing.T) {
 			gitObjectDirectory:            "custom_directory",
 			gitAlternateObjectDirectories: []string{"alternate_directory"},
 			expectedRepo: &gitalypb.Repository{
-				StorageName:                   repo.StorageName,
+				StorageName:                   repo.GetStorageName(),
 				GitObjectDirectory:            relPath,
 				GitAlternateObjectDirectories: []string{"custom_directory", "alternate_directory"},
-				RelativePath:                  repo.RelativePath,
-				GlProjectPath:                 repo.GlProjectPath,
-				GlRepository:                  repo.GlRepository,
+				RelativePath:                  repo.GetRelativePath(),
+				GlProjectPath:                 repo.GetGlProjectPath(),
+				GlRepository:                  repo.GetGlRepository(),
 			},
 		},
 	} {

@@ -398,8 +398,8 @@ func TestCreate(t *testing.T) {
 
 				// The temporary repository must have been created in Gitaly's
 				// temporary storage path.
-				require.Equal(t, repo.StorageName, tempRepo.StorageName)
-				require.True(t, strings.HasPrefix(tempRepo.RelativePath, "+gitaly/tmp/repo"))
+				require.Equal(t, repo.GetStorageName(), tempRepo.GetStorageName())
+				require.True(t, strings.HasPrefix(tempRepo.GetRelativePath(), "+gitaly/tmp/repo"))
 
 				tempRepoPath, err := locator.GetRepoPath(ctx, tempRepo, storage.WithRepositoryVerificationSkipped())
 				require.NoError(t, err)
@@ -416,7 +416,7 @@ func TestCreate(t *testing.T) {
 			}, tc.opts...)
 
 			if tc.requireError != nil {
-				tc.requireError(t, cfg, repo.RelativePath, err)
+				tc.requireError(t, cfg, repo.GetRelativePath(), err)
 			} else {
 				require.NoError(t, err)
 			}

@@ -204,7 +204,7 @@ func TestReceivePack_success(t *testing.T) {
 		Repository:   remoteRepo,
 		GlId:         "123",
 		GlUsername:   "user",
-		GlRepository: remoteRepo.GlRepository,
+		GlRepository: remoteRepo.GetGlRepository(),
 	})
 	require.NoError(t, err)
 	require.Equal(t, lHead, rHead, "local and remote head not equal. push failed")
@@ -221,14 +221,14 @@ func TestReceivePack_success(t *testing.T) {
 	// The repository should have a relative path.
 	if testhelper.IsWALEnabled() {
 		// The repository should be quarantined.
-		require.NotEmpty(t, payload.Repo.GitObjectDirectory)
+		require.NotEmpty(t, payload.Repo.GetGitObjectDirectory())
 		payload.Repo.GitObjectDirectory = "OVERRIDDEN"
 		expectedRepo.GitObjectDirectory = "OVERRIDDEN"
-		require.NotEmpty(t, payload.Repo.GitAlternateObjectDirectories)
+		require.NotEmpty(t, payload.Repo.GetGitAlternateObjectDirectories())
 		payload.Repo.GitAlternateObjectDirectories = []string{"OVERRIDDEN"}
 		expectedRepo.GitAlternateObjectDirectories = []string{"OVERRIDDEN"}
 		// The following values may change so we don't want to assert them for equality.
-		require.NotEmpty(t, payload.Repo.RelativePath)
+		require.NotEmpty(t, payload.Repo.GetRelativePath())
 		payload.Repo.RelativePath = "OVERRIDDEN"
 		expectedRepo.RelativePath = "OVERRIDDEN"
 		// When transactions are enabled the update hook is manually invoked as part of the
@@ -892,7 +892,7 @@ func sshPush(t *testing.T, ctx context.Context, cfg config.Cfg, repo repoWithCha
 		return "", "", fmt.Errorf("failed to run `git push`: %q", out)
 	}
 
-	remoteRepoPath := filepath.Join(cfg.Storages[0].Path, gittest.GetReplicaPath(t, ctx, cfg, request.Repository))
+	remoteRepoPath := filepath.Join(cfg.Storages[0].Path, gittest.GetReplicaPath(t, ctx, cfg, request.GetRepository()))
 
 	localHead := bytes.TrimSpace(gittest.Exec(t, cfg, "-C", repo.path, "rev-parse", "master"))
 	remoteHead := bytes.TrimSpace(gittest.Exec(t, cfg, "-C", remoteRepoPath, "rev-parse", "master"))

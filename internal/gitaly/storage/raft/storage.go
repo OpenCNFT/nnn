@@ -53,7 +53,7 @@ func (m *storageManager) loadStorageInfo(ctx context.Context) error {
 				return err
 			}
 			m.persistedInfo = &persistedInfo
-			m.id = raftID(m.persistedInfo.StorageId)
+			m.id = raftID(m.persistedInfo.GetStorageId())
 			return nil
 		})
 	})
@@ -75,7 +75,7 @@ func (m *storageManager) saveStorageInfo(ctx context.Context, storage *gitalypb.
 			return err
 		}
 		m.persistedInfo = storage
-		m.id = raftID(m.persistedInfo.StorageId)
+		m.id = raftID(m.persistedInfo.GetStorageId())
 		return nil
 	})
 }

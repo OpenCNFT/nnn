@@ -87,7 +87,7 @@ func TestListPartitions(t *testing.T) {
 		// Fork repository goes to the same partition as the source repository.
 		// Used to validate that the partition ID won't be duplicated in the response.
 		forkRepository := &gitalypb.Repository{
-			StorageName:  repo.StorageName,
+			StorageName:  repo.GetStorageName(),
 			RelativePath: gittest.NewRepositoryName(t),
 		}
 		ctx = testhelper.MergeOutgoingMetadata(ctx, testcfg.GitalyServersMetadataFromCfg(t, cfg))
@@ -111,8 +111,8 @@ func TestListPartitions(t *testing.T) {
 		}
 
 		require.NoError(t, err)
-		require.Nil(t, resp.PaginationCursor)
-		require.ElementsMatch(t, resp.Partitions, []*gitalypb.Partition{{Id: "2"}, {Id: "3"}, {Id: "4"}, {Id: "5"}})
+		require.Nil(t, resp.GetPaginationCursor())
+		require.ElementsMatch(t, resp.GetPartitions(), []*gitalypb.Partition{{Id: "2"}, {Id: "3"}, {Id: "4"}, {Id: "5"}})
 	})
 
 	t.Run("multiple pages", func(t *testing.T) {
@@ -131,19 +131,19 @@ func TestListPartitions(t *testing.T) {
 		}
 
 		require.NoError(t, err)
-		require.NotNil(t, resp.PaginationCursor)
-		require.Equal(t, 2, len(resp.Partitions))
+		require.NotNil(t, resp.GetPaginationCursor())
+		require.Equal(t, 2, len(resp.GetPartitions()))
 
 		resp, err = ptnClient.ListPartitions(ctx, &gitalypb.ListPartitionsRequest{
 			StorageName: "default",
 			PaginationParams: &gitalypb.PaginationParameter{
-				PageToken: resp.PaginationCursor.NextCursor,
+				PageToken: resp.GetPaginationCursor().GetNextCursor(),
 				Limit:     2,
 			},
 		})
 		require.NoError(t, err)
-		require.Nil(t, resp.PaginationCursor)
-		require.Equal(t, 1, len(resp.Partitions))
+		require.Nil(t, resp.GetPaginationCursor())
+		require.Equal(t, 1, len(resp.GetPartitions()))
 	})
 }
 

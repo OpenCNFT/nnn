@@ -349,7 +349,7 @@ func TestCreateFork_targetExists(t *testing.T) {
 				// As the source repository created in the setup is the first one, this would get the repository
 				// ID 2.
 				RelativePath: storage.DeriveReplicaPath(2),
-				StorageName:  repo.StorageName,
+				StorageName:  repo.GetStorageName(),
 			}
 
 			tc.seed(t, filepath.Join(cfg.Storages[0].Path, forkedRepo.GetRelativePath()))

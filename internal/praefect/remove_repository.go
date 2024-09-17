@@ -59,8 +59,8 @@ func removeRepositoryHandler(rs datastore.RepositoryStore, logger log.Logger, co
 
 		ctx := stream.Context()
 
-		virtualStorage := repo.StorageName
-		replicaPath, storages, err := rs.DeleteRepository(ctx, virtualStorage, repo.RelativePath)
+		virtualStorage := repo.GetStorageName()
+		replicaPath, storages, err := rs.DeleteRepository(ctx, virtualStorage, repo.GetRelativePath())
 		if err != nil {
 			if errors.Is(err, datastore.ErrRepositoryNotFound) {
 				if errorOnNotFound {
@@ -100,7 +100,7 @@ func removeRepositoryHandler(rs datastore.RepositoryStore, logger log.Logger, co
 				if err := proxyRequest(ctx, conn, rewritten); err != nil {
 					logger.WithFields(log.Fields{
 						"virtual_storage": virtualStorage,
-						"relative_path":   repo.RelativePath,
+						"relative_path":   repo.GetRelativePath(),
 						"storage":         rewrittenStorage,
 					}).WithError(err).ErrorContext(ctx, "failed deleting repository")
 				}

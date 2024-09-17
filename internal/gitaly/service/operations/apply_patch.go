@@ -58,15 +58,15 @@ func (s *Server) UserApplyPatch(stream gitalypb.OperationService_UserApplyPatchS
 }
 
 func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyPatchRequest_Header, stream gitalypb.OperationService_UserApplyPatchServer) error {
-	path, err := s.locator.GetRepoPath(ctx, header.Repository)
+	path, err := s.locator.GetRepoPath(ctx, header.GetRepository())
 	if err != nil {
 		return err
 	}
 
 	branchCreated := false
-	targetBranch := git.NewReferenceNameFromBranchName(string(header.TargetBranch))
+	targetBranch := git.NewReferenceNameFromBranchName(string(header.GetTargetBranch()))
 
-	repo := s.localrepo(header.Repository)
+	repo := s.localrepo(header.GetRepository())
 
 	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, header.Repository, header.User, nil, targetBranch, patchedCommit, currentCommit); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, header.GetRepository(), header.GetUser(), nil, targetBranch, patchedCommit, currentCommit); err != nil {
 		return fmt.Errorf("update reference: %w", err)
 	}
 

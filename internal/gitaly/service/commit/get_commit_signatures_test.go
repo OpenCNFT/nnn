@@ -503,15 +503,15 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 			) []*gitalypb.GetCommitSignaturesResponse {
 				// We don't need to do any fiddling when we have a commit ID, which would signify
 				// another returned commit.
-				if response.CommitId != "" {
+				if response.GetCommitId() != "" {
 					return append(result, response)
 				}
 
 				// But when we don't have a commit ID we append both the signature and signed text so
 				// that it becomes easier to test for these values, as they might otherwise be split.
 				currentResponse := result[len(result)-1]
-				currentResponse.Signature = append(currentResponse.Signature, response.Signature...)
-				currentResponse.SignedText = append(currentResponse.SignedText, response.SignedText...)
+				currentResponse.Signature = append(currentResponse.Signature, response.GetSignature()...)
+				currentResponse.SignedText = append(currentResponse.SignedText, response.GetSignedText()...)
 
 				return result
 			})
@@ -522,13 +522,13 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 				// We cannot use `testhelper.ProtoEqual` here due to it being too inefficient with
 				// the data we're comparing because it contains multiple MB of signed data. This has
 				// in the past led to frequent timeouts in CI.
-				require.Equal(t, expected.CommitId, actualResponses[i].CommitId)
-				require.Equal(t, string(expected.Signature), string(actualResponses[i].Signature))
-				require.Equal(t, string(expected.SignedText), string(actualResponses[i].SignedText))
-				require.Equal(t, string(expected.Signer), string(actualResponses[i].Signer))
+				require.Equal(t, expected.GetCommitId(), actualResponses[i].GetCommitId())
+				require.Equal(t, string(expected.GetSignature()), string(actualResponses[i].GetSignature()))
+				require.Equal(t, string(expected.GetSignedText()), string(actualResponses[i].GetSignedText()))
+				require.Equal(t, string(expected.GetSigner()), string(actualResponses[i].GetSigner()))
 				// It's sufficient to check if the email holds true since that is what we're most
 				// concerned about, because 'mailmap' could swap it out.
-				require.Equal(t, expected.Author.Email, actualResponses[i].Author.Email)
+				require.Equal(t, expected.GetAuthor().GetEmail(), actualResponses[i].GetAuthor().GetEmail())
 			}
 		})
 	}

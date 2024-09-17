@@ -147,7 +147,7 @@ func testUserRevert(t *testing.T, ctx context.Context) {
 						Message:    []byte("Reverting " + firstCommitID),
 						DryRun:     true,
 					},
-					expectedCommitID: firstCommit.Id,
+					expectedCommitID: firstCommit.GetId(),
 					expectedResponse: &gitalypb.UserRevertResponse{BranchUpdate: &gitalypb.OperationBranchUpdate{}},
 					expectedError:    nil,
 				}
@@ -173,7 +173,7 @@ func testUserRevert(t *testing.T, ctx context.Context) {
 						Message:         []byte("Reverting " + firstCommitID),
 						DryRun:          true,
 					},
-					expectedCommitID: firstCommit.Id,
+					expectedCommitID: firstCommit.GetId(),
 					expectedResponse: &gitalypb.UserRevertResponse{BranchUpdate: &gitalypb.OperationBranchUpdate{
 						BranchCreated: true,
 					}},
@@ -464,7 +464,7 @@ func testServerUserRevertQuarantine(t *testing.T, ctx context.Context) {
 		User:       gittest.TestUser,
 		Commit:     revertedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + revertedCommit.Id),
+		Message:    []byte("Reverting " + revertedCommit.GetId()),
 		Timestamp:  &timestamppb.Timestamp{Seconds: 12345},
 	})
 	testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("revert: custom hook error").WithDetail(
@@ -574,13 +574,13 @@ func testServerUserRevertMergeCommit(t *testing.T, ctx context.Context) {
 		User:       gittest.TestUser,
 		Commit:     mergedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + mergedCommit.Id),
+		Message:    []byte("Reverting " + mergedCommit.GetId()),
 	}
 
 	response, err := client.UserRevert(ctx, request)
 	require.NoError(t, err)
 
-	gittest.RequireTree(t, cfg, repoPath, response.BranchUpdate.CommitId,
+	gittest.RequireTree(t, cfg, repoPath, response.GetBranchUpdate().GetCommitId(),
 		[]gittest.TreeEntry{
 			{Mode: "100644", Path: "a", Content: "apple"},
 			{Mode: "100644", Path: "b", Content: "banana"},
@@ -588,7 +588,7 @@ func testServerUserRevertMergeCommit(t *testing.T, ctx context.Context) {
 		})
 
 	if featureflag.GPGSigning.IsEnabled(ctx) {
-		data, err := repo.ReadObject(ctx, git.ObjectID(response.BranchUpdate.CommitId))
+		data, err := repo.ReadObject(ctx, git.ObjectID(response.GetBranchUpdate().GetCommitId()))
 		require.NoError(t, err)
 
 		gpgsig, dataWithoutGpgSig := signature.ExtractSignature(t, ctx, data)
@@ -639,13 +639,13 @@ func testServerUserRevertRootCommit(t *testing.T, ctx context.Context) {
 		User:       gittest.TestUser,
 		Commit:     rootCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + rootCommit.Id),
+		Message:    []byte("Reverting " + rootCommit.GetId()),
 	}
 
 	response, err := client.UserRevert(ctx, request)
 	require.NoError(t, err)
 
-	gittest.RequireTree(t, cfg, repoPath, response.BranchUpdate.CommitId,
+	gittest.RequireTree(t, cfg, repoPath, response.GetBranchUpdate().GetCommitId(),
 		[]gittest.TreeEntry{
 			{Mode: "100644", Path: "bar", Content: "bar"},
 		})
@@ -708,9 +708,9 @@ func testServerUserRevertStableID(t *testing.T, ctx context.Context) {
 			"sha1":   "d01916c25f522190331cff8f75960881120d22a2",
 			"sha256": "28b57208e72bc2317143571997b9cfc444a51b52a43dde1c0282633a2b60de71",
 		}),
-	}, response.BranchUpdate)
-	require.Empty(t, response.CreateTreeError)
-	require.Empty(t, response.CreateTreeErrorCode)
+	}, response.GetBranchUpdate())
+	require.Empty(t, response.GetCreateTreeError())
+	require.Empty(t, response.GetCreateTreeErrorCode())
 
 	// headCommit is pointed commit after revert
 	headCommit, err := repo.ReadCommit(ctx, git.Revision(git.DefaultBranch))
@@ -791,7 +791,7 @@ func testServerUserRevertSuccessfulIntoEmptyRepo(t *testing.T, ctx context.Conte
 		User:            gittest.TestUser,
 		Commit:          revertedCommit,
 		BranchName:      []byte(destinationBranch),
-		Message:         []byte("Reverting " + revertedCommit.Id),
+		Message:         []byte("Reverting " + revertedCommit.GetId()),
 		StartRepository: startRepoProto,
 		StartBranchName: []byte(git.DefaultBranch),
 	}
@@ -799,22 +799,22 @@ func testServerUserRevertSuccessfulIntoEmptyRepo(t *testing.T, ctx context.Conte
 	response, err := client.UserRevert(ctx, request)
 	require.NoError(t, err)
 
-	headCommit, err := repo.ReadCommit(ctx, git.Revision(request.BranchName))
+	headCommit, err := repo.ReadCommit(ctx, git.Revision(request.GetBranchName()))
 	require.NoError(t, err)
 
 	expectedBranchUpdate := &gitalypb.OperationBranchUpdate{
 		BranchCreated: true,
 		RepoCreated:   true,
-		CommitId:      headCommit.Id,
+		CommitId:      headCommit.GetId(),
 	}
 
-	require.Equal(t, expectedBranchUpdate, response.BranchUpdate)
-	require.Empty(t, response.CreateTreeError)
-	require.Empty(t, response.CreateTreeErrorCode)
+	require.Equal(t, expectedBranchUpdate, response.GetBranchUpdate())
+	require.Empty(t, response.GetCreateTreeError())
+	require.Empty(t, response.GetCreateTreeErrorCode())
 
-	require.Equal(t, request.Message, headCommit.Subject)
-	require.Equal(t, revertedCommit.Id, headCommit.ParentIds[0])
-	gittest.RequireTree(t, cfg, repoPath, response.BranchUpdate.CommitId,
+	require.Equal(t, request.GetMessage(), headCommit.GetSubject())
+	require.Equal(t, revertedCommit.GetId(), headCommit.GetParentIds()[0])
+	gittest.RequireTree(t, cfg, repoPath, response.GetBranchUpdate().GetCommitId(),
 		[]gittest.TreeEntry{
 			{Path: "blob1", Mode: "100644", Content: "foobar1"},
 		})
@@ -853,7 +853,7 @@ func testServerUserRevertSuccessfulGitHooks(t *testing.T, ctx context.Context) {
 		User:       gittest.TestUser,
 		Commit:     revertedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + revertedCommit.Id),
+		Message:    []byte("Reverting " + revertedCommit.GetId()),
 	}
 
 	var hookOutputFiles []string
@@ -864,14 +864,14 @@ func testServerUserRevertSuccessfulGitHooks(t *testing.T, ctx context.Context) {
 
 	response, err := client.UserRevert(ctx, request)
 	require.NoError(t, err)
-	require.Empty(t, response.PreReceiveError)
+	require.Empty(t, response.GetPreReceiveError())
 	headCommit, err := repo.ReadCommit(ctx, git.Revision(destinationBranch))
 	require.NoError(t, err)
-	gittest.RequireTree(t, cfg, repoPath, headCommit.Id, nil)
+	gittest.RequireTree(t, cfg, repoPath, headCommit.GetId(), nil)
 
 	for _, file := range hookOutputFiles {
 		output := string(testhelper.MustReadFile(t, file))
-		require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GlUsername)
+		require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 	}
 }
 
@@ -908,7 +908,7 @@ func testServerUserRevertFailedDueToPreReceiveError(t *testing.T, ctx context.Co
 		User:       gittest.TestUser,
 		Commit:     revertedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + revertedCommit.Id),
+		Message:    []byte("Reverting " + revertedCommit.GetId()),
 	}
 
 	hookContent := []byte("#!/bin/sh\necho GL_ID=$GL_ID\nexit 1")
@@ -923,7 +923,7 @@ func testServerUserRevertFailedDueToPreReceiveError(t *testing.T, ctx context.Co
 			require.Equal(t, actualStatus.Message(), "revert: custom hook error")
 			revertError, ok := actualStatus.Details()[0].(*gitalypb.UserRevertError)
 			require.True(t, ok)
-			require.Contains(t, revertError.GetCustomHook().String(), "GL_ID="+gittest.TestUser.GlId)
+			require.Contains(t, revertError.GetCustomHook().String(), "GL_ID="+gittest.TestUser.GetGlId())
 		})
 	}
 }
@@ -976,7 +976,7 @@ func testServerUserRevertFailedDueToCreateTreeErrorConflict(t *testing.T, ctx co
 		User:       gittest.TestUser,
 		Commit:     revertedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + revertedCommit.Id),
+		Message:    []byte("Reverting " + revertedCommit.GetId()),
 	}
 
 	_, err = client.UserRevert(ctx, request)
@@ -1051,13 +1051,13 @@ func testServerUserRevertFailedDueToCreateTreeErrorEmpty(t *testing.T, ctx conte
 		User:       gittest.TestUser,
 		Commit:     revertedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Reverting " + revertedCommit.Id),
+		Message:    []byte("Reverting " + revertedCommit.GetId()),
 	}
 
 	response, err := client.UserRevert(ctx, request)
 	require.NoError(t, err)
-	require.Empty(t, response.CreateTreeError)
-	require.Equal(t, gitalypb.UserRevertResponse_NONE, response.CreateTreeErrorCode)
+	require.Empty(t, response.GetCreateTreeError())
+	require.Equal(t, gitalypb.UserRevertResponse_NONE, response.GetCreateTreeErrorCode())
 
 	_, err = client.UserRevert(ctx, request)
 	expectedError := structerr.NewFailedPrecondition("revert: could not apply because the result was empty").WithDetail(
@@ -1111,7 +1111,7 @@ func testServerUserRevertFailedDueToCommitError(t *testing.T, ctx context.Contex
 		User:            gittest.TestUser,
 		Commit:          revertedCommit,
 		BranchName:      []byte(destinationBranch),
-		Message:         []byte("Reverting " + revertedCommit.Id),
+		Message:         []byte("Reverting " + revertedCommit.GetId()),
 		StartBranchName: []byte(sourceBranch),
 	}
 

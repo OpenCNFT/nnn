@@ -76,7 +76,7 @@ func validateCommitsByMessageRequest(ctx context.Context, locator storage.Locato
 		return err
 	}
 
-	if err := git.ValidateRevision(in.Revision, git.AllowEmptyRevision()); err != nil {
+	if err := git.ValidateRevision(in.GetRevision(), git.AllowEmptyRevision()); err != nil {
 		return err
 	}
 

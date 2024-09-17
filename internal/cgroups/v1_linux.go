@@ -99,36 +99,36 @@ func (cvh *cgroupV1Handler) collect(repoPath string, ch chan<- prometheus.Metric
 		logger.WithError(err).Warn("unable to get cgroup stats")
 	} else {
 		memoryMetric := cvh.memoryReclaimAttemptsTotal.WithLabelValues(repoPath)
-		memoryMetric.Set(float64(metrics.Memory.Usage.Failcnt))
+		memoryMetric.Set(float64(metrics.GetMemory().GetUsage().GetFailcnt()))
 		ch <- memoryMetric
 
 		cpuUserMetric := cvh.cpuUsage.WithLabelValues(repoPath, "user")
-		cpuUserMetric.Set(float64(metrics.CPU.Usage.User))
+		cpuUserMetric.Set(float64(metrics.GetCPU().GetUsage().GetUser()))
 		ch <- cpuUserMetric
 
 		ch <- prometheus.MustNewConstMetric(
 			cvh.cpuCFSPeriods,
 			prometheus.CounterValue,
-			float64(metrics.CPU.Throttling.Periods),
+			float64(metrics.GetCPU().GetThrottling().GetPeriods()),
 			repoPath,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			cvh.cpuCFSThrottledPeriods,
 			prometheus.CounterValue,
-			float64(metrics.CPU.Throttling.ThrottledPeriods),
+			float64(metrics.GetCPU().GetThrottling().GetThrottledPeriods()),
 			repoPath,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			cvh.cpuCFSThrottledTime,
 			prometheus.CounterValue,
-			float64(metrics.CPU.Throttling.ThrottledTime)/float64(time.Second),
+			float64(metrics.GetCPU().GetThrottling().GetThrottledTime())/float64(time.Second),
 			repoPath,
 		)
 
 		cpuKernelMetric := cvh.cpuUsage.WithLabelValues(repoPath, "kernel")
-		cpuKernelMetric.Set(float64(metrics.CPU.Usage.Kernel))
+		cpuKernelMetric.Set(float64(metrics.GetCPU().GetUsage().GetKernel()))
 		ch <- cpuKernelMetric
 	}
 
@@ -174,18 +174,18 @@ func (cvh *cgroupV1Handler) stats() (Stats, error) {
 
 	return Stats{
 		ParentStats: CgroupStats{
-			CPUThrottledCount:    metrics.CPU.Throttling.ThrottledPeriods,
-			CPUThrottledDuration: float64(metrics.CPU.Throttling.ThrottledTime) / float64(time.Second),
-			MemoryUsage:          metrics.Memory.Usage.Usage,
-			MemoryLimit:          metrics.Memory.Usage.Limit,
-			OOMKills:             metrics.MemoryOomControl.OomKill,
-			UnderOOM:             metrics.MemoryOomControl.UnderOom != 0,
-			TotalAnon:            metrics.Memory.TotalRSS,
-			TotalActiveAnon:      metrics.Memory.TotalActiveAnon,
-			TotalInactiveAnon:    metrics.Memory.TotalInactiveAnon,
-			TotalFile:            metrics.Memory.TotalCache,
-			TotalActiveFile:      metrics.Memory.TotalActiveFile,
-			TotalInactiveFile:    metrics.Memory.TotalInactiveFile,
+			CPUThrottledCount:    metrics.GetCPU().GetThrottling().GetThrottledPeriods(),
+			CPUThrottledDuration: float64(metrics.GetCPU().GetThrottling().GetThrottledTime()) / float64(time.Second),
+			MemoryUsage:          metrics.GetMemory().GetUsage().GetUsage(),
+			MemoryLimit:          metrics.GetMemory().GetUsage().GetLimit(),
+			OOMKills:             metrics.GetMemoryOomControl().GetOomKill(),
+			UnderOOM:             metrics.GetMemoryOomControl().GetUnderOom() != 0,
+			TotalAnon:            metrics.GetMemory().GetTotalRSS(),
+			TotalActiveAnon:      metrics.GetMemory().GetTotalActiveAnon(),
+			TotalInactiveAnon:    metrics.GetMemory().GetTotalInactiveAnon(),
+			TotalFile:            metrics.GetMemory().GetTotalCache(),
+			TotalActiveFile:      metrics.GetMemory().GetTotalActiveFile(),
+			TotalInactiveFile:    metrics.GetMemory().GetTotalInactiveFile(),
 		},
 	}, nil
 }

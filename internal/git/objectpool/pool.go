@@ -185,7 +185,7 @@ func FromRepo(
 		},
 	}
 
-	if locator.ValidateRepository(ctx, objectPoolProto.Repository) != nil {
+	if locator.ValidateRepository(ctx, objectPoolProto.GetRepository()) != nil {
 		return nil, ErrInvalidPoolRepository
 	}
 

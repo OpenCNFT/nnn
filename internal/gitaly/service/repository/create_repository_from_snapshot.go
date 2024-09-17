@@ -85,21 +85,21 @@ func newResolvedHTTPClient(httpAddress, resolvedAddress string) (*http.Client, e
 }
 
 func (s *server) untar(ctx context.Context, path string, in *gitalypb.CreateRepositoryFromSnapshotRequest) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", in.HttpUrl, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", in.GetHttpUrl(), nil)
 	if err != nil {
 		return structerr.NewInvalidArgument("Bad HTTP URL: %w", err)
 	}
 
 	client := httpClient
 	if resolvedAddress := in.GetResolvedAddress(); resolvedAddress != "" {
-		client, err = newResolvedHTTPClient(in.HttpUrl, resolvedAddress)
+		client, err = newResolvedHTTPClient(in.GetHttpUrl(), resolvedAddress)
 		if err != nil {
 			return structerr.NewInvalidArgument("creating resolved HTTP client: %w", err)
 		}
 	}
 
-	if in.HttpAuth != "" {
-		req.Header.Set("Authorization", in.HttpAuth)
+	if in.GetHttpAuth() != "" {
+		req.Header.Set("Authorization", in.GetHttpAuth())
 	}
 
 	rsp, err := client.Do(req)

@@ -429,7 +429,7 @@ func (v *MetadataVerifier) verify(ctx context.Context, job verificationJob) (boo
 		return false, err
 	}
 
-	return resp.Exists, nil
+	return resp.GetExists(), nil
 }
 
 // Describe describes the collected metrics to Prometheus.

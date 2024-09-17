@@ -159,7 +159,7 @@ func TestGetObjectDirectorySize_successful(t *testing.T) {
 		// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 		// sends it back to Gitaly when it performs requests in the access checks. The repository
 		// would have already been rewritten by Praefect, so we have to adjust for that as well.
-		gittest.RewrittenRepository(t, ctx, cfg, repo).RelativePath,
+		gittest.RewrittenRepository(t, ctx, cfg, repo).GetRelativePath(),
 	)
 
 	// Initially, the object directory should be empty and thus have a size of zero.
@@ -190,7 +190,7 @@ func TestGetObjectDirectorySize_quarantine(t *testing.T) {
 			// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 			// sends it back to Gitaly when it performs requests in the access checks. The repository
 			// would have already been rewritten by Praefect, so we have to adjust for that as well.
-			gittest.RewrittenRepository(t, ctx, cfg, repo).RelativePath,
+			gittest.RewrittenRepository(t, ctx, cfg, repo).GetRelativePath(),
 		)
 
 		requireObjectDirectorySize(t, ctx, client, repo, 16)
@@ -205,7 +205,7 @@ func TestGetObjectDirectorySize_quarantine(t *testing.T) {
 		// helpers here, we need to manually substitute the rewritten relative path with the original one when sending
 		// it back through the API.
 		quarantinedRepo := quarantine.QuarantinedRepo()
-		quarantinedRepo.RelativePath = repo.RelativePath
+		quarantinedRepo.RelativePath = repo.GetRelativePath()
 
 		// The size of the quarantine directory should be zero.
 		requireObjectDirectorySize(t, ctx, client, quarantinedRepo, 0)
@@ -223,7 +223,7 @@ func TestGetObjectDirectorySize_quarantine(t *testing.T) {
 			// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 			// sends it back to Gitaly when it performs requests in the access checks. The repository
 			// would have already been rewritten by Praefect, so we have to adjust for that as well.
-			gittest.RewrittenRepository(t, ctx, cfg, repo).RelativePath,
+			gittest.RewrittenRepository(t, ctx, cfg, repo).GetRelativePath(),
 		)
 
 		requireObjectDirectorySize(t, ctx, client, repo, 16)
@@ -261,7 +261,7 @@ func TestGetObjectDirectorySize_quarantine(t *testing.T) {
 		// rewritten relative path but with the original relative path of the repository. Since we're using the production
 		// helpers here, we need to manually substitute the rewritten relative path with the original one when sending
 		// it back through the API.
-		repo.RelativePath = repo1.RelativePath
+		repo.RelativePath = repo1.GetRelativePath()
 
 		// Rails sends the repository's relative path from the access checks as provided by Gitaly. If transactions are enabled,
 		// this is the snapshot's relative path. Include the metadata in the test as well as we're testing requests with quarantine
@@ -270,7 +270,7 @@ func TestGetObjectDirectorySize_quarantine(t *testing.T) {
 			// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 			// sends it back to Gitaly when it performs requests in the access checks. The repository
 			// would have already been rewritten by Praefect, so we have to adjust for that as well.
-			gittest.RewrittenRepository(t, ctx, cfg, repo).RelativePath,
+			gittest.RewrittenRepository(t, ctx, cfg, repo).GetRelativePath(),
 		)
 
 		response, err := client.GetObjectDirectorySize(ctx, &gitalypb.GetObjectDirectorySizeRequest{

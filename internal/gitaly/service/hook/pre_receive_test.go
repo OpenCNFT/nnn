@@ -183,7 +183,7 @@ func TestPreReceiveHook_GitlabAPIAccess(t *testing.T) {
 	// socket given it is a service intended only to be used internally by Gitaly for hook callbacks.
 	//
 	// Related issue: https://gitlab.com/gitlab-org/gitaly/-/issues/3746
-	ctx = metadata.AppendToOutgoingContext(ctx, storagemgr.MetadataKeySnapshotRelativePath, repo.RelativePath)
+	ctx = metadata.AppendToOutgoingContext(ctx, storagemgr.MetadataKeySnapshotRelativePath, repo.GetRelativePath())
 
 	stream, err := client.PreReceiveHook(ctx)
 	require.NoError(t, err)

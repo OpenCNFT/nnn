@@ -180,7 +180,7 @@ func findGetArchivePath(ctx context.Context, f *catfile.TreeEntryFinder, commitI
 		return false, err
 	}
 
-	if treeEntry == nil || len(treeEntry.Oid) == 0 {
+	if treeEntry == nil || len(treeEntry.GetOid()) == 0 {
 		return false, nil
 	}
 	return true, nil

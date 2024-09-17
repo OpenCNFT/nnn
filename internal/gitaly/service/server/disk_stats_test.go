@@ -55,25 +55,25 @@ func TestStorageDiskStatistics(t *testing.T) {
 
 	// used and available space may change so we check if it roughly matches (+/- 1GB)
 	avail, used := getSpaceStats(t, cfg.Storages[0].Path)
-	approxEqual(t, c.GetStorageStatuses()[0].Available, avail)
-	approxEqual(t, c.GetStorageStatuses()[0].Used, used)
-	require.Equal(t, cfg.Storages[0].Name, c.GetStorageStatuses()[0].StorageName)
+	approxEqual(t, c.GetStorageStatuses()[0].GetAvailable(), avail)
+	approxEqual(t, c.GetStorageStatuses()[0].GetUsed(), used)
+	require.Equal(t, cfg.Storages[0].Name, c.GetStorageStatuses()[0].GetStorageName())
 
 	if !testhelper.IsWALEnabled() {
-		require.Equal(t, int64(0), c.GetStorageStatuses()[1].Available)
-		require.Equal(t, int64(0), c.GetStorageStatuses()[1].Used)
-		require.Equal(t, cfg.Storages[1].Name, c.GetStorageStatuses()[1].StorageName)
+		require.Equal(t, int64(0), c.GetStorageStatuses()[1].GetAvailable())
+		require.Equal(t, int64(0), c.GetStorageStatuses()[1].GetUsed())
+		require.Equal(t, cfg.Storages[1].Name, c.GetStorageStatuses()[1].GetStorageName())
 	}
 
 	if testhelper.IsPraefectEnabled() && !testhelper.IsWALEnabled() {
 		// This is incorrect behavior caused by the bug explained above.
-		approxEqual(t, c.GetStorageStatuses()[2].Available, avail)
-		approxEqual(t, c.GetStorageStatuses()[2].Used, used)
-		require.Equal(t, cfg.Storages[0].Name, c.GetStorageStatuses()[2].StorageName)
+		approxEqual(t, c.GetStorageStatuses()[2].GetAvailable(), avail)
+		approxEqual(t, c.GetStorageStatuses()[2].GetUsed(), used)
+		require.Equal(t, cfg.Storages[0].Name, c.GetStorageStatuses()[2].GetStorageName())
 
-		require.Equal(t, int64(0), c.GetStorageStatuses()[3].Available)
-		require.Equal(t, int64(0), c.GetStorageStatuses()[3].Used)
-		require.Equal(t, cfg.Storages[1].Name, c.GetStorageStatuses()[3].StorageName)
+		require.Equal(t, int64(0), c.GetStorageStatuses()[3].GetAvailable())
+		require.Equal(t, int64(0), c.GetStorageStatuses()[3].GetUsed())
+		require.Equal(t, cfg.Storages[1].Name, c.GetStorageStatuses()[3].GetStorageName())
 	}
 }
 

@@ -966,7 +966,7 @@ func testRebase(t *testing.T, ctx context.Context) {
 			upstreamRevision := git.Revision(fmt.Sprintf("%s~%d", rebaseResult.String(), data.expectedCommitsAhead))
 			upstreamCommit, err := repo.ReadCommit(ctx, upstreamRevision)
 			require.NoError(t, err)
-			require.Equal(t, data.upstream, upstreamCommit.Id)
+			require.Equal(t, data.upstream, upstreamCommit.GetId())
 		})
 	}
 }

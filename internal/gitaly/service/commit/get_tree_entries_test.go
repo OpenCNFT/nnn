@@ -1202,12 +1202,12 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 				var firstResp *gitalypb.GetTreeEntriesResponse
 				firstResp, err = stream.Recv()
 				require.NoError(t, err)
-				require.NotEmpty(t, firstResp.GetPaginationCursor().NextCursor)
-				initialPageToken := firstResp.PaginationCursor.NextCursor
+				require.NotEmpty(t, firstResp.GetPaginationCursor().GetNextCursor())
+				initialPageToken := firstResp.GetPaginationCursor().GetNextCursor()
 
 				// Verify first entry
-				require.Len(t, firstResp.Entries, 1)
-				require.Equal(t, []byte("rootDir/subDir/subSubDir"), firstResp.Entries[0].Path)
+				require.Len(t, firstResp.GetEntries(), 1)
+				require.Equal(t, []byte("rootDir/subDir/subSubDir"), firstResp.GetEntries()[0].GetPath())
 
 				return setupData{
 					request: &gitalypb.GetTreeEntriesRequest{
@@ -1295,12 +1295,12 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 				firstResp, err = stream.Recv()
 				require.NoError(t, err)
 				require.NotEmpty(t, firstResp.GetPaginationCursor().GetNextCursor())
-				initialPageToken := firstResp.PaginationCursor.NextCursor
+				initialPageToken := firstResp.GetPaginationCursor().GetNextCursor()
 
 				// Verify first two entries
-				require.Len(t, firstResp.Entries, 2)
-				require.Equal(t, []byte("dir1"), firstResp.Entries[0].Path)
-				require.Equal(t, []byte("dir1/file2"), firstResp.Entries[1].Path)
+				require.Len(t, firstResp.GetEntries(), 2)
+				require.Equal(t, []byte("dir1"), firstResp.GetEntries()[0].GetPath())
+				require.Equal(t, []byte("dir1/file2"), firstResp.GetEntries()[1].GetPath())
 
 				// Write a new commit changing the tree
 				gittest.WriteCommit(t, cfg, repoPath,
@@ -1868,7 +1868,7 @@ func BenchmarkGetTreeEntries(b *testing.B) {
 				require.NoError(b, err)
 
 				entriesReceived, err := testhelper.ReceiveAndFold(stream.Recv, func(result int, response *gitalypb.GetTreeEntriesResponse) int {
-					return result + len(response.Entries)
+					return result + len(response.GetEntries())
 				})
 				require.NoError(b, err)
 				require.Equal(b, tc.expectedEntries, entriesReceived)
@@ -1892,13 +1892,13 @@ func getTreeEntriesFromTreeEntryClient(t *testing.T, client gitalypb.CommitServi
 				break
 			}
 			require.NoError(t, err)
-			entries = append(entries, resp.Entries...)
+			entries = append(entries, resp.GetEntries()...)
 
 			if !firstEntryReceived {
-				cursor = resp.PaginationCursor
+				cursor = resp.GetPaginationCursor()
 				firstEntryReceived = true
 			} else {
-				require.Equal(t, nil, resp.PaginationCursor)
+				require.Equal(t, nil, resp.GetPaginationCursor())
 			}
 		} else {
 			testhelper.RequireGrpcError(t, expectedError, err, protocmp.SortRepeatedFields(&spb.Status{}, "details"))

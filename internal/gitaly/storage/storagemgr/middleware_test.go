@@ -352,7 +352,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			assertAdditionalRepository: func(t *testing.T, ctx context.Context, actual *gitalypb.Repository) {
 				expected := validAdditionalRepository()
 				// The additional repository's relative path should have been rewritten.
-				require.NotEqual(t, expected.RelativePath, actual.RelativePath)
+				require.NotEqual(t, expected.GetRelativePath(), actual.GetRelativePath())
 				// But the restored non-snapshotted repository should match the original.
 				testhelper.ProtoEqual(t, expected, storage.ExtractTransaction(ctx).OriginalRepository(actual))
 			},
@@ -385,7 +385,7 @@ messages and behavior by erroring out the requests before they even hit this int
 			assertAdditionalRepository: func(t *testing.T, ctx context.Context, actual *gitalypb.Repository) {
 				expected := validAdditionalRepository()
 				// The additional repository's relative path should have been rewritten.
-				require.NotEqual(t, expected.RelativePath, actual.RelativePath)
+				require.NotEqual(t, expected.GetRelativePath(), actual.GetRelativePath())
 				// But the restored non-snapshotted repository should match the original.
 				testhelper.ProtoEqual(t, expected, storage.ExtractTransaction(ctx).OriginalRepository(actual))
 			},
@@ -509,13 +509,13 @@ messages and behavior by erroring out the requests before they even hit this int
 			if !tc.repositoryCreation {
 				gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
-					RelativePath:           validRepository().RelativePath,
+					RelativePath:           validRepository().GetRelativePath(),
 				})
 			}
 
 			gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 				SkipCreationViaService: true,
-				RelativePath:           validAdditionalRepository().RelativePath,
+				RelativePath:           validAdditionalRepository().GetRelativePath(),
 			})
 
 			txRegistry := storagemgr.NewTransactionRegistry()
@@ -536,20 +536,20 @@ messages and behavior by erroring out the requests before they even hit this int
 					actualRepo := repo
 
 					// When run in a transaction, the relative path will be pointed to the snapshot.
-					assert.NotEqual(t, expectedRepo.RelativePath, repo.RelativePath)
+					assert.NotEqual(t, expectedRepo.GetRelativePath(), repo.GetRelativePath())
 					expectedRepo.RelativePath = ""
 					actualRepo.RelativePath = ""
 
 					if shouldBeQuarantined {
 						// Mutators should have quarantine directory configured.
-						assert.NotEmpty(t, actualRepo.GitObjectDirectory)
+						assert.NotEmpty(t, actualRepo.GetGitObjectDirectory())
 						actualRepo.GitObjectDirectory = ""
-						assert.NotEmpty(t, actualRepo.GitAlternateObjectDirectories)
+						assert.NotEmpty(t, actualRepo.GetGitAlternateObjectDirectories())
 						actualRepo.GitAlternateObjectDirectories = nil
 					} else {
 						// Accessors should not have a quarantine directory configured.
-						assert.Empty(t, actualRepo.GitObjectDirectory)
-						assert.Empty(t, actualRepo.GitAlternateObjectDirectories)
+						assert.Empty(t, actualRepo.GetGitObjectDirectory())
+						assert.Empty(t, actualRepo.GetGitAlternateObjectDirectories())
 					}
 
 					testhelper.ProtoEqual(t, expectedRepo, actualRepo)
@@ -796,7 +796,7 @@ messages and behavior by erroring out the requests before they even hit this int
 				gitalypb.RegisterRepositoryServiceServer(server, mockRepositoryService{
 					objectFormatFunc: func(ctx context.Context, req *gitalypb.ObjectFormatRequest) (*gitalypb.ObjectFormatResponse, error) {
 						assertHandler(ctx)
-						testhelper.ProtoEqual(t, tc.expectedRepository, req.Repository)
+						testhelper.ProtoEqual(t, tc.expectedRepository, req.GetRepository())
 						return &gitalypb.ObjectFormatResponse{}, nil
 					},
 					setCustomHooksFunc: func(stream gitalypb.RepositoryService_SetCustomHooksServer) error {

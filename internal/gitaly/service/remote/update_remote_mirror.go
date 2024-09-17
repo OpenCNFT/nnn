@@ -234,7 +234,7 @@ func (s *server) updateRemoteMirror(stream gitalypb.RemoteService_UpdateRemoteMi
 
 		if err := repo.Push(ctx, remoteName, batch, localrepo.PushOptions{
 			SSHCommand: sshCommand,
-			Force:      !firstRequest.KeepDivergentRefs,
+			Force:      !firstRequest.GetKeepDivergentRefs(),
 			Config:     remoteConfig,
 		}); err != nil {
 			return fmt.Errorf("push to mirror: %w", err)

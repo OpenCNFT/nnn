@@ -141,7 +141,7 @@ on the storage implementation to handle broken storage on initialization.`,
 				return
 			}
 
-			require.Equal(t, tc.exists, response.Exists)
+			require.Equal(t, tc.exists, response.GetExists())
 		})
 	}
 }

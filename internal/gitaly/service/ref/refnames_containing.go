@@ -62,7 +62,7 @@ type branchNamesContainingCommitSender struct {
 
 func (bs *branchNamesContainingCommitSender) Reset() { bs.branchNames = nil }
 func (bs *branchNamesContainingCommitSender) Append(m proto.Message) {
-	bs.branchNames = append(bs.branchNames, stripPrefix(m.(*wrapperspb.StringValue).Value, "refs/heads/"))
+	bs.branchNames = append(bs.branchNames, stripPrefix(m.(*wrapperspb.StringValue).GetValue(), "refs/heads/"))
 }
 
 func (bs *branchNamesContainingCommitSender) Send() error {
@@ -104,7 +104,7 @@ type tagNamesContainingCommitSender struct {
 
 func (ts *tagNamesContainingCommitSender) Reset() { ts.tagNames = nil }
 func (ts *tagNamesContainingCommitSender) Append(m proto.Message) {
-	ts.tagNames = append(ts.tagNames, stripPrefix(m.(*wrapperspb.StringValue).Value, "refs/tags/"))
+	ts.tagNames = append(ts.tagNames, stripPrefix(m.(*wrapperspb.StringValue).GetValue(), "refs/tags/"))
 }
 
 func (ts *tagNamesContainingCommitSender) Send() error {

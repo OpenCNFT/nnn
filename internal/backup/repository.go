@@ -189,7 +189,7 @@ func (s *createBundleFromRefListSender) Reset() {
 func (s *createBundleFromRefListSender) Append(msg proto.Message) {
 	req := msg.(*gitalypb.CreateBundleFromRefListRequest)
 	s.chunk.Repository = req.GetRepository()
-	s.chunk.Patterns = append(s.chunk.Patterns, req.Patterns...)
+	s.chunk.Patterns = append(s.chunk.Patterns, req.GetPatterns()...)
 }
 
 // Send should send the current response message
@@ -422,7 +422,7 @@ func (rr *remoteRepository) ObjectHash(ctx context.Context) (git.ObjectHash, err
 		return git.ObjectHash{}, fmt.Errorf("remote repository: object hash: %w", err)
 	}
 
-	return git.ObjectHashByProto(response.Format)
+	return git.ObjectHashByProto(response.GetFormat())
 }
 
 // HeadReference returns the current value of HEAD.
@@ -437,7 +437,7 @@ func (rr *remoteRepository) HeadReference(ctx context.Context) (git.ReferenceNam
 		return "", fmt.Errorf("remote repository: head reference: %w", err)
 	}
 
-	return git.ReferenceName(response.Name), nil
+	return git.ReferenceName(response.GetName()), nil
 }
 
 func (rr *remoteRepository) newRepoClient() gitalypb.RepositoryServiceClient {

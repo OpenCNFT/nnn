@@ -704,17 +704,17 @@ func getRangeDiffsFromCommitDiffClient(t *testing.T, client gitalypb.DiffService
 
 		if currentCommitPair == nil {
 			currentCommitPair = &rangediff.CommitPair{
-				FromCommit:         fetchedRangeDiff.FromCommitId,
-				ToCommit:           fetchedRangeDiff.ToCommitId,
-				Comparison:         fetchedRangeDiff.Comparison,
-				CommitMessageTitle: fetchedRangeDiff.CommitMessageTitle,
-				PatchData:          fetchedRangeDiff.PatchData,
+				FromCommit:         fetchedRangeDiff.GetFromCommitId(),
+				ToCommit:           fetchedRangeDiff.GetToCommitId(),
+				Comparison:         fetchedRangeDiff.GetComparison(),
+				CommitMessageTitle: fetchedRangeDiff.GetCommitMessageTitle(),
+				PatchData:          fetchedRangeDiff.GetPatchData(),
 			}
 		} else {
-			currentCommitPair.PatchData = append(currentCommitPair.PatchData, fetchedRangeDiff.PatchData...)
+			currentCommitPair.PatchData = append(currentCommitPair.PatchData, fetchedRangeDiff.GetPatchData()...)
 		}
 
-		if fetchedRangeDiff.EndOfPatch {
+		if fetchedRangeDiff.GetEndOfPatch() {
 			commitPairs = append(commitPairs, currentCommitPair)
 			currentCommitPair = nil
 		}

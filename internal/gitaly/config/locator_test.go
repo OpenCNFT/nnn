@@ -53,17 +53,17 @@ func TestConfigLocator_GetRepoPath(t *testing.T) {
 	}{
 		{
 			desc:   "storage is empty",
-			repo:   &gitalypb.Repository{RelativePath: repo.RelativePath},
+			repo:   &gitalypb.Repository{RelativePath: repo.GetRelativePath()},
 			expErr: structerr.NewInvalidArgument("%w", storage.ErrStorageNotSet),
 		},
 		{
 			desc:   "unknown storage",
-			repo:   &gitalypb.Repository{StorageName: "invalid", RelativePath: repo.RelativePath},
+			repo:   &gitalypb.Repository{StorageName: "invalid", RelativePath: repo.GetRelativePath()},
 			expErr: storage.NewStorageNotFoundError("invalid"),
 		},
 		{
 			desc:   "storage doesn't exist on disk",
-			repo:   &gitalypb.Repository{StorageName: cfg.Storages[1].Name, RelativePath: repo.RelativePath},
+			repo:   &gitalypb.Repository{StorageName: cfg.Storages[1].Name, RelativePath: repo.GetRelativePath()},
 			expErr: structerr.NewNotFound("storage does not exist").WithMetadata("storage_path", cfg.Storages[1].Path),
 			skipWithWAL: `
 The test is testing a broken storage by deleting the storage after initializing it.
@@ -145,17 +145,17 @@ func TestConfigLocator_ValidateRepository(t *testing.T) {
 	}{
 		{
 			desc:   "unknown storage",
-			repo:   &gitalypb.Repository{StorageName: "invalid", RelativePath: repo.RelativePath},
+			repo:   &gitalypb.Repository{StorageName: "invalid", RelativePath: repo.GetRelativePath()},
 			expErr: structerr.NewInvalidArgument("%w", storage.ErrStorageNotFound).WithMetadata("storage_name", "invalid"),
 		},
 		{
 			desc: "unchecked unknown storage",
-			repo: &gitalypb.Repository{StorageName: "invalid", RelativePath: repo.RelativePath},
+			repo: &gitalypb.Repository{StorageName: "invalid", RelativePath: repo.GetRelativePath()},
 			opts: []storage.ValidateRepositoryOption{storage.WithSkipStorageExistenceCheck()},
 		},
 		{
 			desc:   "unchecked unset storage",
-			repo:   &gitalypb.Repository{StorageName: "", RelativePath: repo.RelativePath},
+			repo:   &gitalypb.Repository{StorageName: "", RelativePath: repo.GetRelativePath()},
 			expErr: structerr.NewInvalidArgument("%w", storage.ErrStorageNotSet),
 		},
 		{

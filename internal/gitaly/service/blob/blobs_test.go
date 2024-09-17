@@ -79,10 +79,10 @@ func TestListBlobs(t *testing.T) {
 		{
 			desc: "single blob",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
 			},
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize()},
 			},
 		},
 		{
@@ -97,26 +97,26 @@ func TestListBlobs(t *testing.T) {
 		{
 			desc: "single blob with paths",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
 			},
 			withPaths: true,
 			// When iterating blobs directly, we cannot deduce a path and thus don't get
 			// any as response.
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize()},
 			},
 		},
 		{
 			desc: "multiple blobs",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
-				repoInfo.lfsPointers[1].Oid,
-				repoInfo.lfsPointers[2].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
+				repoInfo.lfsPointers[1].GetOid(),
+				repoInfo.lfsPointers[2].GetOid(),
 			},
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size},
-				{Oid: repoInfo.lfsPointers[1].Oid, Size: repoInfo.lfsPointers[1].Size},
-				{Oid: repoInfo.lfsPointers[2].Oid, Size: repoInfo.lfsPointers[2].Size},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize()},
+				{Oid: repoInfo.lfsPointers[1].GetOid(), Size: repoInfo.lfsPointers[1].GetSize()},
+				{Oid: repoInfo.lfsPointers[2].GetOid(), Size: repoInfo.lfsPointers[2].GetSize()},
 			},
 		},
 		{
@@ -208,57 +208,57 @@ func TestListBlobs(t *testing.T) {
 		{
 			desc: "complete contents via negative bytes limit",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
-				repoInfo.lfsPointers[1].Oid,
-				repoInfo.lfsPointers[2].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
+				repoInfo.lfsPointers[1].GetOid(),
+				repoInfo.lfsPointers[2].GetOid(),
 			},
 			bytesLimit: -1,
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size, Data: repoInfo.lfsPointers[0].Data},
-				{Oid: repoInfo.lfsPointers[1].Oid, Size: repoInfo.lfsPointers[1].Size, Data: repoInfo.lfsPointers[1].Data},
-				{Oid: repoInfo.lfsPointers[2].Oid, Size: repoInfo.lfsPointers[2].Size, Data: repoInfo.lfsPointers[2].Data},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize(), Data: repoInfo.lfsPointers[0].GetData()},
+				{Oid: repoInfo.lfsPointers[1].GetOid(), Size: repoInfo.lfsPointers[1].GetSize(), Data: repoInfo.lfsPointers[1].GetData()},
+				{Oid: repoInfo.lfsPointers[2].GetOid(), Size: repoInfo.lfsPointers[2].GetSize(), Data: repoInfo.lfsPointers[2].GetData()},
 			},
 		},
 		{
 			desc: "contents truncated by bytes limit",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
-				repoInfo.lfsPointers[1].Oid,
-				repoInfo.lfsPointers[2].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
+				repoInfo.lfsPointers[1].GetOid(),
+				repoInfo.lfsPointers[2].GetOid(),
 			},
 			bytesLimit: 10,
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size, Data: repoInfo.lfsPointers[0].Data[:10]},
-				{Oid: repoInfo.lfsPointers[1].Oid, Size: repoInfo.lfsPointers[1].Size, Data: repoInfo.lfsPointers[1].Data[:10]},
-				{Oid: repoInfo.lfsPointers[2].Oid, Size: repoInfo.lfsPointers[2].Size, Data: repoInfo.lfsPointers[2].Data[:10]},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize(), Data: repoInfo.lfsPointers[0].GetData()[:10]},
+				{Oid: repoInfo.lfsPointers[1].GetOid(), Size: repoInfo.lfsPointers[1].GetSize(), Data: repoInfo.lfsPointers[1].GetData()[:10]},
+				{Oid: repoInfo.lfsPointers[2].GetOid(), Size: repoInfo.lfsPointers[2].GetSize(), Data: repoInfo.lfsPointers[2].GetData()[:10]},
 			},
 		},
 		{
 			desc: "bytes limit exceeding total blob content size",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
-				repoInfo.lfsPointers[1].Oid,
-				repoInfo.lfsPointers[2].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
+				repoInfo.lfsPointers[1].GetOid(),
+				repoInfo.lfsPointers[2].GetOid(),
 			},
 			bytesLimit: 9000,
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size, Data: repoInfo.lfsPointers[0].Data},
-				{Oid: repoInfo.lfsPointers[1].Oid, Size: repoInfo.lfsPointers[1].Size, Data: repoInfo.lfsPointers[1].Data},
-				{Oid: repoInfo.lfsPointers[2].Oid, Size: repoInfo.lfsPointers[2].Size, Data: repoInfo.lfsPointers[2].Data},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize(), Data: repoInfo.lfsPointers[0].GetData()},
+				{Oid: repoInfo.lfsPointers[1].GetOid(), Size: repoInfo.lfsPointers[1].GetSize(), Data: repoInfo.lfsPointers[1].GetData()},
+				{Oid: repoInfo.lfsPointers[2].GetOid(), Size: repoInfo.lfsPointers[2].GetSize(), Data: repoInfo.lfsPointers[2].GetData()},
 			},
 		},
 		{
 			desc: "bytes limit partially exceeding limit",
 			revisions: []string{
-				repoInfo.lfsPointers[0].Oid,
-				repoInfo.lfsPointers[1].Oid,
-				repoInfo.lfsPointers[2].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
+				repoInfo.lfsPointers[1].GetOid(),
+				repoInfo.lfsPointers[2].GetOid(),
 			},
 			bytesLimit: 128,
 			expectedBlobs: []*gitalypb.ListBlobsResponse_Blob{
-				{Oid: repoInfo.lfsPointers[0].Oid, Size: repoInfo.lfsPointers[0].Size, Data: repoInfo.lfsPointers[0].Data[:128]},
-				{Oid: repoInfo.lfsPointers[1].Oid, Size: repoInfo.lfsPointers[1].Size, Data: repoInfo.lfsPointers[1].Data},
-				{Oid: repoInfo.lfsPointers[2].Oid, Size: repoInfo.lfsPointers[2].Size, Data: repoInfo.lfsPointers[2].Data},
+				{Oid: repoInfo.lfsPointers[0].GetOid(), Size: repoInfo.lfsPointers[0].GetSize(), Data: repoInfo.lfsPointers[0].GetData()[:128]},
+				{Oid: repoInfo.lfsPointers[1].GetOid(), Size: repoInfo.lfsPointers[1].GetSize(), Data: repoInfo.lfsPointers[1].GetData()},
+				{Oid: repoInfo.lfsPointers[2].GetOid(), Size: repoInfo.lfsPointers[2].GetSize(), Data: repoInfo.lfsPointers[2].GetData()},
 			},
 		},
 		{
@@ -268,7 +268,7 @@ func TestListBlobs(t *testing.T) {
 			verify: func(t *testing.T, blobs []*gitalypb.ListBlobsResponse_Blob) {
 				completeBlob := make([]byte, 0, len(chunkedBlob))
 				for _, blob := range blobs {
-					completeBlob = append(completeBlob, blob.Data...)
+					completeBlob = append(completeBlob, blob.GetData()...)
 					blob.Data = nil
 				}
 
@@ -310,7 +310,7 @@ func TestListBlobs(t *testing.T) {
 					break
 				}
 
-				blobs = append(blobs, resp.Blobs...)
+				blobs = append(blobs, resp.GetBlobs()...)
 			}
 
 			if tc.verify != nil {
@@ -341,7 +341,7 @@ func TestListAllBlobs(t *testing.T) {
 	// helpers here, we need to manually substitute the rewritten relative path with the original one when sending
 	// it back through the API.
 	quarantinedRepo := quarantine.QuarantinedRepo()
-	quarantinedRepo.RelativePath = repo.RelativePath
+	quarantinedRepo.RelativePath = repo.GetRelativePath()
 
 	quarantineRepoWithoutAlternates := proto.Clone(quarantinedRepo).(*gitalypb.Repository)
 	quarantineRepoWithoutAlternates.GitAlternateObjectDirectories = []string{}
@@ -397,7 +397,7 @@ func TestListAllBlobs(t *testing.T) {
 			verify: func(t *testing.T, blobs []*gitalypb.ListAllBlobsResponse_Blob) {
 				completeBlob := make([]byte, 0, len(chunkedBlob))
 				for _, blob := range blobs {
-					completeBlob = append(completeBlob, blob.Data...)
+					completeBlob = append(completeBlob, blob.GetData()...)
 					blob.Data = nil
 				}
 
@@ -462,11 +462,11 @@ func TestListAllBlobs(t *testing.T) {
 
 				for _, blob := range blobs {
 					emptyBlobID := "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-					if blob.Oid == emptyBlobID {
-						require.Empty(t, blob.Data)
-						require.Equal(t, int64(0), blob.Size)
+					if blob.GetOid() == emptyBlobID {
+						require.Empty(t, blob.GetData())
+						require.Equal(t, int64(0), blob.GetSize())
 					} else {
-						require.Len(t, blob.Data, 1)
+						require.Len(t, blob.GetData(), 1)
 					}
 				}
 			},
@@ -494,7 +494,7 @@ func TestListAllBlobs(t *testing.T) {
 			t.Parallel()
 
 			ctx := ctx
-			if tc.request.Repository.GitObjectDirectory != "" {
+			if tc.request.GetRepository().GetGitObjectDirectory() != "" {
 				// Rails sends the repository's relative path from the access checks as provided by Gitaly. If transactions are enabled,
 				// this is the snapshot's relative path. Include the metadata in the test as well as we're testing requests with quarantine
 				// as if they were coming from access checks.
@@ -502,7 +502,7 @@ func TestListAllBlobs(t *testing.T) {
 					// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 					// sends it back to Gitaly when it performs requests in the access checks. The repository
 					// would have already been rewritten by Praefect, so we have to adjust for that as well.
-					gittest.RewrittenRepository(t, ctx, cfg, tc.request.Repository).RelativePath,
+					gittest.RewrittenRepository(t, ctx, cfg, tc.request.GetRepository()).GetRelativePath(),
 				)
 			}
 
@@ -519,7 +519,7 @@ func TestListAllBlobs(t *testing.T) {
 					break
 				}
 
-				blobs = append(blobs, resp.Blobs...)
+				blobs = append(blobs, resp.GetBlobs()...)
 			}
 
 			tc.verify(t, blobs)

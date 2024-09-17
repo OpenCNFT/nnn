@@ -148,7 +148,7 @@ func TestDeleteRefs_transaction(t *testing.T) {
 
 			response, err := client.DeleteRefs(ctx, tc.request)
 			require.NoError(t, err)
-			require.Empty(t, response.GitError)
+			require.Empty(t, response.GetGitError())
 
 			require.Equal(t, tc.expectedVotes, len(txManager.Votes()))
 		})
@@ -174,7 +174,7 @@ func TestDeleteRefs_invalidRefFormat(t *testing.T) {
 		&gitalypb.DeleteRefsError{
 			Error: &gitalypb.DeleteRefsError_InvalidFormat{
 				InvalidFormat: &gitalypb.InvalidRefFormatError{
-					Refs: request.Refs,
+					Refs: request.GetRefs(),
 				},
 			},
 		},

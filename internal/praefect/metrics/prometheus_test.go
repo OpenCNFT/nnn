@@ -28,7 +28,7 @@ func TestRegisterReplicationDelay(t *testing.T) {
 	metricFamily := mfs[0]
 	require.Equal(t, "gitaly_praefect_replication_delay", metricFamily.GetName())
 	// The number of metrics should be equal to number of label values
-	require.Len(t, metricFamily.Metric, len(datastore.GetAllChangeTypes()))
+	require.Len(t, metricFamily.GetMetric(), len(datastore.GetAllChangeTypes()))
 }
 
 func TestRegisterReplicationLatency(t *testing.T) {
@@ -50,5 +50,5 @@ func TestRegisterReplicationLatency(t *testing.T) {
 	metricFamily := mfs[0]
 	require.Equal(t, "gitaly_praefect_replication_latency", metricFamily.GetName())
 	// The number of metrics should be equal to number of label values
-	require.Len(t, metricFamily.Metric, len(datastore.GetAllChangeTypes()))
+	require.Len(t, metricFamily.GetMetric(), len(datastore.GetAllChangeTypes()))
 }

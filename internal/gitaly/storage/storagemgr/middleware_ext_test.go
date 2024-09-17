@@ -33,7 +33,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 			desc: "partitioning hint provided",
 			createFork: func(t *testing.T, ctx context.Context, cfg config.Cfg, alternate *gitalypb.Repository) *gitalypb.Repository {
 				fork, _ := gittest.CreateRepository(t,
-					metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
+					metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.GetRelativePath())),
 					cfg,
 				)
 				return fork
@@ -47,7 +47,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 				defer testhelper.MustClose(t, cc)
 
 				fork := &gitalypb.Repository{
-					StorageName:  alternate.StorageName,
+					StorageName:  alternate.GetStorageName(),
 					RelativePath: gittest.NewRepositoryName(t),
 				}
 
@@ -70,7 +70,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 				defer testhelper.MustClose(t, cc)
 
 				fork := &gitalypb.Repository{
-					StorageName:  alternate.StorageName,
+					StorageName:  alternate.GetStorageName(),
 					RelativePath: gittest.NewRepositoryName(t),
 				}
 
@@ -78,7 +78,7 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 
 				_, err = gitalypb.NewRepositoryServiceClient(cc).CreateFork(
 					testhelper.MergeOutgoingMetadata(
-						metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
+						metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.GetRelativePath())),
 						testcfg.GitalyServersMetadataFromCfg(t, cfg),
 					),
 					&gitalypb.CreateForkRequest{
@@ -102,13 +102,13 @@ func TestMiddleware_partitioning_hint(t *testing.T) {
 
 				_, err = gitalypb.NewObjectPoolServiceClient(cc).CreateObjectPool(
 					testhelper.MergeOutgoingMetadata(
-						metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.RelativePath)),
+						metadata.IncomingToOutgoing(storage.ContextWithPartitioningHint(ctx, alternate.GetRelativePath())),
 						testcfg.GitalyServersMetadataFromCfg(t, cfg),
 					),
 					&gitalypb.CreateObjectPoolRequest{
 						ObjectPool: &gitalypb.ObjectPool{
 							Repository: &gitalypb.Repository{
-								StorageName:  alternate.StorageName,
+								StorageName:  alternate.GetStorageName(),
 								RelativePath: gittest.NewObjectPoolName(t),
 							},
 						},

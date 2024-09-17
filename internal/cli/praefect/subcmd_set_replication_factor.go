@@ -100,7 +100,7 @@ func setReplicationFactorAction(appCtx *cli.Context) error {
 		return err
 	}
 
-	fmt.Fprintf(appCtx.App.Writer, "current assignments: %v\n", strings.Join(resp.Storages, ", "))
+	fmt.Fprintf(appCtx.App.Writer, "current assignments: %v\n", strings.Join(resp.GetStorages(), ", "))
 
 	return nil
 }

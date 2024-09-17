@@ -18,7 +18,7 @@ func (s *server) RawDiff(in *gitalypb.RawDiffRequest, stream gitalypb.DiffServic
 	subCmd := gitcmd.Command{
 		Name:  "diff",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--full-index"}},
-		Args:  []string{in.LeftCommitId, in.RightCommitId},
+		Args:  []string{in.GetLeftCommitId(), in.GetRightCommitId()},
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
@@ -38,7 +38,7 @@ func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffServ
 	subCmd := gitcmd.Command{
 		Name:  "format-patch",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stdout"}, gitcmd.ValueFlag{Name: "--signature", Value: "GitLab"}},
-		Args:  []string{in.LeftCommitId + ".." + in.RightCommitId},
+		Args:  []string{in.GetLeftCommitId() + ".." + in.GetRightCommitId()},
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {

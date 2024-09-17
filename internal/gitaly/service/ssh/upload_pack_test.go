@@ -153,7 +153,7 @@ func testUploadPackTimeout(t *testing.T, ctx context.Context, opts ...testcfg.Op
 
 		var code int32
 		if status := resp.GetExitStatus(); status != nil {
-			code = status.Value
+			code = status.GetValue()
 		}
 
 		return code, nil
@@ -447,7 +447,7 @@ func testUploadPackWithSidechannelClient(t *testing.T, ctx context.Context) {
 			testhelper.RequireGrpcError(t, tc.expectedErr, err)
 			if tc.expectedResponse != nil && response != nil {
 				// The payload size is not deterministic(it's a different value in local-test end ci-test), so we set it to the expected value.
-				tc.expectedResponse.PackfileNegotiationStatistics.PayloadSize = response.PackfileNegotiationStatistics.PayloadSize
+				tc.expectedResponse.PackfileNegotiationStatistics.PayloadSize = response.GetPackfileNegotiationStatistics().GetPayloadSize()
 			}
 			testhelper.ProtoEqual(t, tc.expectedResponse, response)
 		})

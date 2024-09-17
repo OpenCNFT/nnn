@@ -14,17 +14,17 @@ func (s *server) CommitDelta(in *gitalypb.CommitDeltaRequest, stream gitalypb.Di
 	ctx := stream.Context()
 
 	s.logger.WithFields(log.Fields{
-		"LeftCommitId":  in.LeftCommitId,
-		"RightCommitId": in.RightCommitId,
-		"Paths":         logPaths(in.Paths),
+		"LeftCommitId":  in.GetLeftCommitId(),
+		"RightCommitId": in.GetRightCommitId(),
+		"Paths":         logPaths(in.GetPaths()),
 	}).DebugContext(ctx, "CommitDelta")
 
 	if err := validateRequest(ctx, s.locator, in); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	leftSha := in.LeftCommitId
-	rightSha := in.RightCommitId
+	leftSha := in.GetLeftCommitId()
+	rightSha := in.GetRightCommitId()
 	paths := in.GetPaths()
 
 	repo := s.localrepo(in.GetRepository())

@@ -24,12 +24,12 @@ func RepositoryExistsHandler(rs datastore.RepositoryStore) grpc.StreamHandler {
 			return structerr.NewInvalidArgument("%w", storage.ErrRepositoryNotSet)
 		}
 
-		storageName := repo.StorageName
+		storageName := repo.GetStorageName()
 		if storageName == "" {
 			return structerr.NewInvalidArgument("%w", storage.ErrStorageNotSet)
 		}
 
-		relativePath := repo.RelativePath
+		relativePath := repo.GetRelativePath()
 		if relativePath == "" {
 			return structerr.NewInvalidArgument("%w", storage.ErrRepositoryPathNotSet)
 		}

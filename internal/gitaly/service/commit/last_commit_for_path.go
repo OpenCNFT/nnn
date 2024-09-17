@@ -67,7 +67,7 @@ func validateLastCommitForPathRequest(ctx context.Context, locator storage.Locat
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(in.Revision); err != nil {
+	if err := git.ValidateRevision(in.GetRevision()); err != nil {
 		return err
 	}
 

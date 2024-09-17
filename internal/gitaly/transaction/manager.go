@@ -141,7 +141,7 @@ func (m *PoolManager) Vote(
 		return err
 	}
 
-	switch response.State {
+	switch response.GetState() {
 	case gitalypb.VoteTransactionResponse_COMMIT:
 		return nil
 	case gitalypb.VoteTransactionResponse_ABORT:

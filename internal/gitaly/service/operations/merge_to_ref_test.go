@@ -131,22 +131,22 @@ func testUserMergeToRefSuccessful(t *testing.T, ctx context.Context) {
 			require.NoError(t, err, "look up git commit after call has finished")
 
 			// Asserts commit parent SHAs
-			require.Equal(t, []string{branchSha, testCase.sourceSha}, commit.ParentIds, "merge commit parents must be the sha before HEAD and source sha")
+			require.Equal(t, []string{branchSha, testCase.sourceSha}, commit.GetParentIds(), "merge commit parents must be the sha before HEAD and source sha")
 
-			require.True(t, strings.HasPrefix(string(commit.Body), testCase.message), "expected %q to start with %q", commit.Body, testCase.message)
+			require.True(t, strings.HasPrefix(string(commit.GetBody()), testCase.message), "expected %q to start with %q", commit.GetBody(), testCase.message)
 
 			// Asserts author
-			author := commit.Author
-			require.Equal(t, gittest.TestUser.Name, author.Name)
-			require.Equal(t, gittest.TestUser.Email, author.Email)
-			require.Equal(t, gittest.TimezoneOffset, string(author.Timezone))
+			author := commit.GetAuthor()
+			require.Equal(t, gittest.TestUser.GetName(), author.GetName())
+			require.Equal(t, gittest.TestUser.GetEmail(), author.GetEmail())
+			require.Equal(t, gittest.TimezoneOffset, string(author.GetTimezone()))
 
-			require.Equal(t, resp.CommitId, commit.Id)
+			require.Equal(t, resp.GetCommitId(), commit.GetId())
 
 			// Calling commitBeforeRefMerge.Id in a non-existent
 			// commit will raise a null-pointer error.
 			if !testCase.emptyRef {
-				require.NotEqual(t, commit.Id, commitBeforeRefMerge.Id)
+				require.NotEqual(t, commit.GetId(), commitBeforeRefMerge.GetId())
 			}
 		})
 	}
@@ -277,7 +277,7 @@ func testUserMergeToRefStableMergeID(t *testing.T, ctx context.Context) {
 	require.Equal(t, gittest.ObjectHashDependent(t, map[string]string{
 		"sha1":   "4f295f8bb631748c7c2d0eb628d019c7802421e3",
 		"sha256": "0af69a0b9550e3943892537d429a385cdc3d3ab309833744c7478a60055882e3",
-	}), response.CommitId)
+	}), response.GetCommitId())
 
 	commit, err := repo.ReadCommit(ctx, git.Revision("refs/merge-requests/x/written"))
 	require.NoError(t, err, "look up git commit after call has finished")
@@ -298,15 +298,15 @@ func testUserMergeToRefStableMergeID(t *testing.T, ctx context.Context) {
 			"sha256": "9ff5a6fc7476b3297e176d8c7dec1c36a7a58dd68e387570229f94cce65d299c",
 		}),
 		Author: &gitalypb.CommitAuthor{
-			Name:  gittest.TestUser.Name,
-			Email: gittest.TestUser.Email,
+			Name:  gittest.TestUser.GetName(),
+			Email: gittest.TestUser.GetEmail(),
 			// Nanoseconds get ignored because commit timestamps aren't that granular.
 			Date:     &timestamppb.Timestamp{Seconds: 12},
 			Timezone: []byte(gittest.TimezoneOffset),
 		},
 		Committer: &gitalypb.CommitAuthor{
-			Name:  gittest.TestUser.Name,
-			Email: gittest.TestUser.Email,
+			Name:  gittest.TestUser.GetName(),
+			Email: gittest.TestUser.GetEmail(),
 			// Nanoseconds get ignored because commit timestamps aren't that granular.
 			Date:     &timestamppb.Timestamp{Seconds: 12},
 			Timezone: []byte(gittest.TimezoneOffset),

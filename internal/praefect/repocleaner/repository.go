@@ -194,7 +194,7 @@ func (wr *Walker) ExecOnRepositories(ctx context.Context, virtualStorage, storag
 			continue
 		}
 
-		batch = append(batch, res.RelativePath)
+		batch = append(batch, res.GetRelativePath())
 
 		if len(batch) == cap(batch) {
 			if err := action(virtualStorage, storage, batch); err != nil {

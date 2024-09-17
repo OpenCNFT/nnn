@@ -201,17 +201,17 @@ func getTagSortField(sortBy *gitalypb.FindAllTagsRequest_SortBy) (string, error)
 	}
 
 	var dir string
-	switch sortBy.Direction {
+	switch sortBy.GetDirection() {
 	case gitalypb.SortDirection_ASCENDING:
 		dir = ""
 	case gitalypb.SortDirection_DESCENDING:
 		dir = "-"
 	default:
-		return "", fmt.Errorf("unsupported sorting direction: %s", sortBy.Direction)
+		return "", fmt.Errorf("unsupported sorting direction: %s", sortBy.GetDirection())
 	}
 
 	var key string
-	switch sortBy.Key {
+	switch sortBy.GetKey() {
 	case gitalypb.FindAllTagsRequest_SortBy_REFNAME:
 		key = "refname"
 	case gitalypb.FindAllTagsRequest_SortBy_CREATORDATE:
@@ -219,7 +219,7 @@ func getTagSortField(sortBy *gitalypb.FindAllTagsRequest_SortBy) (string, error)
 	case gitalypb.FindAllTagsRequest_SortBy_VERSION_REFNAME:
 		key = "version:refname"
 	default:
-		return "", fmt.Errorf("unsupported sorting key: %s", sortBy.Key)
+		return "", fmt.Errorf("unsupported sorting key: %s", sortBy.GetKey())
 	}
 
 	return dir + key, nil

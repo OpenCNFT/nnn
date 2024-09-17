@@ -313,7 +313,7 @@ func TestPostReceive_gitlab(t *testing.T) {
 			env:     standardEnv,
 			changes: "changes\n",
 			postreceive: func(t *testing.T, ctx context.Context, glRepo, glID, changes string, pushOptions ...string) (bool, []gitlab.PostReceiveMessage, error) {
-				require.Equal(t, repo.GlRepository, glRepo)
+				require.Equal(t, repo.GetGlRepository(), glRepo)
 				require.Equal(t, "1234", glID)
 				require.Equal(t, "changes\n", changes)
 				require.Empty(t, pushOptions)

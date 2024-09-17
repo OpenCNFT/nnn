@@ -221,7 +221,7 @@ func TestStreamDirectorMutator(t *testing.T) {
 							RepositoryID:      repoID,
 							Change:            datastore.UpdateRepo,
 							VirtualStorage:    conf.VirtualStorages[0].Name,
-							RelativePath:      targetRepo.RelativePath,
+							RelativePath:      targetRepo.GetRelativePath(),
 							TargetNodeStorage: secondaryNode.Storage,
 							SourceNodeStorage: primaryNode.Storage,
 						},
@@ -242,8 +242,8 @@ func TestStreamDirectorMutator(t *testing.T) {
 					RelativePath: gittest.NewRepositoryName(t),
 				}
 
-				targetRepoID := createRepo(t, rs, "praefect", targetRepo.RelativePath, "rewritten-target")
-				createRepo(t, rs, "praefect", additionalRepo.RelativePath, "rewritten-additional")
+				targetRepoID := createRepo(t, rs, "praefect", targetRepo.GetRelativePath(), "rewritten-target")
+				createRepo(t, rs, "praefect", additionalRepo.GetRelativePath(), "rewritten-additional")
 
 				return setupData{
 					method: "/gitaly.ObjectPoolService/FetchIntoObjectPool",
@@ -268,12 +268,12 @@ func TestStreamDirectorMutator(t *testing.T) {
 					expectedEvent: datastore.ReplicationEvent{
 						State:   datastore.JobStateInProgress,
 						Attempt: 2,
-						LockID:  fmt.Sprintf("praefect|praefect-internal-2|%s", targetRepo.RelativePath),
+						LockID:  fmt.Sprintf("praefect|praefect-internal-2|%s", targetRepo.GetRelativePath()),
 						Job: datastore.ReplicationJob{
 							RepositoryID:      targetRepoID,
 							Change:            datastore.UpdateRepo,
 							VirtualStorage:    conf.VirtualStorages[0].Name,
-							RelativePath:      targetRepo.RelativePath,
+							RelativePath:      targetRepo.GetRelativePath(),
 							TargetNodeStorage: secondaryNode.Storage,
 							SourceNodeStorage: primaryNode.Storage,
 						},
@@ -297,7 +297,7 @@ func TestStreamDirectorMutator(t *testing.T) {
 					request: &gitalypb.UserCreateTagRequest{
 						Repository: targetRepo,
 					},
-					expectedErr: storage.NewRepositoryNotFoundError(targetRepo.StorageName, targetRepo.RelativePath),
+					expectedErr: storage.NewRepositoryNotFoundError(targetRepo.GetStorageName(), targetRepo.GetRelativePath()),
 				}
 			},
 		},
@@ -315,7 +315,7 @@ func TestStreamDirectorMutator(t *testing.T) {
 
 				// We create the target repository, but don't create the additional
 				// one.
-				createRepo(t, rs, "praefect", targetRepo.RelativePath, "rewritten-target")
+				createRepo(t, rs, "praefect", targetRepo.GetRelativePath(), "rewritten-target")
 
 				return setupData{
 					method: "/gitaly.ObjectPoolService/FetchIntoObjectPool",
@@ -328,13 +328,13 @@ func TestStreamDirectorMutator(t *testing.T) {
 					expectedErr: structerr.NewNotFound("%w", fmt.Errorf("mutator call: route repository mutator: %w",
 						fmt.Errorf("resolve additional replica path: %w",
 							additionalRepositoryNotFoundError{
-								storageName:  additionalRepo.StorageName,
-								relativePath: additionalRepo.RelativePath,
+								storageName:  additionalRepo.GetStorageName(),
+								relativePath: additionalRepo.GetRelativePath(),
 							},
 						),
 					)).WithMetadataItems(
-						structerr.MetadataItem{Key: "storage_name", Value: additionalRepo.StorageName},
-						structerr.MetadataItem{Key: "relative_path", Value: additionalRepo.RelativePath},
+						structerr.MetadataItem{Key: "storage_name", Value: additionalRepo.GetStorageName()},
+						structerr.MetadataItem{Key: "relative_path", Value: additionalRepo.GetRelativePath()},
 					),
 				}
 			},
@@ -351,8 +351,8 @@ func TestStreamDirectorMutator(t *testing.T) {
 					RelativePath: gittest.NewRepositoryName(t),
 				}
 
-				createRepo(t, rs, "praefect", targetRepo.RelativePath, "rewritten-target")
-				createRepo(t, rs, "unrelated", additionalRepo.RelativePath, "rewritten-additional")
+				createRepo(t, rs, "praefect", targetRepo.GetRelativePath(), "rewritten-target")
+				createRepo(t, rs, "unrelated", additionalRepo.GetRelativePath(), "rewritten-additional")
 
 				return setupData{
 					method: "/gitaly.ObjectPoolService/FetchIntoObjectPool",
@@ -824,8 +824,8 @@ func TestStreamDirector_maintenance(t *testing.T) {
 	defer tx.Rollback(t)
 
 	rs := datastore.NewPostgresRepositoryStore(tx, cfg.StorageNames())
-	require.NoError(t, rs.CreateRepository(ctx, 1, repo.StorageName, repo.RelativePath,
-		repo.RelativePath, node1.Storage, []string{node2.Storage}, nil, true, true))
+	require.NoError(t, rs.CreateRepository(ctx, 1, repo.GetStorageName(), repo.GetRelativePath(),
+		repo.GetRelativePath(), node1.Storage, []string{node2.Storage}, nil, true, true))
 
 	testdb.SetHealthyNodes(t, ctx, tx, map[string]map[string][]string{"praefect": cfg.StorageNames()})
 
@@ -981,21 +981,21 @@ func TestStreamDirector_maintenanceRPCs(t *testing.T) {
 	}
 	primaryRepository := &gitalypb.Repository{
 		StorageName:  primaryStorage,
-		RelativePath: repository.RelativePath,
+		RelativePath: repository.GetRelativePath(),
 	}
 	secondaryRepository := &gitalypb.Repository{
 		StorageName:  secondaryStorage,
-		RelativePath: repository.RelativePath,
+		RelativePath: repository.GetRelativePath(),
 	}
 
 	repositoryClient := gitalypb.NewRepositoryServiceClient(cc)
 
 	gittest.CreateRepository(t, ctx, primaryCfg, gittest.CreateRepositoryConfig{
-		RelativePath: repository.RelativePath,
+		RelativePath: repository.GetRelativePath(),
 	})
 
 	gittest.CreateRepository(t, ctx, secondaryCfg, gittest.CreateRepositoryConfig{
-		RelativePath: repository.RelativePath,
+		RelativePath: repository.GetRelativePath(),
 	})
 
 	for _, tc := range []struct {
@@ -1063,7 +1063,7 @@ func runMockMaintenanceServer(t *testing.T, cfg gconfig.Cfg) (*mockMaintenanceSe
 
 func (m *mockMaintenanceServer) OptimizeRepository(ctx context.Context, in *gitalypb.OptimizeRepositoryRequest) (*gitalypb.OptimizeRepositoryResponse, error) {
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		in.Repository = tx.OriginalRepository(in.Repository)
+		in.Repository = tx.OriginalRepository(in.GetRepository())
 	}
 
 	m.requestCh <- in
@@ -1072,7 +1072,7 @@ func (m *mockMaintenanceServer) OptimizeRepository(ctx context.Context, in *gita
 
 func (m *mockMaintenanceServer) PruneUnreachableObjects(ctx context.Context, in *gitalypb.PruneUnreachableObjectsRequest) (*gitalypb.PruneUnreachableObjectsResponse, error) {
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		in.Repository = tx.OriginalRepository(in.Repository)
+		in.Repository = tx.OriginalRepository(in.GetRepository())
 	}
 
 	m.requestCh <- in
@@ -1702,7 +1702,7 @@ func TestStreamDirector_repo_creation(t *testing.T) {
 						RepositoryID:      int64(i + 1),
 						Change:            datastore.UpdateRepo,
 						VirtualStorage:    conf.VirtualStorages[0].Name,
-						RelativePath:      targetRepo.RelativePath,
+						RelativePath:      targetRepo.GetRelativePath(),
 						TargetNodeStorage: target,
 						SourceNodeStorage: primaryNode.Storage,
 					},
@@ -1948,7 +1948,7 @@ func TestStreamDirectorStorageScope(t *testing.T) {
 
 		rewritten := gitalypb.WalkReposRequest{}
 		require.NoError(t, proto.Unmarshal(streamParams.Primary().Msg, &rewritten))
-		require.Equal(t, primaryGitaly.Storage, rewritten.StorageName, "stream director didn't rewrite storage")
+		require.Equal(t, primaryGitaly.Storage, rewritten.GetStorageName(), "stream director didn't rewrite storage")
 	})
 }
 

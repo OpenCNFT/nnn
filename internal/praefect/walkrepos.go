@@ -27,11 +27,11 @@ func WalkReposHandler(rs datastore.RepositoryStore) grpc.StreamHandler {
 			return fmt.Errorf("receive request: %w", err)
 		}
 
-		if req.StorageName == "" {
+		if req.GetStorageName() == "" {
 			return structerr.NewInvalidArgument("%w", storage.ErrStorageNotSet)
 		}
 
-		repos, err := rs.ListRepositoryPaths(stream.Context(), req.StorageName)
+		repos, err := rs.ListRepositoryPaths(stream.Context(), req.GetStorageName())
 		if err != nil {
 			return structerr.NewInternal("list repository paths: %w", err)
 		}

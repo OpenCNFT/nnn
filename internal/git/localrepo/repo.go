@@ -110,7 +110,7 @@ func (repo *Repo) QuarantineOnly() (*Repo, error) {
 
 	cloneRepo := proto.Clone(pbRepo).(*gitalypb.Repository)
 	cloneRepo.GitAlternateObjectDirectories = nil
-	if cloneRepo.GitObjectDirectory == "" {
+	if cloneRepo.GetGitObjectDirectory() == "" {
 		return nil, errors.New("repository wasn't quarantined")
 	}
 

@@ -35,7 +35,7 @@ func (s *server) GetObjectPool(ctx context.Context, in *gitalypb.GetObjectPoolRe
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		// The object pool's relative path is pointing to the transaction's snapshot. Return
 		// the original relative path in the response.
-		objectPoolProto.Repository = tx.OriginalRepository(objectPoolProto.Repository)
+		objectPoolProto.Repository = tx.OriginalRepository(objectPoolProto.GetRepository())
 	}
 
 	return &gitalypb.GetObjectPoolResponse{

@@ -57,7 +57,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			setup: func() ([]string, *gitalypb.Repository) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--storage=" + repo.StorageName,
+					"--storage=" + repo.GetStorageName(),
 					"--config=" + configPath,
 				}, repo
 			},
@@ -69,8 +69,8 @@ func TestSetHooksSubcommand(t *testing.T) {
 			setup: func() ([]string, *gitalypb.Repository) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--storage=" + repo.StorageName,
-					"--repository=" + repo.RelativePath,
+					"--storage=" + repo.GetStorageName(),
+					"--repository=" + repo.GetRelativePath(),
 				}, repo
 			},
 			hooks:       &bytes.Buffer{},
@@ -81,7 +81,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			setup: func() ([]string, *gitalypb.Repository) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--repository=" + repo.RelativePath,
+					"--repository=" + repo.GetRelativePath(),
 					"--config=" + configPath,
 				}, repo
 			},
@@ -94,7 +94,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
 					"--storage=non-existent",
-					"--repository=" + repo.RelativePath,
+					"--repository=" + repo.GetRelativePath(),
 					"--config=" + configPath,
 				}, repo
 			},
@@ -106,7 +106,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 			setup: func() ([]string, *gitalypb.Repository) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--storage=" + repo.StorageName,
+					"--storage=" + repo.GetStorageName(),
 					"--repository=non-existent",
 					"--config=" + configPath,
 				}, repo
@@ -119,8 +119,8 @@ func TestSetHooksSubcommand(t *testing.T) {
 			setup: func() ([]string, *gitalypb.Repository) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--storage=" + repo.StorageName,
-					"--repository=" + repo.RelativePath,
+					"--storage=" + repo.GetStorageName(),
+					"--repository=" + repo.GetRelativePath(),
 					"--config=" + configPath,
 				}, repo
 			},
@@ -134,8 +134,8 @@ func TestSetHooksSubcommand(t *testing.T) {
 			setup: func() ([]string, *gitalypb.Repository) {
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--storage=" + repo.StorageName,
-					"--repository=" + repo.RelativePath,
+					"--storage=" + repo.GetStorageName(),
+					"--repository=" + repo.GetRelativePath(),
 					"--config=" + configPath,
 				}, repo
 			},
@@ -159,7 +159,7 @@ func TestSetHooksSubcommand(t *testing.T) {
 
 				repo, _ := gittest.CreateRepository(t, ctx, repoCfg)
 				return []string{
-					"--repository=" + repo.RelativePath,
+					"--repository=" + repo.GetRelativePath(),
 					"--config=" + singleStorageCfgPath,
 				}, repo
 			},
@@ -198,8 +198,8 @@ func TestSetHooksSubcommand(t *testing.T) {
 
 			stream, err := client.GetCustomHooks(ctx, &gitalypb.GetCustomHooksRequest{
 				Repository: &gitalypb.Repository{
-					StorageName:  repo.StorageName,
-					RelativePath: repo.RelativePath,
+					StorageName:  repo.GetStorageName(),
+					RelativePath: repo.GetRelativePath(),
 				},
 			})
 			require.NoError(t, err)

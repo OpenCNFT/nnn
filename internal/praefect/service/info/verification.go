@@ -21,7 +21,7 @@ func (s *Server) MarkUnverified(ctx context.Context, req *gitalypb.MarkUnverifie
 		}
 	case *gitalypb.MarkUnverifiedRequest_Storage_:
 		markUnverified = func() (int64, error) {
-			return s.rs.MarkStorageUnverified(ctx, selector.Storage.VirtualStorage, selector.Storage.Storage)
+			return s.rs.MarkStorageUnverified(ctx, selector.Storage.GetVirtualStorage(), selector.Storage.GetStorage())
 		}
 	default:
 		return nil, fmt.Errorf("unknown selector: %T", selector)

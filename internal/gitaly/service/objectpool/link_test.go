@@ -30,7 +30,7 @@ func TestCompleteForkCreationFlow(t *testing.T) {
 	)
 
 	forkRepository := &gitalypb.Repository{
-		StorageName:  sourceRepository.StorageName,
+		StorageName:  sourceRepository.GetStorageName(),
 		RelativePath: gittest.NewRepositoryName(t),
 	}
 
@@ -148,7 +148,7 @@ func TestLink(t *testing.T) {
 			commit, err := localRepo.ReadCommit(ctx, git.Revision(poolCommitID))
 			require.NoError(t, err)
 			require.NotNil(t, commit)
-			require.Equal(t, poolCommitID.String(), commit.Id)
+			require.Equal(t, poolCommitID.String(), commit.GetId())
 		})
 	}
 }

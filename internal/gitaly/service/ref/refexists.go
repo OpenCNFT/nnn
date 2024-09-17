@@ -16,7 +16,7 @@ func (s *server) RefExists(ctx context.Context, in *gitalypb.RefExistsRequest) (
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	ref := string(in.Ref)
+	ref := string(in.GetRef())
 
 	if !isValidRefName(ref) {
 		return nil, structerr.NewInvalidArgument("invalid refname")

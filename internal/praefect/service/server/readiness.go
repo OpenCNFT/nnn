@@ -41,7 +41,7 @@ func (s *Server) ReadinessCheck(ctx context.Context, req *gitalypb.ReadinessChec
 	}
 
 	if len(failedChecks) > 0 {
-		sort.Slice(failedChecks, func(i, j int) bool { return failedChecks[i].Name < failedChecks[j].Name })
+		sort.Slice(failedChecks, func(i, j int) bool { return failedChecks[i].GetName() < failedChecks[j].GetName() })
 		return &gitalypb.ReadinessCheckResponse{Result: &gitalypb.ReadinessCheckResponse_FailureResponse{
 			FailureResponse: &gitalypb.ReadinessCheckResponse_Failure{
 				FailedChecks: failedChecks,

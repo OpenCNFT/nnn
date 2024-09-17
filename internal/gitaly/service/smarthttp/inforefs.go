@@ -68,7 +68,7 @@ func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, r
 		cmdOpts = append(cmdOpts, gitcmd.WithDisabledHooks())
 	}
 
-	gitConfig, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
+	gitConfig, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
 		return err
 	}

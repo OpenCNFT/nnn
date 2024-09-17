@@ -227,7 +227,7 @@ func (p *parser) ParseCommit(object git.Object) (*Commit, error) {
 				commit.BodySize = int64(len(body))
 				commit.Body = body
 				if max := helper.MaxCommitOrTagMessageSize; len(body) > max {
-					commit.Body = commit.Body[:max]
+					commit.Body = commit.GetBody()[:max]
 				}
 				payload = append(payload, body...)
 			}

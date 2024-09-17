@@ -50,13 +50,13 @@ func (s *server) GetRawChanges(req *gitalypb.GetRawChangesRequest, stream gitaly
 }
 
 func validateRawChangesRequest(ctx context.Context, req *gitalypb.GetRawChangesRequest, objectHash git.ObjectHash, objectInfoReader catfile.ObjectInfoReader) error {
-	if from := req.FromRevision; !objectHash.IsZeroOID(git.ObjectID(from)) {
+	if from := req.GetFromRevision(); !objectHash.IsZeroOID(git.ObjectID(from)) {
 		if _, err := objectInfoReader.Info(ctx, git.Revision(from)); err != nil {
 			return fmt.Errorf("invalid 'from' revision: %q", from)
 		}
 	}
 
-	if to := req.ToRevision; !objectHash.IsZeroOID(git.ObjectID(to)) {
+	if to := req.GetToRevision(); !objectHash.IsZeroOID(git.ObjectID(to)) {
 		if _, err := objectInfoReader.Info(ctx, git.Revision(to)); err != nil {
 			return fmt.Errorf("invalid 'to' revision: %q", to)
 		}

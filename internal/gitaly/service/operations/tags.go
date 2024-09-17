@@ -35,7 +35,7 @@ func (s *Server) UserDeleteTag(ctx context.Context, req *gitalypb.UserDeleteTagR
 	if err := validateUserDeleteTagRequest(ctx, s.locator, req); err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
-	referenceName := git.ReferenceName(fmt.Sprintf("refs/tags/%s", req.TagName))
+	referenceName := git.ReferenceName(fmt.Sprintf("refs/tags/%s", req.GetTagName()))
 
 	repo := s.localrepo(req.GetRepository())
 
@@ -62,13 +62,13 @@ func (s *Server) UserDeleteTag(ctx context.Context, req *gitalypb.UserDeleteTagR
 		revision, err = repo.ResolveRevision(ctx, referenceName.Revision())
 		if err != nil {
 			if errors.Is(err, git.ErrReferenceNotFound) {
-				return nil, structerr.NewFailedPrecondition("tag not found: %s", req.TagName)
+				return nil, structerr.NewFailedPrecondition("tag not found: %s", req.GetTagName())
 			}
-			return nil, structerr.NewInternal("resolving revision %q: %w", referenceName, err).WithMetadata("tag", req.TagName)
+			return nil, structerr.NewInternal("resolving revision %q: %w", referenceName, err).WithMetadata("tag", req.GetTagName())
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, req.Repository, req.User, nil, referenceName, objectHash.ZeroOID, revision); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), nil, referenceName, objectHash.ZeroOID, revision); err != nil {
 		var customHookErr updateref.CustomHookError
 		if errors.As(err, &customHookErr) {
 			return &gitalypb.UserDeleteTagResponse{
@@ -88,23 +88,23 @@ func (s *Server) UserDeleteTag(ctx context.Context, req *gitalypb.UserDeleteTagR
 }
 
 func validateUserCreateTag(ctx context.Context, locator storage.Locator, req *gitalypb.UserCreateTagRequest) error {
-	if len(req.TagName) == 0 {
+	if len(req.GetTagName()) == 0 {
 		return errors.New("empty tag name")
 	}
 
-	if err := git.ValidateRevision(req.TagName); err != nil {
+	if err := git.ValidateRevision(req.GetTagName()); err != nil {
 		return fmt.Errorf("invalid tag name: %w", err)
 	}
 
-	if req.User == nil {
+	if req.GetUser() == nil {
 		return errors.New("empty user")
 	}
 
-	if len(req.TargetRevision) == 0 {
+	if len(req.GetTargetRevision()) == 0 {
 		return errors.New("empty target revision")
 	}
 
-	if bytes.Contains(req.Message, []byte("\000")) {
+	if bytes.Contains(req.GetMessage(), []byte("\000")) {
 		return errors.New("tag message contains NUL byte")
 	}
 
@@ -121,8 +121,8 @@ func (s *Server) UserCreateTag(ctx context.Context, req *gitalypb.UserCreateTagR
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	targetRevision := git.Revision(req.TargetRevision)
-	referenceName := git.ReferenceName(fmt.Sprintf("refs/tags/%s", req.TagName))
+	targetRevision := git.Revision(req.GetTargetRevision())
+	referenceName := git.ReferenceName(fmt.Sprintf("refs/tags/%s", req.GetTagName()))
 
 	taggerSignature, err := git.SignatureFromRequest(req)
 	if err != nil {
@@ -139,7 +139,7 @@ func (s *Server) UserCreateTag(ctx context.Context, req *gitalypb.UserCreateTagR
 		return nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	tag, tagID, err := s.createTag(ctx, quarantineRepo, targetRevision, req.TagName, req.Message, taggerSignature)
+	tag, tagID, err := s.createTag(ctx, quarantineRepo, targetRevision, req.GetTagName(), req.GetMessage(), taggerSignature)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (s *Server) UserCreateTag(ctx context.Context, req *gitalypb.UserCreateTagR
 		)
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, req.Repository, req.User, quarantineDir, referenceName, tagID, objectHash.ZeroOID); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), quarantineDir, referenceName, tagID, objectHash.ZeroOID); err != nil {
 		var notAllowedError hook.NotAllowedError
 		var customHookErr updateref.CustomHookError
 		var updateRefError updateref.Error
@@ -305,8 +305,8 @@ func (s *Server) createTag(
 		tagObject = &gitalypb.Tag{
 			Name:        tagName,
 			Id:          tagObjectID.String(),
-			Message:     createdTag.Message,
-			MessageSize: createdTag.MessageSize,
+			Message:     createdTag.GetMessage(),
+			MessageSize: createdTag.GetMessageSize(),
 			// TargetCommit: is filled in below if needed
 		}
 

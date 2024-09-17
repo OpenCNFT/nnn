@@ -35,6 +35,7 @@ linters:
     - noctx
     - nolintlint
     - paralleltest
+    - protogetter
     - revive
     - rowserrcheck
     - spancheck

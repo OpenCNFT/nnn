@@ -327,11 +327,11 @@ func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapsho
 		}
 
 		tree := creations
-		if objectHash.IsZeroOID(git.ObjectID(change.NewOid)) {
+		if objectHash.IsZeroOID(git.ObjectID(change.GetNewOid())) {
 			tree = deletions
 		}
 
-		referenceName := string(change.ReferenceName)
+		referenceName := string(change.GetReferenceName())
 		if err := tree.Insert(referenceName); err != nil {
 			return fmt.Errorf("insert into tree: %w", err)
 		}
@@ -363,7 +363,7 @@ func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapsho
 		}
 	}
 
-	if err := performReferenceUpdates(refTX.Changes); err != nil {
+	if err := performReferenceUpdates(refTX.GetChanges()); err != nil {
 		return fmt.Errorf("perform reference updates: %w", err)
 	}
 

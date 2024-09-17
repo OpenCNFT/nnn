@@ -68,7 +68,7 @@ func TestReplicateRepository(t *testing.T) {
 		} else {
 			target = proto.Clone(source).(*gitalypb.Repository)
 			target.StorageName = cfg.Storages[1].Name
-			targetPath = filepath.Join(cfg.Storages[1].Path, target.RelativePath)
+			targetPath = filepath.Join(cfg.Storages[1].Path, target.GetRelativePath())
 		}
 
 		return source, sourcePath, target, targetPath
@@ -491,7 +491,7 @@ func TestReplicateRepository_transactional(t *testing.T) {
 	var votes []voting.Vote
 	txServer := testTransactionServer{
 		vote: func(request *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-			vote, err := voting.VoteFromHash(request.ReferenceUpdatesHash)
+			vote, err := voting.VoteFromHash(request.GetReferenceUpdatesHash())
 			require.NoError(t, err)
 			votes = append(votes, vote)
 

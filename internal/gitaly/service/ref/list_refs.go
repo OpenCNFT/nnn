@@ -32,11 +32,11 @@ func (s *server) ListRefs(in *gitalypb.ListRefsRequest, stream gitalypb.RefServi
 	}
 
 	format := localBranchFormatFields
-	if in.PeelTags {
+	if in.GetPeelTags() {
 		format = append(format, "%(*objectname)")
 	}
 
-	writer := newListRefsWriter(stream, headOID, in.PeelTags)
+	writer := newListRefsWriter(stream, headOID, in.GetPeelTags())
 
 	patterns := make([]string, 0, len(in.GetPatterns()))
 	for _, pattern := range in.GetPatterns() {

@@ -200,7 +200,7 @@ func (cmd *restoreSubcommand) run(ctx context.Context, logger log.Logger, stdin 
 			// weren't part of the restore), they need to be deleted so the
 			// state of repos in Gitaly matches that in the Rails DB.
 			if err := removeRepository(ctx, pool, repo); err != nil {
-				removalErrors = append(removalErrors, fmt.Errorf("storage_name %q relative_path %q: %w", storageName, repo.RelativePath, err))
+				removalErrors = append(removalErrors, fmt.Errorf("storage_name %q relative_path %q: %w", storageName, repo.GetRelativePath(), err))
 			}
 		}
 	}
@@ -263,7 +263,7 @@ func listRepositories(ctx context.Context, pool *client.Pool, storageName string
 			return nil, fmt.Errorf("list repos: receiving messages: %w", err)
 		}
 
-		repos = append(repos, &gitalypb.Repository{RelativePath: resp.RelativePath, StorageName: storageName})
+		repos = append(repos, &gitalypb.Repository{RelativePath: resp.GetRelativePath(), StorageName: storageName})
 	}
 
 	return repos, nil

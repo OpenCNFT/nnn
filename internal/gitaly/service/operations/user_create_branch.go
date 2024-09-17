@@ -16,13 +16,13 @@ func validateUserCreateBranchRequest(ctx context.Context, locator storage.Locato
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if len(in.BranchName) == 0 {
+	if len(in.GetBranchName()) == 0 {
 		return errors.New("empty branch name")
 	}
-	if in.User == nil {
+	if in.GetUser() == nil {
 		return errors.New("empty user")
 	}
-	if len(in.StartPoint) == 0 {
+	if len(in.GetStartPoint()) == 0 {
 		return errors.New("empty start point")
 	}
 	return nil
@@ -45,10 +45,10 @@ func (s *Server) UserCreateBranch(ctx context.Context, req *gitalypb.UserCreateB
 	//
 	// startPointReference, err := s.localrepo(req.GetRepository()).GetReference(ctx, "refs/heads/"+string(req.StartPoint))
 	// startPointCommit, err := log.GetCommit(ctx, req.Repository, startPointReference.Target)
-	startPointCommit, err := quarantineRepo.ReadCommit(ctx, git.Revision(req.StartPoint))
+	startPointCommit, err := quarantineRepo.ReadCommit(ctx, git.Revision(req.GetStartPoint()))
 	// END TODO
 	if err != nil {
-		return nil, structerr.NewFailedPrecondition("revspec '%s' not found", req.StartPoint)
+		return nil, structerr.NewFailedPrecondition("revspec '%s' not found", req.GetStartPoint())
 	}
 
 	objectHash, err := quarantineRepo.ObjectHash(ctx)
@@ -56,14 +56,14 @@ func (s *Server) UserCreateBranch(ctx context.Context, req *gitalypb.UserCreateB
 		return nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	startPointOID, err := objectHash.FromHex(startPointCommit.Id)
+	startPointOID, err := objectHash.FromHex(startPointCommit.GetId())
 	if err != nil {
 		return nil, structerr.NewInvalidArgument("could not parse start point commit ID: %w", err)
 	}
 
-	referenceName := git.NewReferenceNameFromBranchName(string(req.BranchName))
+	referenceName := git.NewReferenceNameFromBranchName(string(req.GetBranchName()))
 
-	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.User, quarantineDir, referenceName, startPointOID, objectHash.ZeroOID); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), quarantineDir, referenceName, startPointOID, objectHash.ZeroOID); err != nil {
 		var customHookErr updateref.CustomHookError
 
 		if errors.As(err, &customHookErr) {
@@ -86,7 +86,7 @@ func (s *Server) UserCreateBranch(ctx context.Context, req *gitalypb.UserCreateB
 
 	return &gitalypb.UserCreateBranchResponse{
 		Branch: &gitalypb.Branch{
-			Name:         req.BranchName,
+			Name:         req.GetBranchName(),
 			TargetCommit: startPointCommit,
 		},
 	}, nil

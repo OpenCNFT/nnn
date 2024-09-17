@@ -99,9 +99,9 @@ func TestCreateSubcommand(t *testing.T) {
 				require.NoError(t, encoder.Encode(map[string]string{
 					"address":         cfg.SocketPath,
 					"token":           cfg.Auth.Token,
-					"storage_name":    repo.StorageName,
-					"relative_path":   repo.RelativePath,
-					"gl_project_path": repo.GlProjectPath,
+					"storage_name":    repo.GetStorageName(),
+					"relative_path":   repo.GetRelativePath(),
+					"gl_project_path": repo.GetGlProjectPath(),
 				}))
 			}
 
@@ -122,7 +122,7 @@ func TestCreateSubcommand(t *testing.T) {
 				tc.ExpectedErrMessage)
 
 			for _, repo := range repos {
-				bundlePath := filepath.Join(path, strings.TrimSuffix(repo.RelativePath, ".git"), "the-new-backup", "001.bundle")
+				bundlePath := filepath.Join(path, strings.TrimSuffix(repo.GetRelativePath(), ".git"), "the-new-backup", "001.bundle")
 				require.FileExists(t, bundlePath)
 			}
 		})

@@ -32,7 +32,7 @@ func (s *server) findRemoteRootRefCmd(ctx context.Context, request *gitalypb.Fin
 
 	if authHeader := request.GetHttpAuthorizationHeader(); authHeader != "" {
 		config = append(config, gitcmd.ConfigPair{
-			Key:   fmt.Sprintf("http.%s.extraHeader", request.RemoteUrl),
+			Key:   fmt.Sprintf("http.%s.extraHeader", request.GetRemoteUrl()),
 			Value: "Authorization: " + authHeader,
 		})
 	}

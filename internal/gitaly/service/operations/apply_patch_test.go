@@ -568,7 +568,7 @@ func TestUserApplyPatch(t *testing.T) {
 
 			actualCommit, err := repo.ReadCommit(ctx, git.Revision(commitID))
 			require.NoError(t, err)
-			require.NotEmpty(t, actualCommit.ParentIds)
+			require.NotEmpty(t, actualCommit.GetParentIds())
 			actualCommit.ParentIds = nil // the parent changes with the patches, we just check it is set
 			actualCommit.TreeId = ""     // treeID is asserted via its contents below
 
@@ -580,8 +580,8 @@ func TestUserApplyPatch(t *testing.T) {
 					Body:    expectedBody,
 					Author:  gittest.DefaultCommitAuthor,
 					Committer: &gitalypb.CommitAuthor{
-						Name:     gittest.TestUser.Name,
-						Email:    gittest.TestUser.Email,
+						Name:     gittest.TestUser.GetName(),
+						Email:    gittest.TestUser.GetEmail(),
 						Date:     requestTimestamp,
 						Timezone: []byte("+0800"),
 					},
@@ -648,7 +648,7 @@ index 3742e48..e40a3b9 100644
 
 	response, err := stream.CloseAndRecv()
 	require.NoError(t, err)
-	require.True(t, response.BranchUpdate.BranchCreated)
+	require.True(t, response.GetBranchUpdate().GetBranchCreated())
 
 	patchedCommit, err := repo.ReadCommit(ctx, git.Revision("branch"))
 	require.NoError(t, err)
@@ -674,8 +674,8 @@ index 3742e48..e40a3b9 100644
 			Timezone: []byte("+0200"),
 		},
 		Committer: &gitalypb.CommitAuthor{
-			Name:     gittest.TestUser.Name,
-			Email:    gittest.TestUser.Email,
+			Name:     gittest.TestUser.GetName(),
+			Email:    gittest.TestUser.GetEmail(),
 			Date:     &timestamppb.Timestamp{Seconds: 1234512345},
 			Timezone: []byte("+0800"),
 		},
@@ -743,7 +743,7 @@ index 3742e48..e40a3b9 100644
 
 	response, err := stream.CloseAndRecv()
 	require.NoError(t, err)
-	require.True(t, response.BranchUpdate.BranchCreated)
+	require.True(t, response.GetBranchUpdate().GetBranchCreated())
 	require.Equal(t, 15, len(txManager.Votes()))
 }
 

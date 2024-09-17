@@ -341,9 +341,9 @@ func testUserFFBranch(t *testing.T, ctx context.Context) {
 			testhelper.RequireGrpcError(t, data.expectedErr, err)
 			testhelper.ProtoEqual(t, data.expectedResponse, resp)
 
-			if data.expectedResponse != nil && data.expectedResponse.BranchUpdate != nil {
-				newBranchHead := text.ChompBytes(gittest.Exec(t, cfg, "-C", data.repoPath, "rev-parse", string(data.request.Branch)))
-				require.Equal(t, data.request.CommitId, newBranchHead, "branch head not updated")
+			if data.expectedResponse != nil && data.expectedResponse.GetBranchUpdate() != nil {
+				newBranchHead := text.ChompBytes(gittest.Exec(t, cfg, "-C", data.repoPath, "rev-parse", string(data.request.GetBranch())))
+				require.Equal(t, data.request.GetCommitId(), newBranchHead, "branch head not updated")
 			}
 		})
 	}
@@ -396,7 +396,7 @@ func testUserFFBranchFailingHooks(t *testing.T, ctx context.Context) {
 			}
 
 			require.Nil(t, err)
-			require.Contains(t, resp.PreReceiveError, "failure")
+			require.Contains(t, resp.GetPreReceiveError(), "failure")
 		})
 	}
 }

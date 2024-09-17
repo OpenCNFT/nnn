@@ -29,9 +29,9 @@ func (s *Server) UserMergeToRef(ctx context.Context, request *gitalypb.UserMerge
 	}
 
 	//nolint:staticcheck // Branch is marked as deprecated in the protobuf
-	revision := git.Revision(request.Branch)
+	revision := git.Revision(request.GetBranch())
 	if request.FirstParentRef != nil {
-		revision = git.Revision(request.FirstParentRef)
+		revision = git.Revision(request.GetFirstParentRef())
 	}
 
 	oid, err := repo.ResolveRevision(ctx, revision)
@@ -39,7 +39,7 @@ func (s *Server) UserMergeToRef(ctx context.Context, request *gitalypb.UserMerge
 		return nil, structerr.NewInvalidArgument("Invalid merge source")
 	}
 
-	sourceOID, err := repo.ResolveRevision(ctx, git.Revision(request.SourceSha))
+	sourceOID, err := repo.ResolveRevision(ctx, git.Revision(request.GetSourceSha()))
 	if err != nil {
 		return nil, structerr.NewInvalidArgument("Invalid merge source")
 	}
@@ -72,9 +72,9 @@ func (s *Server) UserMergeToRef(ctx context.Context, request *gitalypb.UserMerge
 			return nil, structerr.NewInvalidArgument("cannot resolve expected old object ID: %w", err).
 				WithMetadata("old_object_id", expectedOldOID)
 		}
-	} else if targetRef, err := repo.GetReference(ctx, git.ReferenceName(request.TargetRef)); err == nil {
+	} else if targetRef, err := repo.GetReference(ctx, git.ReferenceName(request.GetTargetRef())); err == nil {
 		if targetRef.IsSymbolic {
-			return nil, structerr.NewFailedPrecondition("target reference is symbolic: %q", request.TargetRef)
+			return nil, structerr.NewFailedPrecondition("target reference is symbolic: %q", request.GetTargetRef())
 		}
 
 		oid, err := objectHash.FromHex(targetRef.Target)
@@ -96,7 +96,7 @@ func (s *Server) UserMergeToRef(ctx context.Context, request *gitalypb.UserMerge
 		repo,
 		authorSignature,
 		authorSignature,
-		string(request.Message),
+		string(request.GetMessage()),
 		oid.String(),
 		sourceOID.String(),
 		false,
@@ -106,12 +106,12 @@ func (s *Server) UserMergeToRef(ctx context.Context, request *gitalypb.UserMerge
 			log.Fields{
 				"source_sha": sourceOID,
 				"target_sha": oid,
-				"target_ref": string(request.TargetRef),
+				"target_ref": string(request.GetTargetRef()),
 			},
 		).ErrorContext(ctx, "unable to create merge commit")
 
 		return nil, structerr.NewFailedPrecondition("Failed to create merge commit for source_sha %s and target_sha %s at %s",
-			sourceOID, oid, string(request.TargetRef))
+			sourceOID, oid, string(request.GetTargetRef()))
 	}
 
 	mergeOID, err := objectHash.FromHex(mergeCommitID)
@@ -121,8 +121,8 @@ func (s *Server) UserMergeToRef(ctx context.Context, request *gitalypb.UserMerge
 
 	// ... and move branch from target ref to the merge commit. The Ruby
 	// implementation doesn't invoke hooks, so we don't either.
-	if err := repo.UpdateRef(ctx, git.ReferenceName(request.TargetRef), mergeOID, oldTargetOID); err != nil {
-		return nil, structerr.NewFailedPrecondition("Could not update %s. Please refresh and try again", string(request.TargetRef))
+	if err := repo.UpdateRef(ctx, git.ReferenceName(request.GetTargetRef()), mergeOID, oldTargetOID); err != nil {
+		return nil, structerr.NewFailedPrecondition("Could not update %s. Please refresh and try again", string(request.GetTargetRef()))
 	}
 
 	return &gitalypb.UserMergeToRefResponse{
@@ -136,23 +136,23 @@ func validateUserMergeToRefRequest(ctx context.Context, locator storage.Locator,
 	}
 
 	//nolint:staticcheck // Branch is marked as deprecated in the protobuf
-	if len(in.FirstParentRef) == 0 && len(in.Branch) == 0 {
+	if len(in.GetFirstParentRef()) == 0 && len(in.GetBranch()) == 0 {
 		return errors.New("empty first parent ref and branch name")
 	}
 
-	if in.User == nil {
+	if in.GetUser() == nil {
 		return errors.New("empty user")
 	}
 
-	if in.SourceSha == "" {
+	if in.GetSourceSha() == "" {
 		return errors.New("empty source SHA")
 	}
 
-	if len(in.TargetRef) == 0 {
+	if len(in.GetTargetRef()) == 0 {
 		return errors.New("empty target ref")
 	}
 
-	if !strings.HasPrefix(string(in.TargetRef), "refs/merge-requests") {
+	if !strings.HasPrefix(string(in.GetTargetRef()), "refs/merge-requests") {
 		return errors.New("invalid target ref")
 	}
 

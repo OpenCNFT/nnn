@@ -49,7 +49,7 @@ func (*simpleRingReplicaPlacement) apply(storages map[uint64]*gitalypb.Storage) 
 		storage := storages[ids[i]]
 		storage.ReplicaGroups = []uint64{}
 		j := i
-		for k := storage.ReplicationFactor - 1; k >= 1; k-- {
+		for k := storage.GetReplicationFactor() - 1; k >= 1; k-- {
 			for {
 				j = (j + 1) % len(ids)
 				// Ensure the other storage is not on the same node.

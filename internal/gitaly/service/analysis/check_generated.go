@@ -76,8 +76,8 @@ func (s *server) CheckBlobsGenerated(stream gitalypb.AnalysisService_CheckBlobsG
 				}
 
 				if err := chunkSender.Send(&gitalypb.CheckBlobsGeneratedResponse_Blob{
-					Revision:  blob.Revision,
-					Generated: enry.IsGenerated(string(blob.Path), content),
+					Revision:  blob.GetRevision(),
+					Generated: enry.IsGenerated(string(blob.GetPath()), content),
 				}); err != nil {
 					return fmt.Errorf("sending response: %w", err)
 				}
@@ -109,7 +109,7 @@ func (s *server) CheckBlobsGenerated(stream gitalypb.AnalysisService_CheckBlobsG
 
 		// Queue up all revisions specified in the request for processing through git-cat-file(1).
 		for _, blob := range req.GetBlobs() {
-			if err := queue.RequestObject(ctx, git.Revision(blob.Revision)); err != nil {
+			if err := queue.RequestObject(ctx, git.Revision(blob.GetRevision())); err != nil {
 				return fmt.Errorf("requesting object: %w", err)
 			}
 		}
@@ -142,12 +142,12 @@ func (s *server) CheckBlobsGenerated(stream gitalypb.AnalysisService_CheckBlobsG
 }
 
 func validateCheckBlobsGeneratedRequest(req *gitalypb.CheckBlobsGeneratedRequest) error {
-	if len(req.Blobs) == 0 {
+	if len(req.GetBlobs()) == 0 {
 		return errors.New("empty blobs")
 	}
 
-	for _, blob := range req.Blobs {
-		if err := git.ValidateRevision(blob.Revision, git.AllowPathScopedRevision()); err != nil {
+	for _, blob := range req.GetBlobs() {
+		if err := git.ValidateRevision(blob.GetRevision(), git.AllowPathScopedRevision()); err != nil {
 			return err
 		}
 

@@ -25,19 +25,19 @@ func applyOperations(sync func(string) error, storageRoot, walEntryDirectory str
 	// As files have already been synced to the disk when the log entry was written, we
 	// only need to sync the operations on directories.
 	dirtyDirectories := map[string]struct{}{}
-	for _, wrappedOp := range entry.Operations {
+	for _, wrappedOp := range entry.GetOperations() {
 		switch wrapper := wrappedOp.GetOperation().(type) {
 		case *gitalypb.LogEntry_Operation_CreateHardLink_:
 			op := wrapper.CreateHardLink
 
 			basePath := walEntryDirectory
-			if op.SourceInStorage {
+			if op.GetSourceInStorage() {
 				basePath = storageRoot
 			}
 
-			destinationPath := string(op.DestinationPath)
+			destinationPath := string(op.GetDestinationPath())
 			if err := os.Link(
-				filepath.Join(basePath, string(op.SourcePath)),
+				filepath.Join(basePath, string(op.GetSourcePath())),
 				filepath.Join(storageRoot, destinationPath),
 			); err != nil && !errors.Is(err, fs.ErrExist) {
 				return fmt.Errorf("link: %w", err)
@@ -48,8 +48,8 @@ func applyOperations(sync func(string) error, storageRoot, walEntryDirectory str
 		case *gitalypb.LogEntry_Operation_CreateDirectory_:
 			op := wrapper.CreateDirectory
 
-			path := string(op.Path)
-			if err := os.Mkdir(filepath.Join(storageRoot, path), fs.FileMode(op.Mode)); err != nil && !errors.Is(err, fs.ErrExist) {
+			path := string(op.GetPath())
+			if err := os.Mkdir(filepath.Join(storageRoot, path), fs.FileMode(op.GetMode())); err != nil && !errors.Is(err, fs.ErrExist) {
 				return fmt.Errorf("mkdir: %w", err)
 			}
 
@@ -60,7 +60,7 @@ func applyOperations(sync func(string) error, storageRoot, walEntryDirectory str
 		case *gitalypb.LogEntry_Operation_RemoveDirectoryEntry_:
 			op := wrapper.RemoveDirectoryEntry
 
-			path := string(op.Path)
+			path := string(op.GetPath())
 			if err := os.Remove(filepath.Join(storageRoot, path)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("remove: %w", err)
 			}
@@ -73,13 +73,13 @@ func applyOperations(sync func(string) error, storageRoot, walEntryDirectory str
 		case *gitalypb.LogEntry_Operation_SetKey_:
 			op := wrapper.SetKey
 
-			if err := wb.Set(op.Key, op.Value); err != nil {
+			if err := wb.Set(op.GetKey(), op.GetValue()); err != nil {
 				return fmt.Errorf("set key: %w", err)
 			}
 		case *gitalypb.LogEntry_Operation_DeleteKey_:
 			op := wrapper.DeleteKey
 
-			if err := wb.Delete(op.Key); err != nil {
+			if err := wb.Delete(op.GetKey()); err != nil {
 				return fmt.Errorf("delete key: %w", err)
 			}
 		default:

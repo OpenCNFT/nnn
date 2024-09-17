@@ -32,7 +32,7 @@ func (s *Server) UserDeleteBranch(ctx context.Context, req *gitalypb.UserDeleteB
 	if err := validateUserDeleteBranchRequest(ctx, s.locator, req); err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
-	referenceName := git.NewReferenceNameFromBranchName(string(req.BranchName))
+	referenceName := git.NewReferenceNameFromBranchName(string(req.GetBranchName()))
 
 	repo := s.localrepo(req.GetRepository())
 	objectHash, err := repo.ObjectHash(ctx)
@@ -57,11 +57,11 @@ func (s *Server) UserDeleteBranch(ctx context.Context, req *gitalypb.UserDeleteB
 	} else {
 		referenceValue, err = repo.ResolveRevision(ctx, referenceName.Revision())
 		if err != nil {
-			return nil, structerr.NewFailedPrecondition("branch not found: %q", req.BranchName)
+			return nil, structerr.NewFailedPrecondition("branch not found: %q", req.GetBranchName())
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, req.Repository, req.User, nil, referenceName, objectHash.ZeroOID, referenceValue); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), nil, referenceName, objectHash.ZeroOID, referenceValue); err != nil {
 		var notAllowedError hook.NotAllowedError
 		var customHookErr updateref.CustomHookError
 		var updateRefError updateref.Error

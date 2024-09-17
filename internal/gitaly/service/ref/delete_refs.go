@@ -120,16 +120,16 @@ func (s *server) DeleteRefs(ctx context.Context, in *gitalypb.DeleteRefsRequest)
 }
 
 func (s *server) refsToRemove(ctx context.Context, repo *localrepo.Repo, req *gitalypb.DeleteRefsRequest) ([]git.ReferenceName, error) {
-	if len(req.Refs) > 0 {
-		refs := make([]git.ReferenceName, len(req.Refs))
-		for i, ref := range req.Refs {
+	if len(req.GetRefs()) > 0 {
+		refs := make([]git.ReferenceName, len(req.GetRefs()))
+		for i, ref := range req.GetRefs() {
 			refs[i] = git.ReferenceName(ref)
 		}
 		return refs, nil
 	}
 
-	prefixes := make([]string, len(req.ExceptWithPrefix))
-	for i, prefix := range req.ExceptWithPrefix {
+	prefixes := make([]string, len(req.GetExceptWithPrefix()))
+	for i, prefix := range req.GetExceptWithPrefix() {
 		prefixes[i] = string(prefix)
 	}
 
@@ -165,21 +165,21 @@ func validateDeleteRefRequest(ctx context.Context, locator storage.Locator, req 
 		return err
 	}
 
-	if len(req.ExceptWithPrefix) > 0 && len(req.Refs) > 0 {
+	if len(req.GetExceptWithPrefix()) > 0 && len(req.GetRefs()) > 0 {
 		return errors.New("ExceptWithPrefix and Refs are mutually exclusive")
 	}
 
-	if len(req.ExceptWithPrefix) == 0 && len(req.Refs) == 0 { // You can't delete all refs
+	if len(req.GetExceptWithPrefix()) == 0 && len(req.GetRefs()) == 0 { // You can't delete all refs
 		return errors.New("empty ExceptWithPrefix and Refs")
 	}
 
-	for _, prefix := range req.ExceptWithPrefix {
+	for _, prefix := range req.GetExceptWithPrefix() {
 		if len(prefix) == 0 {
 			return errors.New("empty prefix for exclusion")
 		}
 	}
 
-	for _, ref := range req.Refs {
+	for _, ref := range req.GetRefs() {
 		if len(ref) == 0 {
 			return errors.New("empty ref")
 		}

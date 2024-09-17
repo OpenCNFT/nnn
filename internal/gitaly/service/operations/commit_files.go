@@ -147,18 +147,18 @@ func (s *Server) UserCommitFiles(stream gitalypb.OperationService_UserCommitFile
 
 	if err := s.userCommitFiles(ctx, header, stream, objectHash); err != nil {
 		log.AddFields(ctx, log.Fields{
-			"repository_storage":       header.Repository.StorageName,
-			"repository_relative_path": header.Repository.RelativePath,
-			"branch_name":              header.BranchName,
-			"start_branch_name":        header.StartBranchName,
-			"start_sha":                header.StartSha,
-			"force":                    header.Force,
+			"repository_storage":       header.GetRepository().GetStorageName(),
+			"repository_relative_path": header.GetRepository().GetRelativePath(),
+			"branch_name":              header.GetBranchName(),
+			"start_branch_name":        header.GetStartBranchName(),
+			"start_sha":                header.GetStartSha(),
+			"force":                    header.GetForce(),
 		})
 
 		if startRepo := header.GetStartRepository(); startRepo != nil {
 			log.AddFields(ctx, log.Fields{
-				"start_repository_storage":       startRepo.StorageName,
-				"start_repository_relative_path": startRepo.RelativePath,
+				"start_repository_storage":       startRepo.GetStorageName(),
+				"start_repository_relative_path": startRepo.GetRelativePath(),
 			})
 		}
 
@@ -482,15 +482,15 @@ func (s *Server) userCommitFilesGit(
 
 	cfg := localrepo.WriteCommitConfig{
 		AuthorDate:     committerSignature.When,
-		AuthorName:     strings.TrimSpace(string(header.CommitAuthorName)),
-		AuthorEmail:    strings.TrimSpace(string(header.CommitAuthorEmail)),
+		AuthorName:     strings.TrimSpace(string(header.GetCommitAuthorName())),
+		AuthorEmail:    strings.TrimSpace(string(header.GetCommitAuthorEmail())),
 		CommitterDate:  committerSignature.When,
 		CommitterName:  committerSignature.Name,
 		CommitterEmail: committerSignature.Email,
-		Message:        string(header.CommitMessage),
+		Message:        string(header.GetCommitMessage()),
 		TreeID:         treeish,
 		GitConfig:      s.gitConfig,
-		Sign:           header.Sign,
+		Sign:           header.GetSign(),
 	}
 
 	if cfg.AuthorName == "" {
@@ -540,7 +540,7 @@ func (s *Server) userCommitFiles(
 		remoteRepo = nil
 	}
 
-	targetBranchName := git.NewReferenceNameFromBranchName(string(header.BranchName))
+	targetBranchName := git.NewReferenceNameFromBranchName(string(header.GetBranchName()))
 	targetBranchCommit, err := quarantineRepo.ResolveRevision(ctx, targetBranchName.Revision()+"^{commit}")
 	if err != nil {
 		if !errors.Is(err, git.ErrReferenceNotFound) {
@@ -551,20 +551,20 @@ func (s *Server) userCommitFiles(
 	}
 
 	var parentCommitOID git.ObjectID
-	if header.StartSha == "" {
+	if header.GetStartSha() == "" {
 		parentCommitOID, err = s.resolveParentCommit(
 			ctx,
 			quarantineRepo,
 			remoteRepo,
 			targetBranchName,
 			targetBranchCommit,
-			string(header.StartBranchName),
+			string(header.GetStartBranchName()),
 		)
 		if err != nil {
 			return fmt.Errorf("resolve parent commit: %w", err)
 		}
 	} else {
-		parentCommitOID, err = objectHash.FromHex(header.StartSha)
+		parentCommitOID, err = objectHash.FromHex(header.GetStartSha())
 		if err != nil {
 			return structerr.NewInvalidArgument("cannot resolve parent commit: %w", err)
 		}
@@ -611,21 +611,21 @@ func (s *Server) userCommitFiles(
 
 	actions := make([]commitAction, 0, len(pbActions))
 	for _, pbAction := range pbActions {
-		if _, ok := gitalypb.UserCommitFilesActionHeader_ActionType_name[int32(pbAction.header.Action)]; !ok {
-			return structerr.NewInvalidArgument("NoMethodError: undefined method `downcase' for %d:Integer", pbAction.header.Action)
+		if _, ok := gitalypb.UserCommitFilesActionHeader_ActionType_name[int32(pbAction.header.GetAction())]; !ok {
+			return structerr.NewInvalidArgument("NoMethodError: undefined method `downcase' for %d:Integer", pbAction.header.GetAction())
 		}
 
-		path, err := validatePath(repoPath, string(pbAction.header.FilePath))
+		path, err := validatePath(repoPath, string(pbAction.header.GetFilePath()))
 		if err != nil {
 			return structerr.NewInvalidArgument("validate path: %w", err)
 		}
 
 		content := io.Reader(bytes.NewReader(pbAction.content))
-		if pbAction.header.Base64Content {
+		if pbAction.header.GetBase64Content() {
 			content = base64.NewDecoder(base64.StdEncoding, content)
 		}
 
-		switch pbAction.header.Action {
+		switch pbAction.header.GetAction() {
 		case gitalypb.UserCommitFilesActionHeader_CREATE:
 			blobID, err := quarantineRepo.WriteBlob(ctx, content, localrepo.WriteBlobConfig{
 				Path: path,
@@ -637,21 +637,21 @@ func (s *Server) userCommitFiles(
 			actions = append(actions, createFile{
 				OID:            blobID.String(),
 				Path:           path,
-				ExecutableMode: pbAction.header.ExecuteFilemode,
+				ExecutableMode: pbAction.header.GetExecuteFilemode(),
 			})
 		case gitalypb.UserCommitFilesActionHeader_CHMOD:
 			actions = append(actions, changeFileMode{
 				Path:           path,
-				ExecutableMode: pbAction.header.ExecuteFilemode,
+				ExecutableMode: pbAction.header.GetExecuteFilemode(),
 			})
 		case gitalypb.UserCommitFilesActionHeader_MOVE:
-			prevPath, err := validatePath(repoPath, string(pbAction.header.PreviousPath))
+			prevPath, err := validatePath(repoPath, string(pbAction.header.GetPreviousPath()))
 			if err != nil {
 				return structerr.NewInvalidArgument("validate previous path: %w", err)
 			}
 
 			var oid git.ObjectID
-			if !pbAction.header.InferContent {
+			if !pbAction.header.GetInferContent() {
 				var err error
 				oid, err = quarantineRepo.WriteBlob(ctx, content, localrepo.WriteBlobConfig{
 					Path: path,
@@ -727,12 +727,12 @@ func (s *Server) userCommitFiles(
 		oldRevision = parentCommitOID
 		if targetBranchCommit == "" {
 			oldRevision = objectHash.ZeroOID
-		} else if header.Force {
+		} else if header.GetForce() {
 			oldRevision = targetBranchCommit
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, header.GetRepository(), header.User, quarantineDir, targetBranchName, commitID, oldRevision); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, header.GetRepository(), header.GetUser(), quarantineDir, targetBranchName, commitID, oldRevision); err != nil {
 		if errors.As(err, &updateref.Error{}) {
 			return structerr.NewFailedPrecondition("%w", err)
 		}

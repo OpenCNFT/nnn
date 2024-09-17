@@ -794,8 +794,8 @@ func TestConcurrencyLimitHandlerMetrics(t *testing.T) {
 			limitErr, ok := details[0].(*gitalypb.LimitError)
 			require.True(t, ok)
 
-			assert.Equal(t, limiter.ErrMaxQueueSize.Error(), limitErr.ErrorMessage)
-			assert.Equal(t, durationpb.New(0), limitErr.RetryAfter)
+			assert.Equal(t, limiter.ErrMaxQueueSize.Error(), limitErr.GetErrorMessage())
+			assert.Equal(t, durationpb.New(0), limitErr.GetRetryAfter())
 
 			errs++
 			if errs == 9 {
@@ -872,8 +872,8 @@ func TestRateLimitHandler(t *testing.T) {
 			limitErr, ok := details[0].(*gitalypb.LimitError)
 			require.True(t, ok)
 
-			assert.Equal(t, limiter.ErrRateLimit.Error(), limitErr.ErrorMessage)
-			assert.Equal(t, durationpb.New(0), limitErr.RetryAfter)
+			assert.Equal(t, limiter.ErrRateLimit.Error(), limitErr.GetErrorMessage())
+			assert.Equal(t, durationpb.New(0), limitErr.GetRetryAfter())
 		}
 
 		expectedMetrics := `# HELP gitaly_requests_dropped_total Number of requests dropped from the queue
