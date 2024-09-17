@@ -3460,11 +3460,16 @@ func (mgr *TransactionManager) verifyCommitGraphs(ctx context.Context, transacti
 }
 
 // applyReferenceTransaction applies a reference transaction with `git update-ref`.
-func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, changes []*gitalypb.LogEntry_ReferenceTransaction_Change, repository *localrepo.Repo) error {
+func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, changes []*gitalypb.LogEntry_ReferenceTransaction_Change, repository *localrepo.Repo) (returnedErr error) {
 	updater, err := updateref.New(ctx, repository, updateref.WithDisabledTransactions(), updateref.WithNoDeref())
 	if err != nil {
 		return fmt.Errorf("new: %w", err)
 	}
+	defer func() {
+		if err := updater.Close(); err != nil {
+			returnedErr = errors.Join(returnedErr, fmt.Errorf("close updater: %w", err))
+		}
+	}()
 
 	if err := updater.Start(); err != nil {
 		return fmt.Errorf("start: %w", err)
