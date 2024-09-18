@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -1036,6 +1037,8 @@ func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction,
 
 func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCase, setup testTransactionSetup) {
 	logger := testhelper.NewLogger(t)
+	catfileCache := catfile.NewCache(setup.Config)
+	t.Cleanup(catfileCache.Stop)
 
 	storageName := setup.Config.Storages[0].Name
 	storageScopedFactory, err := setup.RepositoryFactory.ScopeByStorage(ctx, storageName)
@@ -1384,6 +1387,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				logger,
 				locator,
 				setup.CommandFactory,
+				catfileCache,
 				nil,
 				counter.NewRepositoryCounter(setup.Config.Storages),
 				rewrittenRepository,

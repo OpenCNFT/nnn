@@ -158,6 +158,12 @@ func NewTestRepo(tb testing.TB, cfg config.Cfg, repo storage.Repository, factory
 // Exec creates a git command with the given args and Repo, executed in the
 // Repo. It validates the arguments in the command before executing.
 func (repo *Repo) Exec(ctx context.Context, cmd gitcmd.Command, opts ...gitcmd.CmdOpt) (*command.Command, error) {
+	refBackend, err := repo.ReferenceBackend(ctx)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, gitcmd.WithReferenceBackend(refBackend))
+
 	return repo.gitCmdFactory.New(ctx, repo, cmd, opts...)
 }
 

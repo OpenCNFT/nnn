@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
@@ -20,6 +21,7 @@ type config struct {
 	commandName    string
 	subcommandName string
 	gitVersion     string
+	refBackend     string
 
 	cgroupsManager        cgroups.Manager
 	cgroupsAddCommandOpts []cgroups.AddCommandOption
@@ -98,6 +100,13 @@ func WithCommandName(commandName, subcommandName string) Option {
 func WithCommandGitVersion(gitCmdVersion string) Option {
 	return func(cfg *config) {
 		cfg.gitVersion = gitCmdVersion
+	}
+}
+
+// WithReferenceBackend overrides the "reference_backend" label used in metrics.
+func WithReferenceBackend(refBackend git.ReferenceBackend) Option {
+	return func(cfg *config) {
+		cfg.refBackend = refBackend.Name
 	}
 }
 

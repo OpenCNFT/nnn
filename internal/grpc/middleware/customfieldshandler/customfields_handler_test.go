@@ -101,7 +101,7 @@ func TestInterceptor(t *testing.T) {
 				require.NoError(t, err)
 			},
 			expectedLogData: map[string]interface{}{
-				"command.count": 3,
+				"command.count": 5,
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func TestInterceptor(t *testing.T) {
 				}
 			},
 			expectedLogData: map[string]interface{}{
-				"command.count": 2,
+				"command.count": 4,
 			},
 		},
 	}
@@ -141,7 +141,7 @@ func TestInterceptor(t *testing.T) {
 			require.Len(t, logEntries, 1)
 			for expectedLogKey, expectedLogValue := range tt.expectedLogData {
 				require.Contains(t, logEntries[0].Data, expectedLogKey)
-				require.Equal(t, logEntries[0].Data[expectedLogKey], expectedLogValue)
+				require.Equal(t, expectedLogValue, logEntries[0].Data[expectedLogKey])
 			}
 		})
 	}

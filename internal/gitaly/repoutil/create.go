@@ -13,7 +13,9 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
@@ -71,6 +73,7 @@ func Create(
 	logger log.Logger,
 	locator storage.Locator,
 	gitCmdFactory gitcmd.CommandFactory,
+	catfileCache catfile.Cache,
 	txManager transaction.Manager,
 	repoCounter *counter.RepositoryCounter,
 	repository storage.Repository,
@@ -92,7 +95,7 @@ func Create(
 		return fmt.Errorf("pre-lock stat: %w", err)
 	}
 
-	newRepo, newRepoDir, err := tempdir.NewRepository(ctx, repository.GetStorageName(), logger, locator)
+	newRepoProto, newRepoDir, err := tempdir.NewRepository(ctx, repository.GetStorageName(), logger, locator)
 	if err != nil {
 		return fmt.Errorf("creating temporary repository: %w", err)
 	}
@@ -141,13 +144,15 @@ func Create(
 		}
 	}
 
-	if err := seedRepository(newRepo); err != nil {
+	if err := seedRepository(newRepoProto); err != nil {
 		// Return the error returned by the callback function as-is so we don't clobber any
 		// potential returned gRPC error codes.
 		return err
 	}
 
-	refBackend, err := gitcmd.DetectReferenceBackend(ctx, gitCmdFactory, newRepo)
+	newRepo := localrepo.New(logger, locator, gitCmdFactory, catfileCache, newRepoProto)
+
+	refBackend, err := newRepo.ReferenceBackend(ctx)
 	if err != nil {
 		return fmt.Errorf("detecting reference backend: %w", err)
 	}
@@ -182,7 +187,7 @@ func Create(
 		// https://gitlab.com/gitlab-org/gitaly/-/issues/6050
 		case filepath.Join(newRepoDir.Path(), "reftable"):
 			if refBackend == git.ReferenceBackendReftables {
-				if err := writeRefs(ctx, voteHash, newRepo, gitCmdFactory); err != nil {
+				if err := writeRefs(ctx, voteHash, newRepo); err != nil {
 					return err
 				}
 				return fs.SkipDir
@@ -295,14 +300,13 @@ func Create(
 func writeRefs(
 	ctx context.Context,
 	w io.Writer,
-	repo *gitalypb.Repository,
-	gitCmdFactory gitcmd.CommandFactory,
+	repo gitcmd.RepositoryExecutor,
 ) error {
 	stderr := &bytes.Buffer{}
 
 	// This doesn't consider dangling symrefs. This needs to be fixed in Git:
 	// https://gitlab.com/gitlab-org/git/-/issues/309
-	cmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "for-each-ref",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--format=%(refname) %(objectname) %(symref)"},
