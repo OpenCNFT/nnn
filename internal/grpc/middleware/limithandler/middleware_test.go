@@ -34,7 +34,7 @@ func fixedLockKey(ctx context.Context) string {
 
 func TestWithConcurrencyLimiters(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		cfg := config.Cfg{
 			Concurrency: []config.Concurrency{
 				{
@@ -76,7 +76,7 @@ func TestWithConcurrencyLimiters(t *testing.T) {
 
 func TestUnaryLimitHandler(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		s := &queueTestServer{
 			server: server{
 				blockCh: make(chan struct{}),
@@ -140,16 +140,12 @@ func TestUnaryLimitHandler(t *testing.T) {
 }
 
 func BenchmarkUnaryLimitQueueStrategyHandler(b *testing.B) {
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).
 		Bench(b, func(b *testing.B, ctx context.Context) {
-			if featureflag.UseResizableSemaphoreInConcurrencyLimiter.IsEnabled(ctx) {
-				for _, numRequests := range []int{100, 200} {
-					b.Run(fmt.Sprintf("%d_requests", numRequests), func(b *testing.B) {
-						testUnaryLimitHandlerQueueStrategy(b, ctx, numRequests)
-					})
-				}
-			} else {
-				b.Skip("dynamic limiting must be enabled to switch queue strategy")
+			for _, numRequests := range []int{100, 200} {
+				b.Run(fmt.Sprintf("%d_requests", numRequests), func(b *testing.B) {
+					testUnaryLimitHandlerQueueStrategy(b, ctx, numRequests)
+				})
 			}
 		})
 }
@@ -192,7 +188,7 @@ func testUnaryLimitHandlerQueueStrategy(b *testing.B, ctx context.Context, numRe
 
 	// Collect metrics
 	droppedRequestFamily := GatherMetrics(lh, "gitaly_requests_dropped_total")
-	concurrencyAquiringSecondsFamily := GatherMetrics(lh, "gitaly_concurrency_limiting_acquiring_seconds")
+	concurrencyAcquiringSecondsFamily := GatherMetrics(lh, "gitaly_concurrency_limiting_acquiring_seconds")
 
 	// Create map to store gathered metrics
 	m := make(map[string]float64)
@@ -201,7 +197,7 @@ func testUnaryLimitHandlerQueueStrategy(b *testing.B, ctx context.Context, numRe
 	extractCounterMetric(droppedRequestFamily, m)
 
 	// Extract histogram results from metric
-	extractHistogramMetric(concurrencyAquiringSecondsFamily, m)
+	extractHistogramMetric(concurrencyAcquiringSecondsFamily, m)
 
 	assert.GreaterOrEqual(b, int(s.queueTestServer.requestCount), 0)
 }
@@ -209,7 +205,7 @@ func testUnaryLimitHandlerQueueStrategy(b *testing.B, ctx context.Context, numRe
 func TestUnaryLimitHandler_queueing(t *testing.T) {
 	t.Parallel()
 
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		t.Run("simple timeout", func(t *testing.T) {
 			cfg := config.Cfg{
 				Concurrency: []config.Concurrency{
@@ -366,7 +362,7 @@ func TestUnaryLimitHandler_queueing(t *testing.T) {
 
 func TestStreamLimitHandler(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		testCases := []struct {
 			desc                  string
 			fullname              string
@@ -610,7 +606,7 @@ func TestStreamLimitHandler(t *testing.T) {
 
 func TestStreamLimitHandler_error(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		s := &queueTestServer{reqArrivedCh: make(chan struct{})}
 		s.blockCh = make(chan struct{})
 
@@ -745,7 +741,7 @@ func (q *customQueueTestServer) UnaryCall(ctx context.Context, in *grpc_testing.
 }
 
 func TestConcurrencyLimitHandlerMetrics(t *testing.T) {
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		s := &queueTestServer{reqArrivedCh: make(chan struct{})}
 		s.blockCh = make(chan struct{})
 

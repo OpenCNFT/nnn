@@ -26,7 +26,7 @@ func TestResizableSemaphore_New(t *testing.T) {
 // become available.
 func TestResizableSemaphore_ContextCanceled(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		t.Run("context is canceled when the semaphore is empty", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			cancel()
@@ -164,7 +164,7 @@ func testResizableSemaphoreCanceledWhenFull(t *testing.T, ctx context.Context, s
 
 func TestResizableSemaphore_Acquire(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		t.Run("acquire less than the capacity", func(t *testing.T) {
 			semaphore := NewResizableSemaphore(5)
 

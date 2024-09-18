@@ -716,7 +716,7 @@ func setupSidechannel(t *testing.T, ctx context.Context, oid string) (context.Co
 
 func TestPackObjects_concurrencyLimit(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		args := []string{"pack-objects", "--revs", "--thin", "--stdout", "--progress", "--delta-base-offset"}
 
 		for _, tc := range []struct {
