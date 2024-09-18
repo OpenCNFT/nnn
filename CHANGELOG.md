@@ -1,5 +1,20 @@
 # Gitaly changelog
 
+## 17.4.0 (2024-09-18)
+
+### Added (2 changes)
+
+- [protobuf: Add new ListPartitions RPC](gitlab-org/gitaly@6d91c01e8a64260dac07c2d0545e31996892b994) ([merge request](gitlab-org/gitaly!7225))
+- [protobuf: Add new backup partition rpc](gitlab-org/gitaly@65d250a24058ed2f61493ce2747dc6800854500f) ([merge request](gitlab-org/gitaly!7182))
+
+### Changed (1 change)
+
+- [Use InvalidArgument error for invalid page token](gitlab-org/gitaly@2efa4d2d896beb4bf31a268d952af6b7f389c745) ([merge request](gitlab-org/gitaly!7224))
+
+### Other (1 change)
+
+- [featureflag: Remove use_empty_tree_in_attr_tree_config](gitlab-org/gitaly@676b701f4adce5fb35d4b56689e7e261d3113e88) ([merge request](gitlab-org/gitaly!7199))
+
 ## 17.3.2 (2024-09-11)
 
 No changes.
