@@ -37,6 +37,11 @@ func TestSearchFilesByContent(t *testing.T) {
 		gittest.TreeEntry{Path: "huge-utf8", Mode: "100644", Content: strings.Repeat("你今天吃了什么东西?\n", 70000)},
 	))
 
+	largeLineCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+		// bufio.NewScanner uses an internal buffer of size 1024 * 64
+		gittest.TreeEntry{Path: "huge-line-file", Mode: "100644", Content: strings.Repeat("abcdefghi", 1024*64) + "\n"},
+	))
+
 	dashedCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
 		gittest.TreeEntry{Path: "-dashed", Mode: "100644", Content: "-dashed\n"},
 	))
@@ -170,6 +175,15 @@ func TestSearchFilesByContent(t *testing.T) {
 			expectedMatches: []string{
 				generateMatch(largeFilesCommit.String(), "huge-utf8", 1, 70000, staticLine("你今天吃了什么东西?")),
 			},
+		},
+		{
+			desc: "file with large line",
+			request: &gitalypb.SearchFilesByContentRequest{
+				Repository: repoProto,
+				Query:      "abcdefg",
+				Ref:        []byte(largeLineCommit),
+			},
+			expectedErr: structerr.NewInternal("sending chunked response failed: scan: bufio.Scanner: token too long"),
 		},
 		{
 			desc: "query with leading dash",
