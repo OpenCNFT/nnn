@@ -38,7 +38,6 @@ func TestSearchFilesByContent(t *testing.T) {
 	))
 
 	largeLineCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
-		// bufio.NewScanner uses an internal buffer of size 1024 * 64
 		gittest.TreeEntry{Path: "huge-line-file", Mode: "100644", Content: strings.Repeat("abcdefghi", 1024*64) + "\n"},
 	))
 
@@ -183,7 +182,9 @@ func TestSearchFilesByContent(t *testing.T) {
 				Query:      "abcdefg",
 				Ref:        []byte(largeLineCommit),
 			},
-			expectedErr: structerr.NewInternal("sending chunked response failed: scan: bufio.Scanner: token too long"),
+			expectedMatches: []string{
+				generateMatch(largeLineCommit.String(), "huge-line-file", 1, 1, staticLine(strings.Repeat("abcdefghi", 1024*64))),
+			},
 		},
 		{
 			desc: "query with leading dash",
