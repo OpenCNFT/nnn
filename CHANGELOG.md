@@ -1,5 +1,9 @@
 # Gitaly changelog
 
+## 16.10.10 (2024-09-19)
+
+No changes.
+
 ## 16.10.9 (2024-07-23)
 
 No changes.
