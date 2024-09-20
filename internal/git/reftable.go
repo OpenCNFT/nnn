@@ -348,7 +348,7 @@ func ReadReftablesList(repoPath string) ([]string, error) {
 
 	list := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
 	for _, line := range list {
-		if !ReftableTableNameRegex.Match([]byte(line)) {
+		if !ReftableTableNameRegex.MatchString(line) {
 			return list, fmt.Errorf("unrecognized reftable name: %s", line)
 		}
 	}

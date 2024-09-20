@@ -24,7 +24,7 @@ func verifyListBlobsRequest(ctx context.Context, locator storage.Locator, req *g
 	if len(req.GetRevisions()) == 0 {
 		return errors.New("missing revisions")
 	}
-	for _, revision := range req.Revisions {
+	for _, revision := range req.GetRevisions() {
 		if err := git.ValidateRevision([]byte(revision), git.AllowPathScopedRevision(), git.AllowPseudoRevision()); err != nil {
 			return structerr.NewInvalidArgument("invalid revision: %w", err).WithMetadata("revision", revision)
 		}

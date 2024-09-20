@@ -336,16 +336,16 @@ func TestPrereceive_gitlab(t *testing.T) {
 			changes: "changes\n",
 			allowed: func(t *testing.T, ctx context.Context, params gitlab.AllowedParams) (bool, string, error) {
 				require.Equal(t, repoPath, params.RepoPath)
-				require.Equal(t, repo.GlRepository, params.GLRepository)
+				require.Equal(t, repo.GetGlRepository(), params.GLRepository)
 				require.Equal(t, "1234", params.GLID)
 				require.Equal(t, "web", params.GLProtocol)
 				require.Equal(t, "changes\n", params.Changes)
-				require.Equal(t, repo.RelativePath, params.RelativePath)
+				require.Equal(t, repo.GetRelativePath(), params.RelativePath)
 				require.Equal(t, pushOptions, params.PushOptions)
 				return true, "", nil
 			},
 			prereceive: func(t *testing.T, ctx context.Context, glRepo string) (bool, error) {
-				require.Equal(t, repo.GlRepository, glRepo)
+				require.Equal(t, repo.GetGlRepository(), glRepo)
 				return true, nil
 			},
 			expectHookCall: true,

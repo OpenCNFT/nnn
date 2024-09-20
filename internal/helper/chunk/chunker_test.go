@@ -22,7 +22,7 @@ type testSender struct {
 
 func (ts *testSender) Reset() { ts.body = ts.body[:0] }
 func (ts *testSender) Append(m proto.Message) {
-	ts.body = append(ts.body, m.(*grpc_testing.Payload).Body...)
+	ts.body = append(ts.body, m.(*grpc_testing.Payload).GetBody()...)
 }
 
 func (ts *testSender) Send() error {

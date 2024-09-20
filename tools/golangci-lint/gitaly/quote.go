@@ -59,7 +59,7 @@ func analyzeInterpolation(call *ast.CallExpr, pass *analysis.Pass) {
 		if strings.HasSuffix(value, `'`) || strings.HasSuffix(value, `"`) {
 			value = value[:len(value)-1]
 		}
-		for _, index := range offendedFormatPattern.FindAllIndex([]byte(value), -1) {
+		for _, index := range offendedFormatPattern.FindAllStringIndex(value, -1) {
 			start := token.Pos(int(str.Pos()) + index[0] + 1)
 			end := token.Pos(int(str.Pos()) + index[1])
 			pass.Report(analysis.Diagnostic{

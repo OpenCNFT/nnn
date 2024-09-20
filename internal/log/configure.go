@@ -22,8 +22,8 @@ var SkipReplacingGlobalLoggers bool
 
 // Config contains logging configuration values
 type Config struct {
-	Format string `toml:"format,omitempty" json:"format"`
-	Level  string `toml:"level,omitempty" json:"level"`
+	Format string `json:"format" toml:"format,omitempty"`
+	Level  string `json:"level"  toml:"level,omitempty"`
 }
 
 // Configure configures the default and gRPC loggers. The gRPC logger's log level will be mapped in order to decrease

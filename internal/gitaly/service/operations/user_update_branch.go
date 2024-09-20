@@ -17,19 +17,19 @@ func validateUserUpdateBranchGo(ctx context.Context, locator storage.Locator, re
 		return err
 	}
 
-	if req.User == nil {
+	if req.GetUser() == nil {
 		return errors.New("empty user")
 	}
 
-	if len(req.BranchName) == 0 {
+	if len(req.GetBranchName()) == 0 {
 		return errors.New("empty branch name")
 	}
 
-	if len(req.Oldrev) == 0 {
+	if len(req.GetOldrev()) == 0 {
 		return errors.New("empty oldrev")
 	}
 
-	if len(req.Newrev) == 0 {
+	if len(req.GetNewrev()) == 0 {
 		return errors.New("empty newrev")
 	}
 
@@ -51,24 +51,24 @@ func (s *Server) UserUpdateBranch(ctx context.Context, req *gitalypb.UserUpdateB
 		return nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	newOID, err := objectHash.FromHex(string(req.Newrev))
+	newOID, err := objectHash.FromHex(string(req.GetNewrev()))
 	if err != nil {
 		return nil, structerr.NewInternal("could not parse newrev: %w", err)
 	}
 
-	oldOID, err := objectHash.FromHex(string(req.Oldrev))
+	oldOID, err := objectHash.FromHex(string(req.GetOldrev()))
 	if err != nil {
 		return nil, structerr.NewInternal("could not parse oldrev: %w", err)
 	}
 
-	referenceName := git.NewReferenceNameFromBranchName(string(req.BranchName))
+	referenceName := git.NewReferenceNameFromBranchName(string(req.GetBranchName()))
 
 	quarantineDir, _, err := s.quarantinedRepo(ctx, req.GetRepository())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.User, quarantineDir, referenceName, newOID, oldOID); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), quarantineDir, referenceName, newOID, oldOID); err != nil {
 		var customHookErr updateref.CustomHookError
 		if errors.As(err, &customHookErr) {
 			return &gitalypb.UserUpdateBranchResponse{
@@ -82,7 +82,7 @@ func (s *Server) UserUpdateBranch(ctx context.Context, req *gitalypb.UserUpdateB
 		// say "branch-name", not
 		// "refs/heads/branch-name". See the
 		// "Gitlab::Git::CommitError" case in the Ruby code.
-		return nil, structerr.NewFailedPrecondition("Could not update %s. Please refresh and try again.", req.BranchName)
+		return nil, structerr.NewFailedPrecondition("Could not update %s. Please refresh and try again.", req.GetBranchName())
 	}
 
 	return &gitalypb.UserUpdateBranchResponse{}, nil

@@ -172,7 +172,7 @@ func TestListAllCommits(t *testing.T) {
 					// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 					// sends it back to Gitaly when it performs requests in the access checks. The repository
 					// would have already been rewritten by Praefect, so we have to adjust for that as well.
-					gittest.RewrittenRepository(t, ctx, cfg, setup.request.Repository).RelativePath,
+					gittest.RewrittenRepository(t, ctx, cfg, setup.request.GetRepository()).GetRelativePath(),
 				)
 			}
 
@@ -180,7 +180,7 @@ func TestListAllCommits(t *testing.T) {
 			require.NoError(t, err)
 
 			actualCommits, err := testhelper.ReceiveAndFold(stream.Recv, func(result []*gitalypb.GitCommit, response *gitalypb.ListAllCommitsResponse) []*gitalypb.GitCommit {
-				return append(result, response.Commits...)
+				return append(result, response.GetCommits()...)
 			})
 			testhelper.RequireGrpcError(t, setup.expectedErr, err)
 
@@ -198,10 +198,10 @@ func TestListAllCommits(t *testing.T) {
 
 			// The order isn't clearly defined, so we simply sort both slices before doing the comparison.
 			sort.Slice(expectedCommits, func(i, j int) bool {
-				return expectedCommits[i].Id < expectedCommits[j].Id
+				return expectedCommits[i].GetId() < expectedCommits[j].GetId()
 			})
 			sort.Slice(actualCommits, func(i, j int) bool {
-				return actualCommits[i].Id < actualCommits[j].Id
+				return actualCommits[i].GetId() < actualCommits[j].GetId()
 			})
 			testhelper.ProtoEqual(t, expectedCommits, actualCommits)
 		})

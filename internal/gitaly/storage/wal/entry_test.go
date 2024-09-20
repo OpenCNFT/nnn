@@ -372,8 +372,8 @@ func TestRecordReferenceUpdates(t *testing.T) {
 		for _, change := range changes {
 			require.NoError(t,
 				updater.Update(
-					git.ReferenceName(change.ReferenceName),
-					git.ObjectID(change.NewOid),
+					git.ReferenceName(change.GetReferenceName()),
+					git.ObjectID(change.GetNewOid()),
 					"",
 				),
 			)
@@ -666,7 +666,7 @@ func TestRecordReferenceUpdates(t *testing.T) {
 
 			setupData := tc.setup(t, commitIDs)
 
-			performChanges(t, updater, referenceTransactionToProto(setupData.existingReferences).Changes)
+			performChanges(t, updater, referenceTransactionToProto(setupData.existingReferences).GetChanges())
 
 			stateDir := t.TempDir()
 			entry := NewEntry(stateDir)

@@ -103,7 +103,7 @@ func TestBackupPartition(t *testing.T) {
 			repo, _ := gittest.CreateRepository(t, ctx, data.cfg)
 
 			forkRepository := &gitalypb.Repository{
-				StorageName:  repo.StorageName,
+				StorageName:  repo.GetStorageName(),
 				RelativePath: gittest.NewRepositoryName(t),
 			}
 
@@ -143,9 +143,9 @@ func TestBackupPartition(t *testing.T) {
 			defer testhelper.MustClose(t, tar)
 
 			testhelper.ContainsTarState(t, tar, testhelper.DirectoryState{
-				".":                         {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
-				repo.RelativePath:           {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
-				forkRepository.RelativePath: {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				".":                              {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				repo.GetRelativePath():           {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				forkRepository.GetRelativePath(): {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 			})
 		})
 	}

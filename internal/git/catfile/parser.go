@@ -154,7 +154,7 @@ func (p *parser) parseTag(object git.Object, name []byte) (*gitalypb.Tag, tagged
 		case "type":
 			tagged.objectType = value
 		case "tag":
-			if len(tag.Name) == 0 {
+			if len(tag.GetName()) == 0 {
 				tag.Name = []byte(value)
 			}
 		case "tagger":

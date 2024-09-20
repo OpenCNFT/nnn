@@ -27,7 +27,7 @@ func (s *server) ReferenceTransactionHook(stream gitalypb.HookService_ReferenceT
 	}
 
 	var state hook.ReferenceTransactionState
-	switch request.State {
+	switch request.GetState() {
 	case gitalypb.ReferenceTransactionHookRequest_PREPARED:
 		state = hook.ReferenceTransactionPrepared
 	case gitalypb.ReferenceTransactionHookRequest_COMMITTED:

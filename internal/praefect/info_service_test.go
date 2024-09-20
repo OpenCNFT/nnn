@@ -133,15 +133,15 @@ func TestInfoService_RepositoryReplicas(t *testing.T) {
 	resp, err := client.RepositoryReplicas(ctx, &gitalypb.RepositoryReplicasRequest{Repository: testRepository})
 	require.NoError(t, err)
 
-	require.Equal(t, checksum.Checksum, resp.Primary.Checksum)
+	require.Equal(t, checksum.GetChecksum(), resp.GetPrimary().GetChecksum())
 	var checked []string
 	for _, secondary := range resp.GetReplicas() {
 		switch storage := secondary.GetRepository().GetStorageName(); storage {
 		case conf.VirtualStorages[0].Nodes[1].Storage:
-			require.NotEqual(t, checksum.Checksum, secondary.Checksum, "should not be equal since we added a commit")
+			require.NotEqual(t, checksum.GetChecksum(), secondary.GetChecksum(), "should not be equal since we added a commit")
 			checked = append(checked, storage)
 		case conf.VirtualStorages[0].Nodes[2].Storage:
-			require.Equal(t, checksum.Checksum, secondary.Checksum)
+			require.Equal(t, checksum.GetChecksum(), secondary.GetChecksum())
 			checked = append(checked, storage)
 		default:
 			require.FailNow(t, "unexpected storage: %q", storage)

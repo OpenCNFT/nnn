@@ -859,8 +859,8 @@ func TestConcurrencyLimiter_queueLimit(t *testing.T) {
 		limitErr, ok := details[0].(*gitalypb.LimitError)
 		require.True(t, ok)
 
-		assert.Equal(t, ErrMaxQueueSize.Error(), limitErr.ErrorMessage)
-		assert.Equal(t, durationpb.New(0), limitErr.RetryAfter)
+		assert.Equal(t, ErrMaxQueueSize.Error(), limitErr.GetErrorMessage())
+		assert.Equal(t, durationpb.New(0), limitErr.GetRetryAfter())
 		assert.Equal(t, monitor.droppedSize, 1)
 
 		close(ch)
@@ -935,8 +935,8 @@ func TestLimitConcurrency_queueWaitTime(t *testing.T) {
 		require.True(t, ok)
 
 		testhelper.RequireGrpcCode(t, err, codes.ResourceExhausted)
-		assert.Equal(t, ErrMaxQueueTime.Error(), limitErr.ErrorMessage)
-		assert.Equal(t, durationpb.New(0).AsDuration(), limitErr.RetryAfter.AsDuration())
+		assert.Equal(t, ErrMaxQueueTime.Error(), limitErr.GetErrorMessage())
+		assert.Equal(t, durationpb.New(0).AsDuration(), limitErr.GetRetryAfter().AsDuration())
 
 		assert.Equal(t, monitor.droppedTime, 1)
 		close(ch)
@@ -998,8 +998,8 @@ func TestLimitConcurrency_queueWaitTimeRealTimeout(t *testing.T) {
 		require.True(t, ok)
 
 		testhelper.RequireGrpcCode(t, err, codes.ResourceExhausted)
-		assert.Equal(t, ErrMaxQueueTime.Error(), limitErr.ErrorMessage)
-		assert.Equal(t, durationpb.New(0).AsDuration(), limitErr.RetryAfter.AsDuration())
+		assert.Equal(t, ErrMaxQueueTime.Error(), limitErr.GetErrorMessage())
+		assert.Equal(t, durationpb.New(0).AsDuration(), limitErr.GetRetryAfter().AsDuration())
 
 		close(release)
 	})

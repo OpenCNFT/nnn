@@ -305,7 +305,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		return transactionalizedRequest{}, fmt.Errorf("extract target repository: %w", err)
 	}
 
-	if targetRepo.GitObjectDirectory != "" || len(targetRepo.GitAlternateObjectDirectories) > 0 {
+	if targetRepo.GetGitObjectDirectory() != "" || len(targetRepo.GetGitAlternateObjectDirectories()) > 0 {
 		// The object directories should only be configured on a repository coming from a request that
 		// was already configured with a quarantine directory and is being looped back to Gitaly from Rails'
 		// authorization checks. If that's the case, the request should already be running in scope of a
@@ -351,7 +351,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 		// In some cases a repository needs to be partitioned with a repository that isn't set as an additional
 		// repository in the request. If so, a partitioning hint is sent through the gRPC metadata to provide
 		// the relative path of the repository the target repository should be partitioned with.
-		alternateStorageName = targetRepo.StorageName
+		alternateStorageName = targetRepo.GetStorageName()
 		alternateRelativePath = hint
 	} else if req, ok := req.(*gitalypb.CreateForkRequest); ok {
 		// We use the source repository of a CreateForkRequest implicitly as a partitioning hint as we know the source
@@ -389,11 +389,11 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 			return transactionalizedRequest{}, ErrPartitioningHintAndAdditionalRepoProvided
 		}
 
-		alternateStorageName = additionalRepo.StorageName
-		alternateRelativePath = additionalRepo.RelativePath
+		alternateStorageName = additionalRepo.GetStorageName()
+		alternateRelativePath = additionalRepo.GetRelativePath()
 	}
 
-	if alternateStorageName != "" && alternateStorageName != targetRepo.StorageName {
+	if alternateStorageName != "" && alternateStorageName != targetRepo.GetStorageName() {
 		return transactionalizedRequest{}, ErrRepositoriesInDifferentStorages
 	}
 
@@ -407,14 +407,14 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 	// See issue: https://gitlab.com/gitlab-org/gitaly/-/issues/5957
 	_, isRepositoryCreation := repositoryCreatingRPCs[methodInfo.FullMethodName()]
 
-	storageHandle, err := node.GetStorage(targetRepo.StorageName)
+	storageHandle, err := node.GetStorage(targetRepo.GetStorageName())
 	if err != nil {
 		return transactionalizedRequest{}, fmt.Errorf("get storage: %w", err)
 	}
 
 	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
 		ReadOnly:              isReadOnly(methodInfo),
-		RelativePath:          targetRepo.RelativePath,
+		RelativePath:          targetRepo.GetRelativePath(),
 		AlternateRelativePath: alternateRelativePath,
 		AllowPartitionAssignmentWithoutRepository: isRepositoryCreation,
 		ForceExclusiveSnapshot:                    forceExclusiveSnapshot[methodInfo.FullMethodName()],
@@ -425,7 +425,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 			// The partition assigner does not have the storage available and returns thus just an error with the
 			// relative path. Convert the error to the usual repository not found error that the RPCs are returning
 			// to conform to the API.
-			return transactionalizedRequest{}, storage.NewRepositoryNotFoundError(targetRepo.StorageName, string(relativePath))
+			return transactionalizedRequest{}, storage.NewRepositoryNotFoundError(targetRepo.GetStorageName(), string(relativePath))
 		}
 
 		return transactionalizedRequest{}, fmt.Errorf("begin transaction: %w", err)

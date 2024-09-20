@@ -135,7 +135,7 @@ func getBlob(stream gitalypb.BlobService_GetBlobClient) (int64, string, []byte, 
 	})
 
 	_, err = io.Copy(data, reader)
-	return firstResponse.Size, firstResponse.Oid, data.Bytes(), err
+	return firstResponse.GetSize(), firstResponse.GetOid(), data.Bytes(), err
 }
 
 func TestGetBlob_invalidRequest(t *testing.T) {

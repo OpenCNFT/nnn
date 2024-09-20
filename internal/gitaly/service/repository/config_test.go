@@ -38,7 +38,7 @@ func TestGetConfig(t *testing.T) {
 			response, err := stream.Recv()
 			var bytes []byte
 			if response != nil {
-				bytes = response.Data
+				bytes = response.GetData()
 			}
 			return bytes, err
 		})

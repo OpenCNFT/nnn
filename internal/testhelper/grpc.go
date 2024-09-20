@@ -97,9 +97,9 @@ func RequireGrpcErrorContains(tb testing.TB, expected, actual error) {
 	expectedConverted := status.Convert(expected).Proto()
 	actualConverted := status.Convert(actual).Proto()
 
-	require.Equal(tb, expectedConverted.Code, actualConverted.Code)
+	require.Equal(tb, expectedConverted.GetCode(), actualConverted.GetCode())
 
-	require.Contains(tb, actualConverted.Message, expectedConverted.Message)
+	require.Contains(tb, actualConverted.GetMessage(), expectedConverted.GetMessage())
 }
 
 // RequireStatusWithErrorMetadataRegexp asserts that expected and actual error match each other. Both are expected to
@@ -122,7 +122,7 @@ func RequireStatusWithErrorMetadataRegexp(tb testing.TB, expected, actual error,
 
 	actualKeys := make([]string, 0, len(actualDetails))
 	for _, detail := range actualDetails {
-		actualKeys = append(actualKeys, string(detail.(*testproto.ErrorMetadata).Key))
+		actualKeys = append(actualKeys, string(detail.(*testproto.ErrorMetadata).GetKey()))
 	}
 
 	expectedKeys := make([]string, 0, len(expectedMetadata))
@@ -134,7 +134,7 @@ func RequireStatusWithErrorMetadataRegexp(tb testing.TB, expected, actual error,
 
 	for _, detail := range actualDetails {
 		metadata := detail.(*testproto.ErrorMetadata)
-		require.Regexp(tb, expectedMetadata[string(metadata.Key)], string(metadata.Value), "metadata key %q's value didn't match expected", metadata.Key)
+		require.Regexp(tb, expectedMetadata[string(metadata.GetKey())], string(metadata.GetValue()), "metadata key %q's value didn't match expected", metadata.GetKey())
 	}
 }
 

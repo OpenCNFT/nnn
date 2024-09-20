@@ -81,23 +81,23 @@ func testUserSquashSuccessful(t *testing.T, ctx context.Context) {
 	})
 	require.NoError(t, err)
 
-	commit, err := repo.ReadCommit(ctx, git.Revision(response.SquashSha))
+	commit, err := repo.ReadCommit(ctx, git.Revision(response.GetSquashSha()))
 	require.NoError(t, err)
-	require.Equal(t, []string{theirsID.String()}, commit.ParentIds)
-	require.Equal(t, author.Name, commit.Author.Name)
-	require.Equal(t, author.Email, commit.Author.Email)
-	require.Equal(t, gittest.TestUser.Name, commit.Committer.Name)
-	require.Equal(t, gittest.TestUser.Email, commit.Committer.Email)
-	require.Equal(t, gittest.TimezoneOffset, string(commit.Committer.Timezone))
-	require.Equal(t, gittest.TimezoneOffset, string(commit.Author.Timezone))
-	require.Equal(t, commitMessage, commit.Subject)
+	require.Equal(t, []string{theirsID.String()}, commit.GetParentIds())
+	require.Equal(t, author.GetName(), commit.GetAuthor().GetName())
+	require.Equal(t, author.GetEmail(), commit.GetAuthor().GetEmail())
+	require.Equal(t, gittest.TestUser.GetName(), commit.GetCommitter().GetName())
+	require.Equal(t, gittest.TestUser.GetEmail(), commit.GetCommitter().GetEmail())
+	require.Equal(t, gittest.TimezoneOffset, string(commit.GetCommitter().GetTimezone()))
+	require.Equal(t, gittest.TimezoneOffset, string(commit.GetAuthor().GetTimezone()))
+	require.Equal(t, commitMessage, commit.GetSubject())
 
-	treeData := gittest.Exec(t, cfg, "-C", repoPath, "ls-tree", "--name-only", response.SquashSha)
+	treeData := gittest.Exec(t, cfg, "-C", repoPath, "ls-tree", "--name-only", response.GetSquashSha())
 	files := strings.Fields(text.ChompBytes(treeData))
 	require.Equal(t, []string{"ours", "theirs"}, files)
 
 	if featureflag.GPGSigning.IsEnabled(ctx) {
-		data, err := repo.ReadObject(ctx, git.ObjectID(response.SquashSha))
+		data, err := repo.ReadObject(ctx, git.ObjectID(response.GetSquashSha()))
 		require.NoError(t, err)
 
 		gpgsig, dataWithoutGpgSig := signature.ExtractSignature(t, ctx, data)
@@ -225,7 +225,7 @@ func testUserSquashTransactional(t *testing.T, ctx context.Context) {
 
 			if tc.expectedErr == nil {
 				require.NoError(t, err)
-				require.Equal(t, squashedCommitID, response.SquashSha)
+				require.Equal(t, squashedCommitID, response.GetSquashSha())
 			} else {
 				testhelper.RequireGrpcError(t, tc.expectedErr, err)
 			}
@@ -278,7 +278,7 @@ func testUserSquashStableID(t *testing.T, ctx context.Context) {
 	})
 	require.NoError(t, err)
 
-	commit, err := repo.ReadCommit(ctx, git.Revision(response.SquashSha))
+	commit, err := repo.ReadCommit(ctx, git.Revision(response.GetSquashSha()))
 	require.NoError(t, err)
 	require.Equal(t, &gitalypb.GitCommit{
 		Id: gittest.ObjectHashDependent(t, map[string]string{
@@ -299,8 +299,8 @@ func testUserSquashStableID(t *testing.T, ctx context.Context) {
 
 func authorFromUser(user *gitalypb.User, seconds int64) *gitalypb.CommitAuthor {
 	return &gitalypb.CommitAuthor{
-		Name:     user.Name,
-		Email:    user.Email,
+		Name:     user.GetName(),
+		Email:    user.GetEmail(),
 		Date:     &timestamppb.Timestamp{Seconds: seconds},
 		Timezone: []byte(gittest.TimezoneOffset),
 	}
@@ -349,16 +349,16 @@ func testUserSquashThreeWayMerge(t *testing.T, ctx context.Context) {
 	})
 	require.NoError(t, err)
 
-	commit, err := repo.ReadCommit(ctx, git.Revision(response.SquashSha))
+	commit, err := repo.ReadCommit(ctx, git.Revision(response.GetSquashSha()))
 	require.NoError(t, err)
-	require.Equal(t, []string{leftID.String()}, commit.ParentIds)
-	require.Equal(t, author.Name, commit.Author.Name)
-	require.Equal(t, author.Email, commit.Author.Email)
-	require.Equal(t, gittest.TestUser.Name, commit.Committer.Name)
-	require.Equal(t, gittest.TimezoneOffset, string(commit.Committer.Timezone))
-	require.Equal(t, gittest.TimezoneOffset, string(commit.Author.Timezone))
-	require.Equal(t, gittest.TestUser.Email, commit.Committer.Email)
-	require.Equal(t, commitMessage, commit.Subject)
+	require.Equal(t, []string{leftID.String()}, commit.GetParentIds())
+	require.Equal(t, author.GetName(), commit.GetAuthor().GetName())
+	require.Equal(t, author.GetEmail(), commit.GetAuthor().GetEmail())
+	require.Equal(t, gittest.TestUser.GetName(), commit.GetCommitter().GetName())
+	require.Equal(t, gittest.TimezoneOffset, string(commit.GetCommitter().GetTimezone()))
+	require.Equal(t, gittest.TimezoneOffset, string(commit.GetAuthor().GetTimezone()))
+	require.Equal(t, gittest.TestUser.GetEmail(), commit.GetCommitter().GetEmail())
+	require.Equal(t, commitMessage, commit.GetSubject())
 }
 
 func TestUserSquash_renames(t *testing.T) {
@@ -423,18 +423,18 @@ func testUserSquashRenames(t *testing.T, ctx context.Context) {
 	response, err := client.UserSquash(ctx, request)
 	require.NoError(t, err)
 
-	commit, err := repo.ReadCommit(ctx, git.Revision(response.SquashSha))
+	commit, err := repo.ReadCommit(ctx, git.Revision(response.GetSquashSha()))
 	require.NoError(t, err)
-	require.Equal(t, []string{startCommitID.String()}, commit.ParentIds)
-	require.Equal(t, author.Name, commit.Author.Name)
-	require.Equal(t, author.Email, commit.Author.Email)
-	require.Equal(t, gittest.TestUser.Name, commit.Committer.Name)
-	require.Equal(t, gittest.TestUser.Email, commit.Committer.Email)
-	require.Equal(t, gittest.TimezoneOffset, string(commit.Committer.Timezone))
-	require.Equal(t, gittest.TimezoneOffset, string(commit.Author.Timezone))
-	require.Equal(t, commitMessage, commit.Subject)
+	require.Equal(t, []string{startCommitID.String()}, commit.GetParentIds())
+	require.Equal(t, author.GetName(), commit.GetAuthor().GetName())
+	require.Equal(t, author.GetEmail(), commit.GetAuthor().GetEmail())
+	require.Equal(t, gittest.TestUser.GetName(), commit.GetCommitter().GetName())
+	require.Equal(t, gittest.TestUser.GetEmail(), commit.GetCommitter().GetEmail())
+	require.Equal(t, gittest.TimezoneOffset, string(commit.GetCommitter().GetTimezone()))
+	require.Equal(t, gittest.TimezoneOffset, string(commit.GetAuthor().GetTimezone()))
+	require.Equal(t, commitMessage, commit.GetSubject())
 
-	gittest.RequireTree(t, cfg, repoPath, response.SquashSha, []gittest.TreeEntry{
+	gittest.RequireTree(t, cfg, repoPath, response.GetSquashSha(), []gittest.TreeEntry{
 		{Path: renamedFilename, Mode: "100644", Content: "This is another change", OID: endBlobID},
 	})
 }
@@ -589,12 +589,12 @@ func testUserSquashEmptyCommit(t *testing.T, ctx context.Context) {
 			})
 			require.NoError(t, err)
 			testhelper.ProtoEqual(t, &gitalypb.UserSquashResponse{
-				SquashSha: tc.expectedCommit.Id,
+				SquashSha: tc.expectedCommit.GetId(),
 			}, response)
 
-			gittest.RequireTree(t, cfg, repoPath, tc.expectedCommit.Id, tc.expectedTreeEntries)
+			gittest.RequireTree(t, cfg, repoPath, tc.expectedCommit.GetId(), tc.expectedTreeEntries)
 
-			commit, err := repo.ReadCommit(ctx, git.Revision(tc.expectedCommit.Id))
+			commit, err := repo.ReadCommit(ctx, git.Revision(tc.expectedCommit.GetId()))
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedCommit, commit)
 		})
@@ -868,7 +868,7 @@ func testUserSquashGitError(t *testing.T, ctx context.Context) {
 			desc: "user has no name set",
 			request: &gitalypb.UserSquashRequest{
 				Repository:    repo,
-				User:          &gitalypb.User{Email: gittest.TestUser.Email},
+				User:          &gitalypb.User{Email: gittest.TestUser.GetEmail()},
 				Author:        gittest.TestUser,
 				CommitMessage: commitMessage,
 				StartSha:      commitID.String(),
@@ -881,7 +881,7 @@ func testUserSquashGitError(t *testing.T, ctx context.Context) {
 			request: &gitalypb.UserSquashRequest{
 				Repository:    repo,
 				User:          gittest.TestUser,
-				Author:        &gitalypb.User{Email: gittest.TestUser.Email},
+				Author:        &gitalypb.User{Email: gittest.TestUser.GetEmail()},
 				CommitMessage: commitMessage,
 				StartSha:      commitID.String(),
 				EndSha:        commitID.String(),
@@ -893,7 +893,7 @@ func testUserSquashGitError(t *testing.T, ctx context.Context) {
 			request: &gitalypb.UserSquashRequest{
 				Repository:    repo,
 				User:          gittest.TestUser,
-				Author:        &gitalypb.User{Name: gittest.TestUser.Name},
+				Author:        &gitalypb.User{Name: gittest.TestUser.GetName()},
 				CommitMessage: commitMessage,
 				StartSha:      commitID.String(),
 				EndSha:        commitID.String(),

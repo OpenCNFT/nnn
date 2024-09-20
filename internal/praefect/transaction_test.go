@@ -94,7 +94,7 @@ func TestTransactionSucceeds(t *testing.T) {
 		ReferenceUpdatesHash: hash[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.State)
+	require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.GetState())
 
 	verifyCounterMetrics(t, txMgr, counterMetrics{
 		registered: 1,
@@ -204,7 +204,7 @@ func TestTransactionWithMultipleNodes(t *testing.T) {
 						ReferenceUpdatesHash: tc.hashes[idx][:],
 					})
 					require.NoError(t, err)
-					require.Equal(t, tc.expectedState, response.State)
+					require.Equal(t, tc.expectedState, response.GetState())
 				}(i)
 			}
 
@@ -438,9 +438,9 @@ func TestTransactionReachesQuorum(t *testing.T) {
 					require.NoError(t, err)
 
 					if v.shouldSucceed {
-						require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.State, "node should have received COMMIT")
+						require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.GetState(), "node should have received COMMIT")
 					} else {
-						require.Equal(t, gitalypb.VoteTransactionResponse_ABORT, response.State, "node should have received ABORT")
+						require.Equal(t, gitalypb.VoteTransactionResponse_ABORT, response.GetState(), "node should have received ABORT")
 					}
 				}(i, v)
 			}
@@ -538,9 +538,9 @@ func TestTransactionWithMultipleVotes(t *testing.T) {
 						assert.NoError(t, err)
 
 						if v.voteSucceeds[j] {
-							assert.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.State, "node should have received COMMIT")
+							assert.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.GetState(), "node should have received COMMIT")
 						} else {
-							assert.Equal(t, gitalypb.VoteTransactionResponse_ABORT, response.State, "node should have received ABORT")
+							assert.Equal(t, gitalypb.VoteTransactionResponse_ABORT, response.GetState(), "node should have received ABORT")
 						}
 					}
 				}(i, v)
@@ -671,9 +671,9 @@ func TestTransactionCancellation(t *testing.T) {
 					require.NoError(t, err)
 
 					if v.shouldSucceed {
-						require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.State, "node should have received COMMIT")
+						require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.GetState(), "node should have received COMMIT")
 					} else {
-						require.Equal(t, gitalypb.VoteTransactionResponse_ABORT, response.State, "node should have received ABORT")
+						require.Equal(t, gitalypb.VoteTransactionResponse_ABORT, response.GetState(), "node should have received ABORT")
 					}
 				}(i, v)
 			}
@@ -783,7 +783,7 @@ func TestStopTransaction(t *testing.T) {
 			ReferenceUpdatesHash: hash[:],
 		})
 		require.NoError(t, err)
-		require.Equal(t, gitalypb.VoteTransactionResponse_STOP, response.State)
+		require.Equal(t, gitalypb.VoteTransactionResponse_STOP, response.GetState())
 
 		results, err := transaction.State()
 		require.NoError(t, err)
@@ -822,7 +822,7 @@ func TestStopTransaction(t *testing.T) {
 			ReferenceUpdatesHash: hash[:],
 		})
 		require.NoError(t, err)
-		require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.State)
+		require.Equal(t, gitalypb.VoteTransactionResponse_COMMIT, response.GetState())
 
 		_, err = client.StopTransaction(ctx, &gitalypb.StopTransactionRequest{
 			TransactionId: transaction.ID(),
@@ -835,7 +835,7 @@ func TestStopTransaction(t *testing.T) {
 			ReferenceUpdatesHash: hash[:],
 		})
 		require.NoError(t, err)
-		require.Equal(t, gitalypb.VoteTransactionResponse_STOP, response.State)
+		require.Equal(t, gitalypb.VoteTransactionResponse_STOP, response.GetState())
 
 		results, err := transaction.State()
 		require.NoError(t, err)
@@ -913,7 +913,7 @@ func TestStopTransaction(t *testing.T) {
 				ReferenceUpdatesHash: hash[:],
 			})
 			require.NoError(t, err)
-			require.Equal(t, gitalypb.VoteTransactionResponse_STOP, response.State)
+			require.Equal(t, gitalypb.VoteTransactionResponse_STOP, response.GetState())
 		}()
 
 		_, err = client.StopTransaction(ctx, &gitalypb.StopTransactionRequest{

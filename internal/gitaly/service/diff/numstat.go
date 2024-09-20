@@ -23,7 +23,7 @@ func (s *server) DiffStats(in *gitalypb.DiffStatsRequest, stream gitalypb.DiffSe
 	cmd, err := repo.Exec(stream.Context(), gitcmd.Command{
 		Name:  "diff",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--numstat"}, gitcmd.Flag{Name: "-z"}},
-		Args:  []string{in.LeftCommitId, in.RightCommitId},
+		Args:  []string{in.GetLeftCommitId(), in.GetRightCommitId()},
 	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)

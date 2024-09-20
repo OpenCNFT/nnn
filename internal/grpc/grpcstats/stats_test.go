@@ -117,7 +117,7 @@ func TestPayloadBytes(t *testing.T) {
 			if !assert.NoError(t, err) {
 				return
 			}
-			require.Equal(t, newStubPayload(), resp.Payload)
+			require.Equal(t, newStubPayload(), resp.GetPayload())
 
 			call, err := testClient.HalfDuplexCall(ctx)
 			if !assert.NoError(t, err) {

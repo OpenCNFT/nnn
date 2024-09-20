@@ -29,7 +29,7 @@ func uploadPack(ctx context.Context, conn *grpc.ClientConn, registry *sidechanne
 		return 0, fmt.Errorf("json unmarshal: %w", err)
 	}
 
-	request.GitConfigOptions = uploadPackConfig(request.GitConfigOptions)
+	request.GitConfigOptions = uploadPackConfig(request.GetGitConfigOptions())
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -43,7 +43,7 @@ func uploadPackWithSidechannel(ctx context.Context, conn *grpc.ClientConn, regis
 		return 0, fmt.Errorf("json unmarshal: %w", err)
 	}
 
-	request.GitConfigOptions = uploadPackConfig(request.GitConfigOptions)
+	request.GitConfigOptions = uploadPackConfig(request.GetGitConfigOptions())
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

@@ -100,32 +100,32 @@ func (cvh *cgroupV2Handler) collect(repoPath string, ch chan<- prometheus.Metric
 		logger.WithError(err).Warn("unable to get cgroup stats")
 	} else {
 		cpuUserMetric := cvh.cpuUsage.WithLabelValues(repoPath, "user")
-		cpuUserMetric.Set(float64(metrics.CPU.UserUsec))
+		cpuUserMetric.Set(float64(metrics.GetCPU().GetUserUsec()))
 		ch <- cpuUserMetric
 
 		ch <- prometheus.MustNewConstMetric(
 			cvh.cpuCFSPeriods,
 			prometheus.CounterValue,
-			float64(metrics.CPU.NrPeriods),
+			float64(metrics.GetCPU().GetNrPeriods()),
 			repoPath,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			cvh.cpuCFSThrottledPeriods,
 			prometheus.CounterValue,
-			float64(metrics.CPU.NrThrottled),
+			float64(metrics.GetCPU().GetNrThrottled()),
 			repoPath,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			cvh.cpuCFSThrottledTime,
 			prometheus.CounterValue,
-			float64(metrics.CPU.ThrottledUsec)/float64(time.Second),
+			float64(metrics.GetCPU().GetThrottledUsec())/float64(time.Second),
 			repoPath,
 		)
 
 		cpuKernelMetric := cvh.cpuUsage.WithLabelValues(repoPath, "kernel")
-		cpuKernelMetric.Set(float64(metrics.CPU.SystemUsec))
+		cpuKernelMetric.Set(float64(metrics.GetCPU().GetSystemUsec()))
 		ch <- cpuKernelMetric
 	}
 
@@ -170,24 +170,24 @@ func (cvh *cgroupV2Handler) stats() (Stats, error) {
 
 	stats := Stats{
 		ParentStats: CgroupStats{
-			CPUThrottledCount:    metrics.CPU.NrThrottled,
-			CPUThrottledDuration: float64(metrics.CPU.ThrottledUsec) / float64(time.Second),
-			MemoryUsage:          metrics.Memory.Usage,
-			MemoryLimit:          metrics.Memory.UsageLimit,
+			CPUThrottledCount:    metrics.GetCPU().GetNrThrottled(),
+			CPUThrottledDuration: float64(metrics.GetCPU().GetThrottledUsec()) / float64(time.Second),
+			MemoryUsage:          metrics.GetMemory().GetUsage(),
+			MemoryLimit:          metrics.GetMemory().GetUsageLimit(),
 			// memory.stat breaks down the cgroup's memory footprint into different types of memory. In
 			// Cgroup V2, this file includes the consumption of the cgroup’s entire subtree. Total_* stats
 			// were removed.
-			TotalAnon:         metrics.Memory.Anon,
-			TotalActiveAnon:   metrics.Memory.ActiveAnon,
-			TotalInactiveAnon: metrics.Memory.InactiveAnon,
-			TotalFile:         metrics.Memory.File,
-			TotalActiveFile:   metrics.Memory.ActiveFile,
-			TotalInactiveFile: metrics.Memory.InactiveFile,
+			TotalAnon:         metrics.GetMemory().GetAnon(),
+			TotalActiveAnon:   metrics.GetMemory().GetActiveAnon(),
+			TotalInactiveAnon: metrics.GetMemory().GetInactiveAnon(),
+			TotalFile:         metrics.GetMemory().GetFile(),
+			TotalActiveFile:   metrics.GetMemory().GetActiveFile(),
+			TotalInactiveFile: metrics.GetMemory().GetInactiveFile(),
 		},
 	}
 
-	if metrics.MemoryEvents != nil {
-		stats.ParentStats.OOMKills = metrics.MemoryEvents.OomKill
+	if metrics.GetMemoryEvents() != nil {
+		stats.ParentStats.OOMKills = metrics.GetMemoryEvents().GetOomKill()
 	}
 	return stats, nil
 }

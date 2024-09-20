@@ -18,7 +18,7 @@ func validateCommitStatsRequest(ctx context.Context, locator storage.Locator, in
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(in.Revision); err != nil {
+	if err := git.ValidateRevision(in.GetRevision()); err != nil {
 		return err
 	}
 	return nil
@@ -45,20 +45,20 @@ func (s *server) commitStats(ctx context.Context, in *gitalypb.CommitStatsReques
 		return nil, fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	commit, err := repo.ReadCommit(ctx, git.Revision(in.Revision))
+	commit, err := repo.ReadCommit(ctx, git.Revision(in.GetRevision()))
 	if err != nil {
 		return nil, err
 	}
 	if commit == nil {
-		return nil, fmt.Errorf("commit not found: %q", in.Revision)
+		return nil, fmt.Errorf("commit not found: %q", in.GetRevision())
 	}
 
 	var args []string
 
 	if len(commit.GetParentIds()) == 0 {
-		args = append(args, objectHash.EmptyTreeOID.String(), commit.Id)
+		args = append(args, objectHash.EmptyTreeOID.String(), commit.GetId())
 	} else {
-		args = append(args, commit.Id+"^", commit.Id)
+		args = append(args, commit.GetId()+"^", commit.GetId())
 	}
 
 	cmd, err := repo.Exec(ctx, gitcmd.Command{
@@ -108,7 +108,7 @@ func (s *server) commitStats(ctx context.Context, in *gitalypb.CommitStatsReques
 	}
 
 	return &gitalypb.CommitStatsResponse{
-		Oid:       commit.Id,
+		Oid:       commit.GetId(),
 		Additions: added,
 		Deletions: deleted,
 	}, nil

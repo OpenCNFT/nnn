@@ -59,9 +59,9 @@ func TestListLFSPointers(t *testing.T) {
 		{
 			desc: "object IDs",
 			revs: []string{
-				repoInfo.lfsPointers[0].Oid,
-				repoInfo.lfsPointers[1].Oid,
-				repoInfo.lfsPointers[2].Oid,
+				repoInfo.lfsPointers[0].GetOid(),
+				repoInfo.lfsPointers[1].GetOid(),
+				repoInfo.lfsPointers[2].GetOid(),
 				repoInfo.defaultTreeID.String(),   // tree
 				repoInfo.defaultCommitID.String(), // commit
 			},
@@ -226,7 +226,7 @@ size 12345`
 				quarantineDir, err := quarantine.New(ctx, gittest.RewrittenRepository(t, ctx, cfg, repo), testhelper.NewLogger(t), config.NewLocator(cfg))
 				require.NoError(t, err)
 
-				repo.GitObjectDirectory = quarantineDir.QuarantinedRepo().GitObjectDirectory
+				repo.GitObjectDirectory = quarantineDir.QuarantinedRepo().GetGitObjectDirectory()
 
 				// There are no quarantined objects yet, so none should be returned
 				// here.
@@ -252,7 +252,7 @@ size 12345`
 				// Note that we need to continue using the non-rewritten repository
 				// here as `localrepo.NewTestRepo()` already will try to rewrite it
 				// again.
-				repo.GitObjectDirectory = quarantineDir.QuarantinedRepo().GitObjectDirectory
+				repo.GitObjectDirectory = quarantineDir.QuarantinedRepo().GetGitObjectDirectory()
 
 				// Write a new object into the repository. Because we set
 				// GIT_OBJECT_DIRECTORY to the quarantine directory, objects will be
@@ -297,7 +297,7 @@ size 12345`
 					// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 					// sends it back to Gitaly when it performs requests in the access checks. The repository
 					// would have already been rewritten by Praefect, so we have to adjust for that as well.
-					gittest.RewrittenRepository(t, ctx, cfg, setup.repo).RelativePath,
+					gittest.RewrittenRepository(t, ctx, cfg, setup.repo).GetRelativePath(),
 				)
 			}
 
@@ -359,9 +359,9 @@ func TestGetLFSPointers(t *testing.T) {
 			request: &gitalypb.GetLFSPointersRequest{
 				Repository: repo,
 				BlobIds: []string{
-					repoInfo.lfsPointers[0].Oid,
-					repoInfo.lfsPointers[1].Oid,
-					repoInfo.lfsPointers[2].Oid,
+					repoInfo.lfsPointers[0].GetOid(),
+					repoInfo.lfsPointers[1].GetOid(),
+					repoInfo.lfsPointers[2].GetOid(),
 				},
 			},
 			expectedPointers: []*gitalypb.LFSPointer{
@@ -375,10 +375,10 @@ func TestGetLFSPointers(t *testing.T) {
 			request: &gitalypb.GetLFSPointersRequest{
 				Repository: repo,
 				BlobIds: []string{
-					repoInfo.lfsPointers[0].Oid,
-					repoInfo.lfsPointers[1].Oid,
+					repoInfo.lfsPointers[0].GetOid(),
+					repoInfo.lfsPointers[1].GetOid(),
 					repoInfo.defaultTreeID.String(),
-					repoInfo.lfsPointers[2].Oid,
+					repoInfo.lfsPointers[2].GetOid(),
 					repoInfo.defaultCommitID.String(),
 				},
 			},
@@ -420,7 +420,7 @@ func lfsPointersEqual(tb testing.TB, expected, actual []*gitalypb.LFSPointer) {
 
 	for _, slice := range [][]*gitalypb.LFSPointer{expected, actual} {
 		sort.Slice(slice, func(i, j int) bool {
-			return strings.Compare(slice[i].Oid, slice[j].Oid) < 0
+			return strings.Compare(slice[i].GetOid(), slice[j].GetOid()) < 0
 		})
 	}
 
@@ -489,7 +489,7 @@ func setupRepoWithLFS(tb testing.TB, ctx context.Context, cfg config.Cfg) (*gita
 	}
 
 	masterTreeID := gittest.WriteTree(tb, cfg, repoPath, []gittest.TreeEntry{
-		{Mode: "100644", Path: lfsPointers[0].Oid, Content: string(lfsPointers[0].Data)},
+		{Mode: "100644", Path: lfsPointers[0].GetOid(), Content: string(lfsPointers[0].GetData())},
 	})
 	masterCommitID := gittest.WriteCommit(tb, cfg, repoPath,
 		gittest.WithTree(masterTreeID),
@@ -498,17 +498,17 @@ func setupRepoWithLFS(tb testing.TB, ctx context.Context, cfg config.Cfg) (*gita
 
 	_ = gittest.WriteCommit(tb, cfg, repoPath,
 		gittest.WithTreeEntries(
-			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[1].Oid, Content: string(lfsPointers[1].Data)},
-			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[2].Oid, Content: string(lfsPointers[2].Data)},
+			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[1].GetOid(), Content: string(lfsPointers[1].GetData())},
+			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[2].GetOid(), Content: string(lfsPointers[2].GetData())},
 		),
 		gittest.WithBranch("foo"),
 	)
 
 	_ = gittest.WriteCommit(tb, cfg, repoPath,
 		gittest.WithTreeEntries(
-			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[3].Oid, Content: string(lfsPointers[3].Data)},
-			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[4].Oid, Content: string(lfsPointers[4].Data)},
-			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[5].Oid, Content: string(lfsPointers[5].Data)},
+			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[3].GetOid(), Content: string(lfsPointers[3].GetData())},
+			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[4].GetOid(), Content: string(lfsPointers[4].GetData())},
+			gittest.TreeEntry{Mode: "100644", Path: lfsPointers[5].GetOid(), Content: string(lfsPointers[5].GetData())},
 		),
 		gittest.WithBranch("bar"),
 	)

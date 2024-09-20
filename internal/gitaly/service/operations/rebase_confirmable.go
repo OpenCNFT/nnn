@@ -41,8 +41,8 @@ func (s *Server) UserRebaseConfirmable(stream gitalypb.OperationService_UserReba
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	branch := git.NewReferenceNameFromBranchName(string(header.Branch))
-	oldrev, err := objectHash.FromHex(header.BranchSha)
+	branch := git.NewReferenceNameFromBranchName(string(header.GetBranch()))
+	oldrev, err := objectHash.FromHex(header.GetBranchSha())
 	if err != nil {
 		return structerr.NewNotFound("%w", err)
 	}
@@ -110,12 +110,12 @@ func (s *Server) UserRebaseConfirmable(stream gitalypb.OperationService_UserReba
 	if err := s.updateReferenceWithHooks(
 		ctx,
 		header.GetRepository(),
-		header.User,
+		header.GetUser(),
 		quarantineDir,
 		branch,
 		newrev,
 		oldrev,
-		header.GitPushOptions...,
+		header.GetGitPushOptions()...,
 	); err != nil {
 		var customHookErr updateref.CustomHookError
 		switch {
@@ -205,23 +205,23 @@ func validateUserRebaseToRefRequest(ctx context.Context, locator storage.Locator
 		return err
 	}
 
-	if len(in.FirstParentRef) == 0 {
+	if len(in.GetFirstParentRef()) == 0 {
 		return errors.New("empty FirstParentRef")
 	}
 
-	if in.User == nil {
+	if in.GetUser() == nil {
 		return errors.New("empty User")
 	}
 
-	if in.SourceSha == "" {
+	if in.GetSourceSha() == "" {
 		return errors.New("empty SourceSha")
 	}
 
-	if len(in.TargetRef) == 0 {
+	if len(in.GetTargetRef()) == 0 {
 		return errors.New("empty TargetRef")
 	}
 
-	if !strings.HasPrefix(string(in.TargetRef), "refs/merge-requests") {
+	if !strings.HasPrefix(string(in.GetTargetRef()), "refs/merge-requests") {
 		return errors.New("invalid TargetRef")
 	}
 

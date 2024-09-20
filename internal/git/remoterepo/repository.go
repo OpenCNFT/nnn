@@ -53,7 +53,7 @@ func (rr *Repo) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
 				return git.ObjectHash{}, err
 			}
 
-			return git.ObjectHashByProto(response.Format)
+			return git.ObjectHashByProto(response.GetFormat())
 		}()
 	})
 
@@ -98,7 +98,7 @@ func (rr *Repo) HasBranches(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("has local branches: %w", err)
 	}
 
-	return resp.Value, nil
+	return resp.GetValue(), nil
 }
 
 // GetDefaultBranch returns the default branch for the remote repository. It does so by invoking
@@ -111,7 +111,7 @@ func (rr *Repo) GetDefaultBranch(ctx context.Context) (git.ReferenceName, error)
 		return "", err
 	}
 
-	return git.ReferenceName(resp.Name), nil
+	return git.ReferenceName(resp.GetName()), nil
 }
 
 // HeadReference returns the reference that HEAD points to for the remote
@@ -126,5 +126,5 @@ func (rr *Repo) HeadReference(ctx context.Context) (git.ReferenceName, error) {
 		return "", err
 	}
 
-	return git.ReferenceName(resp.Name), nil
+	return git.ReferenceName(resp.GetName()), nil
 }

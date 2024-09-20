@@ -41,7 +41,7 @@ func testUserUpdateSubmodule(t *testing.T, ctx context.Context) {
 	equalResponse := func(expected *gitalypb.UserUpdateSubmoduleResponse) func(testing.TB, string, *gitalypb.UserUpdateSubmoduleResponse) {
 		return func(tb testing.TB, expectedCommitID string, actual *gitalypb.UserUpdateSubmoduleResponse) {
 			tb.Helper()
-			if expected.BranchUpdate != nil {
+			if expected.GetBranchUpdate() != nil {
 				expected.BranchUpdate.CommitId = expectedCommitID
 			}
 
@@ -782,9 +782,9 @@ func testUserUpdateSubmodule(t *testing.T, ctx context.Context) {
 			// checking if the submodule was updated correctly in the main repo.
 			var expectedCommitID string
 			if setupData.verify == nil {
-				expectedCommitID = text.ChompBytes(gittest.Exec(t, cfg, "-C", repoPath, "rev-parse", string(setupData.request.Branch)))
+				expectedCommitID = text.ChompBytes(gittest.Exec(t, cfg, "-C", repoPath, "rev-parse", string(setupData.request.GetBranch())))
 
-				entry := gittest.Exec(t, cfg, "-C", repoPath, "ls-tree", "-z", fmt.Sprintf("%s^{tree}:", response.BranchUpdate.CommitId), tc.subPath)
+				entry := gittest.Exec(t, cfg, "-C", repoPath, "ls-tree", "-z", fmt.Sprintf("%s^{tree}:", response.GetBranchUpdate().GetCommitId()), tc.subPath)
 				parser := localrepo.NewParser(bytes.NewReader(entry), gittest.DefaultObjectHash)
 				parsedEntry, err := parser.NextEntry()
 				require.NoError(t, err)

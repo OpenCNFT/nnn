@@ -31,8 +31,8 @@ func (s *server) SSHUploadPack(stream gitalypb.SSHService_SSHUploadPackServer) e
 
 	s.logger.WithFields(log.Fields{
 		"GlRepository":     req.GetRepository().GetGlRepository(),
-		"GitConfigOptions": req.GitConfigOptions,
-		"GitProtocol":      req.GitProtocol,
+		"GitConfigOptions": req.GetGitConfigOptions(),
+		"GitProtocol":      req.GetGitProtocol(),
 	}).DebugContext(ctx, "SSHUploadPack")
 
 	if err = validateFirstUploadPackRequest(ctx, s.locator, req); err != nil {
@@ -82,7 +82,7 @@ func (s *server) sshUploadPack(ctx context.Context, req sshUploadPackRequest, st
 		return nil, 0, err
 	}
 
-	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repoProto.StorageName, repoPath)
+	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repoProto.GetStorageName(), repoPath)
 
 	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {

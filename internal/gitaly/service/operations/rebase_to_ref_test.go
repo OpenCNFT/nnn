@@ -67,13 +67,13 @@ func testUserRebaseToRefSuccessful(t *testing.T, ctx context.Context) {
 	response, err := client.UserRebaseToRef(ctx, request)
 	require.NoError(t, err, "rebase error")
 
-	rebasedCommitID := gittest.ResolveRevision(t, cfg, repoPath, response.CommitId)
+	rebasedCommitID := gittest.ResolveRevision(t, cfg, repoPath, response.GetCommitId())
 	require.NotEqual(t, rebasedCommitID, firstParentRefOID.String(), "no rebase occurred")
 
 	currentTargetRefOID := gittest.ResolveRevision(t, cfg, repoPath, targetRef)
-	require.Equal(t, currentTargetRefOID.String(), response.CommitId, "target ref does not point to rebased commit")
+	require.Equal(t, currentTargetRefOID.String(), response.GetCommitId(), "target ref does not point to rebased commit")
 
-	_, err = repo.ReadCommit(ctx, git.Revision(response.CommitId))
+	_, err = repo.ReadCommit(ctx, git.Revision(response.GetCommitId()))
 	require.NoError(t, err, "rebased commit is unreadable")
 
 	currentParentRefOID := gittest.ResolveRevision(t, cfg, repoPath, firstParentRef)

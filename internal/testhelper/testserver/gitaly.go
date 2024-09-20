@@ -161,7 +161,7 @@ func waitHealthy(tb testing.TB, ctx context.Context, addr string, authToken stri
 
 	resp, err := healthClient.Check(ctx, &healthpb.HealthCheckRequest{}, grpc.WaitForReady(true))
 	require.NoError(tb, err)
-	require.Equal(tb, healthpb.HealthCheckResponse_SERVING, resp.Status, "server not yet ready to serve")
+	require.Equal(tb, healthpb.HealthCheckResponse_SERVING, resp.GetStatus(), "server not yet ready to serve")
 }
 
 func runGitaly(tb testing.TB, cfg config.Cfg, registrar func(srv *grpc.Server, deps *service.Dependencies), opts ...GitalyServerOpt) (*grpc.Server, string, bool) {

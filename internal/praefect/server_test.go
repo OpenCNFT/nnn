@@ -193,13 +193,13 @@ func TestGitalyServerInfo(t *testing.T) {
 		client := gitalypb.NewServerServiceClient(cc)
 		actual, err := client.ServerInfo(ctx, &gitalypb.ServerInfoRequest{})
 		require.NoError(t, err)
-		for _, ss := range actual.StorageStatuses {
+		for _, ss := range actual.GetStorageStatuses() {
 			ss.FsType = ""
 		}
 
 		// sort the storages by name so they match the expected
-		sort.Slice(actual.StorageStatuses, func(i, j int) bool {
-			return actual.StorageStatuses[i].StorageName < actual.StorageStatuses[j].StorageName
+		sort.Slice(actual.GetStorageStatuses(), func(i, j int) bool {
+			return actual.GetStorageStatuses()[i].GetStorageName() < actual.GetStorageStatuses()[j].GetStorageName()
 		})
 
 		require.True(t, proto.Equal(expected, actual), "expected: %v, got: %v", expected, actual)
@@ -235,7 +235,7 @@ func TestGitalyServerInfo(t *testing.T) {
 		client := gitalypb.NewServerServiceClient(cc)
 		actual, err := client.ServerInfo(ctx, &gitalypb.ServerInfoRequest{})
 		require.NoError(t, err, "we expect praefect's server info to fail open even if the gitaly calls result in an error")
-		require.Empty(t, actual.StorageStatuses, "got: %v", actual)
+		require.Empty(t, actual.GetStorageStatuses(), "got: %v", actual)
 	})
 }
 
@@ -547,7 +547,7 @@ func TestGitalyServerSignature(t *testing.T) {
 		actual, err := client.ServerSignature(ctx, &gitalypb.ServerSignatureRequest{})
 		require.NoError(t, err)
 
-		require.Equal(t, expected.PublicKey, actual.PublicKey)
+		require.Equal(t, expected.GetPublicKey(), actual.GetPublicKey())
 	})
 
 	t.Run("gitaly signature mismatch between nodes", func(t *testing.T) {

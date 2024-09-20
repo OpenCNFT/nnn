@@ -26,7 +26,7 @@ func (s *Server) SetReplicationFactor(ctx context.Context, req *gitalypb.SetRepl
 }
 
 func (s *Server) setReplicationFactor(ctx context.Context, req *gitalypb.SetReplicationFactorRequest) (*gitalypb.SetReplicationFactorResponse, error) {
-	storages, err := s.assignmentStore.SetReplicationFactor(ctx, req.VirtualStorage, req.RelativePath, int(req.ReplicationFactor))
+	storages, err := s.assignmentStore.SetReplicationFactor(ctx, req.GetVirtualStorage(), req.GetRelativePath(), int(req.GetReplicationFactor()))
 	if err != nil {
 		return nil, fmt.Errorf("set replication factor: %w", err)
 	}

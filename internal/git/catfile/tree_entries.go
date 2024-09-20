@@ -56,7 +56,7 @@ func (tef *TreeEntryFinder) FindByRevisionAndPath(ctx context.Context, revision,
 	}
 
 	for _, entry := range entries {
-		if string(entry.Path) == path {
+		if string(entry.GetPath()) == path {
 			return entry, nil
 		}
 	}

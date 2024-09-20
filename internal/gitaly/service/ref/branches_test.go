@@ -77,7 +77,7 @@ func TestSuccessfulFindBranchRequest(t *testing.T) {
 			response, err := client.FindBranch(ctx, request)
 
 			require.NoError(t, err)
-			require.Equal(t, testCase.expectedBranch, response.Branch, "mismatched branches")
+			require.Equal(t, testCase.expectedBranch, response.GetBranch(), "mismatched branches")
 		})
 	}
 }

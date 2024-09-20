@@ -19,7 +19,7 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	referenceName := git.NewReferenceNameFromBranchName(string(in.Branch))
+	referenceName := git.NewReferenceNameFromBranchName(string(in.GetBranch()))
 
 	// While we're creating a quarantine directory, we know that it won't ever have any new
 	// objects given that we're doing a fast-forward merge. We still want to create one such
@@ -61,7 +61,7 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 		}
 	}
 
-	commitID, err := objectHash.FromHex(in.CommitId)
+	commitID, err := objectHash.FromHex(in.GetCommitId())
 	if err != nil {
 		return nil, structerr.NewInvalidArgument("cannot parse commit ID: %w", err)
 	}
@@ -74,7 +74,7 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 		return nil, structerr.NewFailedPrecondition("not fast forward")
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, in.GetRepository(), in.User, quarantineDir, referenceName, commitID, revision); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, in.GetRepository(), in.GetUser(), quarantineDir, referenceName, commitID, revision); err != nil {
 		var customHookErr updateref.CustomHookError
 		if errors.As(err, &customHookErr) {
 			if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
@@ -116,7 +116,7 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 
 	return &gitalypb.UserFFBranchResponse{
 		BranchUpdate: &gitalypb.OperationBranchUpdate{
-			CommitId: in.CommitId,
+			CommitId: in.GetCommitId(),
 		},
 	}, nil
 }
@@ -126,15 +126,15 @@ func validateFFRequest(ctx context.Context, locator storage.Locator, in *gitalyp
 		return err
 	}
 
-	if len(in.Branch) == 0 {
+	if len(in.GetBranch()) == 0 {
 		return errors.New("empty branch name")
 	}
 
-	if in.User == nil {
+	if in.GetUser() == nil {
 		return errors.New("empty user")
 	}
 
-	if in.CommitId == "" {
+	if in.GetCommitId() == "" {
 		return errors.New("empty commit id")
 	}
 

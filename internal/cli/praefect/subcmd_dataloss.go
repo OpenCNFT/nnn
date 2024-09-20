@@ -115,56 +115,56 @@ func datalossAction(ctx *cli.Context) error {
 				break
 			}
 
-			if len(resp.Repositories) > 0 {
+			if len(resp.GetRepositories()) > 0 {
 				indentPrintln(ctx.App.Writer, 1, "Repositories:")
 			}
 
-			for _, repo := range resp.Repositories {
+			for _, repo := range resp.GetRepositories() {
 				foundUnavailableRepos = true
 
 				unavailable := ""
-				if repo.Unavailable {
+				if repo.GetUnavailable() {
 					unavailable = " (unavailable)"
 				}
 
-				indentPrintln(ctx.App.Writer, 2, "%s%s:", repo.RelativePath, unavailable)
+				indentPrintln(ctx.App.Writer, 2, "%s%s:", repo.GetRelativePath(), unavailable)
 
-				primary := repo.Primary
+				primary := repo.GetPrimary()
 				if primary == "" {
 					primary = "No Primary"
 				}
 				indentPrintln(ctx.App.Writer, 3, "Primary: %s", primary)
 
 				indentPrintln(ctx.App.Writer, 3, "In-Sync Storages:")
-				for _, storage := range repo.Storages {
-					if storage.BehindBy != 0 {
+				for _, storage := range repo.GetStorages() {
+					if storage.GetBehindBy() != 0 {
 						continue
 					}
 
 					indentPrintln(ctx.App.Writer, 4, "%s%s%s",
-						storage.Name,
-						assignedMessage(storage.Assigned),
-						unhealthyMessage(storage.Healthy),
+						storage.GetName(),
+						assignedMessage(storage.GetAssigned()),
+						unhealthyMessage(storage.GetHealthy()),
 					)
 				}
 
 				indentPrintln(ctx.App.Writer, 3, "Outdated Storages:")
-				for _, storage := range repo.Storages {
-					if storage.BehindBy == 0 {
+				for _, storage := range repo.GetStorages() {
+					if storage.GetBehindBy() == 0 {
 						continue
 					}
 
 					plural := ""
-					if storage.BehindBy > 1 {
+					if storage.GetBehindBy() > 1 {
 						plural = "s"
 					}
 
 					indentPrintln(ctx.App.Writer, 4, "%s is behind by %d change%s or less%s%s",
-						storage.Name,
-						storage.BehindBy,
+						storage.GetName(),
+						storage.GetBehindBy(),
 						plural,
-						assignedMessage(storage.Assigned),
-						unhealthyMessage(storage.Healthy),
+						assignedMessage(storage.GetAssigned()),
+						unhealthyMessage(storage.GetHealthy()),
 					)
 				}
 			}

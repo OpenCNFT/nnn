@@ -31,7 +31,7 @@ func (s *server) CommitIsAncestor(ctx context.Context, in *gitalypb.CommitIsAnce
 
 	repo := s.localrepo(in.GetRepository())
 
-	ret, err := s.commitIsAncestorName(ctx, repo, in.AncestorId, in.ChildId)
+	ret, err := s.commitIsAncestorName(ctx, repo, in.GetAncestorId(), in.GetChildId())
 	return &gitalypb.CommitIsAncestorResponse{Value: ret}, err
 }
 

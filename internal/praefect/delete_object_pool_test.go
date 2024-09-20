@@ -57,7 +57,7 @@ func TestDeleteObjectPoolHandler(t *testing.T) {
 	}
 
 	require.NoError(t,
-		rs.CreateRepository(ctx, 1, repo.StorageName, repo.RelativePath, "replica-path", "primary", []string{"secondary", "unconfigured_storage"}, nil, true, true),
+		rs.CreateRepository(ctx, 1, repo.GetStorageName(), repo.GetRelativePath(), "replica-path", "primary", []string{"secondary", "unconfigured_storage"}, nil, true, true),
 	)
 
 	primaryConn, err := grpc.Dial(primaryAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -109,7 +109,7 @@ func TestDeleteObjectPoolHandler(t *testing.T) {
 	require.Len(t, hook.AllEntries(), 2, "expected a log entry for failed deletion")
 	entry := hook.AllEntries()[0]
 	require.Equal(t, "failed deleting repository", entry.Message)
-	require.Equal(t, repo.StorageName, entry.Data["virtual_storage"])
-	require.Equal(t, repo.RelativePath, entry.Data["relative_path"])
+	require.Equal(t, repo.GetStorageName(), entry.Data["virtual_storage"])
+	require.Equal(t, repo.GetRelativePath(), entry.Data["relative_path"])
 	require.Equal(t, "secondary", entry.Data["storage"])
 }

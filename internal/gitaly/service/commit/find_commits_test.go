@@ -798,7 +798,7 @@ func TestFindCommits_quarantine(t *testing.T) {
 				// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 				// sends it back to Gitaly when it performs requests in the access checks. The repository
 				// would have already been rewritten by Praefect, so we have to adjust for that as well.
-				gittest.RewrittenRepository(t, ctx, cfg, repo).RelativePath,
+				gittest.RewrittenRepository(t, ctx, cfg, repo).GetRelativePath(),
 			)
 
 			commits, err := getCommits(t, ctx, client, &gitalypb.FindCommitsRequest{
@@ -907,7 +907,7 @@ func benchmarkCommitStatsN(b *testing.B, ctx context.Context, request *gitalypb.
 			}
 			require.NoError(b, err)
 
-			for _, commit := range response.Commits {
+			for _, commit := range response.GetCommits() {
 				_, err = client.CommitStats(ctx, &gitalypb.CommitStatsRequest{
 					Repository: repo,
 					Revision:   []byte(commit.GetId()),

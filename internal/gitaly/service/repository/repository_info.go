@@ -13,11 +13,11 @@ func (s *server) RepositoryInfo(
 	ctx context.Context,
 	request *gitalypb.RepositoryInfoRequest,
 ) (*gitalypb.RepositoryInfoResponse, error) {
-	if err := s.locator.ValidateRepository(ctx, request.Repository); err != nil {
+	if err := s.locator.ValidateRepository(ctx, request.GetRepository()); err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	repo := s.localrepo(request.Repository)
+	repo := s.localrepo(request.GetRepository())
 
 	repoPath, err := repo.Path(ctx)
 	if err != nil {

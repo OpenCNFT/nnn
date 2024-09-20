@@ -317,7 +317,7 @@ func TestCommitIsAncestor(t *testing.T) {
 					// Gitaly sends the snapshot's relative path to Rails from `pre-receive` and Rails
 					// sends it back to Gitaly when it performs requests in the access checks. The repository
 					// would have already been rewritten by Praefect, so we have to adjust for that as well.
-					gittest.RewrittenRepository(t, ctx, cfg, setup.request.GetRepository()).RelativePath,
+					gittest.RewrittenRepository(t, ctx, cfg, setup.request.GetRepository()).GetRelativePath(),
 				)
 			}
 

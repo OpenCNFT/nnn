@@ -14,17 +14,17 @@ func (s *server) CommitDiff(in *gitalypb.CommitDiffRequest, stream gitalypb.Diff
 	ctx := stream.Context()
 
 	s.logger.WithFields(log.Fields{
-		"LeftCommitId":  in.LeftCommitId,
-		"RightCommitId": in.RightCommitId,
-		"Paths":         logPaths(in.Paths),
+		"LeftCommitId":  in.GetLeftCommitId(),
+		"RightCommitId": in.GetRightCommitId(),
+		"Paths":         logPaths(in.GetPaths()),
 	}).DebugContext(ctx, "CommitDiff")
 
 	if err := validateRequest(ctx, s.locator, in); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	leftSha := in.LeftCommitId
-	rightSha := in.RightCommitId
+	leftSha := in.GetLeftCommitId()
+	rightSha := in.GetRightCommitId()
 	whitespaceChanges := in.GetWhitespaceChanges()
 	paths := in.GetPaths()
 
@@ -63,26 +63,26 @@ func (s *server) CommitDiff(in *gitalypb.CommitDiffRequest, stream gitalypb.Diff
 	}
 
 	var limits diff.Limits
-	if in.EnforceLimits {
+	if in.GetEnforceLimits() {
 		limits.EnforceLimits = true
-		limits.MaxFiles = int(in.MaxFiles)
-		limits.MaxLines = int(in.MaxLines)
-		limits.MaxBytes = int(in.MaxBytes)
-		limits.MaxPatchBytes = int(in.MaxPatchBytes)
+		limits.MaxFiles = int(in.GetMaxFiles())
+		limits.MaxLines = int(in.GetMaxLines())
+		limits.MaxBytes = int(in.GetMaxBytes())
+		limits.MaxPatchBytes = int(in.GetMaxPatchBytes())
 
-		if len(in.MaxPatchBytesForFileExtension) > 0 {
+		if len(in.GetMaxPatchBytesForFileExtension()) > 0 {
 			limits.MaxPatchBytesForFileExtension = map[string]int{}
 
-			for extension, size := range in.MaxPatchBytesForFileExtension {
+			for extension, size := range in.GetMaxPatchBytesForFileExtension() {
 				limits.MaxPatchBytesForFileExtension[extension] = int(size)
 			}
 		}
 	}
-	limits.CollapseDiffs = in.CollapseDiffs
-	limits.CollectAllPaths = in.CollectAllPaths
-	limits.SafeMaxFiles = int(in.SafeMaxFiles)
-	limits.SafeMaxLines = int(in.SafeMaxLines)
-	limits.SafeMaxBytes = int(in.SafeMaxBytes)
+	limits.CollapseDiffs = in.GetCollapseDiffs()
+	limits.CollectAllPaths = in.GetCollectAllPaths()
+	limits.SafeMaxFiles = int(in.GetSafeMaxFiles())
+	limits.SafeMaxLines = int(in.GetSafeMaxLines())
+	limits.SafeMaxBytes = int(in.GetSafeMaxBytes())
 
 	return s.eachDiff(ctx, repo, cmd, limits, func(diff *diff.Diff) error {
 		response := &gitalypb.CommitDiffResponse{

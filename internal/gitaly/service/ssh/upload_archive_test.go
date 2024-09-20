@@ -67,7 +67,7 @@ func TestFailedUploadArchiveRequestDueToTimeout(t *testing.T) {
 
 		var code int32
 		if status := resp.GetExitStatus(); status != nil {
-			code = status.Value
+			code = status.GetValue()
 		}
 
 		return code, nil

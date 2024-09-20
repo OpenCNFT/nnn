@@ -207,7 +207,7 @@ func (hm *HealthManager) performHealthChecks(ctx context.Context) ([]string, []s
 					}).Error("failed checking node health")
 				}
 
-				healthy[i] = resp != nil && resp.Status == grpc_health_v1.HealthCheckResponse_SERVING
+				healthy[i] = resp != nil && resp.GetStatus() == grpc_health_v1.HealthCheckResponse_SERVING
 			}(i, client)
 			i++
 		}

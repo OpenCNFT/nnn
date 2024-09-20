@@ -341,7 +341,7 @@ func TestListLastCommitsForTree(t *testing.T) {
 				result []*gitalypb.ListLastCommitsForTreeResponse_CommitForTree,
 				response *gitalypb.ListLastCommitsForTreeResponse,
 			) []*gitalypb.ListLastCommitsForTreeResponse_CommitForTree {
-				return append(result, response.Commits...)
+				return append(result, response.GetCommits()...)
 			})
 			testhelper.RequireGrpcError(t, setup.expectedErr, err)
 			testhelper.ProtoEqual(t, setup.expectedCommits, commits)

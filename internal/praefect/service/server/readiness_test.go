@@ -70,7 +70,7 @@ func TestServer_ReadinessCheck(t *testing.T) {
 	assert.NotNil(t, resp.GetOkResponse())
 	if !assert.Nil(t, resp.GetFailureResponse()) {
 		for _, failure := range resp.GetFailureResponse().GetFailedChecks() {
-			assert.Failf(t, "failed check", "%s: %s", failure.Name, failure.ErrorMessage)
+			assert.Failf(t, "failed check", "%s: %s", failure.GetName(), failure.GetErrorMessage())
 		}
 	}
 	names := make([]string, 0, cap(triggered))
@@ -115,10 +115,10 @@ func TestServer_ReadinessCheck_unreachableGitaly(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, resp.GetOkResponse())
 	require.NotNil(t, resp.GetFailureResponse())
-	require.Len(t, resp.GetFailureResponse().FailedChecks, 5)
-	require.Equal(t, "clock synchronization", resp.GetFailureResponse().FailedChecks[0].Name)
-	require.Equal(t, "database read/write", resp.GetFailureResponse().FailedChecks[1].Name)
-	require.Equal(t, "gitaly node connectivity & disk access", resp.GetFailureResponse().FailedChecks[2].Name)
-	require.Equal(t, "praefect migrations", resp.GetFailureResponse().FailedChecks[3].Name)
-	require.Equal(t, "unavailable repositories", resp.GetFailureResponse().FailedChecks[4].Name)
+	require.Len(t, resp.GetFailureResponse().GetFailedChecks(), 5)
+	require.Equal(t, "clock synchronization", resp.GetFailureResponse().GetFailedChecks()[0].GetName())
+	require.Equal(t, "database read/write", resp.GetFailureResponse().GetFailedChecks()[1].GetName())
+	require.Equal(t, "gitaly node connectivity & disk access", resp.GetFailureResponse().GetFailedChecks()[2].GetName())
+	require.Equal(t, "praefect migrations", resp.GetFailureResponse().GetFailedChecks()[3].GetName())
+	require.Equal(t, "unavailable repositories", resp.GetFailureResponse().GetFailedChecks()[4].GetName())
 }

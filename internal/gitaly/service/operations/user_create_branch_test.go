@@ -111,7 +111,7 @@ func TestUserCreateBranch_successful(t *testing.T) {
 
 			response, err := client.UserCreateBranch(ctx, request)
 			require.NoError(t, err)
-			require.Equal(t, setup.expectedBranch, response.Branch)
+			require.Equal(t, setup.expectedBranch, response.GetBranch())
 
 			branches := gittest.Exec(t, cfg, "-C", repoPath, "for-each-ref", "--", "refs/heads/"+branchName)
 			require.Contains(t, string(branches), "refs/heads/"+branchName)
@@ -220,7 +220,7 @@ func TestUserCreateBranch_hook(t *testing.T) {
 			require.NoError(t, err)
 
 			output := string(testhelper.MustReadFile(t, hookOutputTempPath))
-			require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GlUsername)
+			require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 		})
 	}
 }
@@ -314,7 +314,7 @@ func TestUserCreateBranch_hookFailure(t *testing.T) {
 
 	hookContent := []byte("#!/bin/sh\necho GL_ID=$GL_ID\nexit 1")
 
-	expectedObject := "GL_ID=" + gittest.TestUser.GlId
+	expectedObject := "GL_ID=" + gittest.TestUser.GetGlId()
 
 	for _, hookName := range gitlabPreHooks {
 		gittest.WriteCustomHook(t, repoPath, hookName, hookContent)

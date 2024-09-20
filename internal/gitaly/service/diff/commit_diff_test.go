@@ -1150,23 +1150,23 @@ func getDiffsFromCommitDiffClient(t *testing.T, client gitalypb.DiffService_Comm
 
 		if currentDiff == nil {
 			currentDiff = &diff.Diff{
-				FromID:         fetchedDiff.FromId,
-				ToID:           fetchedDiff.ToId,
-				OldMode:        fetchedDiff.OldMode,
-				NewMode:        fetchedDiff.NewMode,
-				FromPath:       fetchedDiff.FromPath,
-				ToPath:         fetchedDiff.ToPath,
-				Binary:         fetchedDiff.Binary,
-				Collapsed:      fetchedDiff.Collapsed,
-				OverflowMarker: fetchedDiff.OverflowMarker,
-				Patch:          fetchedDiff.RawPatchData,
-				TooLarge:       fetchedDiff.TooLarge,
+				FromID:         fetchedDiff.GetFromId(),
+				ToID:           fetchedDiff.GetToId(),
+				OldMode:        fetchedDiff.GetOldMode(),
+				NewMode:        fetchedDiff.GetNewMode(),
+				FromPath:       fetchedDiff.GetFromPath(),
+				ToPath:         fetchedDiff.GetToPath(),
+				Binary:         fetchedDiff.GetBinary(),
+				Collapsed:      fetchedDiff.GetCollapsed(),
+				OverflowMarker: fetchedDiff.GetOverflowMarker(),
+				Patch:          fetchedDiff.GetRawPatchData(),
+				TooLarge:       fetchedDiff.GetTooLarge(),
 			}
 		} else {
-			currentDiff.Patch = append(currentDiff.Patch, fetchedDiff.RawPatchData...)
+			currentDiff.Patch = append(currentDiff.Patch, fetchedDiff.GetRawPatchData()...)
 		}
 
-		if fetchedDiff.EndOfPatch {
+		if fetchedDiff.GetEndOfPatch() {
 			diffs = append(diffs, currentDiff)
 			currentDiff = nil
 		}

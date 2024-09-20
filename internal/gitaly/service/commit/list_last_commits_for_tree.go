@@ -161,7 +161,7 @@ func validateListLastCommitsForTreeRequest(ctx context.Context, locator storage.
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision([]byte(in.Revision)); err != nil {
+	if err := git.ValidateRevision([]byte(in.GetRevision())); err != nil {
 		return err
 	}
 	if in.GetOffset() < 0 {

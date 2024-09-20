@@ -519,9 +519,9 @@ func (txn *Transaction) originalPackedRefsFilePath() string {
 // the repository in the transaction's snapshot.
 func (txn *Transaction) RewriteRepository(repo *gitalypb.Repository) *gitalypb.Repository {
 	rewritten := proto.Clone(repo).(*gitalypb.Repository)
-	rewritten.RelativePath = txn.snapshot.RelativePath(repo.RelativePath)
+	rewritten.RelativePath = txn.snapshot.RelativePath(repo.GetRelativePath())
 
-	if repo.RelativePath == txn.relativePath {
+	if repo.GetRelativePath() == txn.relativePath {
 		rewritten.GitObjectDirectory = txn.snapshotRepository.GetGitObjectDirectory()
 		rewritten.GitAlternateObjectDirectories = txn.snapshotRepository.GetGitAlternateObjectDirectories()
 	}
@@ -532,7 +532,7 @@ func (txn *Transaction) RewriteRepository(repo *gitalypb.Repository) *gitalypb.R
 // OriginalRepository returns the repository as it was before rewriting it to point to the snapshot.
 func (txn *Transaction) OriginalRepository(repo *gitalypb.Repository) *gitalypb.Repository {
 	original := proto.Clone(repo).(*gitalypb.Repository)
-	original.RelativePath = strings.TrimPrefix(repo.RelativePath, txn.snapshot.Prefix()+string(os.PathSeparator))
+	original.RelativePath = strings.TrimPrefix(repo.GetRelativePath(), txn.snapshot.Prefix()+string(os.PathSeparator))
 	original.GitObjectDirectory = ""
 	original.GitAlternateObjectDirectories = nil
 	return original
@@ -2318,13 +2318,13 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 func (mgr *TransactionManager) verifyKeyValueOperations(tx *Transaction) error {
 	if readSet := tx.recordingReadWriter.ReadSet(); len(readSet) > 0 {
 		if err := mgr.walkCommittedEntries(tx, func(entry *gitalypb.LogEntry, _ map[git.ObjectID]struct{}) error {
-			for _, op := range entry.Operations {
+			for _, op := range entry.GetOperations() {
 				var key []byte
-				switch op := op.Operation.(type) {
+				switch op := op.GetOperation().(type) {
 				case *gitalypb.LogEntry_Operation_SetKey_:
-					key = op.SetKey.Key
+					key = op.SetKey.GetKey()
 				case *gitalypb.LogEntry_Operation_DeleteKey_:
-					key = op.DeleteKey.Key
+					key = op.DeleteKey.GetKey()
 				}
 
 				stringKey := string(key)
@@ -2458,7 +2458,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("read applied LSN: %w", err)
 	}
 
-	mgr.appliedLSN = storage.LSN(appliedLSN.Value)
+	mgr.appliedLSN = storage.LSN(appliedLSN.GetValue())
 
 	if err := mgr.createStateDirectory(); err != nil {
 		return fmt.Errorf("create state directory: %w", err)
@@ -2826,8 +2826,8 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		// Sort the reference updates so the reference changes are always logged in a deterministic order.
 		sort.Slice(changes, func(i, j int) bool {
 			return bytes.Compare(
-				changes[i].ReferenceName,
-				changes[j].ReferenceName,
+				changes[i].GetReferenceName(),
+				changes[j].GetReferenceName(),
 			) == -1
 		})
 
@@ -3162,7 +3162,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 		for _, op := range entry.GetOperations() {
 			switch op := op.GetOperation().(type) {
 			case *gitalypb.LogEntry_Operation_RemoveDirectoryEntry_:
-				if string(op.RemoveDirectoryEntry.Path) == stats.AlternatesFilePath(transaction.relativePath) {
+				if string(op.RemoveDirectoryEntry.GetPath()) == stats.AlternatesFilePath(transaction.relativePath) {
 					return errConcurrentAlternateUnlink
 				}
 			}
@@ -3276,8 +3276,8 @@ func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transact
 
 	// Check for any concurrent ref deletion between this transaction's snapshot LSN to the end.
 	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
-		for _, refTransaction := range entry.ReferenceTransactions {
-			for _, change := range refTransaction.Changes {
+		for _, refTransaction := range entry.GetReferenceTransactions() {
+			for _, change := range refTransaction.GetChanges() {
 				// Dealing of HEAD ref is only applicable to reftable backend and
 				// can be ignored here.
 				if bytes.Equal(change.GetReferenceName(), []byte("HEAD")) {
@@ -3481,17 +3481,17 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 	}
 
 	for _, change := range changes {
-		if len(change.NewTarget) > 0 {
+		if len(change.GetNewTarget()) > 0 {
 			if err := updater.UpdateSymbolicReference(
 				version,
-				git.ReferenceName(change.ReferenceName),
-				git.ReferenceName(change.NewTarget),
+				git.ReferenceName(change.GetReferenceName()),
+				git.ReferenceName(change.GetNewTarget()),
 			); err != nil {
-				return fmt.Errorf("update symref %q: %w", change.ReferenceName, err)
+				return fmt.Errorf("update symref %q: %w", change.GetReferenceName(), err)
 			}
 		} else {
-			if err := updater.Update(git.ReferenceName(change.ReferenceName), git.ObjectID(change.NewOid), ""); err != nil {
-				return fmt.Errorf("update %q: %w", change.ReferenceName, err)
+			if err := updater.Update(git.ReferenceName(change.GetReferenceName()), git.ObjectID(change.GetNewOid()), ""); err != nil {
+				return fmt.Errorf("update %q: %w", change.GetReferenceName(), err)
 			}
 		}
 	}
@@ -3611,7 +3611,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 	// If the repository is being deleted, just delete it without any other changes given
 	// they'd all be removed anyway. Reapplying the other changes after a crash would also
 	// not work if the repository was successfully deleted before the crash.
-	if logEntry.RepositoryDeletion == nil {
+	if logEntry.GetRepositoryDeletion() == nil {
 		if err := mgr.applyHousekeeping(ctx, lsn, logEntry); err != nil {
 			return fmt.Errorf("apply housekeeping: %w", err)
 		}
@@ -3669,7 +3669,7 @@ func (mgr *TransactionManager) createRepository(ctx context.Context, repositoryP
 
 // applyHousekeeping applies housekeeping results to the target repository.
 func (mgr *TransactionManager) applyHousekeeping(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	if logEntry.Housekeeping == nil {
+	if logEntry.GetHousekeeping() == nil {
 		return nil
 	}
 
@@ -3697,7 +3697,7 @@ func (mgr *TransactionManager) applyHousekeeping(ctx context.Context, lsn storag
 func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
 	// For reftables, pack-refs is done via transaction operations, and we keep
 	// this nil. So we'd exit early too.
-	if logEntry.Housekeeping.PackRefs == nil {
+	if logEntry.GetHousekeeping().GetPackRefs() == nil {
 		return nil
 	}
 
@@ -3707,7 +3707,7 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "apply")
 	defer finishTimer()
 
-	repositoryPath := mgr.getAbsolutePath(logEntry.RelativePath)
+	repositoryPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
 	// Remove packed-refs lock. While we shouldn't be producing any new stale locks, it makes sense to have
 	// this for historic state until we're certain none of the repositories contain stale locks anymore.
 	// This clean up is not needed afterward.
@@ -3731,7 +3731,7 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 
 	modifiedDirs := map[string]struct{}{}
 	// Prune loose references. The log entry carries the list of fully qualified references to prune.
-	for _, ref := range logEntry.Housekeeping.PackRefs.PrunedRefs {
+	for _, ref := range logEntry.GetHousekeeping().GetPackRefs().GetPrunedRefs() {
 		path := filepath.Join(repositoryPath, string(ref))
 		if err := os.Remove(path); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
@@ -3786,7 +3786,7 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 // applyRepacking applies the new packfile set and removed known pruned packfiles. New packfiles created by concurrent
 // changes are kept intact.
 func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	if logEntry.Housekeeping.Repack == nil {
+	if logEntry.GetHousekeeping().GetRepack() == nil {
 		return nil
 	}
 
@@ -3796,10 +3796,10 @@ func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.L
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("repack", "apply")
 	defer finishTimer()
 
-	repack := logEntry.Housekeeping.Repack
-	repoPath := mgr.getAbsolutePath(logEntry.RelativePath)
+	repack := logEntry.GetHousekeeping().GetRepack()
+	repoPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
 
-	if err := mgr.replacePackfiles(repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn), repack.NewFiles, repack.DeletedFiles); err != nil {
+	if err := mgr.replacePackfiles(repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn), repack.GetNewFiles(), repack.GetDeletedFiles()); err != nil {
 		return fmt.Errorf("applying packfiles into destination repository: %w", err)
 	}
 
@@ -3811,8 +3811,8 @@ func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.L
 		return fmt.Errorf("prune loose objects: %w", err)
 	}
 
-	if repack.IsFullRepack {
-		if err := stats.UpdateFullRepackTimestamp(mgr.getAbsolutePath(logEntry.RelativePath), time.Now()); err != nil {
+	if repack.GetIsFullRepack() {
+		if err := stats.UpdateFullRepackTimestamp(mgr.getAbsolutePath(logEntry.GetRelativePath()), time.Now()); err != nil {
 			return fmt.Errorf("updating repack timestamp: %w", err)
 		}
 	}
@@ -3851,7 +3851,7 @@ func (mgr *TransactionManager) pruneLooseObjects(repositoryPath string) error {
 // can simply remove and link new directory over. Apart from commit-graph task, the repacking task also replaces the
 // chain before verification.
 func (mgr *TransactionManager) applyCommitGraphs(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	if logEntry.Housekeeping.WriteCommitGraphs == nil {
+	if logEntry.GetHousekeeping().GetWriteCommitGraphs() == nil {
 		return nil
 	}
 
@@ -3861,7 +3861,7 @@ func (mgr *TransactionManager) applyCommitGraphs(ctx context.Context, lsn storag
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("commit-graph", "apply")
 	defer finishTimer()
 
-	repoPath := mgr.getAbsolutePath(logEntry.RelativePath)
+	repoPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
 	if err := mgr.replaceCommitGraphs(repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn)); err != nil {
 		return fmt.Errorf("rewriting commit-graph: %w", err)
 	}
@@ -4102,7 +4102,7 @@ func (mgr *TransactionManager) walkCommittedEntries(transaction *Transaction, ca
 		// Transaction manager works on the partition level, including a repository and all of its pool
 		// member repositories (if any). We need to filter log entries of the repository this
 		// transaction targets.
-		if entry.RelativePath != transaction.relativePath {
+		if entry.GetRelativePath() != transaction.relativePath {
 			continue
 		}
 		if err := callback(entry, committed.objectDependencies); err != nil {

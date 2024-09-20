@@ -239,7 +239,7 @@ func WithConcurrency(total, perStorage int) PipelineOption {
 // Handle queues a request to create a backup. Commands either processed sequentially
 // or concurrently, if WithConcurrency() was called.
 func (p *Pipeline) Handle(ctx context.Context, cmd Command) {
-	ch := p.getWorker(cmd.Repository().StorageName)
+	ch := p.getWorker(cmd.Repository().GetStorageName())
 
 	select {
 	case <-ctx.Done():
@@ -325,7 +325,7 @@ func (p *Pipeline) processCommand(ctx context.Context, cmd Command) {
 		return
 	}
 
-	storageName := cmd.Repository().StorageName
+	storageName := cmd.Repository().GetStorageName()
 	p.processedReposMu.Lock()
 	if _, ok := p.processedRepos[storageName]; !ok {
 		p.processedRepos[storageName] = make(map[repositoryKey]struct{})
@@ -350,9 +350,9 @@ func (p *Pipeline) addError(repo *gitalypb.Repository, err error) {
 func (p *Pipeline) cmdLogger(cmd Command) log.Logger {
 	return p.log.WithFields(log.Fields{
 		"command":         cmd.Name(),
-		"storage_name":    cmd.Repository().StorageName,
-		"relative_path":   cmd.Repository().RelativePath,
-		"gl_project_path": cmd.Repository().GlProjectPath,
+		"storage_name":    cmd.Repository().GetStorageName(),
+		"relative_path":   cmd.Repository().GetRelativePath(),
+		"gl_project_path": cmd.Repository().GetGlProjectPath(),
 	})
 }
 
@@ -374,5 +374,5 @@ func (p *Pipeline) releaseWorkerSlot() {
 
 // NewRepositoryKey returns a unique identifier for the provided repo.
 func NewRepositoryKey(repo *gitalypb.Repository) repositoryKey {
-	return repositoryKey(repo.StorageName + "-" + repo.RelativePath)
+	return repositoryKey(repo.GetStorageName() + "-" + repo.GetRelativePath())
 }

@@ -29,11 +29,11 @@ func (s *server) SSHReceivePack(stream gitalypb.SSHService_SSHReceivePackServer)
 	}
 
 	s.logger.WithFields(log.Fields{
-		"GlID":             req.GlId,
-		"GlRepository":     req.GlRepository,
-		"GlUsername":       req.GlUsername,
-		"GitConfigOptions": req.GitConfigOptions,
-		"GitProtocol":      req.GitProtocol,
+		"GlID":             req.GetGlId(),
+		"GlRepository":     req.GetGlRepository(),
+		"GlUsername":       req.GetGlUsername(),
+		"GitConfigOptions": req.GetGitConfigOptions(),
+		"GitProtocol":      req.GetGitProtocol(),
 	}).DebugContext(stream.Context(), "SSHReceivePack")
 
 	if err = validateFirstReceivePackRequest(stream.Context(), s.locator, req); err != nil {
@@ -86,12 +86,12 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 	})
 	stderr = io.MultiWriter(&stderrBuilder, stderr)
 
-	repoPath, err := s.locator.GetRepoPath(ctx, req.Repository)
+	repoPath, err := s.locator.GetRepoPath(ctx, req.GetRepository())
 	if err != nil {
 		return err
 	}
 
-	config, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
+	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (s *server) sshReceivePack(stream gitalypb.SSHService_SSHReceivePackServer,
 }
 
 func validateFirstReceivePackRequest(ctx context.Context, locator storage.Locator, req *gitalypb.SSHReceivePackRequest) error {
-	if req.GlId == "" {
+	if req.GetGlId() == "" {
 		return errors.New("empty GlId")
 	}
 	if req.Stdin != nil {

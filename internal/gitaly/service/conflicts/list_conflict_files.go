@@ -28,12 +28,12 @@ func (s *server) ListConflictFiles(request *gitalypb.ListConflictFilesRequest, s
 		return err
 	}
 
-	ours, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.OurCommitOid+"^{commit}"))
+	ours, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.GetOurCommitOid()+"^{commit}"))
 	if err != nil {
 		return structerr.NewFailedPrecondition("could not lookup 'our' OID: %w", err)
 	}
 
-	theirs, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.TheirCommitOid+"^{commit}"))
+	theirs, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.GetTheirCommitOid()+"^{commit}"))
 	if err != nil {
 		return structerr.NewFailedPrecondition("could not lookup 'their' OID: %w", err)
 	}
@@ -111,14 +111,14 @@ func (s *server) conflictFilesWithGitMergeTree(
 	}
 
 	for _, conflict := range conflicts {
-		if !request.AllowTreeConflicts && (conflict.theirPath == "" || conflict.ourPath == "") {
+		if !request.GetAllowTreeConflicts() && (conflict.theirPath == "" || conflict.ourPath == "") {
 			return structerr.NewFailedPrecondition("conflict side missing")
 		}
 
 		conflictFiles = append(conflictFiles, &gitalypb.ConflictFile{
 			ConflictFilePayload: &gitalypb.ConflictFile_Header{
 				Header: &gitalypb.ConflictFileHeader{
-					CommitOid:    request.OurCommitOid,
+					CommitOid:    request.GetOurCommitOid(),
 					TheirPath:    []byte(conflict.theirPath),
 					OurPath:      []byte(conflict.ourPath),
 					AncestorPath: []byte(conflict.ancestorPath),

@@ -153,14 +153,14 @@ func TestPostReceivePack_successful(t *testing.T) {
 	expectedRepo := gittest.RewrittenRepository(t, ctx, cfg, repo)
 	if testhelper.IsWALEnabled() {
 		// The repository should be quarantined.
-		require.NotEmpty(t, payload.Repo.GitObjectDirectory)
+		require.NotEmpty(t, payload.Repo.GetGitObjectDirectory())
 		payload.Repo.GitObjectDirectory = "OVERRIDDEN"
 		expectedRepo.GitObjectDirectory = "OVERRIDDEN"
-		require.NotEmpty(t, payload.Repo.GitAlternateObjectDirectories)
+		require.NotEmpty(t, payload.Repo.GetGitAlternateObjectDirectories())
 		payload.Repo.GitAlternateObjectDirectories = []string{"OVERRIDDEN"}
 		expectedRepo.GitAlternateObjectDirectories = []string{"OVERRIDDEN"}
 		// The following values may change so we don't want to assert them for equality.
-		require.NotEmpty(t, payload.Repo.RelativePath)
+		require.NotEmpty(t, payload.Repo.GetRelativePath())
 		payload.Repo.RelativePath = "OVERRIDDEN"
 		expectedRepo.RelativePath = "OVERRIDDEN"
 		// When transactions are enabled the update hook is manually invoked as part of the

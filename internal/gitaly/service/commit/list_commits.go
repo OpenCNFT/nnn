@@ -20,7 +20,7 @@ func verifyListCommitsRequest(ctx context.Context, locator storage.Locator, requ
 	if len(request.GetRevisions()) == 0 {
 		return errors.New("missing revisions")
 	}
-	for _, revision := range request.Revisions {
+	for _, revision := range request.GetRevisions() {
 		if err := git.ValidateRevision([]byte(revision), git.AllowPseudoRevision()); err != nil {
 			return structerr.NewInvalidArgument("invalid revision: %w", err).WithMetadata("revision", revision)
 		}

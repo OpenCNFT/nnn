@@ -1540,13 +1540,13 @@ func testResolveConflicts(t *testing.T, ctx context.Context) {
 
 			if setup.requestHeader.Header != nil && !setup.skipCommitCheck {
 				repo := localrepo.NewTestRepo(t, setup.cfg, setup.repo)
-				headCommit, err := repo.ReadCommit(ctx, git.Revision(setup.requestHeader.Header.SourceBranch))
+				headCommit, err := repo.ReadCommit(ctx, git.Revision(setup.requestHeader.Header.GetSourceBranch()))
 				require.NoError(t, err)
-				require.Contains(t, headCommit.ParentIds, setup.requestHeader.Header.OurCommitOid)
-				require.Contains(t, headCommit.ParentIds, setup.requestHeader.Header.TheirCommitOid)
-				testhelper.ProtoEqual(t, setup.expectedCommitAuthor, headCommit.Author)
-				testhelper.ProtoEqual(t, setup.expectedCommitAuthor, headCommit.Committer)
-				require.Equal(t, string(headCommit.Subject), conflictResolutionCommitMessage)
+				require.Contains(t, headCommit.GetParentIds(), setup.requestHeader.Header.GetOurCommitOid())
+				require.Contains(t, headCommit.GetParentIds(), setup.requestHeader.Header.GetTheirCommitOid())
+				testhelper.ProtoEqual(t, setup.expectedCommitAuthor, headCommit.GetAuthor())
+				testhelper.ProtoEqual(t, setup.expectedCommitAuthor, headCommit.GetCommitter())
+				require.Equal(t, string(headCommit.GetSubject()), conflictResolutionCommitMessage)
 			}
 
 			if setup.additionalChecks != nil {

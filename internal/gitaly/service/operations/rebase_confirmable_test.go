@@ -191,8 +191,8 @@ func testUserRebaseConfirmableSkipEmptyCommits(t *testing.T, ctx context.Context
 		}),
 		Author: gittest.DefaultCommitAuthor,
 		Committer: &gitalypb.CommitAuthor{
-			Name:     gittest.TestUser.Name,
-			Email:    gittest.TestUser.Email,
+			Name:     gittest.TestUser.GetName(),
+			Email:    gittest.TestUser.GetEmail(),
 			Date:     &timestamppb.Timestamp{Seconds: 123456},
 			Timezone: []byte(gittest.TimezoneOffset),
 		},
@@ -360,8 +360,8 @@ func testUserRebaseConfirmableStableCommitIDs(t *testing.T, ctx context.Context)
 		}),
 		Author: gittest.DefaultCommitAuthor,
 		Committer: &gitalypb.CommitAuthor{
-			Name:  gittest.TestUser.Name,
-			Email: gittest.TestUser.Email,
+			Name:  gittest.TestUser.GetName(),
+			Email: gittest.TestUser.GetEmail(),
 			// Nanoseconds get ignored because commit timestamps aren't that granular.
 			Date:     committerDate,
 			Timezone: []byte(gittest.TimezoneOffset),

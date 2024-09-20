@@ -74,14 +74,14 @@ func (s *Server) ServerInfo(ctx context.Context, in *gitalypb.ServerInfoRequest)
 			// technically, any storage's storage status can be returned in the virtual storage's server info,
 			// but to be consistent we will choose the storage with the same name as the internal gitaly storage name.
 			for _, storageStatus := range resp.GetStorageStatuses() {
-				if storageStatus.StorageName == storage {
+				if storageStatus.GetStorageName() == storage {
 					storageStatuses[i] = storageStatus
 					// the storage name in the response needs to be rewritten to be the virtual storage name
 					// because the praefect client has no concept of internal gitaly nodes that are behind praefect.
 					// From the perspective of the praefect client, the primary internal gitaly node's storage status is equivalent
 					// to the virtual storage's storage status.
 					storageStatuses[i].StorageName = virtualStorage
-					storageStatuses[i].Writeable = storageStatus.Writeable
+					storageStatuses[i].Writeable = storageStatus.GetWriteable()
 					storageStatuses[i].ReplicationFactor = uint32(len(storages))
 
 					// Rails tests configure Praefect in front of tests that drive the direct git access with Rugged patches.
@@ -91,7 +91,7 @@ func (s *Server) ServerInfo(ctx context.Context, in *gitalypb.ServerInfoRequest)
 					if len(storages) > 1 {
 						// Each of the Gitaly nodes have a different filesystem ID they've generated. To have a stable filesystem
 						// ID for a given virtual storage, the filesystem ID is generated from the virtual storage's name.
-						storageStatuses[i].FilesystemId = DeriveFilesystemID(storageStatus.StorageName).String()
+						storageStatuses[i].FilesystemId = DeriveFilesystemID(storageStatus.GetStorageName()).String()
 					}
 
 					break

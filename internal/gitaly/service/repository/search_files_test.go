@@ -564,8 +564,8 @@ func consumeFilenameByContentChunked(stream gitalypb.RepositoryService_SearchFil
 			return nil, err
 		}
 
-		match = append(match, resp.MatchData...)
-		if resp.EndOfMatch {
+		match = append(match, resp.GetMatchData()...)
+		if resp.GetEndOfMatch() {
 			matches = append(matches, string(match))
 			match = nil
 		}
@@ -585,7 +585,7 @@ func consumeFilenameByName(stream gitalypb.RepositoryService_SearchFilesByNameCl
 			return nil, err
 		}
 
-		for _, file := range resp.Files {
+		for _, file := range resp.GetFiles() {
 			filenames = append(filenames, string(file))
 		}
 	}

@@ -25,8 +25,8 @@ func TestSingleTrailer(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 1, len(pairs))
-	assert.Equal(t, "Key", string(pairs[0].Key))
-	assert.Equal(t, "Value", string(pairs[0].Value))
+	assert.Equal(t, "Key", string(pairs[0].GetKey()))
+	assert.Equal(t, "Value", string(pairs[0].GetValue()))
 }
 
 func TestSingleTrailerWithTooLongKey(t *testing.T) {
@@ -41,8 +41,8 @@ func TestSingleTrailerWithTooLongKey(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 1, len(pairs))
-	assert.Equal(t, "Foo", string(pairs[0].Key))
-	assert.Equal(t, "Bar", string(pairs[0].Value))
+	assert.Equal(t, "Foo", string(pairs[0].GetKey()))
+	assert.Equal(t, "Bar", string(pairs[0].GetValue()))
 }
 
 func TestSingleTrailerWithTooLongValue(t *testing.T) {
@@ -55,8 +55,8 @@ func TestSingleTrailerWithTooLongValue(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 1, len(pairs))
-	assert.Equal(t, "Foo", string(pairs[0].Key))
-	assert.Equal(t, "Bar", string(pairs[0].Value))
+	assert.Equal(t, "Foo", string(pairs[0].GetKey()))
+	assert.Equal(t, "Bar", string(pairs[0].GetValue()))
 }
 
 func TestTooManyTrailers(t *testing.T) {
@@ -76,8 +76,8 @@ func TestSingleTrailerWithoutValue(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 1, len(pairs))
-	assert.Equal(t, "Key", string(pairs[0].Key))
-	assert.Equal(t, "", string(pairs[0].Value))
+	assert.Equal(t, "Key", string(pairs[0].GetKey()))
+	assert.Equal(t, "", string(pairs[0].GetValue()))
 }
 
 func TestSingleTrailerWithoutValueWithTrailingNullByte(t *testing.T) {
@@ -85,8 +85,8 @@ func TestSingleTrailerWithoutValueWithTrailingNullByte(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 1, len(pairs))
-	assert.Equal(t, "Key", string(pairs[0].Key))
-	assert.Equal(t, "", string(pairs[0].Value))
+	assert.Equal(t, "Key", string(pairs[0].GetKey()))
+	assert.Equal(t, "", string(pairs[0].GetValue()))
 }
 
 func TestMultipleTrailers(t *testing.T) {
@@ -94,10 +94,10 @@ func TestMultipleTrailers(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 2, len(pairs))
-	assert.Equal(t, "Key1", string(pairs[0].Key))
-	assert.Equal(t, "Value1", string(pairs[0].Value))
-	assert.Equal(t, "Key2", string(pairs[1].Key))
-	assert.Equal(t, "Value2", string(pairs[1].Value))
+	assert.Equal(t, "Key1", string(pairs[0].GetKey()))
+	assert.Equal(t, "Value1", string(pairs[0].GetValue()))
+	assert.Equal(t, "Key2", string(pairs[1].GetKey()))
+	assert.Equal(t, "Value2", string(pairs[1].GetValue()))
 }
 
 func TestMultipleTrailersWithTrailingNullByte(t *testing.T) {
@@ -105,10 +105,10 @@ func TestMultipleTrailersWithTrailingNullByte(t *testing.T) {
 	pairs := Parse(input)
 
 	assert.Equal(t, 2, len(pairs))
-	assert.Equal(t, "Key1", string(pairs[0].Key))
-	assert.Equal(t, "Value1", string(pairs[0].Value))
-	assert.Equal(t, "Key2", string(pairs[1].Key))
-	assert.Equal(t, "Value2", string(pairs[1].Value))
+	assert.Equal(t, "Key1", string(pairs[0].GetKey()))
+	assert.Equal(t, "Value1", string(pairs[0].GetValue()))
+	assert.Equal(t, "Key2", string(pairs[1].GetKey()))
+	assert.Equal(t, "Value2", string(pairs[1].GetValue()))
 }
 
 func TestInvalidTrailer(t *testing.T) {

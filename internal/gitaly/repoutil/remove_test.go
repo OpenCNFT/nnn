@@ -81,7 +81,7 @@ func TestRemove(t *testing.T) {
 
 				return gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
-					RelativePath:           repo.RelativePath,
+					RelativePath:           repo.GetRelativePath(),
 				})
 			},
 		},

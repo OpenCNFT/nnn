@@ -72,7 +72,7 @@ func TestGitalyServerFactory(t *testing.T) {
 		healthClient := healthpb.NewHealthClient(cc)
 		resp, err := healthClient.Check(ctx, &healthpb.HealthCheckRequest{})
 		require.NoError(t, err)
-		require.Equal(t, healthpb.HealthCheckResponse_SERVING, resp.Status)
+		require.Equal(t, healthpb.HealthCheckResponse_SERVING, resp.GetStatus())
 		return healthClient
 	}
 

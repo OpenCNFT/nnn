@@ -108,32 +108,32 @@ func metadataAction(appCtx *cli.Context) error {
 		return fmt.Errorf("get metadata: %w", err)
 	}
 
-	fmt.Fprintf(appCtx.App.Writer, "Repository ID: %d\n", metadata.RepositoryId)
-	fmt.Fprintf(appCtx.App.Writer, "Virtual Storage: %q\n", metadata.VirtualStorage)
-	fmt.Fprintf(appCtx.App.Writer, "Relative Path: %q\n", metadata.RelativePath)
-	fmt.Fprintf(appCtx.App.Writer, "Replica Path: %q\n", metadata.ReplicaPath)
-	fmt.Fprintf(appCtx.App.Writer, "Primary: %q\n", metadata.Primary)
-	fmt.Fprintf(appCtx.App.Writer, "Generation: %d\n", metadata.Generation)
+	fmt.Fprintf(appCtx.App.Writer, "Repository ID: %d\n", metadata.GetRepositoryId())
+	fmt.Fprintf(appCtx.App.Writer, "Virtual Storage: %q\n", metadata.GetVirtualStorage())
+	fmt.Fprintf(appCtx.App.Writer, "Relative Path: %q\n", metadata.GetRelativePath())
+	fmt.Fprintf(appCtx.App.Writer, "Replica Path: %q\n", metadata.GetReplicaPath())
+	fmt.Fprintf(appCtx.App.Writer, "Primary: %q\n", metadata.GetPrimary())
+	fmt.Fprintf(appCtx.App.Writer, "Generation: %d\n", metadata.GetGeneration())
 	fmt.Fprintf(appCtx.App.Writer, "Replicas:\n")
-	for _, replica := range metadata.Replicas {
-		fmt.Fprintf(appCtx.App.Writer, "- Storage: %q\n", replica.Storage)
-		fmt.Fprintf(appCtx.App.Writer, "  Assigned: %v\n", replica.Assigned)
+	for _, replica := range metadata.GetReplicas() {
+		fmt.Fprintf(appCtx.App.Writer, "- Storage: %q\n", replica.GetStorage())
+		fmt.Fprintf(appCtx.App.Writer, "  Assigned: %v\n", replica.GetAssigned())
 
-		generationText := fmt.Sprintf("%d, fully up to date", replica.Generation)
-		if replica.Generation == -1 {
+		generationText := fmt.Sprintf("%d, fully up to date", replica.GetGeneration())
+		if replica.GetGeneration() == -1 {
 			generationText = "replica not yet created"
-		} else if replica.Generation < metadata.Generation {
-			generationText = fmt.Sprintf("%d, behind by %d changes", replica.Generation, metadata.Generation-replica.Generation)
+		} else if replica.GetGeneration() < metadata.GetGeneration() {
+			generationText = fmt.Sprintf("%d, behind by %d changes", replica.GetGeneration(), metadata.GetGeneration()-replica.GetGeneration())
 		}
 
 		verifiedAt := "unverified"
-		if replica.VerifiedAt.IsValid() {
-			verifiedAt = replica.VerifiedAt.AsTime().String()
+		if replica.GetVerifiedAt().IsValid() {
+			verifiedAt = replica.GetVerifiedAt().AsTime().String()
 		}
 
 		fmt.Fprintf(appCtx.App.Writer, "  Generation: %s\n", generationText)
-		fmt.Fprintf(appCtx.App.Writer, "  Healthy: %v\n", replica.Healthy)
-		fmt.Fprintf(appCtx.App.Writer, "  Valid Primary: %v\n", replica.ValidPrimary)
+		fmt.Fprintf(appCtx.App.Writer, "  Healthy: %v\n", replica.GetHealthy())
+		fmt.Fprintf(appCtx.App.Writer, "  Valid Primary: %v\n", replica.GetValidPrimary())
 		fmt.Fprintf(appCtx.App.Writer, "  Verified At: %s\n", verifiedAt)
 	}
 	return nil

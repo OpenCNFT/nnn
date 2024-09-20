@@ -51,18 +51,18 @@ const (
 // Failover contains configuration for the mechanism that tracks healthiness of the cluster nodes.
 type Failover struct {
 	// Enabled is a trigger used to check if failover is enabled or not.
-	Enabled bool `toml:"enabled,omitempty" json:"enabled"`
+	Enabled bool `json:"enabled" toml:"enabled,omitempty"`
 	// ElectionStrategy is the strategy to use for electing primaries nodes.
-	ElectionStrategy         ElectionStrategy  `toml:"election_strategy,omitempty" json:"election_strategy"`
-	ErrorThresholdWindow     duration.Duration `toml:"error_threshold_window,omitempty" json:"error_threshold_window"`
-	WriteErrorThresholdCount uint32            `toml:"write_error_threshold_count,omitempty" json:"write_error_threshold_count"`
-	ReadErrorThresholdCount  uint32            `toml:"read_error_threshold_count,omitempty" json:"read_error_threshold_count"`
+	ElectionStrategy         ElectionStrategy  `json:"election_strategy"           toml:"election_strategy,omitempty"`
+	ErrorThresholdWindow     duration.Duration `json:"error_threshold_window"      toml:"error_threshold_window,omitempty"`
+	WriteErrorThresholdCount uint32            `json:"write_error_threshold_count" toml:"write_error_threshold_count,omitempty"`
+	ReadErrorThresholdCount  uint32            `json:"read_error_threshold_count"  toml:"read_error_threshold_count,omitempty"`
 	// BootstrapInterval allows set a time duration that would be used on startup to make initial health check.
 	// The default value is 1s.
-	BootstrapInterval duration.Duration `toml:"bootstrap_interval,omitempty" json:"bootstrap_interval"`
+	BootstrapInterval duration.Duration `json:"bootstrap_interval" toml:"bootstrap_interval,omitempty"`
 	// MonitorInterval allows set a time duration that would be used after bootstrap is completed to execute health checks.
 	// The default value is 3s.
-	MonitorInterval duration.Duration `toml:"monitor_interval,omitempty" json:"monitor_interval"`
+	MonitorInterval duration.Duration `json:"monitor_interval" toml:"monitor_interval,omitempty"`
 }
 
 // ErrorThresholdsConfigured checks whether returns whether the errors thresholds are configured. If they
@@ -124,10 +124,10 @@ func (f Failover) Validate() error {
 type BackgroundVerification struct {
 	// VerificationInterval determines the duration after a replica due for reverification.
 	// The feature is disabled if verification interval is 0 or below.
-	VerificationInterval duration.Duration `toml:"verification_interval,omitempty" json:"verification_interval"`
+	VerificationInterval duration.Duration `json:"verification_interval" toml:"verification_interval,omitempty"`
 	// DeleteInvalidRecords controls whether the background verifier will actually delete the metadata
 	// records that point to non-existent replicas.
-	DeleteInvalidRecords bool `toml:"delete_invalid_records" json:"delete_invalid_records"`
+	DeleteInvalidRecords bool `json:"delete_invalid_records" toml:"delete_invalid_records"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -149,9 +149,9 @@ func DefaultBackgroundVerificationConfig() BackgroundVerification {
 type Reconciliation struct {
 	// SchedulingInterval the interval between each automatic reconciliation run. If set to 0,
 	// automatic reconciliation is disabled.
-	SchedulingInterval duration.Duration `toml:"scheduling_interval,omitempty" json:"scheduling_interval"`
+	SchedulingInterval duration.Duration `json:"scheduling_interval" toml:"scheduling_interval,omitempty"`
 	// HistogramBuckets configures the reconciliation scheduling duration histogram's buckets.
-	HistogramBuckets []float64 `toml:"histogram_buckets,omitempty" json:"histogram_buckets"`
+	HistogramBuckets []float64 `json:"histogram_buckets" toml:"histogram_buckets,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -180,10 +180,10 @@ func DefaultReconciliationConfig() Reconciliation {
 type Replication struct {
 	// BatchSize controls how many replication jobs to dequeue and lock
 	// in a single call to the database.
-	BatchSize uint `toml:"batch_size,omitempty" json:"batch_size"`
+	BatchSize uint `json:"batch_size" toml:"batch_size,omitempty"`
 	// ParallelStorageProcessingWorkers is a number of workers used to process replication
 	// events per virtual storage (how many storages would be processed in parallel).
-	ParallelStorageProcessingWorkers uint `toml:"parallel_storage_processing_workers,omitempty" json:"parallel_storage_processing_workers"`
+	ParallelStorageProcessingWorkers uint `json:"parallel_storage_processing_workers" toml:"parallel_storage_processing_workers,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -205,37 +205,37 @@ type Config struct {
 	// configuration. The executable is expected to write JSON-formatted configuration to its standard
 	// output that we will then deserialize and merge back into the initially-loaded configuration again.
 	// This is an easy mechanism to generate parts of the configuration at runtime, like for example secrets.
-	ConfigCommand          string                 `toml:"config_command,omitempty" json:"config_command"`
-	AllowLegacyElectors    bool                   `toml:"i_understand_my_election_strategy_is_unsupported_and_will_be_removed_without_warning,omitempty" json:"i_understand_my_election_strategy_is_unsupported_and_will_be_removed_without_warning"`
-	BackgroundVerification BackgroundVerification `toml:"background_verification,omitempty" json:"background_verification"`
-	Reconciliation         Reconciliation         `toml:"reconciliation,omitempty" json:"reconciliation"`
-	Replication            Replication            `toml:"replication,omitempty" json:"replication"`
-	ListenAddr             string                 `toml:"listen_addr,omitempty" json:"listen_addr"`
-	TLSListenAddr          string                 `toml:"tls_listen_addr,omitempty" json:"tls_listen_addr"`
-	SocketPath             string                 `toml:"socket_path,omitempty" json:"socket_path"`
-	VirtualStorages        []*VirtualStorage      `toml:"virtual_storage,omitempty" json:"virtual_storage"`
-	Logging                log.Config             `toml:"logging,omitempty" json:"logging"`
-	Sentry                 sentry.Config          `toml:"sentry,omitempty" json:"sentry"`
-	PrometheusListenAddr   string                 `toml:"prometheus_listen_addr,omitempty" json:"prometheus_listen_addr"`
-	Prometheus             prometheus.Config      `toml:"prometheus,omitempty" json:"prometheus"`
-	Auth                   auth.Config            `toml:"auth,omitempty" json:"auth"`
-	TLS                    config.TLS             `toml:"tls,omitempty" json:"tls"`
-	DB                     `toml:"database,omitempty" json:"database"`
-	Failover               Failover            `toml:"failover,omitempty" json:"failover"`
-	MemoryQueueEnabled     bool                `toml:"memory_queue_enabled,omitempty" json:"memory_queue_enabled"`
-	GracefulStopTimeout    duration.Duration   `toml:"graceful_stop_timeout,omitempty" json:"graceful_stop_timeout"`
-	RepositoriesCleanup    RepositoriesCleanup `toml:"repositories_cleanup,omitempty" json:"repositories_cleanup"`
-	Yamux                  Yamux               `toml:"yamux,omitempty" json:"yamux"`
+	ConfigCommand          string                 `json:"config_command"                                                                       toml:"config_command,omitempty"`
+	AllowLegacyElectors    bool                   `json:"i_understand_my_election_strategy_is_unsupported_and_will_be_removed_without_warning" toml:"i_understand_my_election_strategy_is_unsupported_and_will_be_removed_without_warning,omitempty"`
+	BackgroundVerification BackgroundVerification `json:"background_verification"                                                              toml:"background_verification,omitempty"`
+	Reconciliation         Reconciliation         `json:"reconciliation"                                                                       toml:"reconciliation,omitempty"`
+	Replication            Replication            `json:"replication"                                                                          toml:"replication,omitempty"`
+	ListenAddr             string                 `json:"listen_addr"                                                                          toml:"listen_addr,omitempty"`
+	TLSListenAddr          string                 `json:"tls_listen_addr"                                                                      toml:"tls_listen_addr,omitempty"`
+	SocketPath             string                 `json:"socket_path"                                                                          toml:"socket_path,omitempty"`
+	VirtualStorages        []*VirtualStorage      `json:"virtual_storage"                                                                      toml:"virtual_storage,omitempty"`
+	Logging                log.Config             `json:"logging"                                                                              toml:"logging,omitempty"`
+	Sentry                 sentry.Config          `json:"sentry"                                                                               toml:"sentry,omitempty"`
+	PrometheusListenAddr   string                 `json:"prometheus_listen_addr"                                                               toml:"prometheus_listen_addr,omitempty"`
+	Prometheus             prometheus.Config      `json:"prometheus"                                                                           toml:"prometheus,omitempty"`
+	Auth                   auth.Config            `json:"auth"                                                                                 toml:"auth,omitempty"`
+	TLS                    config.TLS             `json:"tls"                                                                                  toml:"tls,omitempty"`
+	DB                     `json:"database"                                                                             toml:"database,omitempty"`
+	Failover               Failover            `json:"failover"                                                                             toml:"failover,omitempty"`
+	MemoryQueueEnabled     bool                `json:"memory_queue_enabled"                                                                 toml:"memory_queue_enabled,omitempty"`
+	GracefulStopTimeout    duration.Duration   `json:"graceful_stop_timeout"                                                                toml:"graceful_stop_timeout,omitempty"`
+	RepositoriesCleanup    RepositoriesCleanup `json:"repositories_cleanup"                                                                 toml:"repositories_cleanup,omitempty"`
+	Yamux                  Yamux               `json:"yamux"                                                                                toml:"yamux,omitempty"`
 }
 
 // Yamux contains Yamux related configuration values.
 type Yamux struct {
 	// MaximumStreamWindowSizeBytes sets the maximum window size in bytes used for yamux streams.
 	// Higher value can increase throughput at the cost of more memory usage.
-	MaximumStreamWindowSizeBytes uint32 `toml:"maximum_stream_window_size_bytes,omitempty" json:"maximum_stream_window_size_bytes"`
+	MaximumStreamWindowSizeBytes uint32 `json:"maximum_stream_window_size_bytes" toml:"maximum_stream_window_size_bytes,omitempty"`
 	// AcceptBacklog sets the maximum number of stream openings in-flight before further openings
 	// block.
-	AcceptBacklog uint `toml:"accept_backlog,omitempty" json:"accept_backlog"`
+	AcceptBacklog uint `json:"accept_backlog" toml:"accept_backlog,omitempty"`
 }
 
 func (cfg Yamux) validate() error {
@@ -279,14 +279,14 @@ func DefaultLoggingConfig() log.Config {
 
 // VirtualStorage represents a set of nodes for a storage
 type VirtualStorage struct {
-	Name  string  `toml:"name,omitempty" json:"name"`
-	Nodes []*Node `toml:"node,omitempty" json:"node"`
+	Name  string  `json:"name" toml:"name,omitempty"`
+	Nodes []*Node `json:"node" toml:"node,omitempty"`
 	// DefaultReplicationFactor is the replication factor set for new repositories.
 	// A valid value is inclusive between 1 and the number of configured storages in the
 	// virtual storage. Setting the value to 0 or below causes Praefect to not store any
 	// host assignments, falling back to the behavior of replicating to every configured
 	// storage
-	DefaultReplicationFactor int `toml:"default_replication_factor,omitempty" json:"default_replication_factor"`
+	DefaultReplicationFactor int `json:"default_replication_factor" toml:"default_replication_factor,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -522,36 +522,36 @@ func (c Config) DefaultReplicationFactors() map[string]int {
 
 // DBConnection holds Postgres client configuration data.
 type DBConnection struct {
-	Host        string `toml:"host,omitempty" json:"host"`
-	Port        int    `toml:"port,omitempty" json:"port"`
-	User        string `toml:"user,omitempty" json:"user"`
-	Password    string `toml:"password,omitempty" json:"password"`
-	DBName      string `toml:"dbname,omitempty" json:"dbname"`
-	SSLMode     string `toml:"sslmode,omitempty" json:"sslmode"`
-	SSLCert     string `toml:"sslcert,omitempty" json:"sslcert"`
-	SSLKey      string `toml:"sslkey,omitempty" json:"sslkey"`
-	SSLRootCert string `toml:"sslrootcert,omitempty" json:"sslrootcert"`
+	Host        string `json:"host"        toml:"host,omitempty"`
+	Port        int    `json:"port"        toml:"port,omitempty"`
+	User        string `json:"user"        toml:"user,omitempty"`
+	Password    string `json:"password"    toml:"password,omitempty"`
+	DBName      string `json:"dbname"      toml:"dbname,omitempty"`
+	SSLMode     string `json:"sslmode"     toml:"sslmode,omitempty"`
+	SSLCert     string `json:"sslcert"     toml:"sslcert,omitempty"`
+	SSLKey      string `json:"sslkey"      toml:"sslkey,omitempty"`
+	SSLRootCert string `json:"sslrootcert" toml:"sslrootcert,omitempty"`
 }
 
 // DB holds database configuration data.
 type DB struct {
-	Host        string `toml:"host,omitempty" json:"host"`
-	Port        int    `toml:"port,omitempty" json:"port"`
-	User        string `toml:"user,omitempty" json:"user"`
-	Password    string `toml:"password,omitempty" json:"password"`
-	DBName      string `toml:"dbname,omitempty" json:"dbname"`
-	SSLMode     string `toml:"sslmode,omitempty" json:"sslmode"`
-	SSLCert     string `toml:"sslcert,omitempty" json:"sslcert"`
-	SSLKey      string `toml:"sslkey,omitempty" json:"sslkey"`
-	SSLRootCert string `toml:"sslrootcert,omitempty" json:"sslrootcert"`
+	Host        string `json:"host"        toml:"host,omitempty"`
+	Port        int    `json:"port"        toml:"port,omitempty"`
+	User        string `json:"user"        toml:"user,omitempty"`
+	Password    string `json:"password"    toml:"password,omitempty"`
+	DBName      string `json:"dbname"      toml:"dbname,omitempty"`
+	SSLMode     string `json:"sslmode"     toml:"sslmode,omitempty"`
+	SSLCert     string `json:"sslcert"     toml:"sslcert,omitempty"`
+	SSLKey      string `json:"sslkey"      toml:"sslkey,omitempty"`
+	SSLRootCert string `json:"sslrootcert" toml:"sslrootcert,omitempty"`
 
-	SessionPooled DBConnection `toml:"session_pooled,omitempty" json:"session_pooled"`
+	SessionPooled DBConnection `json:"session_pooled" toml:"session_pooled,omitempty"`
 
 	// The following configuration keys are deprecated and
 	// will be removed. Use Host and Port attributes of
 	// SessionPooled instead.
-	HostNoProxy string `toml:"host_no_proxy,omitempty" json:"host_no_proxy"`
-	PortNoProxy int    `toml:"port_no_proxy,omitempty" json:"port_no_proxy"`
+	HostNoProxy string `json:"host_no_proxy" toml:"host_no_proxy,omitempty"`
+	PortNoProxy int    `json:"port_no_proxy" toml:"port_no_proxy,omitempty"`
 }
 
 // RepositoriesCleanup configures repository synchronisation.
@@ -559,11 +559,11 @@ type RepositoriesCleanup struct {
 	// CheckInterval is a time period used to check if operation should be executed.
 	// It is recommended to keep it less than run_interval configuration as some
 	// nodes may be out of service, so they can be stale for too long.
-	CheckInterval duration.Duration `toml:"check_interval,omitempty" json:"check_interval"`
+	CheckInterval duration.Duration `json:"check_interval" toml:"check_interval,omitempty"`
 	// RunInterval: the check runs if the previous operation was done at least RunInterval before.
-	RunInterval duration.Duration `toml:"run_interval,omitempty" json:"run_interval"`
+	RunInterval duration.Duration `json:"run_interval" toml:"run_interval,omitempty"`
 	// RepositoriesInBatch is the number of repositories to pass as a batch for processing.
-	RepositoriesInBatch uint `toml:"repositories_in_batch,omitempty" json:"repositories_in_batch"`
+	RepositoriesInBatch uint `json:"repositories_in_batch" toml:"repositories_in_batch,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.

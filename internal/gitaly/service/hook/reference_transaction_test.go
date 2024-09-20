@@ -294,7 +294,7 @@ ref:refs/heads/main ref:refs/heads/branch-1 HEAD
 
 			var reftxHash []byte
 			transactionServer.handler = func(in *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-				reftxHash = in.ReferenceUpdatesHash
+				reftxHash = in.GetReferenceUpdatesHash()
 				return &gitalypb.VoteTransactionResponse{
 					State: tc.voteResponse,
 				}, nil

@@ -19,17 +19,17 @@ func (s *Server) UserRebaseToRef(ctx context.Context, request *gitalypb.UserReba
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	quarantineDir, quarantineRepo, err := s.quarantinedRepo(ctx, request.Repository)
+	quarantineDir, quarantineRepo, err := s.quarantinedRepo(ctx, request.GetRepository())
 	if err != nil {
 		return nil, structerr.NewInternal("creating repo quarantine: %w", err)
 	}
 
-	oid, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.FirstParentRef))
+	oid, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.GetFirstParentRef()))
 	if err != nil {
 		return nil, structerr.NewInvalidArgument("invalid FirstParentRef")
 	}
 
-	sourceOID, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.SourceSha))
+	sourceOID, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.GetSourceSha()))
 	if err != nil {
 		return nil, structerr.NewInvalidArgument("invalid SourceSha")
 	}
@@ -56,9 +56,9 @@ func (s *Server) UserRebaseToRef(ctx context.Context, request *gitalypb.UserReba
 			return nil, structerr.NewInvalidArgument("cannot resolve expected old object ID: %w", err).
 				WithMetadata("old_object_id", expectedOldOID)
 		}
-	} else if targetRef, err := quarantineRepo.GetReference(ctx, git.ReferenceName(request.TargetRef)); err == nil {
+	} else if targetRef, err := quarantineRepo.GetReference(ctx, git.ReferenceName(request.GetTargetRef())); err == nil {
 		if targetRef.IsSymbolic {
-			return nil, structerr.NewFailedPrecondition("target reference is symbolic: %q", request.TargetRef)
+			return nil, structerr.NewFailedPrecondition("target reference is symbolic: %q", request.GetTargetRef())
 		}
 
 		oid, err := objectHash.FromHex(targetRef.Target)
@@ -90,7 +90,7 @@ func (s *Server) UserRebaseToRef(ctx context.Context, request *gitalypb.UserReba
 		var conflictErr *localrepo.RebaseConflictError
 		if errors.As(err, &conflictErr) {
 			return nil, structerr.NewFailedPrecondition("failed to rebase %s on %s while preparing %s due to conflict",
-				sourceOID, oid, string(request.TargetRef))
+				sourceOID, oid, string(request.GetTargetRef()))
 		}
 
 		return nil, structerr.NewInternal("rebasing commits: %w", err)
@@ -101,8 +101,8 @@ func (s *Server) UserRebaseToRef(ctx context.Context, request *gitalypb.UserReba
 	}
 
 	repo := s.localrepo(request.GetRepository())
-	if err := repo.UpdateRef(ctx, git.ReferenceName(request.TargetRef), rebasedOID, oldTargetOID); err != nil {
-		return nil, structerr.NewFailedPrecondition("could not update %s. Please refresh and try again", string(request.TargetRef))
+	if err := repo.UpdateRef(ctx, git.ReferenceName(request.GetTargetRef()), rebasedOID, oldTargetOID); err != nil {
+		return nil, structerr.NewFailedPrecondition("could not update %s. Please refresh and try again", string(request.GetTargetRef()))
 	}
 
 	return &gitalypb.UserRebaseToRefResponse{

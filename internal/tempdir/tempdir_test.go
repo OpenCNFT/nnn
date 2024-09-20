@@ -22,8 +22,8 @@ func TestNewRepositorySuccess(t *testing.T) {
 
 	repo, tempDir, err := NewRepository(ctx, cfg.Storages[0].Name, testhelper.NewLogger(t), locator)
 	require.NoError(t, err)
-	require.Equal(t, cfg.Storages[0].Name, repo.StorageName)
-	require.Contains(t, repo.RelativePath, tmpRootPrefix)
+	require.Equal(t, cfg.Storages[0].Name, repo.GetStorageName())
+	require.Contains(t, repo.GetRelativePath(), tmpRootPrefix)
 
 	calculatedPath, err := locator.GetRepoPath(ctx, repo, storage.WithRepositoryVerificationSkipped())
 	require.NoError(t, err)

@@ -132,7 +132,7 @@ func (g *metadataRaftGroup) tryBootstrap() (*gitalypb.Cluster, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting leader state of metadata group: %w", err)
 	}
-	if !leaderState.Valid || leaderState.LeaderId != g.clusterConfig.NodeID {
+	if !leaderState.GetValid() || leaderState.GetLeaderId() != g.clusterConfig.NodeID {
 		g.logger.Info("not a leader, waiting for the leader to bootstrap cluster")
 		return nil, nil
 	}
@@ -163,7 +163,7 @@ func (g *metadataRaftGroup) RegisterStorage(storageName string) (*gitalypb.Stora
 	if err != nil {
 		return nil, err
 	}
-	for _, storage := range cluster.Storages {
+	for _, storage := range cluster.GetStorages() {
 		if storage.GetName() == storageName {
 			return nil, fmt.Errorf("storage %q already registered", storageName)
 		}
@@ -196,7 +196,7 @@ func (g *metadataRaftGroup) UpdateStorage(storageID raftID, nodeID raftID, repli
 	if err != nil {
 		return nil, err
 	}
-	if cluster.Storages[storageID.ToUint64()] == nil {
+	if cluster.GetStorages()[storageID.ToUint64()] == nil {
 		return nil, fmt.Errorf("storage with ID %d not found", storageID)
 	}
 	result, response, err := g.requestUpdateStorage(storageID, nodeID, replicationFactor)

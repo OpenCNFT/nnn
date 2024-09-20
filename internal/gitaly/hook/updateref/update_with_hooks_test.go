@@ -117,8 +117,8 @@ func TestUpdaterWithHooks_UpdateReference(t *testing.T) {
 			gittest.DefaultObjectHash,
 			nil,
 			&gitcmd.UserDetails{
-				UserID:   gittest.TestUser.GlId,
-				Username: gittest.TestUser.GlUsername,
+				UserID:   gittest.TestUser.GetGlId(),
+				Username: gittest.TestUser.GetGlUsername(),
 				Protocol: "web",
 			},
 			gitcmd.ReceivePackHooks,

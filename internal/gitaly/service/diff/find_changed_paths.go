@@ -74,13 +74,13 @@ func (s *server) FindChangedPaths(in *gitalypb.FindChangedPathsRequest, stream g
 		gitcmd.Flag{Name: "--diff-filter=AMDTCR"},
 	}
 
-	if in.FindRenames {
+	if in.GetFindRenames() {
 		flags = append(flags, gitcmd.Flag{Name: "--find-renames=30%"})
 	} else {
 		flags = append(flags, gitcmd.Flag{Name: "--no-renames"})
 	}
 
-	switch in.MergeCommitDiffMode {
+	switch in.GetMergeCommitDiffMode() {
 	case gitalypb.FindChangedPathsRequest_MERGE_COMMIT_DIFF_MODE_INCLUDE_MERGES, gitalypb.FindChangedPathsRequest_MERGE_COMMIT_DIFF_MODE_UNSPECIFIED:
 		// By default, git diff-tree --stdin does not show differences
 		// for merge commits. With this flag, it shows differences to
@@ -357,7 +357,7 @@ func (s *server) validateFindChangedPathsRequestParams(ctx context.Context, in *
 	defer cancel()
 
 	for _, request := range in.GetRequests() {
-		switch t := request.Type.(type) {
+		switch t := request.GetType().(type) {
 		case *gitalypb.FindChangedPathsRequest_Request_CommitRequest_:
 			oid, err := resolveObjectWithType(
 				ctx,

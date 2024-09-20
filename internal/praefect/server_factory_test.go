@@ -104,7 +104,7 @@ func TestServerFactory(t *testing.T) {
 		healthClient := healthpb.NewHealthClient(cc)
 		resp, err := healthClient.Check(ctx, &healthpb.HealthCheckRequest{})
 		require.NoError(t, err)
-		require.Equal(t, healthpb.HealthCheckResponse_SERVING, resp.Status)
+		require.Equal(t, healthpb.HealthCheckResponse_SERVING, resp.GetStatus())
 		return healthClient
 	}
 
@@ -117,7 +117,7 @@ func TestServerFactory(t *testing.T) {
 			Revision:   []byte(revision),
 		})
 		require.NoError(t, err)
-		require.Equal(t, revision.String(), resp.Commit.Id)
+		require.Equal(t, revision.String(), resp.GetCommit().GetId())
 	}
 
 	checkSidechannelGitaly := func(t *testing.T, ctx context.Context, addr string, creds credentials.TransportCredentials) {

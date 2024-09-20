@@ -167,8 +167,8 @@ func (m *Manager) Start() (returnedErr error) {
 	if err != nil {
 		return fmt.Errorf("getting cluster info: %w", err)
 	}
-	if cluster.ClusterId != m.clusterConfig.ClusterID {
-		return fmt.Errorf("joining the wrong cluster, expected to join %q but joined %q", m.clusterConfig.ClusterID, cluster.ClusterId)
+	if cluster.GetClusterId() != m.clusterConfig.ClusterID {
+		return fmt.Errorf("joining the wrong cluster, expected to join %q but joined %q", m.clusterConfig.ClusterID, cluster.GetClusterId())
 	}
 
 	if err := m.registerStorages(); err != nil {
@@ -214,12 +214,12 @@ func (m *Manager) registerStorages() error {
 			if err := storageMgr.saveStorageInfo(m.ctx, storageInfo); err != nil {
 				return fmt.Errorf("saving storage info: %w", err)
 			}
-		} else if storageMgr.persistedInfo.NodeId != m.clusterConfig.NodeID || storageMgr.persistedInfo.ReplicationFactor != m.clusterConfig.ReplicationFactor {
+		} else if storageMgr.persistedInfo.GetNodeId() != m.clusterConfig.NodeID || storageMgr.persistedInfo.GetReplicationFactor() != m.clusterConfig.ReplicationFactor {
 			// Changes that gonna affect replication. Gitaly needs to sync up those changes to metadata
 			// Raft group to shuffle the replication groups. We don't persit new info intentionally. The
 			// replication of this node will be applied by the replicators later.
 			if _, err := m.metadataGroup.UpdateStorage(
-				raftID(storageMgr.persistedInfo.StorageId),
+				raftID(storageMgr.persistedInfo.GetStorageId()),
 				raftID(m.clusterConfig.NodeID),
 				m.clusterConfig.ReplicationFactor,
 			); err != nil {

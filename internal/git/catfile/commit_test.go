@@ -84,7 +84,7 @@ func TestGetCommitWithTrailers(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.Equal(t, commit.Trailers, []*gitalypb.CommitTrailer{
+	require.Equal(t, commit.GetTrailers(), []*gitalypb.CommitTrailer{
 		{
 			Key:   []byte("Signed-off-by"),
 			Value: []byte("John Doe <john.doe@example.com>"),

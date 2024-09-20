@@ -198,7 +198,7 @@ func CreateRepository(tb testing.TB, ctx context.Context, cfg config.Cfg, config
 
 		repoPath = filepath.Join(storage.Path, getReplicaPath(tb, ctx, conn, repository))
 	} else {
-		repoPath = filepath.Join(storage.Path, repository.RelativePath)
+		repoPath = filepath.Join(storage.Path, repository.GetRelativePath())
 
 		if opts.Seed != "" {
 			Exec(tb, cfg, "clone", "--no-hardlinks", "--dissociate", "--bare", testRepositoryPath(tb, opts.Seed), repoPath)
@@ -266,7 +266,7 @@ func getReplicaPath(tb testing.TB, ctx context.Context, conn *grpc.ClientConn, r
 	}
 	require.NoError(tb, err)
 
-	return metadata.ReplicaPath
+	return metadata.GetReplicaPath()
 }
 
 // RewrittenRepository returns the repository as it would be received by a Gitaly after being rewritten by Praefect.

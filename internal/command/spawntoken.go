@@ -19,7 +19,7 @@ type SpawnConfig struct {
 	// This default value (10 seconds) is very high. Spawning should take
 	// milliseconds or less. If we hit 10 seconds, something is wrong, and
 	// failing the request will create breathing room.
-	Timeout time.Duration `split_words:"true" default:"10s"`
+	Timeout time.Duration `default:"10s" split_words:"true"`
 
 	// MaxSpawnParallel limits the number of goroutines that can spawn a
 	// process at the same time. These parallel spawns will contend for a
@@ -29,7 +29,7 @@ type SpawnConfig struct {
 	// Note that this does not limit the total number of child processes that
 	// can be attached to Gitaly at the same time. It only limits the rate at
 	// which we can create new child processes.
-	MaxParallel int `split_words:"true" default:"10"`
+	MaxParallel int `default:"10" split_words:"true"`
 }
 
 // SpawnTokenManager limits the number of goroutines that can spawn a process at a time.

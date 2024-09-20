@@ -89,7 +89,7 @@ func TestWalkRepos(t *testing.T) {
 				s,
 				func(resp *gitalypb.WalkReposResponse) error {
 					deleteOnce.Do(func() {
-						require.NoError(t, os.RemoveAll(filepath.Join(storageRoot, deletedRepo.RelativePath)))
+						require.NoError(t, os.RemoveAll(filepath.Join(storageRoot, deletedRepo.GetRelativePath())))
 					})
 					return s.Send(resp)
 				},

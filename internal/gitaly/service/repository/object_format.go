@@ -9,11 +9,11 @@ import (
 
 // ObjectFormat determines the object format of the Git repository.
 func (s *server) ObjectFormat(ctx context.Context, request *gitalypb.ObjectFormatRequest) (*gitalypb.ObjectFormatResponse, error) {
-	if err := s.locator.ValidateRepository(ctx, request.Repository); err != nil {
+	if err := s.locator.ValidateRepository(ctx, request.GetRepository()); err != nil {
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	repo := s.localrepo(request.Repository)
+	repo := s.localrepo(request.GetRepository())
 
 	// Check for the path up-front so that we detect missing repositories early on.
 	if _, err := repo.Path(ctx); err != nil {

@@ -45,7 +45,7 @@ func (s *server) FindCommits(req *gitalypb.FindCommitsRequest, stream gitalypb.C
 
 	// Use Gitaly's default branch lookup function because that is already
 	// migrated.
-	if revision := req.Revision; len(revision) == 0 && !req.GetAll() {
+	if revision := req.GetRevision(); len(revision) == 0 && !req.GetAll() {
 		defaultBranch, err := repo.GetDefaultBranch(ctx)
 		if err != nil {
 			return structerr.NewInternal("defaultBranchName: %w", err)
@@ -53,7 +53,7 @@ func (s *server) FindCommits(req *gitalypb.FindCommitsRequest, stream gitalypb.C
 		req.Revision = []byte(defaultBranch)
 	}
 	// Clients might send empty paths. That is an error
-	for _, path := range req.Paths {
+	for _, path := range req.GetPaths() {
 		if len(path) == 0 {
 			return structerr.NewInvalidArgument("path is empty string")
 		}

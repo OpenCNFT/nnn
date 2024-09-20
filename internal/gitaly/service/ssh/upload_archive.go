@@ -34,7 +34,7 @@ func (s *server) SSHUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveSer
 func (s *server) sshUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveServer, req *gitalypb.SSHUploadArchiveRequest) error {
 	ctx := stream.Context()
 
-	repoPath, err := s.locator.GetRepoPath(ctx, req.Repository)
+	repoPath, err := s.locator.GetRepoPath(ctx, req.GetRepository())
 	if err != nil {
 		return err
 	}

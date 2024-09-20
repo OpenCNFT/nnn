@@ -209,10 +209,10 @@ func TestRepo_QuarantineOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		expectedRepo := &gitalypb.Repository{
-			StorageName:                   repoProto.StorageName,
-			RelativePath:                  repoProto.RelativePath,
-			GlRepository:                  repoProto.GlRepository,
-			GlProjectPath:                 repoProto.GlProjectPath,
+			StorageName:                   repoProto.GetStorageName(),
+			RelativePath:                  repoProto.GetRelativePath(),
+			GlRepository:                  repoProto.GetGlRepository(),
+			GlProjectPath:                 repoProto.GetGlProjectPath(),
 			GitObjectDirectory:            "quarantine-directory",
 			GitAlternateObjectDirectories: []string{"objects"},
 		}

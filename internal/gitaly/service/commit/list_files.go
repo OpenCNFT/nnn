@@ -67,7 +67,7 @@ func validateListFilesRequest(ctx context.Context, locator storage.Locator, in *
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(in.Revision, git.AllowEmptyRevision()); err != nil {
+	if err := git.ValidateRevision(in.GetRevision(), git.AllowEmptyRevision()); err != nil {
 		return err
 	}
 	return nil
@@ -126,5 +126,5 @@ type listFilesSender struct {
 func (s *listFilesSender) Reset()      { s.response = &gitalypb.ListFilesResponse{} }
 func (s *listFilesSender) Send() error { return s.stream.Send(s.response) }
 func (s *listFilesSender) Append(m proto.Message) {
-	s.response.Paths = append(s.response.Paths, m.(*gitalypb.ListFilesResponse).Paths...)
+	s.response.Paths = append(s.response.Paths, m.(*gitalypb.ListFilesResponse).GetPaths()...)
 }

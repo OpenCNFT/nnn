@@ -63,7 +63,7 @@ func (s *Server) Dataloss(
 			})
 		}
 
-		if !req.IncludePartiallyReplicated && !unavailable {
+		if !req.GetIncludePartiallyReplicated() && !unavailable {
 			continue
 		}
 
