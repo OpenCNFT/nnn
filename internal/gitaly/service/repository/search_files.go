@@ -79,16 +79,17 @@ func sendMatchInChunks(buf []byte, stream gitalypb.RepositoryService_SearchFiles
 
 func sendSearchFilesResultChunked(cmd *command.Command, stream gitalypb.RepositoryService_SearchFilesByContentServer) error {
 	var buf []byte
-	scanner := bufio.NewScanner(cmd)
+	reader := bufio.NewReader(cmd)
 
-	for scanner.Scan() {
-		// Intentionally avoid scanner.Bytes() because that returns a []byte that
-		// becomes invalid on the next loop iteration, and we want to hold on to
-		// the contents of the current line for a while. Scanner.Text() is a
-		// string and hence immutable.
-		line := scanner.Text() + "\n"
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return fmt.Errorf("readbytes: %w", err)
+		}
 
-		if line == string(contentDelimiter) {
+		if bytes.Equal(line, contentDelimiter) {
 			if err := sendMatchInChunks(buf, stream); err != nil {
 				return err
 			}
@@ -98,10 +99,6 @@ func sendSearchFilesResultChunked(cmd *command.Command, stream gitalypb.Reposito
 		}
 
 		buf = append(buf, line...)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scan: %w", err)
 	}
 
 	if len(buf) > 0 {
