@@ -142,7 +142,7 @@ gitaly_spawn_token_waiting_length 0
 
 `
 	testhelper.RequireHistogramSampleCounts(t, manager, map[string]int{
-		"gitaly_spawn_forking_time_seconds": 2,
+		"gitaly_spawn_forking_time_seconds": 0,
 		"gitaly_spawn_waiting_time_seconds": 2,
 	})
 	testhelper.RequirePromMetrics(
@@ -156,7 +156,6 @@ gitaly_spawn_token_waiting_length 0
 	logrusFields := customFields.Fields()
 
 	require.Contains(t, logrusFields, "command.spawn_token_wait_ms")
-	require.Contains(t, logrusFields, "command.spawn_token_fork_ms")
 }
 
 func TestGetSpawnToken_CommandStats_timeout(t *testing.T) {

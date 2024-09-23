@@ -214,6 +214,9 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	cmdName := path.Base(nameAndArgs[0])
 	defer putToken()
 
+	startForking := time.Now()
+	defer spawnTokenManager.recordForkTime(ctx, startForking)
+
 	logPid := -1
 	defer func() {
 		logger.WithFields(log.Fields{
