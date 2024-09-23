@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -171,6 +172,11 @@ func TestNew_spawnTimeout(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
+
+	if featureflag.DisableSpawnTokenQueue.IsEnabled(ctx) {
+		t.Skip("Spawn token queue is disabled.")
+	}
+
 	spawnTimeout := 200 * time.Millisecond
 	spawnTokenManager := NewSpawnTokenManager(SpawnConfig{
 		Timeout:     spawnTimeout,

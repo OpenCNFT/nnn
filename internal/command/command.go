@@ -207,12 +207,16 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	if spawnTokenManager == nil {
 		spawnTokenManager = globalSpawnTokenManager
 	}
-	putToken, err := spawnTokenManager.GetSpawnToken(ctx)
-	if err != nil {
-		return nil, err
+
+	if featureflag.DisableSpawnTokenQueue.IsDisabled(ctx) {
+		putToken, err := spawnTokenManager.GetSpawnToken(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer putToken()
 	}
+
 	cmdName := path.Base(nameAndArgs[0])
-	defer putToken()
 
 	startForking := time.Now()
 	defer spawnTokenManager.recordForkTime(ctx, startForking)
@@ -374,6 +378,7 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	if cfg.stderr != nil {
 		cmd.Stderr = cfg.stderr
 	} else {
+		var err error
 		command.stderrBuffer, err = newStderrBuffer(maxStderrBytes, maxStderrLineLength, []byte("\n"))
 		if err != nil {
 			return nil, fmt.Errorf("creating stderr buffer: %w", err)
