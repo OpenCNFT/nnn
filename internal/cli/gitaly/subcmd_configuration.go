@@ -11,14 +11,9 @@ const validationErrorCode = 2
 
 func newConfigurationCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "configuration",
-		Usage: "run configuration-related commands",
-		Description: `Run commands related to Gitaly configuration.
-
-Provides the following subcommand:
-
-- validate`,
-		HideHelpCommand: true,
+		Name:        "configuration",
+		Usage:       "run configuration-related commands",
+		Description: "Run commands related to Gitaly configuration.",
 		Subcommands: []*cli.Command{
 			{
 				Name:  "validate",

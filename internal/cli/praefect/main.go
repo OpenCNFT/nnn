@@ -51,8 +51,7 @@ func NewApp() *cli.App {
 		//
 		// The 'DefaultCommand: "serve"' setting can't be used here because it won't be
 		// possible to invoke sub-command not yet registered.
-		Action:          serveAction,
-		HideHelpCommand: true,
+		Action: serveAction,
 		Commands: []*cli.Command{
 			newServeCommand(),
 			newConfigurationCommand(),

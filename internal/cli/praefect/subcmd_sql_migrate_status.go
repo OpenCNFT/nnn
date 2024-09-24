@@ -17,8 +17,7 @@ func newSQLMigrateStatusCommand() *cli.Command {
 		Usage: "show applied database migrations",
 		Description: "The commands prints a table of the migration identifiers applied to the database\n" +
 			"with the timestamp for each when it was applied.",
-		HideHelpCommand: true,
-		Action:          sqlMigrateStatusAction,
+		Action: sqlMigrateStatusAction,
 		Before: func(ctx *cli.Context) error {
 			if ctx.Args().Present() {
 				_ = cli.ShowSubcommandHelp(ctx)

@@ -47,8 +47,7 @@ func newServeCommand() *cli.Command {
 		Description: `Launch the Praefect server daemon.
 
 Example: praefect --config praefect.config.toml serve`,
-		Action:          serveAction,
-		HideHelpCommand: true,
+		Action: serveAction,
 		Before: func(context *cli.Context) error {
 			if context.Args().Present() {
 				return unexpectedPositionalArgsError{Command: context.Command.Name}

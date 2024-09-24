@@ -76,6 +76,9 @@ DESCRIPTION:
 
    Example: praefect configuration validate < praefect.config.toml
 
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
 OPTIONS:
    --help, -h  show help
 `,

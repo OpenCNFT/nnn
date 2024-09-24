@@ -31,7 +31,7 @@ func TestGitalyCLI(t *testing.T) {
 		{
 			desc:     "without arguments",
 			exitCode: 2,
-			stdout:   "NAME:\n   gitaly - a Git RPC service\n\nUSAGE:\n   gitaly command [command options]\n\nDESCRIPTION:\n   Gitaly is a Git RPC service for handling Git calls.\n\nCOMMANDS:\n   serve          launch the server daemon\n   check          verify internal API is accessible\n   configuration  run configuration-related commands\n   hooks          manage Git hooks\n   bundle-uri     Generate bundle URI bundle\n   git            execute Git commands using Gitaly's embedded Git\n   db             Interact with the BadgerDB\n\nOPTIONS:\n   --help, -h     show help\n   --version, -v  print the version\n",
+			stdout:   "NAME:\n   gitaly - a Git RPC service\n\nUSAGE:\n   gitaly command [command options]\n\nDESCRIPTION:\n   Gitaly is a Git RPC service for handling Git calls.\n\nCOMMANDS:\n   serve          launch the server daemon\n   check          verify internal API is accessible\n   configuration  run configuration-related commands\n   hooks          manage Git hooks\n   bundle-uri     Generate bundle URI bundle\n   git            execute Git commands using Gitaly's embedded Git\n   db             Interact with the BadgerDB\n   help, h        Shows a list of commands or help for one command\n\nOPTIONS:\n   --help, -h     show help\n   --version, -v  print the version\n",
 		},
 		{
 			desc:     "with non-existent config",
@@ -43,7 +43,7 @@ func TestGitalyCLI(t *testing.T) {
 			desc:     "check without config",
 			args:     []string{"check"},
 			exitCode: 2,
-			stdout:   "NAME:\n   gitaly check - verify internal API is accessible\n\nUSAGE:\n   gitaly check <gitaly_config_file>\n\n   Example: gitaly check gitaly.config.toml\n\nDESCRIPTION:\n   Check that the internal Gitaly API is accessible.\n\nOPTIONS:\n   --help, -h  show help\n",
+			stdout:   "NAME:\n   gitaly check - verify internal API is accessible\n\nUSAGE:\n   gitaly check <gitaly_config_file>\n\n   Example: gitaly check gitaly.config.toml\n\nDESCRIPTION:\n   Check that the internal Gitaly API is accessible.\n\nCOMMANDS:\n   help, h  Shows a list of commands or help for one command\n\nOPTIONS:\n   --help, -h  show help\n",
 			stderr:   "invalid argument(s)",
 		},
 		{

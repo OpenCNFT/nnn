@@ -25,13 +25,10 @@ const (
 
 func newHooksCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "hooks",
-		Usage:     "manage Git hooks",
-		UsageText: "gitaly hooks set",
-		Description: `Manage hooks for a Git repository.
-
-Provides the "set" subcommand.`,
-		HideHelpCommand: true,
+		Name:        "hooks",
+		Usage:       "manage Git hooks",
+		UsageText:   "gitaly hooks set",
+		Description: "Manage hooks for a Git repository.",
 		Subcommands: []*cli.Command{
 			{
 				Name:  "set",
