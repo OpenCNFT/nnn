@@ -298,6 +298,7 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	// Enable reftable backend, if env variable set
 	newRepoReftableEnabled := env.GetString("GIT_DEFAULT_REF_FORMAT", "files")
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.NewRepoReftableBackend, newRepoReftableEnabled == "reftable")
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.DisableSpawnTokenQueue, rnd.Int()%2 == 0)
 
 	for _, opt := range opts {
 		ctx = opt(ctx)

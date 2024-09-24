@@ -119,11 +119,8 @@ func (m *SpawnTokenManager) GetSpawnToken(ctx context.Context) (putToken func(),
 	select {
 	case m.spawnTokens <- struct{}{}:
 		m.recordQueuingTime(ctx, startWaiting, "")
-
-		startForking := time.Now()
 		return func() {
 			<-m.spawnTokens
-			m.recordForkTime(ctx, startForking)
 		}, nil
 	case <-time.After(m.spawnConfig.Timeout):
 		m.recordQueuingTime(ctx, startWaiting, "spawn token timeout")
