@@ -19,6 +19,10 @@ No changes.
 
 - [featureflag: Remove use_empty_tree_in_attr_tree_config](gitlab-org/gitaly@676b701f4adce5fb35d4b56689e7e261d3113e88) ([merge request](gitlab-org/gitaly!7199))
 
+## 17.3.4 (2024-09-24)
+
+No changes.
+
 ## 17.3.3 (2024-09-16)
 
 No changes.
