@@ -68,6 +68,13 @@ var (
 		},
 		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "ctxswitchtype", "git_version", "reference_backend"},
 	)
+	spawnForkingTimeHistogram = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "gitaly_spawn_forking_time_seconds",
+			Help:    "Histogram of actual forking time after spawn tokens are acquired",
+			Buckets: []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0, 10.0},
+		},
+	)
 
 	// exportedEnvVars contains a list of environment variables
 	// that are always exported to child processes on spawn
@@ -112,20 +119,7 @@ var (
 	// envInjector is responsible for injecting environment variables required for tracing into
 	// the child process.
 	envInjector = labkittracing.NewEnvInjector()
-
-	// globalSpawnTokenManager is responsible for limiting the total number of commands that can spawn at a time in a
-	// Gitaly process.
-	globalSpawnTokenManager *SpawnTokenManager
 )
-
-func init() {
-	var err error
-	globalSpawnTokenManager, err = NewSpawnTokenManagerFromEnv()
-	if err != nil {
-		panic(err)
-	}
-	prometheus.MustRegister(globalSpawnTokenManager)
-}
 
 const (
 	// maxStderrBytes is at most how many bytes will be written to stderr
@@ -203,23 +197,17 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 		opt(&cfg)
 	}
 
-	spawnTokenManager := cfg.spawnTokenManager
-	if spawnTokenManager == nil {
-		spawnTokenManager = globalSpawnTokenManager
-	}
-
-	if featureflag.DisableSpawnTokenQueue.IsDisabled(ctx) {
-		putToken, err := spawnTokenManager.GetSpawnToken(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer putToken()
-	}
-
 	cmdName := path.Base(nameAndArgs[0])
 
 	startForking := time.Now()
-	defer spawnTokenManager.recordForkTime(ctx, startForking)
+	defer func() {
+		delta := time.Since(startForking)
+		spawnForkingTimeHistogram.Observe(delta.Seconds())
+
+		if customFields := log.CustomFieldsFromContext(ctx); customFields != nil {
+			customFields.RecordSum("command.spawn_token_fork_ms", int(delta.Milliseconds()))
+		}
+	}()
 
 	logPid := -1
 	defer func() {

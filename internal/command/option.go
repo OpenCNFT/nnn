@@ -25,7 +25,6 @@ type config struct {
 
 	cgroupsManager        cgroups.Manager
 	cgroupsAddCommandOpts []cgroups.AddCommandOption
-	spawnTokenManager     *SpawnTokenManager
 	// logConfiguration contains the logging configuration to pass to the
 	// command if subprocess logging is in use.
 	logConfiguration log.Config
@@ -116,14 +115,6 @@ func WithCgroup(cgroupsManager cgroups.Manager, opts ...cgroups.AddCommandOption
 	return func(cfg *config) {
 		cfg.cgroupsManager = cgroupsManager
 		cfg.cgroupsAddCommandOpts = opts
-	}
-}
-
-// WithSpawnTokenManager assigns a spawn token manager for the command. If this option is not set, the command uses
-// the process-global spawn token manager.
-func WithSpawnTokenManager(spawnTokenManager *SpawnTokenManager) Option {
-	return func(cfg *config) {
-		cfg.spawnTokenManager = spawnTokenManager
 	}
 }
 
