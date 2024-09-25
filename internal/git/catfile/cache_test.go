@@ -3,12 +3,14 @@ package catfile
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -202,10 +204,71 @@ func TestCache_autoExpiry(t *testing.T) {
 	require.True(t, value0.isClosed(), "value should be closed after eviction")
 }
 
+func TestRoundToNearestFiveMinutes(t *testing.T) {
+	testCases := []struct {
+		minute           int
+		expectedInterval int
+	}{
+		{
+			minute:           2,
+			expectedInterval: 5,
+		},
+		{
+			minute:           5,
+			expectedInterval: 10,
+		},
+		{
+			minute:           6,
+			expectedInterval: 10,
+		},
+		{
+			minute:           11,
+			expectedInterval: 15,
+		},
+		{
+			minute:           22,
+			expectedInterval: 25,
+		},
+		{
+			minute:           34,
+			expectedInterval: 35,
+		},
+		{
+			minute:           49,
+			expectedInterval: 50,
+		},
+		{
+			minute:           54,
+			expectedInterval: 55,
+		},
+		{
+			minute:           58,
+			expectedInterval: 60,
+		},
+	}
+
+	base := time.Date(2024, 9, 25, 1, 0, 0, 0, time.UTC)
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%d minutes", tc.minute), func(t *testing.T) {
+			require.Equal(t,
+				tc.expectedInterval,
+				roundToNearestFiveMinute(base.Add(time.Duration(tc.minute)*time.Minute)),
+			)
+		})
+	}
+}
+
 func TestCache_ObjectReader(t *testing.T) {
 	t.Parallel()
 
-	ctx := testhelper.Context(t)
+	testhelper.NewFeatureSets(
+		featureflag.RemoveCatfileCacheSessionID,
+	).Run(t, testCacheObjectReader)
+}
+
+func testCacheObjectReader(t *testing.T, ctx context.Context) {
+	t.Parallel()
+
 	cfg := testcfg.Build(t)
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -218,20 +281,7 @@ func TestCache_ObjectReader(t *testing.T) {
 	cache := newCache(time.Hour, 10, helper.NewManualTicker())
 	defer cache.Stop()
 
-	t.Run("uncacheable", func(t *testing.T) {
-		// The context doesn't carry a session ID and is thus uncacheable.
-		// The process should never get returned to the cache and must be
-		// killed on context cancellation.
-		reader, cancel, err := cache.ObjectReader(ctx, repoExecutor)
-		require.NoError(t, err)
-
-		cancel()
-
-		require.True(t, reader.isClosed())
-		require.Empty(t, keys(t, &cache.objectReaders))
-	})
-
-	t.Run("cacheable", func(t *testing.T) {
+	t.Run("cached", func(t *testing.T) {
 		defer cache.Evict()
 
 		ctx := correlation.ContextWithCorrelation(ctx, "1")
@@ -247,8 +297,14 @@ func TestCache_ObjectReader(t *testing.T) {
 		cancel()
 
 		allKeys := keys(t, &cache.objectReaders)
+
+		expectedSessionID := "1"
+
+		if featureflag.RemoveCatfileCacheSessionID.IsEnabled(ctx) {
+			expectedSessionID = fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
+		}
 		require.Equal(t, []key{{
-			sessionID:   "1",
+			sessionID:   expectedSessionID,
 			repoStorage: repo.GetStorageName(),
 			repoRelPath: repo.GetRelativePath(),
 		}}, allKeys)
@@ -307,7 +363,14 @@ func TestCache_ObjectReader(t *testing.T) {
 func TestCache_ObjectReaderWithoutMailmap(t *testing.T) {
 	t.Parallel()
 
-	ctx := testhelper.Context(t)
+	testhelper.NewFeatureSets(
+		featureflag.RemoveCatfileCacheSessionID,
+	).Run(t, testCacheObjectReaderWithoutMailmap)
+}
+
+func testCacheObjectReaderWithoutMailmap(t *testing.T, ctx context.Context) {
+	t.Parallel()
+
 	cfg := testcfg.Build(t)
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -320,20 +383,7 @@ func TestCache_ObjectReaderWithoutMailmap(t *testing.T) {
 	cache := newCache(time.Hour, 10, helper.NewManualTicker())
 	defer cache.Stop()
 
-	t.Run("uncacheable", func(t *testing.T) {
-		// The context doesn't carry a session ID and is thus uncacheable.
-		// The process should never get returned to the cache and must be
-		// killed on context cancellation.
-		reader, cancel, err := cache.ObjectReaderWithoutMailmap(ctx, repoExecutor)
-		require.NoError(t, err)
-
-		cancel()
-
-		require.True(t, reader.isClosed())
-		require.Empty(t, keys(t, &cache.objectReadersWithoutMailmap))
-	})
-
-	t.Run("cacheable", func(t *testing.T) {
+	t.Run("cached", func(t *testing.T) {
 		defer cache.Evict()
 
 		ctx := correlation.ContextWithCorrelation(ctx, "1")
@@ -349,8 +399,14 @@ func TestCache_ObjectReaderWithoutMailmap(t *testing.T) {
 		cancel()
 
 		allKeys := keys(t, &cache.objectReadersWithoutMailmap)
+		expectedSessionID := "1"
+
+		if featureflag.RemoveCatfileCacheSessionID.IsEnabled(ctx) {
+			expectedSessionID = fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
+		}
+
 		require.Equal(t, []key{{
-			sessionID:   "1",
+			sessionID:   expectedSessionID,
 			repoStorage: repo.GetStorageName(),
 			repoRelPath: repo.GetRelativePath(),
 		}}, allKeys)

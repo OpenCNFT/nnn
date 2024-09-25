@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -228,6 +229,12 @@ func (c *ProcessCache) ObjectInfoReader(ctx context.Context, repo gitcmd.Reposit
 	return objectInfoReader, cancel, nil
 }
 
+// Calculate the nearest 5-minute interval. For our cache key, we want to
+// enforce expiry after 5 minutes.
+func roundToNearestFiveMinute(t time.Time) int {
+	return ((t.Minute() / 5) + 1) * 5
+}
+
 func (c *ProcessCache) getOrCreateProcess(
 	ctx context.Context,
 	repo storage.Repository,
@@ -240,7 +247,16 @@ func (c *ProcessCache) getOrCreateProcess(
 	span, ctx := tracing.StartSpanIfHasParent(ctx, spanName, nil)
 	defer span.Finish()
 
-	cacheKey, isCacheable := newCacheKey(metadata.GetValue(ctx, SessionIDField), repo)
+	var sessionID string
+
+	if featureflag.RemoveCatfileCacheSessionID.IsEnabled(ctx) {
+		sessionID = fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
+	} else {
+		sessionID = metadata.GetValue(ctx, SessionIDField)
+	}
+
+	cacheKey, isCacheable := newCacheKey(sessionID, repo)
+
 	if isCacheable {
 		// We only try to look up cached processes in case it is cacheable, which requires a
 		// session ID. This is mostly done such that git-cat-file(1) processes from one user
