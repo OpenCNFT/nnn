@@ -1838,7 +1838,7 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 	runPackRefs := transaction.runHousekeeping.packRefs
 	repoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
 
-	if err := mgr.removePackedRefsLocks(mgr.ctx, repoPath); err != nil {
+	if err := mgr.removePackedRefsLocks(ctx, repoPath); err != nil {
 		return fmt.Errorf("remove stale packed-refs locks: %w", err)
 	}
 	// First walk to collect the list of loose refs.
@@ -2137,7 +2137,11 @@ func unwrapExpectedError(err error) error {
 //
 // Run keeps running until Stop is called or it encounters a fatal error. All transactions will error with
 // storage.ErrTransactionProcessingStopped when Run returns.
-func (mgr *TransactionManager) Run() (returnedErr error) {
+func (mgr *TransactionManager) Run() error {
+	return mgr.run(mgr.ctx)
+}
+
+func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	defer func() {
 		// On-going operations may fail with a context canceled error if the manager is stopped. This is
 		// not a real error though given the manager will recover from this on restart. Swallow the error.
@@ -2151,7 +2155,7 @@ func (mgr *TransactionManager) Run() (returnedErr error) {
 	defer mgr.Close()
 	defer mgr.testHooks.beforeRunExiting()
 
-	if err := mgr.initialize(mgr.ctx); err != nil {
+	if err := mgr.initialize(ctx); err != nil {
 		return fmt.Errorf("initialize: %w", err)
 	}
 
@@ -2159,7 +2163,7 @@ func (mgr *TransactionManager) Run() (returnedErr error) {
 		if mgr.appliedLSN < mgr.appendedLSN {
 			lsn := mgr.appliedLSN + 1
 
-			if err := mgr.applyLogEntry(mgr.ctx, lsn); err != nil {
+			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
 				return fmt.Errorf("apply log entry: %w", err)
 			}
 
@@ -2182,7 +2186,7 @@ func (mgr *TransactionManager) Run() (returnedErr error) {
 			continue
 		}
 
-		if err := mgr.processTransaction(); err != nil {
+		if err := mgr.processTransaction(ctx); err != nil {
 			return fmt.Errorf("process transaction: %w", err)
 		}
 	}
@@ -2190,7 +2194,7 @@ func (mgr *TransactionManager) Run() (returnedErr error) {
 
 // processTransaction waits for a transaction and processes it by verifying and
 // logging it.
-func (mgr *TransactionManager) processTransaction() (returnedErr error) {
+func (mgr *TransactionManager) processTransaction(ctx context.Context) (returnedErr error) {
 	var transaction *Transaction
 	select {
 	case transaction = <-mgr.admissionQueue:
@@ -2208,16 +2212,16 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 		return nil
 	case <-mgr.acknowledgedQueue:
 		return nil
-	case <-mgr.ctx.Done():
+	case <-ctx.Done():
 	}
 
 	// Return if the manager was stopped. The select is indeterministic so this guarantees
 	// the manager stops the processing even if there are transactions in the queue.
-	if err := mgr.ctx.Err(); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	span, ctx := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.processTransaction", nil)
+	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.processTransaction", nil)
 	defer span.Finish()
 
 	if err := func() (commitErr error) {
@@ -2241,7 +2245,7 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 			return fmt.Errorf("verify alternate update: %w", err)
 		}
 
-		if err := mgr.setupStagingRepository(mgr.ctx, transaction, alternateRelativePath); err != nil {
+		if err := mgr.setupStagingRepository(ctx, transaction, alternateRelativePath); err != nil {
 			return fmt.Errorf("setup staging snapshot: %w", err)
 		}
 
@@ -2249,7 +2253,7 @@ func (mgr *TransactionManager) processTransaction() (returnedErr error) {
 		// objects are the reference tips set in the transaction and the objects the transaction's packfile
 		// is based on. If an object dependency is missing, the transaction is aborted as applying it would
 		// result in repository corruption.
-		if err := mgr.verifyObjectsExist(mgr.ctx, transaction.stagingRepository, transaction.objectDependencies); err != nil {
+		if err := mgr.verifyObjectsExist(ctx, transaction.stagingRepository, transaction.objectDependencies); err != nil {
 			return fmt.Errorf("verify object dependencies: %w", err)
 		}
 
@@ -2515,7 +2519,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
-	if err := mgr.removeStaleWALFiles(mgr.ctx, mgr.oldestLSN, mgr.appendedLSN); err != nil {
+	if err := mgr.removeStaleWALFiles(ctx, mgr.oldestLSN, mgr.appendedLSN); err != nil {
 		return fmt.Errorf("remove stale packs: %w", err)
 	}
 
@@ -2664,7 +2668,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 		return "", errRelativePathNotSet
 	}
 
-	span, _ := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.verifyAlternateUpdate", nil)
+	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyAlternateUpdate", nil)
 	defer span.Finish()
 
 	repositoryPath := mgr.getAbsolutePath(transaction.relativePath)
@@ -2744,7 +2748,7 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		return nil, errRelativePathNotSet
 	}
 
-	span, _ := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.verifyReferences", nil)
+	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyReferences", nil)
 	defer span.Finish()
 
 	// Apply quarantine to the staging repository in order to ensure the new objects are available when we
@@ -3183,7 +3187,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 		return nil, fmt.Errorf("verifying repacking: %w", err)
 	}
 
-	commitGraphsEntry, err := mgr.verifyCommitGraphs(mgr.ctx, transaction)
+	commitGraphsEntry, err := mgr.verifyCommitGraphs(ctx, transaction)
 	if err != nil {
 		return nil, fmt.Errorf("verifying commit graph update: %w", err)
 	}
@@ -3673,7 +3677,7 @@ func (mgr *TransactionManager) applyHousekeeping(ctx context.Context, lsn storag
 		return nil
 	}
 
-	span, _ := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.applyHousekeeping", nil)
+	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyHousekeeping", nil)
 	defer span.Finish()
 
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("total", "apply")
@@ -3701,7 +3705,7 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 		return nil
 	}
 
-	span, _ := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.applyPackRefs", nil)
+	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyPackRefs", nil)
 	defer span.Finish()
 
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "apply")
@@ -3790,7 +3794,7 @@ func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.L
 		return nil
 	}
 
-	span, _ := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.applyRepacking", nil)
+	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyRepacking", nil)
 	defer span.Finish()
 
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("repack", "apply")
@@ -3855,7 +3859,7 @@ func (mgr *TransactionManager) applyCommitGraphs(ctx context.Context, lsn storag
 		return nil
 	}
 
-	span, _ := tracing.StartSpanIfHasParent(mgr.ctx, "transaction.applyCommitGraphs", nil)
+	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyCommitGraphs", nil)
 	defer span.Finish()
 
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("commit-graph", "apply")
