@@ -2873,11 +2873,11 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 	}
 
 	if refBackend == git.ReferenceBackendReftables {
-		if err := mgr.verifyReferencesWithGitForReftables(ctx, referenceTransactions, transaction); err != nil {
+		if err := mgr.verifyReferencesWithGitForReftables(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
 			return nil, fmt.Errorf("verify references with git: %w", err)
 		}
 	} else {
-		if err := mgr.verifyReferencesWithGit(ctx, referenceTransactions, transaction); err != nil {
+		if err := mgr.verifyReferencesWithGit(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
 			return nil, fmt.Errorf("verify references with git: %w", err)
 		}
 	}
@@ -2894,12 +2894,8 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 	ctx context.Context,
 	referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction,
 	tx *Transaction,
+	repo *localrepo.Repo,
 ) error {
-	repo, err := tx.stagingRepository.Quarantine(ctx, tx.quarantineDirectory)
-	if err != nil {
-		return fmt.Errorf("quarantine: %w", err)
-	}
-
 	reftablePath := mgr.getAbsolutePath(repo.GetRelativePath(), "reftable/")
 	existingTables := make(map[string]struct{})
 	lockedTables := make(map[string]struct{})
@@ -2924,7 +2920,7 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 	}
 
 	// We first track the existing tables in the reftable directory.
-	if err = filepath.WalkDir(
+	if err := filepath.WalkDir(
 		reftablePath,
 		reftableWalker(func(path string) error {
 			if filepath.Base(path) == "tables.list" {
@@ -2964,7 +2960,7 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 
 	// With this, we can track the new tables added along with the 'tables.list'
 	// as operations on the transaction.
-	if err = filepath.WalkDir(
+	if err := filepath.WalkDir(
 		reftablePath,
 		reftableWalker(func(path string) error {
 			if _, ok := lockedTables[path]; ok {
@@ -2996,8 +2992,8 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 	return nil
 }
 
-func (txn *Transaction) containsReferenceDeletions(ctx context.Context) (bool, error) {
-	objectHash, err := txn.stagingRepository.ObjectHash(ctx)
+func (txn *Transaction) containsReferenceDeletions(ctx context.Context, stagingRepository *localrepo.Repo) (bool, error) {
+	objectHash, err := stagingRepository.ObjectHash(ctx)
 	if err != nil {
 		return false, fmt.Errorf("object hash: %w", err)
 	}
@@ -3013,7 +3009,7 @@ func (txn *Transaction) containsReferenceDeletions(ctx context.Context) (bool, e
 	return false, nil
 }
 
-func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transaction) error {
+func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transaction, stagingRepository *localrepo.Repo) error {
 	// Get the inode of the `packed-refs` file as it was before the transaction. This was
 	// recorded when the transaction began.
 	preImagePackedRefsInode, err := getInode(tx.originalPackedRefsFilePath())
@@ -3046,7 +3042,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 		// deletions. If our transaction didn't modify the packed-refs file, the references we are
 		// deleting were not packed. They don't conflict with removal of other references that were
 		// removed from the packed-refs file by a concurrent transaction.
-		containsReferenceDeletions, err := tx.containsReferenceDeletions(ctx)
+		containsReferenceDeletions, err := tx.containsReferenceDeletions(ctx, stagingRepository)
 		if err != nil {
 			return fmt.Errorf("contains reference deletions: %w", err)
 		}
@@ -3066,7 +3062,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 	}
 
 	// Get the inode of the `packed-refs` file as it is currently in the repository.
-	stagingRepoPath, err := tx.stagingRepository.Path(ctx)
+	stagingRepoPath, err := stagingRepository.Path(ctx)
 	if err != nil {
 		return fmt.Errorf("staging repo path: %w", err)
 	}
@@ -3121,7 +3117,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 // repository. This ensures the updates will go through when they are being applied from the log. This also catches any
 // invalid reference names and file/directory conflicts with Git's loose reference storage which can occur with references
 // like 'refs/heads/parent' and 'refs/heads/parent/child'.
-func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction, tx *Transaction) error {
+func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction, tx *Transaction, repo *localrepo.Repo) error {
 	// We don't want to delete references from the packed-refs in `RecordReferenceUpdates` below as it can be very
 	// slow and blocks all other transaction processing. We avoid this by staging the packed-refs file from
 	// transaction's post-image into the staging repository. All references the transaction would have deleted
@@ -3133,13 +3129,8 @@ func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, refe
 	// has modified the file. We do this by checking whether the packed-refs file's inode is the same as it was
 	// when our transaction began. If not, someone has modified the packed-refs file and us overriding the changes
 	// there could lead to lost updates.
-	if err := mgr.stagePackedRefs(ctx, tx); err != nil {
+	if err := mgr.stagePackedRefs(ctx, tx, repo); err != nil {
 		return fmt.Errorf("stage packed-refs: %w", err)
-	}
-
-	repo, err := tx.stagingRepository.Quarantine(ctx, tx.quarantineDirectory)
-	if err != nil {
-		return fmt.Errorf("quarantine: %w", err)
 	}
 
 	objectHash, err := repo.ObjectHash(ctx)
