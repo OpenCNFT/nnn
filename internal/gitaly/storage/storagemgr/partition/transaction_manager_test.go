@@ -2366,13 +2366,13 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionSize:      1,
 		},
 		{
-			numberOfRepositories: 10,
-			concurrentUpdaters:   1,
+			numberOfRepositories: 1,
+			concurrentUpdaters:   10,
 			transactionSize:      1,
 		},
 		{
-			numberOfRepositories: 1,
-			concurrentUpdaters:   10,
+			numberOfRepositories: 10,
+			concurrentUpdaters:   1,
 			transactionSize:      1,
 		},
 		{
@@ -2479,6 +2479,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 
 				for j := 0; j < tc.concurrentUpdaters; j++ {
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
+						Write:         true,
 						RelativePaths: []string{repo.GetRelativePath()},
 					})
 					require.NoError(b, err)
@@ -2500,6 +2501,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 					nextReferences := getReferenceUpdates(i, commit2, commit1)
 
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
+						Write:         true,
 						RelativePaths: []string{relativePath},
 					})
 					require.NoError(b, err)
@@ -2514,6 +2516,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 
 						for range transactionChan {
 							transaction, err := manager.Begin(ctx, storage.BeginOptions{
+								Write:         true,
 								RelativePaths: []string{relativePath},
 							})
 							require.NoError(b, err)
