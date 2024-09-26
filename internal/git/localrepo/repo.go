@@ -35,35 +35,52 @@ type Repo struct {
 	gitCmdFactory gitcmd.CommandFactory
 	catfileCache  catfile.Cache
 
-	detectObjectHashOnce sync.Once
-	objectHash           git.ObjectHash
-	objectHashErr        error
-
-	detectRefBackendOnce sync.Once
-	referenceBackend     git.ReferenceBackend
-	referenceBackendErr  error
+	detectObjectHash func(context.Context) (git.ObjectHash, error)
+	detectRefBackend func(context.Context) (git.ReferenceBackend, error)
 }
 
 // New creates a new Repo from its protobuf representation.
 func New(logger log.Logger, locator storage.Locator, gitCmdFactory gitcmd.CommandFactory, catfileCache catfile.Cache, repo storage.Repository) *Repo {
+	var (
+		detectObjectHashOnce sync.Once
+		objectHash           git.ObjectHash
+		objectHashErr        error
+
+		detectRefBackendOnce sync.Once
+		refBackend           git.ReferenceBackend
+		refBackendErr        error
+	)
+
 	return &Repo{
 		Repository:    repo,
 		logger:        logger,
 		locator:       locator,
 		gitCmdFactory: gitCmdFactory,
 		catfileCache:  catfileCache,
+
+		// These are implemented as closures in order to make it safe to share these functions between
+		// other localrepo instances derived from this one. The closures hide the details and avoid
+		// copying the sync.Once used to facilitate the caching.
+		detectObjectHash: func(ctx context.Context) (git.ObjectHash, error) {
+			detectObjectHashOnce.Do(func() {
+				objectHash, objectHashErr = gitcmd.DetectObjectHash(ctx, gitCmdFactory, repo)
+			})
+
+			return objectHash, objectHashErr
+		},
+		detectRefBackend: func(ctx context.Context) (git.ReferenceBackend, error) {
+			detectRefBackendOnce.Do(func() {
+				refBackend, refBackendErr = gitcmd.DetectReferenceBackend(ctx, gitCmdFactory, repo)
+			})
+
+			return refBackend, refBackendErr
+		},
 	}
 }
 
 // NewFrom creates a new Repo from its protobuf representation using dependencies of another Repo.
 func NewFrom(other *Repo, repo storage.Repository) *Repo {
-	return &Repo{
-		Repository:    repo,
-		logger:        other.logger,
-		locator:       other.locator,
-		gitCmdFactory: other.gitCmdFactory,
-		catfileCache:  other.catfileCache,
-	}
+	return New(other.logger, other.locator, other.gitCmdFactory, other.catfileCache, repo)
 }
 
 // Quarantine return the repository quarantined. The quarantine directory becomes the repository's
@@ -84,13 +101,13 @@ func (repo *Repo) Quarantine(ctx context.Context, quarantineDirectory string) (*
 		return nil, fmt.Errorf("apply quarantine: %w", err)
 	}
 
-	return New(
-		repo.logger,
-		repo.locator,
-		repo.gitCmdFactory,
-		repo.catfileCache,
-		quarantinedRepo,
-	), nil
+	quarantined := NewFrom(repo, quarantinedRepo)
+	// Share the object hash and reference backend detection with the parent to avoid
+	// re-resolving them.
+	quarantined.detectObjectHash = repo.detectObjectHash
+	quarantined.detectRefBackend = repo.detectRefBackend
+
+	return quarantined, nil
 }
 
 // QuarantineOnly returns the repository with only the quarantine directory configured as an object
@@ -207,17 +224,10 @@ func (repo *Repo) StorageTempDir() (string, error) {
 
 // ObjectHash detects the object hash used by this particular repository.
 func (repo *Repo) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
-	repo.detectObjectHashOnce.Do(func() {
-		repo.objectHash, repo.objectHashErr = gitcmd.DetectObjectHash(ctx, repo.gitCmdFactory, repo)
-	})
-	return repo.objectHash, repo.objectHashErr
+	return repo.detectObjectHash(ctx)
 }
 
 // ReferenceBackend detects the reference backend used by this repository.
 func (repo *Repo) ReferenceBackend(ctx context.Context) (git.ReferenceBackend, error) {
-	repo.detectRefBackendOnce.Do(func() {
-		repo.referenceBackend, repo.referenceBackendErr = gitcmd.DetectReferenceBackend(ctx, repo.gitCmdFactory, repo)
-	})
-
-	return repo.referenceBackend, repo.referenceBackendErr
+	return repo.detectRefBackend(ctx)
 }
