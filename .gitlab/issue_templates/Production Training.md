@@ -70,7 +70,7 @@ Please edit this section like a workbook, adding not just the answer but also ho
 ## Follow-up activities
 
 Link: [Gitaly Customer Issues](https://gitlab.com/gitlab-org/gitaly/-/issues/?sort=due_date&state=opened&label_name%5B%5D=Gitaly%20Customer%20Issue&first_page_size=100)
-
+- [ ] [Set up a local ELK and import log files into it](../../doc/setup_local_elk_for_downloaded_logs.md)
 - [ ] Read through some recently closed customer issues and the investigation. Follow the reasoning and understand the fix.
 - [ ] Join an ongoing investigation, or pick up a new incoming issue. (Add the current milestone and ~"workflow::in dev" while assignign the issue to yourself.) Ask for help and guidance shamelessly. :slight_smile:
 - [ ] Monitor `#g_gitaly` for incoming questions, direct them to our [intake flow](https://handbook.gitlab.com/handbook/engineering/infrastructure/core-platform/systems/gitaly/#customer-issues)
