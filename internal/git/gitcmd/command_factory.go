@@ -743,6 +743,12 @@ func (cf *ExecCommandFactory) AttrTreeConfig(ctx context.Context, repo storage.R
 		"archive":      {},
 		"log":          {},
 		"format-patch": {},
+		// Below commands do not need attributes. They are here
+		// to avoid object hash resolving below as it causes
+		// performance degradation with transactions.
+		"cat-file":   {},
+		"rev-parse":  {},
+		"update-ref": {},
 	}
 	if _, ok := whiteList[sc.Name]; ok {
 		return &ConfigPair{Key: "attr.tree", Value: "HEAD"}

@@ -285,7 +285,7 @@ func TestRepo_ObjectHash(t *testing.T) {
 	// But if we're adding the `attr.tree` config, we also check the object
 	// hash there to get the empty tree OID, so the logic would be executed
 	// once more.
-	require.Equal(t, "detection-logic\ndetection-logic\n",
+	require.Equal(t, "detection-logic\n",
 		string(testhelper.MustReadFile(t, outputFile)),
 	)
 
@@ -297,7 +297,7 @@ func TestRepo_ObjectHash(t *testing.T) {
 
 	// But the detection logic should not have been executed a second time.
 	// Read the comment in the first check for logic regarding the flag.
-	require.Equal(t, "detection-logic\ndetection-logic\n",
+	require.Equal(t, "detection-logic\n",
 		string(testhelper.MustReadFile(t, outputFile)),
 	)
 }
