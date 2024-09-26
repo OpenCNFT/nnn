@@ -76,7 +76,7 @@ func (s *server) executeMaybeWithTransaction(ctx context.Context, repo *localrep
 
 	defer func() {
 		if returnedErr != nil {
-			if err := transaction.Rollback(); err != nil {
+			if err := transaction.Rollback(ctx); err != nil {
 				s.logger.WithError(err).Error("failed to rollback WAL transaction")
 			}
 		}

@@ -163,9 +163,9 @@ func (tx *finalizableTransaction) Commit(ctx context.Context) error {
 }
 
 // Rollback rolls back the transaction and runs the finalizer.
-func (tx *finalizableTransaction) Rollback() error {
+func (tx *finalizableTransaction) Rollback(ctx context.Context) error {
 	defer tx.finalize()
-	return tx.Transaction.Rollback()
+	return tx.Transaction.Rollback(ctx)
 }
 
 // newFinalizableTransaction returns a wrapped transaction that executes finalize when the transaction

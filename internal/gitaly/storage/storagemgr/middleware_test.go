@@ -568,7 +568,7 @@ messages and behavior by erroring out the requests before they even hit this int
 				assert.NoError(t, err)
 
 				if tc.rollbackTransaction {
-					assert.NoError(t, tx.Rollback())
+					assert.NoError(t, tx.Rollback(ctx))
 				}
 			}
 

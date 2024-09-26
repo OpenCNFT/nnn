@@ -598,7 +598,7 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 }
 
 // Rollback releases resources associated with the transaction without performing any changes.
-func (txn *Transaction) Rollback() error {
+func (txn *Transaction) Rollback(ctx context.Context) error {
 	if err := txn.updateState(transactionStateRollback); err != nil {
 		return err
 	}
