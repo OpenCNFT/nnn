@@ -2375,69 +2375,27 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 		return nil
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	revisions := make([]git.Revision, 0, len(oids))
+	for oid := range oids {
+		revisions = append(revisions, oid.Revision())
+	}
 
-	oidReader, oidWriter := io.Pipe()
-	eg.Go(func() (returnedErr error) {
-		defer oidWriter.CloseWithError(returnedErr)
+	objectHash, err := repository.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("object hash: %w", err)
+	}
 
-		for oid := range oids {
-			if _, err := fmt.Fprintln(oidWriter, oid.String()); err != nil {
-				return fmt.Errorf("write dependency oid: %w", err)
-			}
+	if err := checkObjects(ctx, repository, revisions, func(revision git.Revision, oid git.ObjectID) error {
+		if objectHash.IsZeroOID(oid) {
+			return localrepo.InvalidObjectError(revision)
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return fmt.Errorf("check objects: %w", err)
+	}
 
-	resultReader, resultWriter := io.Pipe()
-	eg.Go(func() (returnedErr error) {
-		defer oidReader.CloseWithError(returnedErr)
-		defer resultWriter.CloseWithError(returnedErr)
-
-		var stderr bytes.Buffer
-		if err := repository.ExecAndWait(ctx,
-			gitcmd.Command{
-				Name: "cat-file",
-				Flags: []gitcmd.Option{
-					gitcmd.Flag{Name: "--batch-check=%(objectname)"},
-					gitcmd.Flag{Name: "--buffer"},
-				},
-			},
-			gitcmd.WithStdin(oidReader),
-			gitcmd.WithStdout(resultWriter),
-			gitcmd.WithStderr(&stderr),
-		); err != nil {
-			return structerr.New("cat-file: %w", err).WithMetadata("stderr", stderr.String())
-		}
-
-		return nil
-	})
-
-	eg.Go(func() (returnedErr error) {
-		defer resultReader.CloseWithError(returnedErr)
-
-		scanner := bufio.NewScanner(resultReader)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if oid, isMissing := strings.CutSuffix(line, " missing"); isMissing {
-				return localrepo.InvalidObjectError(oid)
-			}
-
-			// Sanity check this was actually an object ID we were looking for.
-			if _, ok := oids[git.ObjectID(line)]; !ok {
-				return fmt.Errorf("unexpected oid line: %q", line)
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return fmt.Errorf("scanning cat-file output: %w", err)
-		}
-
-		return nil
-	})
-
-	return eg.Wait()
+	return nil
 }
 
 // Close stops the transaction processing causing Run to return.
