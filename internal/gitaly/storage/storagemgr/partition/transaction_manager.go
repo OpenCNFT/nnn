@@ -2720,8 +2720,9 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		return nil, fmt.Errorf("reference backend: %w", err)
 	}
 
-	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
-	for referenceName, update := range transaction.flattenReferenceTransactions() {
+	flattenedReferenceTransactions := transaction.flattenReferenceTransactions()
+	revisions := make([]git.Revision, 0, len(flattenedReferenceTransactions))
+	for referenceName := range flattenedReferenceTransactions {
 		// Transactions should only stage references with valid names as otherwise Git would already
 		// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
 		// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
@@ -2732,25 +2733,21 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 			return nil, InvalidReferenceFormatError{ReferenceName: referenceName}
 		}
 
-		actualOldTip, err := stagingRepositoryWithQuarantine.ResolveRevision(ctx, referenceName.Revision())
-		if errors.Is(err, git.ErrReferenceNotFound) {
-			objectHash, err := stagingRepositoryWithQuarantine.ObjectHash(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("object hash: %w", err)
-			}
+		revisions = append(revisions, referenceName.Revision())
+	}
 
-			actualOldTip = objectHash.ZeroOID
-		} else if err != nil {
-			return nil, fmt.Errorf("resolve revision: %w", err)
-		}
+	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
+	if err := checkObjects(ctx, stagingRepositoryWithQuarantine, revisions, func(revision git.Revision, actualOldTip git.ObjectID) error {
+		referenceName := git.ReferenceName(revision)
+		update := flattenedReferenceTransactions[referenceName]
 
 		if update.IsRegularUpdate() && update.OldOID != actualOldTip {
 			if transaction.skipVerificationFailures {
 				droppedReferenceUpdates[referenceName] = struct{}{}
-				continue
+				return nil
 			}
 
-			return nil, ReferenceVerificationError{
+			return ReferenceVerificationError{
 				ReferenceName:  referenceName,
 				ExpectedOldOID: update.OldOID,
 				ActualOldOID:   actualOldTip,
@@ -2762,8 +2759,12 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 			// This was a no-op and doesn't need to be written out. The reference's old value has been
 			// verified now to match what is expected.
 			droppedReferenceUpdates[referenceName] = struct{}{}
-			continue
+			return nil
 		}
+
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("check objects: %w", err)
 	}
 
 	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
