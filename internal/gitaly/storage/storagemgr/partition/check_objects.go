@@ -24,10 +24,15 @@ func checkObjects(ctx context.Context, repository *localrepo.Repo, revisions []g
 	eg.Go(func() (returnedErr error) {
 		defer revisionWriter.CloseWithError(returnedErr)
 
+		input := bufio.NewWriter(revisionWriter)
 		for _, revision := range revisions {
-			if _, err := fmt.Fprintln(revisionWriter, revision.String()); err != nil {
+			if _, err := fmt.Fprintln(input, revision.String()); err != nil {
 				return fmt.Errorf("write revision: %w", err)
 			}
+		}
+
+		if err := input.Flush(); err != nil {
+			return fmt.Errorf("flush: %w", err)
 		}
 
 		return nil
