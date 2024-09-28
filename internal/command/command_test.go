@@ -267,6 +267,31 @@ func TestNew_setupStdin(t *testing.T) {
 	require.Equal(t, stdin, buf.String())
 }
 
+func TestCommand_closeStdin(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+
+	cmd, err := New(ctx, testhelper.SharedLogger(t), []string{"cat"}, WithSetupStdin(), WithSetupStdout())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, cmd.Wait()) }()
+
+	input := []byte("test value")
+	_, err = cmd.Write(input)
+	require.NoError(t, err)
+
+	// Close stdin after writing the input. With stdin closed, we expect the `cat` command to return
+	// after outputting input. Since `cat` finished processing input from stdin, it will then exit
+	// closing its stdout. The closed stdout will lead to ReadAll unblocking.
+	require.NoError(t, cmd.Stdin().Close())
+
+	output, err := io.ReadAll(cmd)
+	require.NoError(t, err)
+
+	require.Equal(t, input, output)
+}
+
 func TestCommand_read(t *testing.T) {
 	t.Parallel()
 

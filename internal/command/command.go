@@ -489,11 +489,16 @@ func (c *Command) Read(p []byte) (int, error) {
 
 // Write calls Write() on the stdin pipe of the command.
 func (c *Command) Write(p []byte) (int, error) {
+	return c.Stdin().Write(p)
+}
+
+// Stdin returns the commands stdin pipe.
+func (c *Command) Stdin() io.WriteCloser {
 	if c.writer == nil {
 		panic("command has no writer")
 	}
 
-	return c.writer.Write(p)
+	return c.writer
 }
 
 // Wait calls Wait() on the exec.Cmd instance inside the command. This
