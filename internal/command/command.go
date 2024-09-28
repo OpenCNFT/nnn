@@ -72,7 +72,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "gitaly_spawn_forking_time_seconds",
 			Help:    "Histogram of actual forking time after spawn tokens are acquired",
-			Buckets: []float64{0.001, 0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0, 10.0},
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
 		},
 	)
 
