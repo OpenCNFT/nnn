@@ -35,6 +35,15 @@ const (
 	// with any directory name that could be provided by a user. The '+'
 	// character is not allowed in GitLab namespaces or repositories.
 	GitalyDataPrefix = "+gitaly"
+
+	// defaultPackObjectsLimitingConcurrency defines the default concurrency for pack-objects limiting. Pack-objects
+	// limiting is scoped by remote IPs. This limit means a single IP could only issue at most 200 distinct requests
+	// at the same time. Requests fetching same data lead to only 1 pack-objects command; hence counted as 1.
+	defaultPackObjectsLimitingConcurrency = 200
+	// defaultPackObjectsLimitingQueueSize defines the default queue size for pack-objects limiting. A request is
+	// put into a queue when there are more concurrent requests than defined. This default prevents the queue from
+	// growing boundlessly.
+	defaultPackObjectsLimitingQueueSize = 200
 )
 
 // configKeyRegex is intended to verify config keys in their `core.gc` or
@@ -575,7 +584,7 @@ type PackObjectsLimiting struct {
 func (pol PackObjectsLimiting) Validate() error {
 	return cfgerror.New().
 		Append(cfgerror.Comparable(pol.MaxConcurrency).GreaterOrEqual(0), "max_concurrency").
-		Append(cfgerror.Comparable(pol.MaxQueueLength).GreaterOrEqual(0), "max_queue_length").
+		Append(cfgerror.Comparable(pol.MaxQueueLength).GreaterThan(0), "max_queue_length").
 		Append(cfgerror.Comparable(pol.MaxQueueWait.Duration()).GreaterOrEqual(0), "max_queue_wait").
 		Append(cfgerror.Comparable(pol.MinLimit).GreaterOrEqual(0), "min_limit").
 		Append(cfgerror.Comparable(pol.MaxLimit).GreaterOrEqual(pol.InitialLimit), "max_limit").
@@ -672,15 +681,9 @@ func defaultPackObjectsCacheConfig() StreamCacheConfig {
 }
 
 func defaultPackObjectsLimiting() PackObjectsLimiting {
-	var maxConcurrency, maxQueueLength int
-
-	if maxConcurrency == 0 {
-		maxConcurrency = 200
-	}
-
 	return PackObjectsLimiting{
-		MaxConcurrency: maxConcurrency,
-		MaxQueueLength: maxQueueLength,
+		MaxConcurrency: defaultPackObjectsLimitingConcurrency,
+		MaxQueueLength: defaultPackObjectsLimitingQueueSize,
 		// Requests can stay in the queue as long as they want
 		MaxQueueWait: 0,
 	}
@@ -840,6 +843,10 @@ func (cfg *Cfg) Sanitize() error {
 		if cfg.PackObjectsCache.Dir == "" && len(cfg.Storages) > 0 {
 			cfg.PackObjectsCache.Dir = filepath.Join(cfg.Storages[0].Path, GitalyDataPrefix, "PackObjectsCache")
 		}
+	}
+
+	if cfg.PackObjectsLimiting.MaxQueueLength == 0 {
+		cfg.PackObjectsLimiting.MaxQueueLength = defaultPackObjectsLimitingQueueSize
 	}
 
 	if cfg.GracefulRestartTimeout.Duration() == 0 {
