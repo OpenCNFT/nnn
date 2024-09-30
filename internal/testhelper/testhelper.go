@@ -300,6 +300,8 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.NewRepoReftableBackend, newRepoReftableEnabled == "reftable")
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.DisableSpawnTokenQueue, rnd.Int()%2 == 0)
 
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.RemoveCatfileCacheSessionID, rnd.Int()%2 == 0)
+
 	for _, opt := range opts {
 		ctx = opt(ctx)
 	}
