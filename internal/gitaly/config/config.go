@@ -44,6 +44,10 @@ const (
 	// put into a queue when there are more concurrent requests than defined. This default prevents the queue from
 	// growing boundlessly.
 	defaultPackObjectsLimitingQueueSize = 200
+
+	// defaultConcurrencyQueueSize defines the default queue size for RPC concurrency limits. This type of limiter
+	// is scoped by the RPC and by repository.
+	defaultConcurrencyQueueSize = 500
 )
 
 // configKeyRegex is intended to verify config keys in their `core.gc` or
@@ -506,7 +510,7 @@ type Concurrency struct {
 func (c Concurrency) Validate() error {
 	errs := cfgerror.New().
 		Append(cfgerror.Comparable(c.MaxPerRepo).GreaterOrEqual(0), "max_per_repo").
-		Append(cfgerror.Comparable(c.MaxQueueSize).GreaterOrEqual(0), "max_queue_size").
+		Append(cfgerror.Comparable(c.MaxQueueSize).GreaterThan(0), "max_queue_size").
 		Append(cfgerror.Comparable(c.MaxQueueWait.Duration()).GreaterOrEqual(0), "max_queue_wait")
 
 	if c.Adaptive {
@@ -847,6 +851,12 @@ func (cfg *Cfg) Sanitize() error {
 
 	if cfg.PackObjectsLimiting.MaxQueueLength == 0 {
 		cfg.PackObjectsLimiting.MaxQueueLength = defaultPackObjectsLimitingQueueSize
+	}
+
+	for i := range cfg.Concurrency {
+		if cfg.Concurrency[i].MaxQueueSize == 0 {
+			cfg.Concurrency[i].MaxQueueSize = defaultConcurrencyQueueSize
+		}
 	}
 
 	if cfg.GracefulRestartTimeout.Duration() == 0 {
