@@ -36,7 +36,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raft"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -65,11 +64,6 @@ import (
 	_ "gitlab.com/gitlab-org/gitaly/v16/internal/grpc/proxy"
 )
 
-const (
-	initRaftClusterFlag = "init-raft-cluster"
-	initRaftClusterEnv  = "GITALY_INIT_RAFT_CLUSTER"
-)
-
 func newServeCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "serve",
@@ -80,13 +74,6 @@ Example: gitaly serve gitaly.config.toml`,
 		Description:     "Launch the Gitaly server daemon.",
 		Action:          serveAction,
 		HideHelpCommand: true,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    initRaftClusterFlag,
-				Usage:   "Bootstrap a new Raft cluster for the first time. If the cluster already exists, this flag will be ignored.",
-				EnvVars: []string{initRaftClusterEnv},
-			},
-		},
 	}
 }
 
@@ -438,25 +425,6 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		txMiddleware = server.TransactionMiddleware{
 			UnaryInterceptor:  storagemgr.NewUnaryInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, node, locator),
 			StreamInterceptor: storagemgr.NewStreamInterceptor(logger, protoregistry.GitalyProtoPreregistered, txRegistry, node, locator),
-		}
-
-		if cfg.Raft.Enabled {
-			logger.WarnContext(ctx, "Raft cluster enabled. This feature is actively under development and is not production ready yet. It might lead to various issues including data loss.")
-			var initRaft bool
-			if appCtx.IsSet(initRaftClusterFlag) {
-				initRaft = appCtx.Value(initRaftClusterFlag).(bool)
-			}
-			raftManager, err := raft.NewManager(ctx, cfg.Storages, cfg.Raft, raft.ManagerConfig{
-				BootstrapCluster: initRaft,
-			}, node, logger)
-			if err != nil {
-				return fmt.Errorf("initializing raft manager: %w", err)
-			}
-			defer raftManager.Close()
-
-			if err := raftManager.Start(); err != nil {
-				return fmt.Errorf("starting raft manager: %w", err)
-			}
 		}
 	} else {
 		storagePaths := make([]string, len(cfg.Storages))
