@@ -64,7 +64,13 @@ func New(logger log.Logger, locator storage.Locator, gitCmdFactory gitcmd.Comman
 		// copying the sync.Once used to facilitate the caching.
 		detectObjectHash: func(ctx context.Context) (git.ObjectHash, error) {
 			detectObjectHashOnce.Do(func() {
-				objectHash, objectHashErr = gitcmd.DetectObjectHash(ctx, gitCmdFactory, repo)
+				path, err := locator.GetRepoPath(ctx, repo)
+				if err != nil {
+					objectHashErr = fmt.Errorf("get repo path: %w", err)
+					return
+				}
+
+				objectHash, objectHashErr = gitcmd.DetectObjectHash(ctx, path)
 			})
 
 			return objectHash, objectHashErr

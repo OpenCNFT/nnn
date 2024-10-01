@@ -17,6 +17,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"google.golang.org/grpc/codes"
 )
 
 func TestCalculateChecksum(t *testing.T) {
@@ -89,13 +90,10 @@ func TestCalculateChecksum(t *testing.T) {
 						Repository: repo,
 					},
 					requireError: func(actual error) {
-						testhelper.RequireStatusWithErrorMetadataRegexp(t,
-							structerr.NewInternal("gitCommand: reading reference backend: exit status 128"),
-							actual,
-							map[string]string{
-								"stderr": "fatal: not a git repository: .+",
-							},
-						)
+						testhelper.RequireGrpcCode(t, actual, codes.DataLoss)
+						// The error includes the repository path. We don't match against it as it
+						// changes with the transaction's snapshot directory.
+						require.ErrorContains(t, actual, "not a git repository")
 					},
 				}
 			},

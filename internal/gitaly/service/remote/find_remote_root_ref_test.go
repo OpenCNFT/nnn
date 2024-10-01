@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -150,7 +151,7 @@ func TestServer_findRemoteRootRefCmd(t *testing.T) {
 
 	port := gittest.HTTPServer(t, ctx, gitCmdFactory, repoPath, nil)
 
-	s := server{gitCmdFactory: gitCmdFactory}
+	s := server{gitCmdFactory: gitCmdFactory, locator: config.NewLocator(cfg)}
 
 	originalURL := fmt.Sprintf("http://example.com:%d/%s", port, filepath.Base(repoPath))
 	resolvedURL := fmt.Sprintf("http://127.0.0.1:%d/%s", port, filepath.Base(repoPath))

@@ -847,12 +847,9 @@ func testUploadPackGitFailure(t *testing.T, ctx context.Context) {
 
 	err = recvUntilError(t, stream)
 
-	testhelper.RequireStatusWithErrorMetadataRegexp(t,
-		structerr.NewInternal(`detecting object hash: reading object format: exit status 128`),
+	testhelper.RequireGrpcError(t,
+		structerr.NewInternal(`running upload-pack: cmd wait: exit status 128, stderr: "fatal: bad config line 1 in file ./config\n"`),
 		err,
-		map[string]string{
-			"stderr": "fatal: bad config line 1 in file .+",
-		},
 	)
 }
 
