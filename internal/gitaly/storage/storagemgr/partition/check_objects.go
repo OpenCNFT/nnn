@@ -83,8 +83,14 @@ func checkObjects(ctx context.Context, repository *localrepo.Repo, revisions []g
 
 	scanner := bufio.NewScanner(cmd)
 	for i := 0; scanner.Scan(); i++ {
+		// Output format: https://git-scm.com/docs/git-cat-file#_batch_output
+		//
+		// missing suffix indicates the object did not exist. ZeroOID is used to signal this
+		// to the callback.
 		oid := objectHash.ZeroOID
 		if rawOID, isMissing := strings.CutSuffix(scanner.Text(), " missing"); !isMissing {
+			// Attempt to parse the OID. This leads to erroring out on unhandled output if
+			// the result was not just the OID.
 			oid, err = objectHash.FromHex(rawOID)
 			if err != nil {
 				return fmt.Errorf("parse object id: %w", err)
