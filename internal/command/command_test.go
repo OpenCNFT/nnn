@@ -20,12 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestNew_environment(t *testing.T) {
@@ -166,52 +161,6 @@ func TestNew_rejectContextWithoutDone(t *testing.T) {
 		_, err := New(testhelper.ContextWithoutCancel(), testhelper.SharedLogger(t), []string{"true"})
 		require.NoError(t, err)
 	})
-}
-
-func TestNew_spawnTimeout(t *testing.T) {
-	t.Parallel()
-
-	ctx := testhelper.Context(t)
-
-	if featureflag.DisableSpawnTokenQueue.IsEnabled(ctx) {
-		t.Skip("Spawn token queue is disabled.")
-	}
-
-	spawnTimeout := 200 * time.Millisecond
-	spawnTokenManager := NewSpawnTokenManager(SpawnConfig{
-		Timeout:     spawnTimeout,
-		MaxParallel: 0,
-	})
-
-	tick := time.After(spawnTimeout / 2)
-	errCh := make(chan error)
-	go func() {
-		_, err := New(ctx, testhelper.SharedLogger(t), []string{"true"}, WithSpawnTokenManager(spawnTokenManager))
-		errCh <- err
-	}()
-
-	select {
-	case <-errCh:
-		require.FailNow(t, "expected spawning to be delayed")
-	case <-tick:
-		// This is the happy case: we expect spawning of the command to be delayed by up to
-		// 200ms until it finally times out.
-	}
-
-	// And after some time we expect that spawning of the command fails due to the configured
-	// timeout.
-	err := <-errCh
-	var structErr structerr.Error
-	require.ErrorAs(t, err, &structErr)
-	details := structErr.Details()
-	require.Len(t, details, 1)
-
-	limitErr, ok := details[0].(*gitalypb.LimitError)
-	require.True(t, ok)
-
-	testhelper.RequireGrpcCode(t, err, codes.ResourceExhausted)
-	require.Equal(t, "process spawn timed out after 200ms", limitErr.GetErrorMessage())
-	require.Equal(t, durationpb.New(0).AsDuration(), limitErr.GetRetryAfter().AsDuration())
 }
 
 func TestCommand_Wait_contextCancellationKillsCommand(t *testing.T) {
