@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
@@ -2287,7 +2288,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					require.NoError(t, tm.appendLogEntry(map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
+					require.NoError(t, tm.appendLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
@@ -2366,13 +2367,13 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionSize:      1,
 		},
 		{
-			numberOfRepositories: 10,
-			concurrentUpdaters:   1,
+			numberOfRepositories: 1,
+			concurrentUpdaters:   10,
 			transactionSize:      1,
 		},
 		{
-			numberOfRepositories: 1,
-			concurrentUpdaters:   10,
+			numberOfRepositories: 10,
+			concurrentUpdaters:   1,
 			transactionSize:      1,
 		},
 		{
@@ -2392,6 +2393,13 @@ func BenchmarkTransactionManager(b *testing.B) {
 			tc.transactionSize,
 		)
 		b.Run(desc, func(b *testing.B) {
+			traceFile, err := os.OpenFile("trace.bin", os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
+			require.NoError(b, err)
+			defer traceFile.Close()
+
+			require.NoError(b, trace.Start(traceFile))
+			defer trace.Stop()
+
 			ctx := testhelper.Context(b)
 
 			cfg := testcfg.Build(b)
@@ -2479,6 +2487,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 
 				for j := 0; j < tc.concurrentUpdaters; j++ {
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
+						Write:         true,
 						RelativePaths: []string{repo.GetRelativePath()},
 					})
 					require.NoError(b, err)
@@ -2500,6 +2509,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 					nextReferences := getReferenceUpdates(i, commit2, commit1)
 
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
+						Write:         true,
 						RelativePaths: []string{relativePath},
 					})
 					require.NoError(b, err)
@@ -2514,6 +2524,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 
 						for range transactionChan {
 							transaction, err := manager.Begin(ctx, storage.BeginOptions{
+								Write:         true,
 								RelativePaths: []string{relativePath},
 							})
 							require.NoError(b, err)

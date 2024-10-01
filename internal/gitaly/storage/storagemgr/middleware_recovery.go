@@ -180,7 +180,7 @@ func (mw *TransactionRecoveryMiddleware) applyPendingWAL(ctx context.Context, me
 
 	mw.readyPartitions.Store(key, struct{}{})
 
-	if err := tx.Rollback(); err != nil {
+	if err := tx.Rollback(ctx); err != nil {
 		return fmt.Errorf("rollback: %w", err)
 	}
 

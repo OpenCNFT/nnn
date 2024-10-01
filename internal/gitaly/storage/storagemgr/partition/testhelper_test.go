@@ -1359,7 +1359,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			require.Equal(t, step.ExpectedError, transaction.KV().Delete([]byte(step.Key)))
 		case Rollback:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction rollbacked before beginning it")
-			require.Equal(t, step.ExpectedError, openTransactions[step.TransactionID].Rollback())
+			require.Equal(t, step.ExpectedError, openTransactions[step.TransactionID].Rollback(ctx))
 		case Prune:
 			// Repack all objects into a single pack and remove all other packs to remove all
 			// unreachable objects from the packs.
@@ -1613,7 +1613,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 				RelativePaths: []string{"non-existent"},
 			})
 			require.NoError(t, err)
-			require.NoError(t, tx.Rollback())
+			require.NoError(t, tx.Rollback(ctx))
 
 			return true, nil
 		case managerErr, closeChannel = <-managerErrChannel:

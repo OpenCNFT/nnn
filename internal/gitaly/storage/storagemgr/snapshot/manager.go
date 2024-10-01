@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime/trace"
 	"slices"
 	"strconv"
 	"strings"
@@ -93,6 +94,7 @@ func (mgr *Manager) SetLSN(currentLSN storage.LSN) {
 // GetSnapshot is safe to call concurrently with itself. The caller is responsible for ensuring the state of the
 // snapshotted file system is not modified while the snapshot is taken.
 func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exclusive bool) (_ FileSystem, returnedErr error) {
+	defer trace.StartRegion(ctx, "GetSnapshot").End()
 	if exclusive {
 		mgr.metrics.createdExclusiveSnapshotTotal.Inc()
 		filesystem, err := mgr.newSnapshot(ctx, relativePaths, false)
@@ -103,6 +105,8 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		return closeWrapper{
 			FileSystem: filesystem,
 			close: func() error {
+				defer trace.StartRegion(ctx, "close exclusive snapshot").End()
+
 				mgr.metrics.destroyedExclusiveSnapshotTotal.Inc()
 				// Exclusive snapshots are not shared, so it can be removed as soon
 				// as the user finishes with it.
@@ -144,6 +148,8 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 	mgr.mutex.Unlock()
 
 	cleanup := func() error {
+		defer trace.StartRegion(ctx, "close shared snapshot").End()
+
 		removeSnapshot := false
 
 		mgr.mutex.Lock()

@@ -55,7 +55,7 @@ func newNamespacedDBAccessor(node storage.Node, storageName string, namespace []
 			}
 			defer func() {
 				if returnedErr != nil {
-					if err := tx.Rollback(); err != nil {
+					if err := tx.Rollback(ctx); err != nil {
 						returnedErr = errors.Join(returnedErr, fmt.Errorf("rollback: %w", err))
 					}
 				}

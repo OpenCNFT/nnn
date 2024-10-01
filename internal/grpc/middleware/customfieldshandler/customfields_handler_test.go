@@ -101,7 +101,7 @@ func TestInterceptor(t *testing.T) {
 				require.NoError(t, err)
 			},
 			expectedLogData: map[string]interface{}{
-				"command.count": 5,
+				"command.count": 4,
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func TestInterceptor(t *testing.T) {
 				}
 			},
 			expectedLogData: map[string]interface{}{
-				"command.count": 4,
+				"command.count": 3,
 			},
 		},
 	}

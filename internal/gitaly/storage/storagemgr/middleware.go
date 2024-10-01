@@ -432,7 +432,7 @@ func beginTransactionForRepository(ctx context.Context, logger log.Logger, txReg
 	}
 	defer func() {
 		if returnedErr != nil {
-			if err := tx.Rollback(); err != nil {
+			if err := tx.Rollback(ctx); err != nil {
 				returnedErr = errors.Join(returnedErr, fmt.Errorf("rollback: %w", err))
 			}
 		}
@@ -457,7 +457,7 @@ func newTransactionalizedRequest(ctx context.Context, logger log.Logger, txRegis
 		finishTransaction: func(handlerErr error) error {
 			defer txRegistry.unregister(txID)
 			if handlerErr != nil {
-				if err := tx.Rollback(); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
+				if err := tx.Rollback(ctx); err != nil && !errors.Is(err, storage.ErrTransactionAlreadyCommitted) {
 					logger.WithError(err).ErrorContext(ctx, "failed rolling back transaction")
 				}
 
