@@ -2375,69 +2375,27 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 		return nil
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
+	revisions := make([]git.Revision, 0, len(oids))
+	for oid := range oids {
+		revisions = append(revisions, oid.Revision())
+	}
 
-	oidReader, oidWriter := io.Pipe()
-	eg.Go(func() (returnedErr error) {
-		defer oidWriter.CloseWithError(returnedErr)
+	objectHash, err := repository.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("object hash: %w", err)
+	}
 
-		for oid := range oids {
-			if _, err := fmt.Fprintln(oidWriter, oid.String()); err != nil {
-				return fmt.Errorf("write dependency oid: %w", err)
-			}
+	if err := checkObjects(ctx, repository, revisions, func(revision git.Revision, oid git.ObjectID) error {
+		if objectHash.IsZeroOID(oid) {
+			return localrepo.InvalidObjectError(revision)
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return fmt.Errorf("check objects: %w", err)
+	}
 
-	resultReader, resultWriter := io.Pipe()
-	eg.Go(func() (returnedErr error) {
-		defer oidReader.CloseWithError(returnedErr)
-		defer resultWriter.CloseWithError(returnedErr)
-
-		var stderr bytes.Buffer
-		if err := repository.ExecAndWait(ctx,
-			gitcmd.Command{
-				Name: "cat-file",
-				Flags: []gitcmd.Option{
-					gitcmd.Flag{Name: "--batch-check=%(objectname)"},
-					gitcmd.Flag{Name: "--buffer"},
-				},
-			},
-			gitcmd.WithStdin(oidReader),
-			gitcmd.WithStdout(resultWriter),
-			gitcmd.WithStderr(&stderr),
-		); err != nil {
-			return structerr.New("cat-file: %w", err).WithMetadata("stderr", stderr.String())
-		}
-
-		return nil
-	})
-
-	eg.Go(func() (returnedErr error) {
-		defer resultReader.CloseWithError(returnedErr)
-
-		scanner := bufio.NewScanner(resultReader)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if oid, isMissing := strings.CutSuffix(line, " missing"); isMissing {
-				return localrepo.InvalidObjectError(oid)
-			}
-
-			// Sanity check this was actually an object ID we were looking for.
-			if _, ok := oids[git.ObjectID(line)]; !ok {
-				return fmt.Errorf("unexpected oid line: %q", line)
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			return fmt.Errorf("scanning cat-file output: %w", err)
-		}
-
-		return nil
-	})
-
-	return eg.Wait()
+	return nil
 }
 
 // Close stops the transaction processing causing Run to return.
@@ -2762,8 +2720,9 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		return nil, fmt.Errorf("reference backend: %w", err)
 	}
 
-	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
-	for referenceName, update := range transaction.flattenReferenceTransactions() {
+	flattenedReferenceTransactions := transaction.flattenReferenceTransactions()
+	revisions := make([]git.Revision, 0, len(flattenedReferenceTransactions))
+	for referenceName := range flattenedReferenceTransactions {
 		// Transactions should only stage references with valid names as otherwise Git would already
 		// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
 		// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
@@ -2774,25 +2733,21 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 			return nil, InvalidReferenceFormatError{ReferenceName: referenceName}
 		}
 
-		actualOldTip, err := stagingRepositoryWithQuarantine.ResolveRevision(ctx, referenceName.Revision())
-		if errors.Is(err, git.ErrReferenceNotFound) {
-			objectHash, err := stagingRepositoryWithQuarantine.ObjectHash(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("object hash: %w", err)
-			}
+		revisions = append(revisions, referenceName.Revision())
+	}
 
-			actualOldTip = objectHash.ZeroOID
-		} else if err != nil {
-			return nil, fmt.Errorf("resolve revision: %w", err)
-		}
+	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
+	if err := checkObjects(ctx, stagingRepositoryWithQuarantine, revisions, func(revision git.Revision, actualOldTip git.ObjectID) error {
+		referenceName := git.ReferenceName(revision)
+		update := flattenedReferenceTransactions[referenceName]
 
 		if update.IsRegularUpdate() && update.OldOID != actualOldTip {
 			if transaction.skipVerificationFailures {
 				droppedReferenceUpdates[referenceName] = struct{}{}
-				continue
+				return nil
 			}
 
-			return nil, ReferenceVerificationError{
+			return ReferenceVerificationError{
 				ReferenceName:  referenceName,
 				ExpectedOldOID: update.OldOID,
 				ActualOldOID:   actualOldTip,
@@ -2804,8 +2759,12 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 			// This was a no-op and doesn't need to be written out. The reference's old value has been
 			// verified now to match what is expected.
 			droppedReferenceUpdates[referenceName] = struct{}{}
-			continue
+			return nil
 		}
+
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("check objects: %w", err)
 	}
 
 	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
