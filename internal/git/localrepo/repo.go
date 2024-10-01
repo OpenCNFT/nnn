@@ -77,7 +77,13 @@ func New(logger log.Logger, locator storage.Locator, gitCmdFactory gitcmd.Comman
 		},
 		detectRefBackend: func(ctx context.Context) (git.ReferenceBackend, error) {
 			detectRefBackendOnce.Do(func() {
-				refBackend, refBackendErr = gitcmd.DetectReferenceBackend(ctx, gitCmdFactory, repo)
+				path, err := locator.GetRepoPath(ctx, repo)
+				if err != nil {
+					refBackendErr = fmt.Errorf("get repo path: %w", err)
+					return
+				}
+
+				refBackend, refBackendErr = gitcmd.DetectReferenceBackend(ctx, path)
 			})
 
 			return refBackend, refBackendErr
