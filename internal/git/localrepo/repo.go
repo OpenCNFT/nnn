@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/trace"
 	"sync"
 	"testing"
 
@@ -224,10 +225,12 @@ func (repo *Repo) StorageTempDir() (string, error) {
 
 // ObjectHash detects the object hash used by this particular repository.
 func (repo *Repo) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
+	defer trace.StartRegion(ctx, "ObjectHash").End()
 	return repo.detectObjectHash(ctx)
 }
 
 // ReferenceBackend detects the reference backend used by this repository.
 func (repo *Repo) ReferenceBackend(ctx context.Context) (git.ReferenceBackend, error) {
+	defer trace.StartRegion(ctx, "ReferenceBackend").End()
 	return repo.detectRefBackend(ctx)
 }
