@@ -17,6 +17,7 @@ func UploadPack(ctx context.Context, conn *grpc.ClientConn, stdin io.Reader, std
 	defer cancel()
 
 	ssh := gitalypb.NewSSHServiceClient(conn)
+	//nolint:staticcheck
 	uploadPackStream, err := ssh.SSHUploadPack(ctx)
 	if err != nil {
 		return 0, err
