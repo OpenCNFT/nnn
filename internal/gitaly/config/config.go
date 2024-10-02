@@ -1237,16 +1237,6 @@ type Raft struct {
 	ClusterID string `json:"cluster_id" toml:"cluster_id"`
 	// NodeID is the unique ID of the node.
 	NodeID uint64 `json:"node_id" toml:"node_id"`
-	// RaftAddr is the exposed address used for all inter-node communication in the Raft protocol. This
-	// option is temporary until we implement a networking layer that allows Raft to co-exist with the
-	// cluster's gRPC port.
-	RaftAddr string `json:"raft_addr" toml:"raft_addr"`
-	// InitialMembers contains the list of initial members of the cluster. It's a map of NodeID to
-	// RaftAddr. Due to limitations of the TOML format, it's not possible to set the map key as a uint64.
-	InitialMembers map[string]string `json:"initial_members" toml:"initial_members"`
-	// ReplicationFactor defines the number of nodes where data of this storage are replicated,
-	// including the original storage.
-	ReplicationFactor uint64 `json:"replication_factor" toml:"replication_factor"`
 	// RTTMilliseconds is the maximum round trip between two nodes in the cluster. It's used to
 	// calculate multiple types of timeouts of Raft protocol.
 	RTTMilliseconds uint64 `json:"rtt_milliseconds" toml:"rtt_milliseconds"`
@@ -1266,9 +1256,6 @@ const (
 	// RaftDefaultHeartbeatTicks is the default heartbeat RTT for the Raft cluster. The estimated election
 	// timeout is DefaultRTT * DefaultHeartbeatTicks.
 	RaftDefaultHeartbeatTicks = 2
-	// RaftDefaultReplicationFactor is the default number of nodes where data of this storage are
-	// replicated. By default, the factor is 3, which means 1 main storage + 2 replicated storages.
-	RaftDefaultReplicationFactor = 3
 )
 
 func (r Raft) fulfillDefaults() Raft {
@@ -1280,9 +1267,6 @@ func (r Raft) fulfillDefaults() Raft {
 	}
 	if r.HeartbeatTicks == 0 {
 		r.HeartbeatTicks = RaftDefaultHeartbeatTicks
-	}
-	if r.ReplicationFactor == 0 {
-		r.ReplicationFactor = RaftDefaultReplicationFactor
 	}
 	return r
 }
@@ -1302,31 +1286,16 @@ func (r Raft) Validate(transactions Transactions) error {
 	}
 
 	cfgErr = cfgErr.
-		Append(cfgerror.NotEmptyMap(r.InitialMembers), "initial_members").
 		Append(cfgerror.NotEmpty(r.ClusterID), "cluster_id").
 		Append(cfgerror.Comparable(r.NodeID).GreaterThan(0), "node_id").
-		Append(cfgerror.NotEmpty(r.RaftAddr), "raft_addr").
-		Append(cfgerror.Comparable(r.ReplicationFactor).GreaterThan(0), "replication_factor").
 		Append(cfgerror.Comparable(r.RTTMilliseconds).GreaterThan(0), "rtt_millisecond").
 		Append(cfgerror.Comparable(r.ElectionTicks).GreaterThan(0), "election_rtt").
 		Append(cfgerror.Comparable(r.HeartbeatTicks).GreaterThan(0), "heartbeat_rtt")
-
-	// Validate RaftAddr to have hosts:port format
-	if _, _, err := net.SplitHostPort(r.RaftAddr); err != nil {
-		cfgErr = cfgErr.Append(fmt.Errorf("invalid address format: %s", err.Error()), "raft_addr")
-	}
 
 	// Validate UUID format of ClusterID
 	if r.ClusterID != "" {
 		if _, err := uuid.Parse(r.ClusterID); err != nil {
 			cfgErr = cfgErr.Append(fmt.Errorf("invalid UUID format for ClusterID: %s", err.Error()), "cluster_id")
-		}
-	}
-
-	// Validate InitialMembers to have node_id:raft_addr format
-	for nodeID, raftAddr := range r.InitialMembers {
-		if _, _, err := net.SplitHostPort(raftAddr); err != nil {
-			cfgErr = cfgErr.Append(fmt.Errorf("invalid address format: %s", err.Error()), fmt.Sprintf("initial_members[%s]", nodeID))
 		}
 	}
 
