@@ -580,7 +580,7 @@ message FetchRemoteRequest {
   // remote_params specifies the remote repository which should be fetched
   // from.
   Remote remote_params = 10;
-  // check_tags_changed defined whether to check if any tags were modified,
+  // check_tags_changed defines whether to check if any tags were modified,
   // returning the result in the tags_changed field of FetchRemoteResponse.
   bool check_tags_changed = 11;
 
@@ -591,9 +591,10 @@ message FetchRemoteRequest {
 // FetchRemoteResponse is a response for the FetchRemote RPC.
 message FetchRemoteResponse {
   // tags_changed is set based to true if tags were changed or cannot be determined
-  // and false when no tags were change. It is only calculated when check_tags_changed
-  // was set in the FetchRemoteRequest.
+  // and false when no tags were change.
   bool tags_changed = 1;
+  // repo_changed is set to true if the repo was changed.
+  bool repo_changed = 2;
 }
 
 // CreateRepositoryRequest is a request for the CreateRepository RPC.
