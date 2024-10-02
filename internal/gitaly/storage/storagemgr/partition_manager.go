@@ -274,17 +274,6 @@ func (sm *StorageManager) Begin(ctx context.Context, opts storage.TransactionOpt
 		return nil, fmt.Errorf("get partition: %w", err)
 	}
 
-	relativePaths := []string{relativePath}
-	relativeStateDir := deriveStateDirectory(partitionID)
-	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
-	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
-		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
-	}
-
-	if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
-		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
-	}
-
 	ptn, err := sm.startPartition(ctx, partitionID)
 	if err != nil {
 		return nil, err
@@ -298,6 +287,7 @@ func (sm *StorageManager) Begin(ctx context.Context, opts storage.TransactionOpt
 		}
 	}()
 
+	relativePaths := []string{relativePath}
 	if opts.AlternateRelativePath != "" {
 		relativePaths = append(relativePaths, opts.AlternateRelativePath)
 	}
