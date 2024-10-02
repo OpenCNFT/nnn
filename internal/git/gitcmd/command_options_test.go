@@ -397,14 +397,6 @@ func TestWithInternalFetch(t *testing.T) {
 	ctx = metadata.NewIncomingContext(ctx, md)
 	ctx = correlation.ContextWithCorrelation(ctx, "correlation-id-1")
 
-	uploadPackRequest := gitalypb.SSHUploadPackRequest{
-		Repository: &gitalypb.Repository{
-			StorageName: "default",
-		},
-	}
-	uploadPackRequestMarshalled, err := protojson.Marshal(&uploadPackRequest)
-	require.NoError(t, err)
-
 	uploadPackRequestWithSidechannel := gitalypb.SSHUploadPackWithSidechannelRequest{
 		Repository: &gitalypb.Repository{
 			StorageName: "default",
@@ -413,49 +405,19 @@ func TestWithInternalFetch(t *testing.T) {
 	uploadPackRequestWithSidechannelMarshalled, err := protojson.Marshal(&uploadPackRequestWithSidechannel)
 	require.NoError(t, err)
 
-	for _, tc := range []struct {
-		desc                string
-		createOption        func() CmdOpt
-		expectedSidechannel bool
-		expectedPayload     []byte
-	}{
-		{
-			desc: "without sidechannel",
-			createOption: func() CmdOpt {
-				return WithInternalFetch(&uploadPackRequest)
-			},
-			expectedSidechannel: false,
-			expectedPayload:     uploadPackRequestMarshalled,
-		},
-		{
-			desc: "with sidechannel",
-			createOption: func() CmdOpt {
-				return WithInternalFetchWithSidechannel(&uploadPackRequestWithSidechannel)
-			},
-			expectedSidechannel: true,
-			expectedPayload:     uploadPackRequestWithSidechannelMarshalled,
-		},
-	} {
-		t.Run(tc.desc, func(t *testing.T) {
-			var commandCfg cmdCfg
+	var commandCfg cmdCfg
 
-			option := tc.createOption()
-			require.NoError(t, option(ctx, cfg, gitCmdFactory, &commandCfg))
+	option := WithInternalFetchWithSidechannel(&uploadPackRequestWithSidechannel)
+	require.NoError(t, option(ctx, cfg, gitCmdFactory, &commandCfg))
 
-			require.Subset(t, commandCfg.env, []string{
-				fmt.Sprintf("GIT_SSH_COMMAND=%s upload-pack", cfg.BinaryPath("gitaly-ssh")),
-				fmt.Sprintf("GITALY_PAYLOAD=%s", tc.expectedPayload),
-				"CORRELATION_ID=correlation-id-1",
-				"GIT_SSH_VARIANT=simple",
-			})
+	require.Subset(t, commandCfg.env, []string{
+		fmt.Sprintf("GIT_SSH_COMMAND=%s upload-pack", cfg.BinaryPath("gitaly-ssh")),
+		fmt.Sprintf("GITALY_PAYLOAD=%s", uploadPackRequestWithSidechannelMarshalled),
+		"CORRELATION_ID=correlation-id-1",
+		"GIT_SSH_VARIANT=simple",
+	})
 
-			if tc.expectedSidechannel {
-				require.Contains(t, commandCfg.env, "GITALY_USE_SIDECHANNEL=1")
-			} else {
-				require.NotContains(t, commandCfg.env, "GITALY_USE_SIDECHANNEL=1")
-			}
-		})
-	}
+	require.Contains(t, commandCfg.env, "GITALY_USE_SIDECHANNEL=1")
 }
 
 func TestConfigPairsToEnvironment(t *testing.T) {
