@@ -338,16 +338,6 @@ func (sm *StorageManager) GetPartition(ctx context.Context, partitionID storage.
 
 // startPartition starts a partition.
 func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partitionHandle, error) {
-	relativeStateDir := deriveStateDirectory(partitionID)
-	absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
-	if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
-		return nil, fmt.Errorf("create state directory hierarchy: %w", err)
-	}
-
-	if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
-		return nil, fmt.Errorf("sync state directory hierarchy: %w", err)
-	}
-
 	for {
 		sm.mu.Lock()
 		if sm.closed {
@@ -357,67 +347,83 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 		ptn, ok := sm.partitions[partitionID]
 		if !ok {
-			ptn = &partition{
-				closing:         make(chan struct{}),
-				closed:          make(chan struct{}),
-				partitionClosed: make(chan struct{}),
-			}
-
-			stagingDir, err := os.MkdirTemp(sm.stagingDirectory, "")
-			if err != nil {
-				sm.mu.Unlock()
-				return nil, fmt.Errorf("create staging directory: %w", err)
-			}
-
-			logger := sm.logger.WithField("partition_id", partitionID)
-
-			mgr := sm.partitionFactory.New(
-				logger,
-				partitionID,
-				keyvalue.NewPrefixedTransactioner(sm.database, keyPrefixPartition(partitionID)),
-				sm.name,
-				sm.path,
-				absoluteStateDir,
-				stagingDir,
-			)
-
-			ptn.Partition = mgr
-
-			sm.partitions[partitionID] = ptn
-
-			sm.metrics.partitionsStarted.Inc()
-			sm.activePartitions.Add(1)
-			go func() {
-				if err := mgr.Run(); err != nil {
-					logger.WithError(err).WithField("partition_state_directory", relativeStateDir).Error("partition failed")
+			if err := func() error {
+				ptn = &partition{
+					closing:         make(chan struct{}),
+					closed:          make(chan struct{}),
+					partitionClosed: make(chan struct{}),
 				}
 
-				// In the event that Partition stops running, a new Partition instance will
-				// need to be started in order to continue processing transactions. The partition instance
-				// is deleted allowing the next transaction for the repository to create a new partition
-				// instance.
-				sm.mu.Lock()
-				delete(sm.partitions, partitionID)
-				sm.mu.Unlock()
-
-				close(ptn.partitionClosed)
-
-				// If the Partition returned due to an error, it could be that there are still
-				// in-flight transactions operating on their staged state. Removing the staging directory
-				// while they are active can lead to unexpected errors. Wait with the removal until they've
-				// all finished, and only then remove the staging directory.
-				//
-				// All transactions must eventually finish, so we don't wait on a context cancellation here.
-				<-ptn.closing
-
-				if err := os.RemoveAll(stagingDir); err != nil {
-					logger.WithError(err).Error("failed removing partition's staging directory")
+				relativeStateDir := deriveStateDirectory(partitionID)
+				absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
+				if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
+					return fmt.Errorf("create state directory hierarchy: %w", err)
 				}
 
-				sm.metrics.partitionsStopped.Inc()
-				close(ptn.closed)
-				sm.activePartitions.Done()
-			}()
+				if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
+					return fmt.Errorf("sync state directory hierarchy: %w", err)
+				}
+
+				stagingDir, err := os.MkdirTemp(sm.stagingDirectory, "")
+				if err != nil {
+					return fmt.Errorf("create staging directory: %w", err)
+				}
+
+				logger := sm.logger.WithField("partition_id", partitionID)
+
+				mgr := sm.partitionFactory.New(
+					logger,
+					partitionID,
+					keyvalue.NewPrefixedTransactioner(sm.database, keyPrefixPartition(partitionID)),
+					sm.name,
+					sm.path,
+					absoluteStateDir,
+					stagingDir,
+				)
+
+				ptn.Partition = mgr
+
+				sm.partitions[partitionID] = ptn
+
+				sm.metrics.partitionsStarted.Inc()
+				sm.activePartitions.Add(1)
+				go func() {
+					if err := mgr.Run(); err != nil {
+						logger.WithError(err).WithField("partition_state_directory", relativeStateDir).Error("partition failed")
+					}
+
+					// In the event that Partition stops running, a new Partition instance will
+					// need to be started in order to continue processing transactions. The partition instance
+					// is deleted allowing the next transaction for the repository to create a new partition
+					// instance.
+					sm.mu.Lock()
+					delete(sm.partitions, partitionID)
+					sm.mu.Unlock()
+
+					close(ptn.partitionClosed)
+
+					// If the Partition returned due to an error, it could be that there are still
+					// in-flight transactions operating on their staged state. Removing the staging directory
+					// while they are active can lead to unexpected errors. Wait with the removal until they've
+					// all finished, and only then remove the staging directory.
+					//
+					// All transactions must eventually finish, so we don't wait on a context cancellation here.
+					<-ptn.closing
+
+					if err := os.RemoveAll(stagingDir); err != nil {
+						logger.WithError(err).Error("failed removing partition's staging directory")
+					}
+
+					sm.metrics.partitionsStopped.Inc()
+					close(ptn.closed)
+					sm.activePartitions.Done()
+				}()
+
+				return nil
+			}(); err != nil {
+				sm.mu.Unlock()
+				return nil, fmt.Errorf("start partition: %w", err)
+			}
 		}
 
 		if ptn.isClosing() {
