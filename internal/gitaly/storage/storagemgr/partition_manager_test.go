@@ -155,7 +155,7 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 		// The closePartition step closes the transaction manager directly without calling close
 		// on the partition, so we check the manager directly here as well.
 		if ptn.isClosing() || ptn.Partition.(*mockPartition).closeCalled.Load() {
-			waiter := ptn.partitionClosed
+			waiter := ptn.managerFinished
 			if waitForFullClose {
 				waiter = ptn.closed
 			}

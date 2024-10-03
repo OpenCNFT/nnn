@@ -184,10 +184,10 @@ type partition struct {
 	closing chan struct{}
 	// closed is closed when the partitions goroutine has finished.
 	closed chan struct{}
-	// partitionClosed is closed to signal when the partition.Run has returned.
+	// managerFinished is closed to signal when the partition.Run has returned.
 	// Clients stumbling on the partition when it is closing wait on this channel to know when the previous
 	// partition instance has closed and it is safe to start another one.
-	partitionClosed chan struct{}
+	managerFinished chan struct{}
 	// referenceCount holds the current number of references held to the partition.
 	referenceCount uint
 	// Partition is the wrapped partition handle.
@@ -351,7 +351,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				ptn = &partition{
 					closing:         make(chan struct{}),
 					closed:          make(chan struct{}),
-					partitionClosed: make(chan struct{}),
+					managerFinished: make(chan struct{}),
 				}
 
 				relativeStateDir := deriveStateDirectory(partitionID)
@@ -400,7 +400,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					delete(sm.partitions, partitionID)
 					sm.mu.Unlock()
 
-					close(ptn.partitionClosed)
+					close(ptn.managerFinished)
 
 					// If the Partition returned due to an error, it could be that there are still
 					// in-flight transactions operating on their staged state. Removing the staging directory
@@ -435,7 +435,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-ptn.partitionClosed:
+			case <-ptn.managerFinished:
 			}
 
 			continue
