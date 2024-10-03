@@ -134,7 +134,7 @@ GIT_EXECUTABLES += git-http-backend
 GIT_VERSION ?=
 #
 # GIT_VERSION_x_xx defines versions for each instance of bundled Git we ship. When a new
-# version is added, be sure to update GIT_PACKED_EXECUTABLES, the *-bundled-git targets,
+# major version is added, be sure to update GIT_PACKED_EXECUTABLES, the *-bundled-git targets,
 # and add new targets under the "# These targets build specific releases of Git." section.
 GIT_VERSION_2_46 ?= v2.46.2
 #
