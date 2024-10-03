@@ -1123,7 +1123,7 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 
 	t.Run("faulty key", func(t *testing.T) {
 		require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
-			require.NoError(t, tx.Set([]byte("p/\x00\x00\x00\x00\x05/applied_lsn"), nil))
+			require.NoError(t, tx.Set([]byte("p/\x00\x00\x00\x05/a"), nil))
 			return nil
 		}))
 
@@ -1145,7 +1145,7 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 
 		// Removing the faulty key to prevent being seen from other tests below
 		require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
-			require.NoError(t, tx.Delete([]byte("p/\x00\x00\x00\x00\x05/applied_lsn")))
+			require.NoError(t, tx.Delete([]byte("p/\x00\x00\x00\x05/a")))
 			return nil
 		}))
 	})
