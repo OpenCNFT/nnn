@@ -75,6 +75,8 @@ type StorageManager struct {
 	partitionAssigner *partitionAssigner
 	// partitions contains all the active partitions. Each repository can have up to one partition.
 	partitions map[storage.PartitionID]*partition
+	// initializingPartitions keeps track of partitions currently being initialized.
+	initializingPartitions sync.WaitGroup
 	// activePartitions keeps track of active partitions.
 	activePartitions sync.WaitGroup
 	// partitionFactory is a factory to create Partitions.
@@ -82,6 +84,12 @@ type StorageManager struct {
 
 	// metrics are the metrics gathered from the storage manager.
 	metrics storageManagerMetrics
+
+	// syncer is used to fsync. The interface is defined only for testing purposes. See the actual
+	// implementation for documentation.
+	syncer interface {
+		SyncHierarchy(rootPath, relativePath string) error
+	}
 }
 
 // NewStorageManager instantiates a new StorageManager.
@@ -126,6 +134,7 @@ func NewStorageManager(
 		partitions:        map[storage.PartitionID]*partition{},
 		partitionFactory:  partitionFactory,
 		metrics:           metrics.storageManagerMetrics(name),
+		syncer:            safe.NewSyncer(),
 	}, nil
 }
 
@@ -135,8 +144,17 @@ func (sm *StorageManager) Close() {
 	// Mark the storage as closed so no new transactions can begin anymore. This
 	// also means no more partitions are spawned.
 	sm.closed = true
+	sm.mu.Unlock()
+
+	// Wait for all of the partitions initializations to finish. Failing initializations
+	// need to acquire the lock to clean up the partition, so we can't hold the lock while
+	// some partitions are initializing.
+	sm.initializingPartitions.Wait()
+
+	// Close all currently active partitions. No more partitions can be added to the list
+	// as we set closed in the earlier lock block.
+	sm.mu.Lock()
 	for _, ptn := range sm.partitions {
-		// Close all partitions.
 		ptn.close()
 	}
 	sm.mu.Unlock()
@@ -180,6 +198,12 @@ func newFinalizableTransaction(tx storage.Transaction, finalize func()) *finaliz
 
 // partition contains the transaction manager and tracks the number of in-flight transactions for the partition.
 type partition struct {
+	// initialized is closed when the partition has been setup and is ready for
+	// access.
+	initialized chan struct{}
+	// errInitialization holds a possible error encountered while initializing the partition.
+	// If set, the partition must not be used.
+	errInitialization error
 	// closing is closed when the partition has no longer any active transactions.
 	closing chan struct{}
 	// closed is closed when the partitions goroutine has finished.
@@ -346,15 +370,41 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 		ptn, ok := sm.partitions[partitionID]
 		if !ok {
-			if err := func() error {
-				defer sm.mu.Unlock()
-
+			sm.initializingPartitions.Add(1)
+			// The partition isn't running yet so we're responsible for setting it up.
+			if err := func() (returnedErr error) {
+				// Place the partition's state in the map and release the
+				// lock so we don't block retrieval of other partitions
+				// while setting up this one.
 				ptn = &partition{
+					initialized:     make(chan struct{}),
 					closing:         make(chan struct{}),
 					closed:          make(chan struct{}),
 					managerFinished: make(chan struct{}),
 					referenceCount:  1,
 				}
+				sm.partitions[partitionID] = ptn
+				sm.mu.Unlock()
+
+				removePartition := func() {
+					sm.mu.Lock()
+					delete(sm.partitions, partitionID)
+					sm.mu.Unlock()
+				}
+
+				defer func() {
+					if returnedErr != nil {
+						// If the partition setup failed, set the error so the goroutines waiting
+						// for the partition to be setup know to abort.
+						ptn.errInitialization = returnedErr
+						// Remove the partition immediately from the map. Since the setup failed,
+						// there's no goroutine running for the partition.
+						removePartition()
+					}
+
+					sm.initializingPartitions.Done()
+					close(ptn.initialized)
+				}()
 
 				relativeStateDir := deriveStateDirectory(partitionID)
 				absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
@@ -362,7 +412,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					return fmt.Errorf("create state directory hierarchy: %w", err)
 				}
 
-				if err := safe.NewSyncer().SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
+				if err := sm.syncer.SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
 					return fmt.Errorf("sync state directory hierarchy: %w", err)
 				}
 
@@ -385,8 +435,6 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 				ptn.Partition = mgr
 
-				sm.partitions[partitionID] = ptn
-
 				sm.metrics.partitionsStarted.Inc()
 				sm.activePartitions.Add(1)
 				go func() {
@@ -398,9 +446,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					// need to be started in order to continue processing transactions. The partition instance
 					// is deleted allowing the next transaction for the repository to create a new partition
 					// instance.
-					sm.mu.Lock()
-					delete(sm.partitions, partitionID)
-					sm.mu.Unlock()
+					removePartition()
 
 					close(ptn.managerFinished)
 
@@ -430,6 +476,8 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			return newPartitionHandle(sm, ptn), nil
 		}
 
+		// Someone else has set up the partition or is in process of doing so.
+
 		if ptn.isClosing() {
 			// If the partition is in the process of shutting down, the partition should not be
 			// used. The lock is released while waiting for the partition to complete closing as to
@@ -444,8 +492,23 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			}
 		}
 
+		// Increment the reference count and release the lock. We don't want to hold the lock while waiting
+		// for the initialization so other partition retrievals can proceed.
 		ptn.referenceCount++
 		sm.mu.Unlock()
+
+		// Wait for the goroutine setting up the partition to finish initializing it. The initialization
+		// doesn't take long so we don't wait on context here.
+		<-ptn.initialized
+		// If there was an error initializing the partition, bail out. We don't reattempt
+		// setting up the partition here as it's unlikely to succeed. Subsequent requests
+		// that didn't run concurrently with this attempt will retry.
+		//
+		// We also don't need to worry about the reference count since the goroutine
+		// setting up the partition removes it from the map immediately if initialization fails.
+		if err := ptn.errInitialization; err != nil {
+			return nil, fmt.Errorf("initialize partition: %w", err)
+		}
 
 		return newPartitionHandle(sm, ptn), nil
 	}

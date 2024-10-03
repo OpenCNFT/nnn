@@ -2,9 +2,11 @@ package storagemgr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1196,4 +1198,242 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 		require.False(t, iterator.Next())
 		require.NoError(t, iterator.Err())
 	})
+}
+
+type SyncerFunc func(rootPath, relativePath string) error
+
+func (fn SyncerFunc) SyncHierarchy(rootPath, relativePath string) error {
+	return fn(rootPath, relativePath)
+}
+
+func TestStorageManager_partitionInitialization(t *testing.T) {
+	cfg := testcfg.Build(t)
+
+	logger := testhelper.SharedLogger(t)
+
+	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	require.NoError(t, err)
+	defer dbMgr.Close()
+
+	mgr, err := NewStorageManager(
+		logger,
+		cfg.Storages[0].Name,
+		cfg.Storages[0].Path,
+		dbMgr,
+		newStubPartitionFactory(),
+		NewMetrics(cfg.Prometheus),
+	)
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	blockedInSync := make(chan struct{})
+	unblockSync := make(chan struct{})
+
+	firstCall := true
+	mgr.syncer = SyncerFunc(func(rootPath, relativePath string) error {
+		if firstCall {
+			firstCall = false
+			close(blockedInSync)
+			<-unblockSync
+			return errors.New("syncing error")
+		}
+
+		return nil
+	})
+
+	ctx := testhelper.Context(t)
+
+	// Start a partition that blocks while initializing.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		ptn, err := mgr.GetPartition(ctx, 1)
+		assert.EqualError(t, err, "start partition: sync state directory hierarchy: syncing error")
+		assert.Nil(t, ptn)
+	}()
+
+	<-blockedInSync
+
+	// Get the same partition a second time. It should block while the first
+	// one is setting it up, and ultimately get the same error.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		ptn, err := mgr.GetPartition(ctx, 1)
+		assert.EqualError(t, err, "initialize partition: sync state directory hierarchy: syncing error")
+		assert.Nil(t, ptn)
+	}()
+
+	// Spin until the second GetPartition operation has incremented the reference count
+	// on the partition to reflect the other pending partition handle retrieval.
+	for {
+		mgr.mu.Lock()
+		refCount := mgr.partitions[1].referenceCount
+		mgr.mu.Unlock()
+
+		if refCount == 2 {
+			break
+		}
+
+		runtime.Gosched()
+	}
+
+	// While the other partition is initializing, we should be able to retrieve other partitions.
+	ptn, err := mgr.GetPartition(ctx, 2)
+	require.NoError(t, err)
+	defer ptn.Close()
+
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		1: 2,
+		2: 1,
+	})
+
+	// Release the blocked partition 1 retrievals and wait for the goroutines
+	// to finish.
+	close(unblockSync)
+	wg.Wait()
+
+	// Only partition 2 should still be active.
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		2: 1,
+	})
+
+	// Closing the remaining handle to partition 2 should leave us with no active partitions.
+	ptn.Close()
+	blockOnPartitionClosing(t, mgr, true)
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
+}
+
+func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
+	cfg := testcfg.Build(t)
+
+	logger := testhelper.SharedLogger(t)
+
+	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	require.NoError(t, err)
+	defer dbMgr.Close()
+
+	mgr, err := NewStorageManager(
+		logger,
+		cfg.Storages[0].Name,
+		cfg.Storages[0].Path,
+		dbMgr,
+		newStubPartitionFactory(),
+		NewMetrics(cfg.Prometheus),
+	)
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	firstBlockedInSync := make(chan struct{})
+	secondBlockedInSync := make(chan struct{})
+	unblockInitialization := make(chan struct{})
+
+	call := 0
+	mgr.syncer = SyncerFunc(func(rootPath, relativePath string) error {
+		call++
+		switch call {
+		case 1:
+			close(firstBlockedInSync)
+			<-unblockInitialization
+			return errors.New("syncing error")
+		case 2:
+			close(secondBlockedInSync)
+			<-unblockInitialization
+			return nil
+		case 3:
+			return nil
+		default:
+			t.Errorf("unexpected call")
+			return fmt.Errorf("unexpected call")
+		}
+	})
+
+	ctx := testhelper.Context(t)
+
+	// Start a partition that is initializing when close is called, and fails the initialization.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		ptn, err := mgr.GetPartition(ctx, 1)
+		assert.EqualError(t, err, "start partition: sync state directory hierarchy: syncing error")
+		assert.Nil(t, ptn)
+	}()
+
+	<-firstBlockedInSync
+
+	// Start a partition that is initializing when close is called, and succeeds.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		ptn, err := mgr.GetPartition(ctx, 2)
+		assert.NoError(t, err)
+		ptn.Close()
+	}()
+
+	<-secondBlockedInSync
+
+	// Start a partition, and leave it open. We expect closing the manager to close the
+	// partition.
+	ptn, err := mgr.GetPartition(ctx, 3)
+	require.NoError(t, err)
+	require.NotNil(t, ptn)
+
+	// Close the manager. Close blocks until all partitions are initializations are finished
+	// and all partitions closed.
+	closeDone := make(chan struct{})
+	go func() {
+		defer close(closeDone)
+		mgr.Close()
+	}()
+
+	// Spin until the Close() call above has marked the manager closed.
+	for {
+		mgr.mu.Lock()
+		closed := mgr.closed
+		mgr.mu.Unlock()
+
+		if closed {
+			break
+		}
+
+		runtime.Gosched()
+	}
+
+	// New partitions can no longer be started.
+	ptn, err = mgr.GetPartition(ctx, 4)
+	require.Equal(t, ErrPartitionManagerClosed, err)
+	require.Nil(t, ptn)
+
+	// First two partitions are still initializing, the third one has initialized.
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
+		1: 1,
+		2: 1,
+		3: 1,
+	})
+
+	require.Nil(t, mgr.partitions[1].Partition)
+	require.Nil(t, mgr.partitions[2].Partition)
+	require.NotNil(t, mgr.partitions[3].Partition)
+
+	// The Close() is still waiting for the ongoing initializations to finish.
+	select {
+	case <-closeDone:
+		t.Fatalf("expected close to be still blocked")
+	default:
+	}
+
+	// Allow the initializations to finish. We expect the ongoing Close() call to close
+	// the partitions.
+	close(unblockInitialization)
+
+	<-closeDone
+	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
+
+	wg.Wait()
 }
