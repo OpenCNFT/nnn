@@ -57,6 +57,7 @@ type revlistConfig struct {
 	regexIgnoreCase       bool
 	commitMessagePatterns [][]byte
 	skipResult            func(*RevisionResult) bool
+	skip                  uint
 }
 
 // RevlistOption is an option for the revlist pipeline step.
@@ -189,6 +190,13 @@ func WithSkipRevlistResult(skipResult func(*RevisionResult) bool) RevlistOption 
 	}
 }
 
+// WithSkip causes git-rev-list(1) to skip a number of commits before starting to show the commit output.
+func WithSkip(p uint) RevlistOption {
+	return func(cfg *revlistConfig) {
+		cfg.skip = p
+	}
+}
+
 // Revlist runs git-rev-list(1) with objects and object names enabled. The returned channel will
 // contain all object IDs listed by this command. Cancelling the context will cause the pipeline to
 // be cancelled, too.
@@ -284,6 +292,13 @@ func Revlist(
 			for _, pattern := range cfg.commitMessagePatterns {
 				flags = append(flags, gitcmd.Flag{Name: fmt.Sprintf("--grep=%s", pattern)})
 			}
+		}
+
+		if cfg.skip > 0 {
+			flags = append(flags, gitcmd.Flag{
+				Name: fmt.Sprintf("--skip=%d", cfg.skip),
+			},
+			)
 		}
 
 		var stderr strings.Builder
