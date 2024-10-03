@@ -314,7 +314,6 @@ type partitionHandle struct {
 
 // newPartitionHandle creates a new handle to the partition. `sm.mu.Lock()` must be held while calling this.
 func newPartitionHandle(sm *StorageManager, ptn *partition) *partitionHandle {
-	ptn.referenceCount++
 	return &partitionHandle{sm: sm, partition: ptn}
 }
 
@@ -348,10 +347,13 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 		ptn, ok := sm.partitions[partitionID]
 		if !ok {
 			if err := func() error {
+				defer sm.mu.Unlock()
+
 				ptn = &partition{
 					closing:         make(chan struct{}),
 					closed:          make(chan struct{}),
 					managerFinished: make(chan struct{}),
+					referenceCount:  1,
 				}
 
 				relativeStateDir := deriveStateDirectory(partitionID)
@@ -421,9 +423,11 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 				return nil
 			}(); err != nil {
-				sm.mu.Unlock()
 				return nil, fmt.Errorf("start partition: %w", err)
 			}
+
+			// We were the one setting up the partition. Return the handle directly as we know it succeeded.
+			return newPartitionHandle(sm, ptn), nil
 		}
 
 		if ptn.isClosing() {
@@ -436,12 +440,12 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-ptn.managerFinished:
+				continue
 			}
-
-			continue
 		}
 
-		defer sm.mu.Unlock()
+		ptn.referenceCount++
+		sm.mu.Unlock()
 
 		return newPartitionHandle(sm, ptn), nil
 	}
