@@ -125,6 +125,7 @@ var _ gitcmd.RepositoryExecutor = RepositoryPathExecutor{}
 // RepositoryPathExecutor is a `gitcmd.RepositoryExecutor` that knows to execute commands in a Git repository identified by
 // its absolute path.
 type RepositoryPathExecutor struct {
+	repoPath string
 	storage.Repository
 	factory gitcmd.CommandFactory
 }
@@ -135,6 +136,7 @@ func NewRepositoryPathExecutor(tb testing.TB, cfg config.Cfg, repoPath string) R
 	require.NoError(tb, err)
 
 	return RepositoryPathExecutor{
+		repoPath: repoPath,
 		Repository: &gitalypb.Repository{
 			StorageName:  cfg.Storages[0].Name,
 			RelativePath: relativePath,
@@ -165,10 +167,10 @@ func (e RepositoryPathExecutor) GitVersion(ctx context.Context) (git.Version, er
 
 // ObjectHash determines the object hash used by the repository.
 func (e RepositoryPathExecutor) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
-	return gitcmd.DetectObjectHash(ctx, e.factory, e.Repository)
+	return gitcmd.DetectObjectHash(ctx, e.repoPath)
 }
 
 // ReferenceBackend detects the reference backend used by this repository.
 func (e RepositoryPathExecutor) ReferenceBackend(ctx context.Context) (git.ReferenceBackend, error) {
-	return gitcmd.DetectReferenceBackend(ctx, e.factory, e.Repository)
+	return gitcmd.DetectReferenceBackend(ctx, e.repoPath)
 }

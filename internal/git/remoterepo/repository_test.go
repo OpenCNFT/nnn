@@ -125,9 +125,7 @@ func TestRepository_ObjectHash(t *testing.T) {
 				return setupData{
 					repo: repo,
 					requireError: func(tb testing.TB, actual error) {
-						testhelper.RequireStatusWithErrorMetadataRegexp(tb, structerr.NewInternal("detecting object hash: reading object format: exit status 128"), actual, map[string]string{
-							"stderr": "error: invalid value for 'extensions.objectformat': 'blake2b'\nfatal: bad config line 5 in file .+/config\n",
-						})
+						testhelper.RequireGrpcError(tb, structerr.NewInternal(`detecting object hash: unknown object format: "blake2b"`), actual)
 					},
 				}
 			},

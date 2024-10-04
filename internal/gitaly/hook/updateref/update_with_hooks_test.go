@@ -41,7 +41,7 @@ func TestUpdaterWithHooks_UpdateReference_invalidParameters(t *testing.T) {
 	revA := git.ObjectID(strings.Repeat("a", gittest.DefaultObjectHash.EncodedLen()))
 	revB := git.ObjectID(strings.Repeat("b", gittest.DefaultObjectHash.EncodedLen()))
 
-	updater := updateref.NewUpdaterWithHooks(cfg, testhelper.NewLogger(t), nil, &hook.MockManager{}, gitCmdFactory, nil)
+	updater := updateref.NewUpdaterWithHooks(cfg, testhelper.NewLogger(t), config.NewLocator(cfg), &hook.MockManager{}, gitCmdFactory, nil)
 
 	testCases := []struct {
 		desc           string

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/trace"
 	"sync"
 	"testing"
 
@@ -63,14 +64,26 @@ func New(logger log.Logger, locator storage.Locator, gitCmdFactory gitcmd.Comman
 		// copying the sync.Once used to facilitate the caching.
 		detectObjectHash: func(ctx context.Context) (git.ObjectHash, error) {
 			detectObjectHashOnce.Do(func() {
-				objectHash, objectHashErr = gitcmd.DetectObjectHash(ctx, gitCmdFactory, repo)
+				path, err := locator.GetRepoPath(ctx, repo)
+				if err != nil {
+					objectHashErr = fmt.Errorf("get repo path: %w", err)
+					return
+				}
+
+				objectHash, objectHashErr = gitcmd.DetectObjectHash(ctx, path)
 			})
 
 			return objectHash, objectHashErr
 		},
 		detectRefBackend: func(ctx context.Context) (git.ReferenceBackend, error) {
 			detectRefBackendOnce.Do(func() {
-				refBackend, refBackendErr = gitcmd.DetectReferenceBackend(ctx, gitCmdFactory, repo)
+				path, err := locator.GetRepoPath(ctx, repo)
+				if err != nil {
+					refBackendErr = fmt.Errorf("get repo path: %w", err)
+					return
+				}
+
+				refBackend, refBackendErr = gitcmd.DetectReferenceBackend(ctx, path)
 			})
 
 			return refBackend, refBackendErr
@@ -224,10 +237,12 @@ func (repo *Repo) StorageTempDir() (string, error) {
 
 // ObjectHash detects the object hash used by this particular repository.
 func (repo *Repo) ObjectHash(ctx context.Context) (git.ObjectHash, error) {
+	defer trace.StartRegion(ctx, "ObjectHash").End()
 	return repo.detectObjectHash(ctx)
 }
 
 // ReferenceBackend detects the reference backend used by this repository.
 func (repo *Repo) ReferenceBackend(ctx context.Context) (git.ReferenceBackend, error) {
+	defer trace.StartRegion(ctx, "ReferenceBackend").End()
 	return repo.detectRefBackend(ctx)
 }

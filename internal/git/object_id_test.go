@@ -157,24 +157,6 @@ func TestDetectObjectHash(t *testing.T) {
 			expectedHash: git.ObjectHashSHA256,
 		},
 		{
-			desc: "invalid repository configuration",
-			setup: func(t *testing.T) *gitalypb.Repository {
-				testhelper.SkipWithReftable(t, "creating a repository with reftables sets the core.repositoryformatversion to 1")
-
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
-					SkipCreationViaService: true,
-					ObjectFormat:           "sha1",
-				})
-
-				gittest.Exec(t, cfg, "-C", repoPath, "config", "extensions.objectFormat", "sha1")
-
-				return repo
-			},
-			expectedErr: structerr.New("reading object format: exit status 128").WithMetadata(
-				"stderr", "fatal: repo version is 0, but v1-only extension found:\n\tobjectformat\n",
-			),
-		},
-		{
 			desc: "unknown hash",
 			setup: func(t *testing.T) *gitalypb.Repository {
 				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -186,9 +168,7 @@ func TestDetectObjectHash(t *testing.T) {
 
 				return repo
 			},
-			expectedErr: structerr.New("reading object format: exit status 128").WithMetadata(
-				"stderr", "error: invalid value for 'extensions.objectformat'",
-			),
+			expectedErr: structerr.New(`unknown object format: "blake2"`),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {

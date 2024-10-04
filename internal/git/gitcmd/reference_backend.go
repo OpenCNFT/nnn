@@ -1,43 +1,48 @@
 package gitcmd
 
 import (
-	"bytes"
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
+var regexpReferenceBackend = regexp.MustCompile(`^[ \t]*(?i:refstorage)[ \t]*=[ \t]*(.*)[ \t;#]?`)
+
 // DetectReferenceBackend detects the reference backend used by the repository.
-// If the git version doesn't support `--show-ref-format`, it'll simply echo
-// '--show-ref-format'. We fallback to files backend in such situations.
+// It plucks out the first refstorage configuration value from the repository's configuration
+// file and doesn't validate the configuration.
 //
 // Note: It is recommended to use localrepo.ReferenceBackend since that value is
 // cached for a given repository.
-func DetectReferenceBackend(ctx context.Context, gitCmdFactory CommandFactory, repository storage.Repository) (git.ReferenceBackend, error) {
-	var stdout, stderr bytes.Buffer
-
-	revParseCmd, err := gitCmdFactory.New(ctx, repository, Command{
-		Name: "rev-parse",
-		Flags: []Option{
-			Flag{"--show-ref-format"},
-		},
-	}, WithStdout(&stdout), WithStderr(&stderr))
+func DetectReferenceBackend(ctx context.Context, repoPath string) (_ git.ReferenceBackend, returnedErr error) {
+	configFile, err := os.Open(filepath.Join(repoPath, "config"))
 	if err != nil {
-		return git.ReferenceBackend{}, fmt.Errorf("spawning rev-parse: %w", err)
+		return git.ReferenceBackend{}, fmt.Errorf("open: %w", err)
+	}
+	defer func() {
+		if err := configFile.Close(); err != nil {
+			returnedErr = errors.Join(returnedErr, fmt.Errorf("close: %w", err))
+		}
+	}()
+
+	backendName := git.ReferenceBackendFiles.Name
+	scanner := bufio.NewScanner(configFile)
+	for scanner.Scan() {
+		if matches := regexpReferenceBackend.FindSubmatch(scanner.Bytes()); len(matches) > 0 {
+			backendName = string(matches[1])
+			break
+		}
 	}
 
-	if err := revParseCmd.Wait(); err != nil {
-		return git.ReferenceBackend{}, structerr.New("reading reference backend: %w", err).WithMetadata("stderr", stderr.String())
+	if err := scanner.Err(); err != nil {
+		return git.ReferenceBackend{}, fmt.Errorf("scan: %w", err)
 	}
 
-	backend, err := git.ReferenceBackendByName(text.ChompBytes(stdout.Bytes()))
-	if err != nil {
-		// If we don't know the backend type, let's just fallback to the files backend.
-		return git.ReferenceBackendFiles, nil
-	}
-	return backend, nil
+	return git.ReferenceBackendByName(backendName)
 }

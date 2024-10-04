@@ -81,15 +81,9 @@ func TestFsck(t *testing.T) {
 
 				setupData := setupData{
 					repo: repo,
-					requireError: func(actual error) {
-						testhelper.RequireStatusWithErrorMetadataRegexp(t,
-							structerr.NewInternal("reading reference backend: exit status 128"),
-							actual,
-							map[string]string{
-								"stderr": "fatal: not a git repository: .+",
-							},
-						)
-					},
+					requireResponse: equalResponse(t, &gitalypb.FsckResponse{
+						Error: []byte("fatal: not a git repository: '" + repoPath + "'\n"),
+					}),
 				}
 
 				if testhelper.IsWALEnabled() {
