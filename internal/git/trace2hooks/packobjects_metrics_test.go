@@ -368,8 +368,6 @@ gitaly_pack_objects_stages_seconds_count{stage="write-pack-file"} 2
 `,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 			ctx := log.InitContextCustomFields(testhelper.Context(t))

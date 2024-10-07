@@ -1,5 +1,32 @@
 # Gitaly changelog
 
+## 17.4.1 (2024-09-24)
+
+No changes.
+
+## 17.4.0 (2024-09-18)
+
+### Added (2 changes)
+
+- [protobuf: Add new ListPartitions RPC](gitlab-org/gitaly@6d91c01e8a64260dac07c2d0545e31996892b994) ([merge request](gitlab-org/gitaly!7225))
+- [protobuf: Add new backup partition rpc](gitlab-org/gitaly@65d250a24058ed2f61493ce2747dc6800854500f) ([merge request](gitlab-org/gitaly!7182))
+
+### Changed (1 change)
+
+- [Use InvalidArgument error for invalid page token](gitlab-org/gitaly@2efa4d2d896beb4bf31a268d952af6b7f389c745) ([merge request](gitlab-org/gitaly!7224))
+
+### Other (1 change)
+
+- [featureflag: Remove use_empty_tree_in_attr_tree_config](gitlab-org/gitaly@676b701f4adce5fb35d4b56689e7e261d3113e88) ([merge request](gitlab-org/gitaly!7199))
+
+## 17.3.4 (2024-09-24)
+
+No changes.
+
+## 17.3.3 (2024-09-16)
+
+No changes.
+
 ## 17.3.2 (2024-09-11)
 
 No changes.
@@ -21,6 +48,14 @@ No changes.
 - [gitalybackup: Do not consider pool repos dangling on restore](gitlab-org/gitaly@37552827044b27980372977c078d36ed5b6cbb33) ([merge request](gitlab-org/gitaly!7146))
 - [Ensure page token is for the same tree](gitlab-org/gitaly@dc09bfc081125d97059358376a9960cea42f1dbb) ([merge request](gitlab-org/gitaly!7121))
 - [objectpool: Return already exists gRPC code from CreateObjectPool](gitlab-org/gitaly@cc8e1ca1f419dc3d976ee63917c6a518ff54df65) ([merge request](gitlab-org/gitaly!7104))
+
+## 17.2.8 (2024-09-24)
+
+No changes.
+
+## 17.2.7 (2024-09-16)
+
+No changes.
 
 ## 17.2.6 (2024-09-13)
 
@@ -59,6 +94,10 @@ No changes.
 - [Ensure page token is for the same tree](gitlab-org/gitaly@1ab723e39f5b7921e2ec7343fb2c0e55a7b45954) ([merge request](gitlab-org/gitaly!7068))
 - [git: Allow reading the attributes for 'git-merge-tree(1)'](gitlab-org/gitaly@2635c20f5a062507aee3282f87df797193e1c1aa) ([merge request](gitlab-org/gitaly!7066))
 
+## 17.1.8 (2024-09-16)
+
+No changes.
+
 ## 17.1.7 (2024-09-11)
 
 No changes.
@@ -92,6 +131,10 @@ No changes.
 ### Fixed (1 change)
 
 - [Don't retain write buffer when chunking responses](gitlab-org/gitaly@cb83b8d4133ceff869685b8dbd4badbcddfa580a) ([merge request](gitlab-org/gitaly!6990))
+
+## 17.0.8 (2024-09-16)
+
+No changes.
 
 ## 17.0.7 (2024-09-10)
 
@@ -136,6 +179,10 @@ No changes.
 ### Changed (1 change)
 
 - [config: Don't allow storages to share a path](gitlab-org/gitaly@1f2789d97fd7b7d104a1ebaabbea90f9e5e4bff8) ([merge request](gitlab-org/gitaly!6849))
+
+## 16.11.10 (2024-09-16)
+
+No changes.
 
 ## 16.11.9 (2024-09-10)
 
@@ -186,6 +233,10 @@ No changes.
 - [Fix FindCommits in repositories missing default branches](gitlab-org/gitaly@6e011ae3ecff6d8797de15df19b23c3000eea111) ([merge request](gitlab-org/gitaly!6801))
 - [Allow unauthenticated access to health checking service](gitlab-org/gitaly@fcdbc76dc24f946a84155d91c1a8a5a55de0e5a1) ([merge request](gitlab-org/gitaly!6715))
 
+## 16.10.10 (2024-09-19)
+
+No changes.
+
 ## 16.10.9 (2024-07-23)
 
 No changes.
@@ -235,6 +286,10 @@ No changes.
 - [commit: Fix nil panic in LastCommitForPath](gitlab-org/gitaly@f1250677f3f3cacb575aad20bac22a3410ff5f40) ([merge request](gitlab-org/gitaly!6677))
 - [proxy: Register proxy codec](gitlab-org/gitaly@e16ef95d0e08e3144e67b63b4446b4996e44da1c) ([merge request](gitlab-org/gitaly!6662))
 - [Always use CLONE_INTO_CGROUP when supported](gitlab-org/gitaly@057f4e9d177c018774bf036cc952542f2e3ec833) ([merge request](gitlab-org/gitaly!6653))
+
+## 16.9.11 (2024-09-19)
+
+No changes.
 
 ## 16.9.10 (2024-07-23)
 
@@ -294,6 +349,10 @@ No changes.
 
 - [proto: Deprecate RemoveAll](gitlab-org/gitaly@a9b8db1b0894b1d613c77b2736409563199d5e62) ([merge request](gitlab-org/gitaly!6614))
 
+## 16.8.10 (2024-09-20)
+
+No changes.
+
 ## 16.8.9 (2024-07-23)
 
 No changes.
@@ -340,6 +399,10 @@ No changes.
 ### Deprecated (1 change)
 
 - [proto: Deprecate RemoveAll](gitlab-org/gitaly@bead28d4dd8c6fa0166d4490fe479dca78c51bc7) ([merge request](gitlab-org/gitaly!6579))
+
+## 16.7.10 (2024-09-20)
+
+No changes.
 
 ## 16.7.9 (2024-07-23)
 
@@ -397,6 +460,10 @@ No changes.
 
 - [gitaly: Move asynchronous tasks to end of startup](gitlab-org/gitaly@dd4ea4388b4b8e7c49ea423126f8be5e067729cd) ([merge request](gitlab-org/gitaly!6532))
 - [cgroups: Create repository cgroups on-demand](gitlab-org/gitaly@105f6dd81689b7819b844b8be1be844bca6f2a67) ([merge request](gitlab-org/gitaly!6499))
+
+## 16.6.10 (2024-09-20)
+
+No changes.
 
 ## 16.6.9 (2024-07-23)
 
@@ -462,6 +529,10 @@ No changes.
 
 - [backup: Use --all when creating an incremental backup bundle](gitlab-org/gitaly@d874d8c3eb0d0c9b9362b583ba8ccc42221140cd) ([merge request](gitlab-org/gitaly!6421))
 
+## 16.5.10 (2024-09-20)
+
+No changes.
+
 ## 16.5.9 (2024-07-23)
 
 No changes.
@@ -525,6 +596,10 @@ No changes.
 
 - [gitaly: Don't block on preloading licensedb](gitlab-org/gitaly@d96964bf6fe4a17adfded56a28bc276377351bc8) ([merge request](gitlab-org/gitaly!6397))
 - [packed_binaries: Extract binaries in parallel](gitlab-org/gitaly@2f5d4f93bdd27d3299f9ccc005ee7bcca35efcc9) ([merge request](gitlab-org/gitaly!6401))
+
+## 16.4.7 (2024-09-20)
+
+No changes.
 
 ## 16.4.6 (2024-07-23)
 
@@ -591,6 +666,10 @@ No changes.
 
 - [backup: Improve time taken to create a full backup bundle](gitlab-org/gitaly@c43b91c07de39a4e32b3bb855787ab43e9c6a6c7) ([merge request](gitlab-org/gitaly!6305))
 - [backup: Improve performance of writing ref lists](gitlab-org/gitaly@897aadac824654041b9c383b17ec8a5f217eac6b) ([merge request](gitlab-org/gitaly!6305))
+
+## 16.3.9 (2024-09-20)
+
+No changes.
 
 ## 16.3.8 (2024-07-23)
 
@@ -666,6 +745,10 @@ No changes.
 ### updated (1 change)
 
 - [backup: Write an empty ref list for empty repositories](gitlab-org/gitaly@7fbae125172570e5bef222908388ba0ca1c9e43a) ([merge request](gitlab-org/gitaly!6090))
+
+## 16.2.11 (2024-09-23)
+
+No changes.
 
 ## 16.2.10 (2024-07-23)
 
@@ -747,6 +830,10 @@ No changes.
 
 - [localrepo: Avoid getting all branches for default branch detection](gitlab-org/gitaly@bdd3c05a2cc2889260050f2714884cc24503ae1a) by @blanet ([merge request](gitlab-org/gitaly!5725))
 
+## 16.1.8 (2024-09-23)
+
+No changes.
+
 ## 16.1.7 (2024-07-23)
 
 No changes.
@@ -791,6 +878,10 @@ No changes.
 ### Changed (1 change)
 
 - [Use SSH for signing commits](gitlab-org/gitaly@2a1007bee30206a282312d73186ff82c379f6aa9) ([merge request](gitlab-org/gitaly!5408))
+
+## 16.0.10 (2024-09-23)
+
+No changes.
 
 ## 16.0.9 (2024-07-23)
 

@@ -252,9 +252,21 @@ func TestListCommits(t *testing.T) {
 				main3,
 			},
 		},
+		{
+			desc: "skip commits",
+			request: &gitalypb.ListCommitsRequest{
+				Repository: repoProto,
+				Revisions: []string{
+					main3ID.String(),
+				},
+				Skip: 2,
+			},
+			expectedCommits: []*gitalypb.GitCommit{
+				// Skip two commits from main3
+				main1, main0,
+			},
+		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

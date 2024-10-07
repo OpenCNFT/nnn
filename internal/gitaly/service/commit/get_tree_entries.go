@@ -29,7 +29,7 @@ func validateGetTreeEntriesRequest(ctx context.Context, locator storage.Locator,
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
-	if err := git.ValidateRevision(in.Revision); err != nil {
+	if err := git.ValidateRevision(in.GetRevision()); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
@@ -52,23 +52,23 @@ func populateFlatPath(
 	entries []*gitalypb.TreeEntry,
 ) error {
 	for _, entry := range entries {
-		entry.FlatPath = entry.Path
+		entry.FlatPath = entry.GetPath()
 
-		if entry.Type != gitalypb.TreeEntry_TREE {
+		if entry.GetType() != gitalypb.TreeEntry_TREE {
 			continue
 		}
 
 		for i := 1; i < defaultFlatTreeRecursion; i++ {
-			subEntries, err := catfile.TreeEntries(ctx, objectReader, entry.CommitOid, string(entry.FlatPath))
+			subEntries, err := catfile.TreeEntries(ctx, objectReader, entry.GetCommitOid(), string(entry.GetFlatPath()))
 			if err != nil {
 				return err
 			}
 
-			if len(subEntries) != 1 || subEntries[0].Type != gitalypb.TreeEntry_TREE {
+			if len(subEntries) != 1 || subEntries[0].GetType() != gitalypb.TreeEntry_TREE {
 				break
 			}
 
-			entry.FlatPath = subEntries[0].Path
+			entry.FlatPath = subEntries[0].GetPath()
 		}
 	}
 
@@ -270,8 +270,8 @@ func sortTrees(entries []*gitalypb.TreeEntry, sortBy gitalypb.GetTreeEntriesRequ
 	var err error
 
 	sort.SliceStable(entries, func(i, j int) bool {
-		a, firstError := toLsTreeEnum(entries[i].Type)
-		b, secondError := toLsTreeEnum(entries[j].Type)
+		a, firstError := toLsTreeEnum(entries[i].GetType())
+		b, secondError := toLsTreeEnum(entries[j].GetType())
 
 		if firstError != nil {
 			err = firstError
@@ -332,8 +332,8 @@ func (s *server) GetTreeEntries(in *gitalypb.GetTreeEntriesRequest, stream gital
 	ctx := stream.Context()
 
 	s.logger.WithFields(log.Fields{
-		"Revision": in.Revision,
-		"Path":     in.Path,
+		"Revision": in.GetRevision(),
+		"Path":     in.GetPath(),
 	}).DebugContext(ctx, "GetTreeEntries")
 
 	if err := validateGetTreeEntriesRequest(ctx, s.locator, in); err != nil {
@@ -345,7 +345,7 @@ func (s *server) GetTreeEntries(in *gitalypb.GetTreeEntriesRequest, stream gital
 	revision := string(in.GetRevision())
 	path := string(in.GetPath())
 
-	return s.sendTreeEntriesUnified(stream, repo, revision, path, in.Recursive, in.SkipFlatPaths, in.GetSort(), in.GetPaginationParams())
+	return s.sendTreeEntriesUnified(stream, repo, revision, path, in.GetRecursive(), in.GetSkipFlatPaths(), in.GetSort(), in.GetPaginationParams())
 }
 
 func paginateTreeEntries(ctx context.Context, entries []*gitalypb.TreeEntry, p *gitalypb.PaginationParameter, rootTreeOID git.ObjectID) ([]*gitalypb.TreeEntry, string, error) {

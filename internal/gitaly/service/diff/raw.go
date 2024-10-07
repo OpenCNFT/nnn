@@ -18,14 +18,16 @@ func (s *server) RawDiff(in *gitalypb.RawDiffRequest, stream gitalypb.DiffServic
 	subCmd := gitcmd.Command{
 		Name:  "diff",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--full-index"}},
-		Args:  []string{in.LeftCommitId, in.RightCommitId},
+		Args:  []string{in.GetLeftCommitId(), in.GetRightCommitId()},
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
 		return stream.Send(&gitalypb.RawDiffResponse{Data: p})
 	})
 
-	return sendRawOutput(stream.Context(), s.gitCmdFactory, in.Repository, sw, subCmd)
+	repo := s.localrepo(in.GetRepository())
+
+	return sendRawOutput(stream.Context(), repo, sw, subCmd)
 }
 
 func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffService_RawPatchServer) error {
@@ -36,18 +38,20 @@ func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffServ
 	subCmd := gitcmd.Command{
 		Name:  "format-patch",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stdout"}, gitcmd.ValueFlag{Name: "--signature", Value: "GitLab"}},
-		Args:  []string{in.LeftCommitId + ".." + in.RightCommitId},
+		Args:  []string{in.GetLeftCommitId() + ".." + in.GetRightCommitId()},
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
 		return stream.Send(&gitalypb.RawPatchResponse{Data: p})
 	})
 
-	return sendRawOutput(stream.Context(), s.gitCmdFactory, in.Repository, sw, subCmd)
+	repo := s.localrepo(in.GetRepository())
+
+	return sendRawOutput(stream.Context(), repo, sw, subCmd)
 }
 
-func sendRawOutput(ctx context.Context, gitCmdFactory gitcmd.CommandFactory, repo *gitalypb.Repository, sender io.Writer, subCmd gitcmd.Command) error {
-	cmd, err := gitCmdFactory.New(ctx, repo, subCmd, gitcmd.WithSetupStdout())
+func sendRawOutput(ctx context.Context, repo gitcmd.RepositoryExecutor, sender io.Writer, subCmd gitcmd.Command) error {
+	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}

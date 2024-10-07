@@ -56,16 +56,16 @@ func TestGitalyServerInfo(t *testing.T) {
 	require.Equal(t, gitVersion.String(), c.GetGitVersion())
 
 	require.Len(t, c.GetStorageStatuses(), len(cfg.Storages))
-	require.True(t, c.GetStorageStatuses()[0].Readable)
-	require.True(t, c.GetStorageStatuses()[0].Writeable)
-	require.NotEmpty(t, c.GetStorageStatuses()[0].FsType)
-	require.Equal(t, uint32(1), c.GetStorageStatuses()[0].ReplicationFactor)
+	require.True(t, c.GetStorageStatuses()[0].GetReadable())
+	require.True(t, c.GetStorageStatuses()[0].GetWriteable())
+	require.NotEmpty(t, c.GetStorageStatuses()[0].GetFsType())
+	require.Equal(t, uint32(1), c.GetStorageStatuses()[0].GetReplicationFactor())
 
 	if !testhelper.IsWALEnabled() {
-		require.False(t, c.GetStorageStatuses()[1].Readable)
-		require.False(t, c.GetStorageStatuses()[1].Writeable)
-		require.Equal(t, metadata.GitalyFilesystemID, c.GetStorageStatuses()[0].FilesystemId)
-		require.Equal(t, uint32(1), c.GetStorageStatuses()[1].ReplicationFactor)
+		require.False(t, c.GetStorageStatuses()[1].GetReadable())
+		require.False(t, c.GetStorageStatuses()[1].GetWriteable())
+		require.Equal(t, metadata.GitalyFilesystemID, c.GetStorageStatuses()[0].GetFilesystemId())
+		require.Equal(t, uint32(1), c.GetStorageStatuses()[1].GetReplicationFactor())
 	}
 }
 

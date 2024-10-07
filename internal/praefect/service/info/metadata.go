@@ -13,14 +13,14 @@ import (
 // GetRepositoryMetadata returns the cluster metadata for a repository.
 func (s *Server) GetRepositoryMetadata(ctx context.Context, req *gitalypb.GetRepositoryMetadataRequest) (*gitalypb.GetRepositoryMetadataResponse, error) {
 	var getMetadata func() (datastore.RepositoryMetadata, error)
-	switch query := req.Query.(type) {
+	switch query := req.GetQuery().(type) {
 	case *gitalypb.GetRepositoryMetadataRequest_RepositoryId:
 		getMetadata = func() (datastore.RepositoryMetadata, error) {
 			return s.rs.GetRepositoryMetadata(ctx, query.RepositoryId)
 		}
 	case *gitalypb.GetRepositoryMetadataRequest_Path_:
 		getMetadata = func() (datastore.RepositoryMetadata, error) {
-			return s.rs.GetRepositoryMetadataByPath(ctx, query.Path.VirtualStorage, query.Path.RelativePath)
+			return s.rs.GetRepositoryMetadataByPath(ctx, query.Path.GetVirtualStorage(), query.Path.GetRelativePath())
 		}
 	default:
 		return nil, structerr.NewInternal("unknown query type: %T", query)

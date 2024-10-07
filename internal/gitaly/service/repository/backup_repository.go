@@ -32,10 +32,10 @@ func (s *server) BackupRepository(ctx context.Context, in *gitalypb.BackupReposi
 	)
 
 	err := manager.Create(ctx, &backup.CreateRequest{
-		Repository:       in.Repository,
-		VanityRepository: in.VanityRepository,
-		BackupID:         in.BackupId,
-		Incremental:      in.Incremental,
+		Repository:       in.GetRepository(),
+		VanityRepository: in.GetVanityRepository(),
+		BackupID:         in.GetBackupId(),
+		Incremental:      in.GetIncremental(),
 	})
 
 	switch {

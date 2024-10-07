@@ -297,7 +297,6 @@ func TestWalkObjects(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -419,7 +418,6 @@ func TestPackAndUnpackObjects(t *testing.T) {
 			expectedErrorMessage: "unpack objects: exit status 128",
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

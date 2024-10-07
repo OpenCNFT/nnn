@@ -41,7 +41,7 @@ func TestUpdaterWithHooks_UpdateReference_invalidParameters(t *testing.T) {
 	revA := git.ObjectID(strings.Repeat("a", gittest.DefaultObjectHash.EncodedLen()))
 	revB := git.ObjectID(strings.Repeat("b", gittest.DefaultObjectHash.EncodedLen()))
 
-	updater := updateref.NewUpdaterWithHooks(cfg, testhelper.NewLogger(t), nil, &hook.MockManager{}, gitCmdFactory, nil)
+	updater := updateref.NewUpdaterWithHooks(cfg, testhelper.NewLogger(t), config.NewLocator(cfg), &hook.MockManager{}, gitCmdFactory, nil)
 
 	testCases := []struct {
 		desc           string
@@ -117,8 +117,8 @@ func TestUpdaterWithHooks_UpdateReference(t *testing.T) {
 			gittest.DefaultObjectHash,
 			nil,
 			&gitcmd.UserDetails{
-				UserID:   gittest.TestUser.GlId,
-				Username: gittest.TestUser.GlUsername,
+				UserID:   gittest.TestUser.GetGlId(),
+				Username: gittest.TestUser.GetGlUsername(),
 				Protocol: "web",
 			},
 			gitcmd.ReceivePackHooks,
@@ -134,7 +134,7 @@ func TestUpdaterWithHooks_UpdateReference(t *testing.T) {
 		expectedPayload.FeatureFlagsWithValue = nil
 		actualPayload.FeatureFlagsWithValue = nil
 
-		require.Equal(t, expectedPayload, actualPayload)
+		testhelper.ProtoEqual(t, expectedPayload, actualPayload)
 	}
 
 	referenceTransactionCalls := 0

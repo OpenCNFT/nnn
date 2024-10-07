@@ -52,7 +52,7 @@ func (s *server) getAndStreamTagMessages(request *gitalypb.GetTagMessagesRequest
 			return stream.Send(&gitalypb.GetTagMessagesResponse{Message: p})
 		})
 
-		msgReader := bytes.NewReader(tag.Message)
+		msgReader := bytes.NewReader(tag.GetMessage())
 
 		if _, err = io.Copy(sw, msgReader); err != nil {
 			return fmt.Errorf("failed to send response: %w", err)

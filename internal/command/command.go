@@ -31,42 +31,49 @@ var (
 			Name: "gitaly_command_cpu_seconds_total",
 			Help: "Sum of CPU time spent by shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "mode", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "mode", "git_version", "reference_backend"},
 	)
 	realSecondsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_real_seconds_total",
 			Help: "Sum of real time spent by shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	minorPageFaultsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_minor_page_faults_total",
 			Help: "Sum of minor page faults performed while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	majorPageFaultsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_major_page_faults_total",
 			Help: "Sum of major page faults performed while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	signalsReceivedTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_signals_received_total",
 			Help: "Sum of signals received while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "git_version", "reference_backend"},
 	)
 	contextSwitchesTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "gitaly_command_context_switches_total",
 			Help: "Sum of context switches performed while shelling out",
 		},
-		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "ctxswitchtype", "git_version"},
+		[]string{"grpc_service", "grpc_method", "cmd", "subcmd", "ctxswitchtype", "git_version", "reference_backend"},
+	)
+	spawnForkingTimeHistogram = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "gitaly_spawn_forking_time_seconds",
+			Help:    "Histogram of actual forking time after spawn tokens are acquired",
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
+		},
 	)
 
 	// exportedEnvVars contains a list of environment variables
@@ -112,20 +119,7 @@ var (
 	// envInjector is responsible for injecting environment variables required for tracing into
 	// the child process.
 	envInjector = labkittracing.NewEnvInjector()
-
-	// globalSpawnTokenManager is responsible for limiting the total number of commands that can spawn at a time in a
-	// Gitaly process.
-	globalSpawnTokenManager *SpawnTokenManager
 )
-
-func init() {
-	var err error
-	globalSpawnTokenManager, err = NewSpawnTokenManagerFromEnv()
-	if err != nil {
-		panic(err)
-	}
-	prometheus.MustRegister(globalSpawnTokenManager)
-}
 
 const (
 	// maxStderrBytes is at most how many bytes will be written to stderr
@@ -164,6 +158,7 @@ type Command struct {
 	metricsSubCmd string
 	cgroupPath    string
 	cmdGitVersion string
+	refBackend    string
 }
 
 // New creates a Command from the given executable name and arguments On success, the Command
@@ -202,16 +197,17 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 		opt(&cfg)
 	}
 
-	spawnTokenManager := cfg.spawnTokenManager
-	if spawnTokenManager == nil {
-		spawnTokenManager = globalSpawnTokenManager
-	}
-	putToken, err := spawnTokenManager.GetSpawnToken(ctx)
-	if err != nil {
-		return nil, err
-	}
 	cmdName := path.Base(nameAndArgs[0])
-	defer putToken()
+
+	startForking := time.Now()
+	defer func() {
+		delta := time.Since(startForking)
+		spawnForkingTimeHistogram.Observe(delta.Seconds())
+
+		if customFields := log.CustomFieldsFromContext(ctx); customFields != nil {
+			customFields.RecordSum("command.spawn_token_fork_ms", int(delta.Milliseconds()))
+		}
+	}()
 
 	logPid := -1
 	defer func() {
@@ -248,6 +244,7 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 		metricsCmd:           cfg.commandName,
 		metricsSubCmd:        cfg.subcommandName,
 		cmdGitVersion:        cfg.gitVersion,
+		refBackend:           cfg.refBackend,
 		subprocessLoggerDone: make(chan struct{}),
 		processExitedCh:      make(chan struct{}),
 	}
@@ -369,6 +366,7 @@ func New(ctx context.Context, logger log.Logger, nameAndArgs []string, opts ...O
 	if cfg.stderr != nil {
 		cmd.Stderr = cfg.stderr
 	} else {
+		var err error
 		command.stderrBuffer, err = newStderrBuffer(maxStderrBytes, maxStderrLineLength, []byte("\n"))
 		if err != nil {
 			return nil, fmt.Errorf("creating stderr buffer: %w", err)
@@ -479,11 +477,16 @@ func (c *Command) Read(p []byte) (int, error) {
 
 // Write calls Write() on the stdin pipe of the command.
 func (c *Command) Write(p []byte) (int, error) {
+	return c.Stdin().Write(p)
+}
+
+// Stdin returns the commands stdin pipe.
+func (c *Command) Stdin() io.WriteCloser {
 	if c.writer == nil {
 		panic("command has no writer")
 	}
 
-	return c.writer.Write(p)
+	return c.writer
 }
 
 // Wait calls Wait() on the exec.Cmd instance inside the command. This
@@ -595,7 +598,11 @@ func (c *Command) logProcessComplete() {
 
 	entry.DebugContext(ctx, "spawn complete")
 	if c.stderrBuffer != nil && c.stderrBuffer.Len() > 0 {
-		entry.ErrorContext(ctx, c.stderrBuffer.String())
+		logLevel := entry.WarnContext
+		if exitCode != 0 {
+			logLevel = entry.ErrorContext
+		}
+		logLevel(ctx, c.stderrBuffer.String())
 	}
 
 	if customFields := log.CustomFieldsFromContext(ctx); customFields != nil {
@@ -623,15 +630,15 @@ func (c *Command) logProcessComplete() {
 	if c.metricsCmd != "" {
 		cmdName = c.metricsCmd
 	}
-	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "system", c.cmdGitVersion).Add(systemTime.Seconds())
-	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "user", c.cmdGitVersion).Add(userTime.Seconds())
-	realSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(realTime.Seconds())
+	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "system", c.cmdGitVersion, c.refBackend).Add(systemTime.Seconds())
+	cpuSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "user", c.cmdGitVersion, c.refBackend).Add(userTime.Seconds())
+	realSecondsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(realTime.Seconds())
 	if ok {
-		minorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(float64(rusage.Minflt))
-		majorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(float64(rusage.Majflt))
-		signalsReceivedTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion).Add(float64(rusage.Nsignals))
-		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "voluntary", c.cmdGitVersion).Add(float64(rusage.Nvcsw))
-		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "nonvoluntary", c.cmdGitVersion).Add(float64(rusage.Nivcsw))
+		minorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(float64(rusage.Minflt))
+		majorPageFaultsTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(float64(rusage.Majflt))
+		signalsReceivedTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, c.cmdGitVersion, c.refBackend).Add(float64(rusage.Nsignals))
+		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "voluntary", c.cmdGitVersion, c.refBackend).Add(float64(rusage.Nvcsw))
+		contextSwitchesTotal.WithLabelValues(service, method, cmdName, c.metricsSubCmd, "nonvoluntary", c.cmdGitVersion, c.refBackend).Add(float64(rusage.Nivcsw))
 	}
 
 	c.span.SetTag("pid", cmd.ProcessState.Pid())

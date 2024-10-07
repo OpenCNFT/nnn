@@ -359,7 +359,7 @@ func TestStreamingNoAuth(t *testing.T) {
 }
 
 func TestAuthBeforeLimit(t *testing.T) {
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx netctx.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx netctx.Context) {
 		cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
 			Auth: auth.Config{Token: "abc123"},
 			Concurrency: []config.Concurrency{{
@@ -400,7 +400,6 @@ sleep %v
 		errChan := make(chan error)
 
 		for i := 0; i < 2; i++ {
-			i := i
 			go func() {
 				_, err := client.UserCreateTag(ctx, &gitalypb.UserCreateTagRequest{
 					Repository:     repo,

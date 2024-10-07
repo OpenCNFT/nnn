@@ -133,7 +133,7 @@ func (repo *Repo) rebaseUsingMergeTree(ctx context.Context, cfg rebaseConfig, up
 	}
 
 	oursCommitOID := upstreamOID
-	oursTreeOID := git.ObjectID(upstreamCommit.TreeId)
+	oursTreeOID := git.ObjectID(upstreamCommit.GetTreeId())
 	for _, todoItem := range todoList {
 		theirsCommit, err := repo.ReadCommit(ctx, git.Revision(todoItem))
 		if err != nil {
@@ -141,16 +141,16 @@ func (repo *Repo) rebaseUsingMergeTree(ctx context.Context, cfg rebaseConfig, up
 		}
 
 		opts := []MergeTreeOption{WithAllowUnrelatedHistories()}
-		if len(theirsCommit.ParentIds) > 0 {
-			opts = append(opts, WithMergeBase(git.Revision(theirsCommit.ParentIds[0])))
+		if len(theirsCommit.GetParentIds()) > 0 {
+			opts = append(opts, WithMergeBase(git.Revision(theirsCommit.GetParentIds()[0])))
 		}
 
-		newTreeOID, err := repo.MergeTree(ctx, oursCommitOID.String(), theirsCommit.Id, opts...)
+		newTreeOID, err := repo.MergeTree(ctx, oursCommitOID.String(), theirsCommit.GetId(), opts...)
 		if err != nil {
 			var conflictErr *MergeTreeConflictError
 			if errors.As(err, &conflictErr) {
 				return newTreeOID, &RebaseConflictError{
-					Commit:        theirsCommit.Id,
+					Commit:        theirsCommit.GetId(),
 					ConflictError: conflictErr,
 				}
 			}
@@ -163,17 +163,17 @@ func (repo *Repo) rebaseUsingMergeTree(ctx context.Context, cfg rebaseConfig, up
 		//    upstream commit, but become empty after rebasing, we just ignore it.
 		// Refer to https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---emptydropkeepask
 		if newTreeOID == oursTreeOID {
-			if len(theirsCommit.ParentIds) == 0 {
-				if theirsCommit.TreeId != objectHash.EmptyTreeOID.String() {
+			if len(theirsCommit.GetParentIds()) == 0 {
+				if theirsCommit.GetTreeId() != objectHash.EmptyTreeOID.String() {
 					continue
 				}
 			} else {
-				theirsParentCommit, err := repo.ReadCommit(ctx, git.Revision(theirsCommit.ParentIds[0]))
+				theirsParentCommit, err := repo.ReadCommit(ctx, git.Revision(theirsCommit.GetParentIds()[0]))
 				if err != nil {
 					return "", fmt.Errorf("reading parent commit: %w", err)
 				}
 
-				if theirsCommit.TreeId != theirsParentCommit.TreeId {
+				if theirsCommit.GetTreeId() != theirsParentCommit.GetTreeId() {
 					continue
 				}
 			}

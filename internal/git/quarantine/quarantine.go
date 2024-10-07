@@ -68,7 +68,7 @@ func Apply(repoPath string, repo *gitalypb.Repository, quarantineDir string) (*g
 	}
 
 	// All paths are relative to the repository root.
-	objectDir := repo.GitObjectDirectory
+	objectDir := repo.GetGitObjectDirectory()
 	if objectDir == "" {
 		// Set the default object directory as an alternate if the repository didn't
 		// have the object directory overwritten yet.
@@ -101,7 +101,7 @@ func (d *Dir) Migrate(ctx context.Context) error {
 		return fmt.Errorf("migrating quarantine: %w", err)
 	}
 
-	objectDir := d.repo.GitObjectDirectory
+	objectDir := d.repo.GetGitObjectDirectory()
 	if objectDir == "" {
 		// Migrate the objects to the default object directory if the repository
 		// didn't have an object directory explicitly configured.

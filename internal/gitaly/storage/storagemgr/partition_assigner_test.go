@@ -198,7 +198,6 @@ func TestPartitionAssigner(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -286,7 +285,6 @@ func TestPartitionAssigner_alternates(t *testing.T) {
 			expectedError:           storage.ErrRelativePathEscapesRoot,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -329,13 +327,13 @@ func TestPartitionAssigner_alternates(t *testing.T) {
 				expectedPartitionAssignments = partitionAssignments{}
 			}
 
-			if memberPartitionID, err := pa.getPartitionID(ctx, memberRepo.RelativePath, "", false); tc.expectedError != nil {
+			if memberPartitionID, err := pa.getPartitionID(ctx, memberRepo.GetRelativePath(), "", false); tc.expectedError != nil {
 				require.ErrorIs(t, err, tc.expectedError)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, expectedPartitionAssignments["member"], memberPartitionID)
 
-				poolPartitionID, err := pa.getPartitionID(ctx, poolRepo.RelativePath, "", false)
+				poolPartitionID, err := pa.getPartitionID(ctx, poolRepo.GetRelativePath(), "", false)
 				require.NoError(t, err)
 				require.Equal(t, expectedPartitionAssignments["pool"], poolPartitionID)
 			}
@@ -389,7 +387,6 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 			withAlternate: true,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -418,7 +415,6 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 			})
 
 			for i := 0; i < repositoryCount; i++ {
-				i := i
 				collectedIDs[i] = make([]storage.PartitionID, goroutineCount)
 
 				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -438,18 +434,17 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 					go func() {
 						defer wg.Done()
 						<-start
-						_, err := pa.getPartitionID(ctx, repo.RelativePath, "", false)
+						_, err := pa.getPartitionID(ctx, repo.GetRelativePath(), "", false)
 						assert.NoError(t, err)
 					}()
 				}
 
 				for j := 0; j < goroutineCount; j++ {
-					j := j
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
 						<-start
-						ptnID, err := pa.getPartitionID(ctx, repo.RelativePath, "", false)
+						ptnID, err := pa.getPartitionID(ctx, repo.GetRelativePath(), "", false)
 						assert.NoError(t, err)
 						collectedIDs[i][j] = ptnID
 					}()
@@ -472,7 +467,7 @@ func TestPartitionAssigner_concurrentAccess(t *testing.T) {
 			if tc.withAlternate {
 				// We expect all repositories to have been assigned to the same partition as they are all linked to the same pool.
 				require.Equal(t, []storage.PartitionID{2, 2, 2, 2, 2, 2, 2, 2, 2, 2}, partitionIDs)
-				ptnID, err := pa.getPartitionID(ctx, pool.RelativePath, "", false)
+				ptnID, err := pa.getPartitionID(ctx, pool.GetRelativePath(), "", false)
 				require.NoError(t, err)
 				require.Equal(t, storage.PartitionID(2), ptnID, "pool should have been assigned into the same partition as the linked repositories")
 				return

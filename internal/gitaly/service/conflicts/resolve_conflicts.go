@@ -151,7 +151,7 @@ func (s *server) resolveConflicts(header *gitalypb.ResolveConflictsRequestHeader
 	if err := s.repoWithBranchCommit(ctx,
 		quarantineRepo,
 		targetRepo,
-		header.TargetBranch,
+		header.GetTargetBranch(),
 	); err != nil {
 		return err
 	}
@@ -181,12 +181,12 @@ func (s *server) resolveConflicts(header *gitalypb.ResolveConflictsRequestHeader
 
 	if err := s.updater.UpdateReference(
 		ctx,
-		header.Repository,
-		header.User,
+		header.GetRepository(),
+		header.GetUser(),
 		quarantineDir,
 		git.ReferenceName("refs/heads/"+string(header.GetSourceBranch())),
 		commitOID,
-		git.ObjectID(header.OurCommitOid),
+		git.ObjectID(header.GetOurCommitOid()),
 	); err != nil {
 		return err
 	}

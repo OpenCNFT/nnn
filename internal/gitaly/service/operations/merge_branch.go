@@ -39,7 +39,7 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 		return fmt.Errorf("detecting object format: %w", err)
 	}
 
-	referenceName := git.NewReferenceNameFromBranchName(string(firstRequest.Branch))
+	referenceName := git.NewReferenceNameFromBranchName(string(firstRequest.GetBranch()))
 
 	var revision git.ObjectID
 	if expectedOldOID := firstRequest.GetExpectedOldOid(); expectedOldOID != "" {
@@ -72,9 +72,9 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 	mergeCommitID, err := s.merge(ctx, quarantineRepo,
 		authorSignature,
 		authorSignature,
-		string(firstRequest.Message),
+		string(firstRequest.GetMessage()),
 		revision.String(),
-		firstRequest.CommitId,
+		firstRequest.GetCommitId(),
 		firstRequest.GetSquash(),
 	)
 	if err != nil {
@@ -93,7 +93,7 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 								ConflictingFiles: conflictingFiles,
 								ConflictingCommitIds: []string{
 									revision.String(),
-									firstRequest.CommitId,
+									firstRequest.GetCommitId(),
 								},
 							},
 						},
@@ -119,11 +119,11 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 	if err != nil {
 		return err
 	}
-	if !secondRequest.Apply {
+	if !secondRequest.GetApply() {
 		return structerr.NewFailedPrecondition("merge aborted by client")
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, firstRequest.GetRepository(), firstRequest.User, quarantineDir, referenceName, mergeOID, revision); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, firstRequest.GetRepository(), firstRequest.GetUser(), quarantineDir, referenceName, mergeOID, revision); err != nil {
 		var notAllowedError hook.NotAllowedError
 		var customHookErr updateref.CustomHookError
 		var updateRefError updateref.Error
@@ -200,27 +200,27 @@ func validateMergeBranchRequest(ctx context.Context, locator storage.Locator, re
 		return err
 	}
 
-	if request.User == nil {
+	if request.GetUser() == nil {
 		return errors.New("empty user")
 	}
 
-	if len(request.User.Email) == 0 {
+	if len(request.GetUser().GetEmail()) == 0 {
 		return errors.New("empty user email")
 	}
 
-	if len(request.User.Name) == 0 {
+	if len(request.GetUser().GetName()) == 0 {
 		return errors.New("empty user name")
 	}
 
-	if len(request.Branch) == 0 {
+	if len(request.GetBranch()) == 0 {
 		return errors.New("empty branch name")
 	}
 
-	if request.CommitId == "" {
+	if request.GetCommitId() == "" {
 		return errors.New("empty commit ID")
 	}
 
-	if len(request.Message) == 0 {
+	if len(request.GetMessage()) == 0 {
 		return errors.New("empty message")
 	}
 

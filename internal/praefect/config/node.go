@@ -9,9 +9,9 @@ import (
 
 // Node describes an address that serves a storage
 type Node struct {
-	Storage string `toml:"storage,omitempty" json:"storage"`
-	Address string `toml:"address,omitempty" json:"address"`
-	Token   string `toml:"token,omitempty" json:"token"`
+	Storage string `json:"storage" toml:"storage,omitempty"`
+	Address string `json:"address" toml:"address,omitempty"`
+	Token   string `json:"token"   toml:"token,omitempty"`
 }
 
 //nolint:revive // This is unintentionally missing documentation.

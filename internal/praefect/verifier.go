@@ -227,7 +227,6 @@ func (v *MetadataVerifier) run(ctx context.Context) error {
 	wg.Add(len(jobs))
 	results := make([]verificationResult, len(jobs))
 	for i, job := range jobs {
-		i, job := i, job
 		go func() {
 			defer wg.Done()
 
@@ -430,7 +429,7 @@ func (v *MetadataVerifier) verify(ctx context.Context, job verificationJob) (boo
 		return false, err
 	}
 
-	return resp.Exists, nil
+	return resp.GetExists(), nil
 }
 
 // Describe describes the collected metrics to Prometheus.

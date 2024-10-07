@@ -19,12 +19,12 @@ import (
 
 func TestStreamDBNaiveKeyer(t *testing.T) {
 	expectGetMiss := func(ctx context.Context, cache Cache, req *gitalypb.InfoRefsRequest) {
-		_, err := cache.GetStream(ctx, req.Repository, req)
+		_, err := cache.GetStream(ctx, req.GetRepository(), req)
 		require.Equal(t, ErrReqNotFound, err)
 	}
 
 	expectGetHit := func(ctx context.Context, cache Cache, req *gitalypb.InfoRefsRequest, expectStr string) {
-		actualStream, err := cache.GetStream(ctx, req.Repository, req)
+		actualStream, err := cache.GetStream(ctx, req.GetRepository(), req)
 		require.NoError(t, err)
 		actualBytes, err := io.ReadAll(actualStream)
 		require.NoError(t, err)
@@ -39,7 +39,7 @@ func TestStreamDBNaiveKeyer(t *testing.T) {
 	}
 
 	storeAndRetrieve := func(ctx context.Context, cache Cache, req *gitalypb.InfoRefsRequest, expectStr string) {
-		require.NoError(t, cache.PutStream(ctx, req.Repository, req, strings.NewReader(expectStr)))
+		require.NoError(t, cache.PutStream(ctx, req.GetRepository(), req, strings.NewReader(expectStr)))
 		expectGetHit(ctx, cache, req, expectStr)
 	}
 
@@ -87,7 +87,7 @@ func TestStreamDBNaiveKeyer(t *testing.T) {
 		storeAndRetrieve(ctx, cache, req1, "content-1")
 		storeAndRetrieve(ctx, cache, req2, "content-2")
 
-		invalidationEvent(ctx, cache, req1.Repository)
+		invalidationEvent(ctx, cache, req1.GetRepository())
 
 		expectGetMiss(ctx, cache, req1)
 		expectGetHit(ctx, cache, req2, "content-2")
@@ -98,7 +98,7 @@ func TestStreamDBNaiveKeyer(t *testing.T) {
 
 		storeAndRetrieve(ctx, cache, req1, "content-1")
 
-		require.NoError(t, cache.PutStream(ctx, req1.Repository, req1, strings.NewReader("not what you were looking for")))
+		require.NoError(t, cache.PutStream(ctx, req1.GetRepository(), req1, strings.NewReader("not what you were looking for")))
 		expectGetHit(ctx, cache, req1, "not what you were looking for")
 	})
 
@@ -124,21 +124,21 @@ func TestStreamDBNaiveKeyer(t *testing.T) {
 		storeAndRetrieve(ctx, cache, req2, "unrelated")
 
 		// Start critical section without closing it.
-		repo1Lease, err := cache.StartLease(ctx, req1.Repository)
+		repo1Lease, err := cache.StartLease(ctx, req1.GetRepository())
 		require.NoError(t, err)
 
 		// Accessing repo cache with open critical section should fail.
-		_, err = cache.GetStream(ctx, req1.Repository, req1)
+		_, err = cache.GetStream(ctx, req1.GetRepository(), req1)
 		require.Equal(t, err, ErrPendingExists)
-		err = cache.PutStream(ctx, req1.Repository, req1, strings.NewReader("conflict"))
+		err = cache.PutStream(ctx, req1.GetRepository(), req1, strings.NewReader("conflict"))
 		require.Equal(t, err, ErrPendingExists)
 
 		// Other repo caches should be unaffected.
 		expectGetHit(ctx, cache, req2, "unrelated")
 
 		// Opening and closing a new critical section doesn't resolve the issue.
-		invalidationEvent(ctx, cache, req1.Repository)
-		_, err = cache.GetStream(ctx, req1.Repository, req1)
+		invalidationEvent(ctx, cache, req1.GetRepository())
+		_, err = cache.GetStream(ctx, req1.GetRepository(), req1)
 		require.Equal(t, err, ErrPendingExists)
 
 		// Only completing/removing the pending generation file will allow access.
@@ -150,7 +150,7 @@ func TestStreamDBNaiveKeyer(t *testing.T) {
 		cache := New(cfg, locator, logger)
 
 		nonexistentRepo := &gitalypb.Repository{
-			StorageName:  repo1.StorageName,
+			StorageName:  repo1.GetStorageName(),
 			RelativePath: "does-not-exist",
 		}
 
@@ -186,7 +186,7 @@ func TestLoserCount(t *testing.T) {
 
 	// Run streams concurrently for the same repo and request
 	for _, l := range leashes {
-		go func(l chan struct{}) { errQ <- cache.PutStream(ctx, req.Repository, req, leashedReader{l, wg}) }(l)
+		go func(l chan struct{}) { errQ <- cache.PutStream(ctx, req.GetRepository(), req, leashedReader{l, wg}) }(l)
 		l <- struct{}{}
 	}
 

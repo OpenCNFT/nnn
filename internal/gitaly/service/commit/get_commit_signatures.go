@@ -47,7 +47,7 @@ func (s *server) GetCommitSignatures(request *gitalypb.GetCommitSignaturesReques
 	}
 
 	parser := catfile.NewParser()
-	for _, commitID := range request.CommitIds {
+	for _, commitID := range request.GetCommitIds() {
 		commitObj, err := objectReader.Object(ctx, git.Revision(commitID)+"^{commit}")
 		if err != nil {
 			if errors.As(err, &catfile.NotFoundError{}) {
@@ -123,7 +123,7 @@ func validateGetCommitSignaturesRequest(objectHash git.ObjectHash, request *gita
 	}
 
 	// Do not support shorthand or invalid commit SHAs
-	for _, commitID := range request.CommitIds {
+	for _, commitID := range request.GetCommitIds() {
 		if err := objectHash.ValidateHex(commitID); err != nil {
 			return err
 		}

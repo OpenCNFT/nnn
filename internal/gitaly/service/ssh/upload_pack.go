@@ -31,8 +31,8 @@ func (s *server) SSHUploadPack(stream gitalypb.SSHService_SSHUploadPackServer) e
 
 	s.logger.WithFields(log.Fields{
 		"GlRepository":     req.GetRepository().GetGlRepository(),
-		"GitConfigOptions": req.GitConfigOptions,
-		"GitProtocol":      req.GitProtocol,
+		"GitConfigOptions": req.GetGitConfigOptions(),
+		"GitProtocol":      req.GetGitProtocol(),
 	}).DebugContext(ctx, "SSHUploadPack")
 
 	if err = validateFirstUploadPackRequest(ctx, s.locator, req); err != nil {
@@ -74,13 +74,15 @@ type sshUploadPackRequest interface {
 }
 
 func (s *server) sshUploadPack(ctx context.Context, req sshUploadPackRequest, stdin io.Reader, stdout, stderr io.Writer) (negotiation *stats.PackfileNegotiation, _ int, _ error) {
-	repo := req.GetRepository()
-	repoPath, err := s.locator.GetRepoPath(ctx, repo)
+	repoProto := req.GetRepository()
+
+	repo := s.localrepo(repoProto)
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repo.StorageName, repoPath)
+	gitcmd.WarnIfTooManyBitmaps(ctx, s.logger, s.locator, repoProto.GetStorageName(), repoPath)
 
 	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
@@ -121,10 +123,15 @@ func (s *server) sshUploadPack(ctx context.Context, req sshUploadPackRequest, st
 		config = append(config, uploadPackConfig...)
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	commandOpts := []gitcmd.CmdOpt{
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
-		gitcmd.WithPackObjectsHookEnv(repo, "ssh"),
+		gitcmd.WithPackObjectsHookEnv(objectHash, repoProto, "ssh"),
 	}
 
 	timeoutTicker := s.uploadPackRequestTimeoutTickerFactory()

@@ -64,8 +64,6 @@ func (s *Server) RepositoryReplicas(ctx context.Context, in *gitalypb.Repository
 	g, ctx := errgroup.WithContext(ctx)
 
 	for i, storage := range secondaries {
-		i := i             // rescoping
-		storage := storage // rescoping
 		g.Go(func() error {
 			var err error
 			resp.Replicas[i], err = s.getRepositoryDetails(ctx, virtualStorage, storage, relativePath, replicaPath)

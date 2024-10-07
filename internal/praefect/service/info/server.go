@@ -65,29 +65,29 @@ func NewServer(
 
 //nolint:revive // This is unintentionally missing documentation.
 func (s *Server) SetAuthoritativeStorage(ctx context.Context, req *gitalypb.SetAuthoritativeStorageRequest) (*gitalypb.SetAuthoritativeStorageResponse, error) {
-	storages := s.conf.StorageNames()[req.VirtualStorage]
+	storages := s.conf.StorageNames()[req.GetVirtualStorage()]
 	if storages == nil {
-		return nil, structerr.NewInvalidArgument("unknown virtual storage: %q", req.VirtualStorage)
+		return nil, structerr.NewInvalidArgument("unknown virtual storage: %q", req.GetVirtualStorage())
 	}
 
 	foundStorage := false
 	for i := range storages {
-		if storages[i] == req.AuthoritativeStorage {
+		if storages[i] == req.GetAuthoritativeStorage() {
 			foundStorage = true
 			break
 		}
 	}
 
 	if !foundStorage {
-		return nil, structerr.NewInvalidArgument("unknown authoritative storage: %q", req.AuthoritativeStorage)
+		return nil, structerr.NewInvalidArgument("unknown authoritative storage: %q", req.GetAuthoritativeStorage())
 	}
 
-	if err := s.rs.SetAuthoritativeReplica(ctx, req.VirtualStorage, req.RelativePath, req.AuthoritativeStorage); err != nil {
+	if err := s.rs.SetAuthoritativeReplica(ctx, req.GetVirtualStorage(), req.GetRelativePath(), req.GetAuthoritativeStorage()); err != nil {
 		if errors.Is(err, datastore.ErrRepositoryNotFound) {
 			return nil, structerr.NewInvalidArgument("repository does not exist on virtual storage").WithMetadataItems(
-				structerr.MetadataItem{Key: "virtual_storage", Value: req.VirtualStorage},
-				structerr.MetadataItem{Key: "relative_path", Value: req.RelativePath},
-				structerr.MetadataItem{Key: "authoritative_storage", Value: req.AuthoritativeStorage},
+				structerr.MetadataItem{Key: "virtual_storage", Value: req.GetVirtualStorage()},
+				structerr.MetadataItem{Key: "relative_path", Value: req.GetRelativePath()},
+				structerr.MetadataItem{Key: "authoritative_storage", Value: req.GetAuthoritativeStorage()},
 			)
 		}
 

@@ -200,7 +200,7 @@ func TestManager_Create(t *testing.T) {
 
 				data := tc.setup(t, vanityRepo)
 
-				manifestPath := filepath.Join(backupRoot, "manifests", vanityRepo.StorageName, vanityRepo.RelativePath, backupID+".toml")
+				manifestPath := filepath.Join(backupRoot, "manifests", vanityRepo.GetStorageName(), vanityRepo.GetRelativePath(), backupID+".toml")
 				refsPath := joinBackupPath(t, backupRoot, vanityRepo, backupID, "001.refs")
 				bundlePath := joinBackupPath(t, backupRoot, vanityRepo, backupID, "001.bundle")
 				customHooksPath := joinBackupPath(t, backupRoot, vanityRepo, backupID, "001.custom_hooks.tar")
@@ -456,8 +456,6 @@ func TestManager_Restore_latest(t *testing.T) {
 			},
 		},
 	} {
-		managerTC := managerTC
-
 		t.Run(managerTC.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -781,7 +779,7 @@ custom_hooks_path = '%[2]s/%[3]s/002.custom_hooks.tar'
 						Repository: repo,
 					})
 					require.NoError(t, err)
-					require.Equal(t, tc.expectExists, exists.Exists, "repository exists")
+					require.Equal(t, tc.expectExists, exists.GetExists(), "repository exists")
 
 					if expectedChecksum != nil {
 						checksum, err := repoClient.CalculateChecksum(ctx, &gitalypb.CalculateChecksumRequest{
@@ -849,8 +847,6 @@ func TestManager_Restore_specific(t *testing.T) {
 			},
 		},
 	} {
-		managerTC := managerTC
-
 		t.Run(managerTC.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1079,7 +1075,7 @@ custom_hooks_path = 'custom_hooks.tar'
 						Repository: repo,
 					})
 					require.NoError(t, err)
-					require.Equal(t, tc.expectExists, exists.Exists, "repository exists")
+					require.Equal(t, tc.expectExists, exists.GetExists(), "repository exists")
 
 					if expectedChecksum != nil {
 						checksum, err := repoClient.CalculateChecksum(ctx, &gitalypb.CalculateChecksumRequest{

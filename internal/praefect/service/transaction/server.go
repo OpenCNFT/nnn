@@ -32,7 +32,7 @@ func (s *Server) VoteTransaction(ctx context.Context, in *gitalypb.VoteTransacti
 		return nil, structerr.NewInvalidArgument("invalid reference update hash: %w", err)
 	}
 
-	if err := s.txMgr.VoteTransaction(ctx, in.TransactionId, in.Node, vote); err != nil {
+	if err := s.txMgr.VoteTransaction(ctx, in.GetTransactionId(), in.GetNode(), vote); err != nil {
 		switch {
 		case errors.Is(err, transactions.ErrNotFound):
 			return nil, structerr.NewNotFound("%w", err)
@@ -61,7 +61,7 @@ func (s *Server) VoteTransaction(ctx context.Context, in *gitalypb.VoteTransacti
 // will not get accepted anymore. It is fine to call this RPC multiple times on
 // the same transaction.
 func (s *Server) StopTransaction(ctx context.Context, in *gitalypb.StopTransactionRequest) (*gitalypb.StopTransactionResponse, error) {
-	if err := s.txMgr.StopTransaction(ctx, in.TransactionId); err != nil {
+	if err := s.txMgr.StopTransaction(ctx, in.GetTransactionId()); err != nil {
 		switch {
 		case errors.Is(err, transactions.ErrNotFound):
 			return nil, structerr.NewNotFound("%w", err)

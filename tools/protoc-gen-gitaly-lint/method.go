@@ -285,8 +285,8 @@ func findChildMsg(topLevelMsgs map[string]*descriptorpb.DescriptorProto, t *desc
 func getFileTypes(filename string, req *pluginpb.CodeGeneratorRequest) ([]*descriptorpb.DescriptorProto, error) {
 	var types []*descriptorpb.DescriptorProto
 	var protoFile *descriptorpb.FileDescriptorProto
-	for _, pf := range req.ProtoFile {
-		if pf.Name != nil && *pf.Name == filename {
+	for _, pf := range req.GetProtoFile() {
+		if pf.Name != nil && pf.GetName() == filename {
 			types = pf.GetMessageType()
 			protoFile = pf
 			break
@@ -297,7 +297,7 @@ func getFileTypes(filename string, req *pluginpb.CodeGeneratorRequest) ([]*descr
 		return nil, errors.New("proto file could not be found: " + filename)
 	}
 
-	for _, dep := range protoFile.Dependency {
+	for _, dep := range protoFile.GetDependency() {
 		depTypes, err := getFileTypes(dep, req)
 		if err != nil {
 			return nil, err

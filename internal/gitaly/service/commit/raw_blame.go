@@ -40,8 +40,10 @@ func (s *server) RawBlame(in *gitalypb.RawBlameRequest, stream gitalypb.CommitSe
 		return stream.Send(&gitalypb.RawBlameResponse{Data: p})
 	})
 
+	repo := s.localrepo(in.GetRepository())
+
 	var stderr strings.Builder
-	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:        "blame",
 		Flags:       flags,
 		Args:        []string{revision},
@@ -96,7 +98,7 @@ func validateRawBlameRequest(ctx context.Context, locator storage.Locator, in *g
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(in.Revision); err != nil {
+	if err := git.ValidateRevision(in.GetRevision()); err != nil {
 		return err
 	}
 

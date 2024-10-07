@@ -222,8 +222,6 @@ func TestNewRequestInfo(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -393,8 +391,6 @@ func TestExtractServiceAndMethodName(t *testing.T) {
 			expectedMethod:  "",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

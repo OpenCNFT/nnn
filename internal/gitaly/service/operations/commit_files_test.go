@@ -900,8 +900,6 @@ func testUserCommitFiles(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -953,15 +951,15 @@ func testUserCommitFiles(t *testing.T, ctx context.Context) {
 				}
 
 				require.NoError(t, err)
-				require.Equal(t, step.branchCreated, resp.BranchUpdate.BranchCreated, "step %d", i+1)
-				require.Equal(t, step.repoCreated, resp.BranchUpdate.RepoCreated, "step %d", i+1)
+				require.Equal(t, step.branchCreated, resp.GetBranchUpdate().GetBranchCreated(), "step %d", i+1)
+				require.Equal(t, step.repoCreated, resp.GetBranchUpdate().GetRepoCreated(), "step %d", i+1)
 				gittest.RequireTree(t, cfg, repoPath, branch, step.treeEntries)
 
 				authorDate := gittest.Exec(t, cfg, "-C", repoPath, "log", "--pretty='format:%ai'", "-1")
 				require.Contains(t, string(authorDate), gittest.TimezoneOffset)
 
 				repo := localrepo.NewTestRepo(t, cfg, repoProto)
-				data, err := repo.ReadObject(ctx, git.ObjectID(resp.BranchUpdate.CommitId))
+				data, err := repo.ReadObject(ctx, git.ObjectID(resp.GetBranchUpdate().GetCommitId()))
 				require.NoError(t, err)
 
 				gpgsig, dataWithoutGpgSig := signature.ExtractSignature(t, ctx, data)
@@ -1021,12 +1019,12 @@ func testUserCommitFilesStableCommitID(t *testing.T, ctx context.Context) {
 	resp, err := stream.CloseAndRecv()
 	require.NoError(t, err)
 
-	require.Equal(t, resp.BranchUpdate.CommitId, gittest.ObjectHashDependent(t, map[string]string{
+	require.Equal(t, resp.GetBranchUpdate().GetCommitId(), gittest.ObjectHashDependent(t, map[string]string{
 		"sha1":   "23ec4ccd7fcc6ecf39431805bbff1cbcb6c23b9d",
 		"sha256": "0ab6f5df19cb4387f5b1bdac29ea497e12ad4ebd6c50c0a6ade01c75d2f5c5ad",
 	}))
-	require.True(t, resp.BranchUpdate.BranchCreated)
-	require.True(t, resp.BranchUpdate.RepoCreated)
+	require.True(t, resp.GetBranchUpdate().GetBranchCreated())
+	require.True(t, resp.GetBranchUpdate().GetRepoCreated())
 	gittest.RequireTree(t, cfg, repoPath, "refs/heads/master", []gittest.TreeEntry{
 		{Mode: "100644", Path: "file.txt", Content: "content"},
 	})
@@ -1052,8 +1050,8 @@ func testUserCommitFilesStableCommitID(t *testing.T, ctx context.Context) {
 			Timezone: []byte(gittest.TimezoneOffset),
 		},
 		Committer: &gitalypb.CommitAuthor{
-			Name:     gittest.TestUser.Name,
-			Email:    gittest.TestUser.Email,
+			Name:     gittest.TestUser.GetName(),
+			Email:    gittest.TestUser.GetEmail(),
 			Date:     &timestamppb.Timestamp{Seconds: 12345},
 			Timezone: []byte(gittest.TimezoneOffset),
 		},
@@ -1304,8 +1302,6 @@ func testSuccessfulUserCommitFilesRequest(t *testing.T, ctx context.Context) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1339,11 +1335,11 @@ func testSuccessfulUserCommitFilesRequest(t *testing.T, ctx context.Context) {
 
 			headCommit, err := localrepo.NewTestRepo(t, cfg, setup.repo).ReadCommit(ctx, git.Revision(setup.branchName))
 			require.NoError(t, err)
-			require.Equal(t, authorName, headCommit.Author.Name)
-			require.Equal(t, gittest.TestUser.Name, headCommit.Committer.Name)
-			require.Equal(t, authorEmail, headCommit.Author.Email)
-			require.Equal(t, gittest.TestUser.Email, headCommit.Committer.Email)
-			require.Equal(t, commitFilesMessage, headCommit.Subject)
+			require.Equal(t, authorName, headCommit.GetAuthor().GetName())
+			require.Equal(t, gittest.TestUser.GetName(), headCommit.GetCommitter().GetName())
+			require.Equal(t, authorEmail, headCommit.GetAuthor().GetEmail())
+			require.Equal(t, gittest.TestUser.GetEmail(), headCommit.GetCommitter().GetEmail())
+			require.Equal(t, commitFilesMessage, headCommit.GetSubject())
 
 			fileContent := gittest.Exec(t, cfg, "-C", setup.repoPath, "show", headCommit.GetId()+":"+filePath)
 			require.Equal(t, "My content", string(fileContent))
@@ -1406,8 +1402,6 @@ func testUserCommitFilesMove(t *testing.T, ctx context.Context) {
 			expectedContent: fileContent,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1436,7 +1430,7 @@ func testUserCommitFilesMove(t *testing.T, ctx context.Context) {
 			update := resp.GetBranchUpdate()
 			require.NotNil(t, update)
 
-			fileContent := gittest.Exec(t, cfg, "-C", testRepoPath, "show", update.CommitId+":"+filePath)
+			fileContent := gittest.Exec(t, cfg, "-C", testRepoPath, "show", update.GetCommitId()+":"+filePath)
 			require.Equal(t, tc.expectedContent, string(fileContent))
 		})
 	}
@@ -1485,8 +1479,8 @@ func testSuccessUserCommitFilesRequestForceCommit(t *testing.T, ctx context.Cont
 	newTargetBranchCommit, err := repo.ReadCommit(ctx, git.Revision(targetBranchName))
 	require.NoError(t, err)
 
-	require.Equal(t, update.CommitId, newTargetBranchCommit.Id)
-	require.Equal(t, []string{startBranchCommitID.String()}, newTargetBranchCommit.ParentIds)
+	require.Equal(t, update.GetCommitId(), newTargetBranchCommit.GetId())
+	require.Equal(t, []string{startBranchCommitID.String()}, newTargetBranchCommit.GetParentIds())
 }
 
 func TestSuccessUserCommitFilesRequestStartSha(t *testing.T) {
@@ -1526,8 +1520,8 @@ func testSuccessUserCommitFilesRequestStartSha(t *testing.T, ctx context.Context
 	newTargetBranchCommit, err := repo.ReadCommit(ctx, git.Revision(targetBranchName))
 	require.NoError(t, err)
 
-	require.Equal(t, update.CommitId, newTargetBranchCommit.Id)
-	require.Equal(t, []string{startCommitID.String()}, newTargetBranchCommit.ParentIds)
+	require.Equal(t, update.GetCommitId(), newTargetBranchCommit.GetId())
+	require.Equal(t, []string{startCommitID.String()}, newTargetBranchCommit.GetParentIds())
 }
 
 func TestUserCommitFiles_remoteRepository(t *testing.T) {
@@ -1567,8 +1561,6 @@ func testUserCommitFilesRemoteRepository(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1595,8 +1587,8 @@ func testUserCommitFilesRemoteRepository(t *testing.T, ctx context.Context) {
 			newTargetBranchCommit, err := newRepo.ReadCommit(ctx, git.Revision(targetBranchName))
 			require.NoError(t, err)
 
-			require.Equal(t, update.CommitId, newTargetBranchCommit.Id)
-			require.Equal(t, []string{startCommitID.String()}, newTargetBranchCommit.ParentIds)
+			require.Equal(t, update.GetCommitId(), newTargetBranchCommit.GetId())
+			require.Equal(t, []string{startCommitID.String()}, newTargetBranchCommit.GetParentIds())
 		})
 	}
 }
@@ -1640,7 +1632,7 @@ func testSuccessfulUserCommitFilesRequestWithSpecialCharactersInSignature(t *tes
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			headerRequest := headerRequest(repoProto, tc.user, targetBranchName, commitFilesMessage, "", "")
-			setAuthorAndEmail(headerRequest, tc.user.Name, tc.user.Email)
+			setAuthorAndEmail(headerRequest, tc.user.GetName(), tc.user.GetEmail())
 
 			stream, err := client.UserCommitFiles(ctx)
 			require.NoError(t, err)
@@ -1652,10 +1644,10 @@ func testSuccessfulUserCommitFilesRequestWithSpecialCharactersInSignature(t *tes
 			newCommit, err := repo.ReadCommit(ctx, git.Revision(targetBranchName))
 			require.NoError(t, err)
 
-			require.Equal(t, tc.author.Name, newCommit.Author.Name, "author name")
-			require.Equal(t, tc.author.Email, newCommit.Author.Email, "author email")
-			require.Equal(t, tc.author.Name, newCommit.Committer.Name, "committer name")
-			require.Equal(t, tc.author.Email, newCommit.Committer.Email, "committer email")
+			require.Equal(t, tc.author.GetName(), newCommit.GetAuthor().GetName(), "author name")
+			require.Equal(t, tc.author.GetEmail(), newCommit.GetAuthor().GetEmail(), "author email")
+			require.Equal(t, tc.author.GetName(), newCommit.GetCommitter().GetName(), "committer name")
+			require.Equal(t, tc.author.GetEmail(), newCommit.GetCommitter().GetEmail(), "committer email")
 		})
 	}
 }
@@ -1703,7 +1695,7 @@ func testFailedUserCommitFilesRequestDueToHooks(t *testing.T, ctx context.Contex
 			}
 
 			expectedOut := fmt.Sprintf("GL_ID=%s GL_USERNAME=%s\n",
-				gittest.TestUser.GlId, gittest.TestUser.GlUsername)
+				gittest.TestUser.GetGlId(), gittest.TestUser.GetGlUsername())
 
 			testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("denied by custom hooks: update reference: running %s hooks: %s", hookName, expectedOut).WithDetail(
 				&gitalypb.UserCommitFilesError{
@@ -1802,8 +1794,6 @@ func testFailedUserCommitFilesRequestDueToIndexError(t *testing.T, ctx context.C
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1934,7 +1924,7 @@ func testUserCommitFilesFailsIfRepositoryMissing(t *testing.T, ctx context.Conte
 
 	_, err = stream.CloseAndRecv()
 	testhelper.RequireGrpcError(t, testhelper.ToInterceptedMetadata(
-		structerr.New("%w", storage.NewRepositoryNotFoundError(repo.StorageName, repo.RelativePath)),
+		structerr.New("%w", storage.NewRepositoryNotFoundError(repo.GetStorageName(), repo.GetRelativePath())),
 	), err)
 }
 
@@ -1987,7 +1977,7 @@ func setForce(headerRequest *gitalypb.UserCommitFilesRequest, force bool) {
 }
 
 func getHeader(headerRequest *gitalypb.UserCommitFilesRequest) *gitalypb.UserCommitFilesRequestHeader {
-	return headerRequest.UserCommitFilesRequestPayload.(*gitalypb.UserCommitFilesRequest_Header).Header
+	return headerRequest.GetUserCommitFilesRequestPayload().(*gitalypb.UserCommitFilesRequest_Header).Header
 }
 
 func createDirHeaderRequest(filePath string) *gitalypb.UserCommitFilesRequest {

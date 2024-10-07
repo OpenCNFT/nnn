@@ -180,8 +180,6 @@ func TestCountCommits(t *testing.T) {
 			expectedErr: status.Error(codes.InvalidArgument, "revision can't start with '-'"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			resp, err := client.CountCommits(ctx, tc.request)
 			testhelper.RequireGrpcError(t, tc.expectedErr, err)

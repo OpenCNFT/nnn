@@ -42,7 +42,7 @@ func TestGetTag(t *testing.T) {
 
 			tag, err := GetTag(ctx, objectReader, git.Revision(tagID), tc.tagName)
 			require.NoError(t, err)
-			require.Equal(t, tc.message, string(tag.Message))
+			require.Equal(t, tc.message, string(tag.GetMessage()))
 			require.Equal(t, tc.tagName, string(tag.GetName()))
 		})
 	}
@@ -91,8 +91,8 @@ func TestTrimTag(t *testing.T) {
 				Message: []byte(tc.message),
 			}
 			TrimTagMessage(tag)
-			require.Equal(t, tc.expectedMessage, string(tag.Message))
-			require.Equal(t, int64(tc.expectedMessageSize), tag.MessageSize)
+			require.Equal(t, tc.expectedMessage, string(tag.GetMessage()))
+			require.Equal(t, int64(tc.expectedMessageSize), tag.GetMessageSize())
 		})
 	}
 }

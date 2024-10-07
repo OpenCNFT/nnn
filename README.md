@@ -51,67 +51,8 @@ GitLab end up in Gitaly.
 
 ## Design
 
-High-level architecture overview:
-
-```mermaid
-graph LR
-
-  subgraph "Gitaly Service"
-  Gitaly == git ==> Filesystem
-  end
-
-  subgraph "Clients"
-    Rails[gitlab-rails] --> Gitaly
-    Workhorse --> Gitaly
-    Shell[gitlab-shell] -- command-line\nclient --> Gitaly
-    Gitaly -. Authorization .-> Rails
-  end
-```
-
-In [High Availability](#high-availability) mode, the current implementation looks like this (some details omitted):
-
-```mermaid
-graph LR
-
-  subgraph "Gitaly Nodes"
-  Gitaly == git ==> Filesystem
-  end
-
-  subgraph "Praefects"
-    LB[typical setup uses a loadbalancer] --> P1
-    LB --> P2
-    P1[Praefect 1]
-    P2[Praefect N]
-    P1 --> PG[(PostgreSQL)]
-    P2 --> PG
-  end
-
-  subgraph "Clients"
-    Rails[gitlab-rails]
-    Workhorse
-    Shell[gitlab-shell]
-  end
-
-Clients --> Praefects --> Gitaly
-```
-
-### Gitaly clients
-
-As of Q4 2018, the following GitLab components act as Gitaly clients:
-
-- [`gitlab`](https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/gitaly_client.rb):
-  the main GitLab Rails application.
-- [`gitlab-shell`](https://gitlab.com/gitlab-org/gitlab-shell/tree/main):
-  for `git clone`, `git push` etc. via SSH.
-- [`gitlab-workhorse`](https://gitlab.com/gitlab-org/gitlab/-/blob/master/workhorse/internal/gitaly/gitaly.go):
-  for `git clone` via HTTPS and for slow requests that serve raw Git data.
-- [`gitaly-ssh`](https://gitlab.com/gitlab-org/gitaly/tree/master/cmd/gitaly-ssh):
-  for internal Git data transfers between Gitaly servers.
-
-The clients written in Go (`gitlab-shell`, `gitlab-workhorse`, `gitaly-ssh`)
-use library code from the
-[`gitlab.com/gitlab-org/gitaly/client`](https://gitlab.com/gitlab-org/gitaly/tree/master/client)
-package.
+The [Gitaly and Gitaly cluster](https://docs.gitlab.com/ee/administration/gitaly/) documentation details the architecture
+and design of Gitaly, including a list of known Gitaly consumers.
 
 ## High Availability
 

@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -1036,6 +1037,8 @@ func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction,
 
 func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCase, setup testTransactionSetup) {
 	logger := testhelper.NewLogger(t)
+	catfileCache := catfile.NewCache(setup.Config)
+	t.Cleanup(catfileCache.Stop)
 
 	storageName := setup.Config.Storages[0].Name
 	storageScopedFactory, err := setup.RepositoryFactory.ScopeByStorage(ctx, storageName)
@@ -1356,7 +1359,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			require.Equal(t, step.ExpectedError, transaction.KV().Delete([]byte(step.Key)))
 		case Rollback:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction rollbacked before beginning it")
-			require.Equal(t, step.ExpectedError, openTransactions[step.TransactionID].Rollback())
+			require.Equal(t, step.ExpectedError, openTransactions[step.TransactionID].Rollback(ctx))
 		case Prune:
 			// Repack all objects into a single pack and remove all other packs to remove all
 			// unreachable objects from the packs.
@@ -1384,6 +1387,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				logger,
 				locator,
 				setup.CommandFactory,
+				catfileCache,
 				nil,
 				counter.NewRepositoryCounter(setup.Config.Storages),
 				rewrittenRepository,
@@ -1609,7 +1613,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 				RelativePaths: []string{"non-existent"},
 			})
 			require.NoError(t, err)
-			require.NoError(t, tx.Rollback())
+			require.NoError(t, tx.Rollback(ctx))
 
 			return true, nil
 		case managerErr, closeChannel = <-managerErrChannel:

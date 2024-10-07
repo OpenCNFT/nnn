@@ -17,11 +17,13 @@ func (s *server) DiffStats(in *gitalypb.DiffStatsRequest, stream gitalypb.DiffSe
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
+	repo := s.localrepo(in.GetRepository())
+
 	var batch []*gitalypb.DiffStats
-	cmd, err := s.gitCmdFactory.New(stream.Context(), in.Repository, gitcmd.Command{
+	cmd, err := repo.Exec(stream.Context(), gitcmd.Command{
 		Name:  "diff",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--numstat"}, gitcmd.Flag{Name: "-z"}},
-		Args:  []string{in.LeftCommitId, in.RightCommitId},
+		Args:  []string{in.GetLeftCommitId(), in.GetRightCommitId()},
 	}, gitcmd.WithSetupStdout())
 	if err != nil {
 		return structerr.NewInternal("cmd: %w", err)

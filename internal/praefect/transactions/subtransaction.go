@@ -41,7 +41,6 @@ type subtransaction struct {
 func newSubtransaction(voters []Voter, threshold uint) (*subtransaction, error) {
 	votersByNode := make(map[string]*Voter, len(voters))
 	for _, voter := range voters {
-		voter := voter // rescope loop variable
 		votersByNode[voter.Name] = &voter
 	}
 

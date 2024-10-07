@@ -57,7 +57,7 @@ type Transaction interface {
 	// changes have been durably persisted.
 	Commit(context.Context) error
 	// Rollback aborts the transactions and discards all of its changes.
-	Rollback() error
+	Rollback(context.Context) error
 	// SnapshotLSN returns the Log Sequence Number (LSN) of the transaction's snapshot. This value is used to track and order transactions.
 	SnapshotLSN() LSN
 	// Root is the absolute path to the root of the transaction's file system snapshot.

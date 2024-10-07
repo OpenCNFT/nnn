@@ -40,8 +40,6 @@ func TestConvertLoggingFields(t *testing.T) {
 			expected: map[string]any{},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			actual := ConvertLoggingFields(tc.input)
 			require.Equal(t, tc.expected, actual)

@@ -46,7 +46,7 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 		return structerr.NewInternal("detecting object format: %w", err)
 	}
 
-	blobInfoPairs, err := s.blobInfoPairs(ctx, repo, objectHash, request.BlobPairs)
+	blobInfoPairs, err := s.blobInfoPairs(ctx, repo, objectHash, request.GetBlobPairs())
 	if err != nil {
 		return err
 	}
@@ -65,10 +65,10 @@ func (s *server) DiffBlobs(request *gitalypb.DiffBlobsRequest, stream gitalypb.D
 	}
 
 	var limits diff.Limits
-	if request.PatchBytesLimit > 0 {
+	if request.GetPatchBytesLimit() > 0 {
 		limits.EnforceLimits = true
 		limits.PatchLimitsOnly = true
-		limits.MaxPatchBytes = int(request.PatchBytesLimit)
+		limits.MaxPatchBytes = int(request.GetPatchBytesLimit())
 	}
 
 	for _, blobInfoPair := range blobInfoPairs {
@@ -231,28 +231,28 @@ func (s *server) blobInfoPairs(
 		blobInfoPair := blobInfoPair{
 			leftOID:       objectHash.ZeroOID,
 			rightOID:      objectHash.ZeroOID,
-			leftRevision:  git.Revision(blobPair.LeftBlob),
-			rightRevision: git.Revision(blobPair.RightBlob),
+			leftRevision:  git.Revision(blobPair.GetLeftBlob()),
+			rightRevision: git.Revision(blobPair.GetRightBlob()),
 		}
 
 		// Null blob IDs do not exist in the repository.
-		if !objectHash.IsZeroOID(git.ObjectID(blobPair.LeftBlob)) {
-			leftOID, err := blobInfo(ctx, reader, objectHash, blobPair.LeftBlob)
+		if !objectHash.IsZeroOID(git.ObjectID(blobPair.GetLeftBlob())) {
+			leftOID, err := blobInfo(ctx, reader, objectHash, blobPair.GetLeftBlob())
 			if err != nil {
 				return nil, structerr.NewInvalidArgument("getting left blob info: %w", err).WithMetadata(
 					"revision",
-					string(blobPair.LeftBlob),
+					string(blobPair.GetLeftBlob()),
 				)
 			}
 			blobInfoPair.leftOID = leftOID
 		}
 
-		if !objectHash.IsZeroOID(git.ObjectID(blobPair.RightBlob)) {
-			rightOID, err := blobInfo(ctx, reader, objectHash, blobPair.RightBlob)
+		if !objectHash.IsZeroOID(git.ObjectID(blobPair.GetRightBlob())) {
+			rightOID, err := blobInfo(ctx, reader, objectHash, blobPair.GetRightBlob())
 			if err != nil {
 				return nil, structerr.NewInvalidArgument("getting right blob info: %w", err).WithMetadata(
 					"revision",
-					string(blobPair.RightBlob),
+					string(blobPair.GetRightBlob()),
 				)
 			}
 			blobInfoPair.rightOID = rightOID
@@ -260,8 +260,8 @@ func (s *server) blobInfoPairs(
 
 		if blobInfoPair.leftOID == blobInfoPair.rightOID {
 			return nil, structerr.NewInvalidArgument("left and right blob revisions resolve to same OID").WithMetadataItems(
-				structerr.MetadataItem{Key: "left_revision", Value: string(blobPair.LeftBlob)},
-				structerr.MetadataItem{Key: "right_revision", Value: string(blobPair.RightBlob)},
+				structerr.MetadataItem{Key: "left_revision", Value: string(blobPair.GetLeftBlob())},
+				structerr.MetadataItem{Key: "right_revision", Value: string(blobPair.GetRightBlob())},
 			)
 		}
 

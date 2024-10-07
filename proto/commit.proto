@@ -263,6 +263,9 @@ message ListCommitsRequest {
   // commit_message_patterns will only list commits whose commit message matches
   // any of the given patterns.
   repeated bytes commit_message_patterns = 13;
+
+  // skip will skip a number commits before starting to show the commit output.
+  uint32 skip = 14;
 }
 
 // ListCommitsResponse is a response for the ListCommits RPC. The response will be

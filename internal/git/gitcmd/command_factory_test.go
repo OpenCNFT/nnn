@@ -382,16 +382,35 @@ func TestExecCommandFactory_addAttrTree(t *testing.T) {
 				Key: "attr.tree", Value: "HEAD",
 			},
 		},
+		{
+			desc: "git update-ref should have attr.tree = HEAD",
+			cmd:  "update-ref",
+			repo: repoSHA1,
+			expectedAttrTreeConfig: &gitcmd.ConfigPair{
+				Key: "attr.tree", Value: "HEAD",
+			},
+		},
+		{
+			desc: "git rev-parse should have attr.tree = HEAD",
+			cmd:  "rev-parse",
+			repo: repoSHA1,
+			expectedAttrTreeConfig: &gitcmd.ConfigPair{
+				Key: "attr.tree", Value: "HEAD",
+			},
+		},
+		{
+			desc: "git cat-file should have attr.tree = HEAD",
+			cmd:  "cat-file",
+			repo: repoSHA1,
+			expectedAttrTreeConfig: &gitcmd.ConfigPair{
+				Key: "attr.tree", Value: "HEAD",
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			cmd := gitcmd.Command{Name: tc.cmd}
 			actualAttrTreeConfig := cf.AttrTreeConfig(ctx, tc.repo, cmd)
-			if tc.expectedAttrTreeConfig == nil {
-				require.Nil(t, actualAttrTreeConfig)
-			} else {
-				require.Equal(t, tc.expectedAttrTreeConfig.Key, actualAttrTreeConfig.Key)
-				require.Equal(t, tc.expectedAttrTreeConfig.Value, actualAttrTreeConfig.Value)
-			}
+			require.Equal(t, tc.expectedAttrTreeConfig, actualAttrTreeConfig)
 		})
 	}
 }
@@ -1061,7 +1080,6 @@ func TestTrace2PackObjectsMetrics(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

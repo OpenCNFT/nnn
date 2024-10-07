@@ -708,7 +708,6 @@ func TestAlternatesInfo_AbsoluteObjectDirectories(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -909,8 +908,6 @@ func TestAlternatesInfoForRepository(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1471,8 +1468,6 @@ func TestPackfileInfoForRepository(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1645,8 +1640,6 @@ func TestBitmapInfoForPath(t *testing.T) {
 			},
 		},
 	} {
-		bitmapTypeTC := bitmapTypeTC
-
 		t.Run(bitmapTypeTC.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1698,8 +1691,6 @@ func TestBitmapInfoForPath(t *testing.T) {
 					},
 				},
 			} {
-				tc := tc
-
 				t.Run(tc.desc, func(t *testing.T) {
 					t.Parallel()
 
@@ -1778,8 +1769,6 @@ func TestBitmapInfoForPath(t *testing.T) {
 			expectedErr: fmt.Errorf("unsupported version: 2"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1956,8 +1945,6 @@ func TestMultiPackIndexInfoForPath(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

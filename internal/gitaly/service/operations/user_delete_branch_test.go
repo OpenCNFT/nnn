@@ -243,8 +243,6 @@ func TestUserDeleteBranch(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -422,7 +420,7 @@ func TestUserDeleteBranch_hooks(t *testing.T) {
 			require.NoError(t, err)
 
 			output := testhelper.MustReadFile(t, hookOutputTempPath)
-			require.Contains(t, string(output), "GL_USERNAME="+gittest.TestUser.GlUsername)
+			require.Contains(t, string(output), "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 		})
 	}
 }
@@ -702,7 +700,7 @@ func TestBranchHookOutput(t *testing.T) {
 
 				// Assert the message separately as it references the hook path which may change and fail the equality check.
 				require.Regexp(t, fmt.Sprintf(`^rpc error: code = PermissionDenied desc = deletion denied by custom hooks: running %s hooks: %s$`, hookTestCase.hookName, testCase.expectedErrorRegexp), err)
-				testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("%s", statusWithoutMessage.Message).WithDetail(
+				testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("%s", statusWithoutMessage.GetMessage()).WithDetail(
 					&gitalypb.UserDeleteBranchError{
 						Error: &gitalypb.UserDeleteBranchError_CustomHook{
 							CustomHook: &gitalypb.CustomHookError{

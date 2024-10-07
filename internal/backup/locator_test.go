@@ -41,9 +41,9 @@ func TestLegacyLocator(t *testing.T) {
 			ObjectFormat: git.ObjectHashSHA1.Format,
 			Steps: []Step{
 				{
-					BundlePath:      repo.RelativePath + ".bundle",
-					RefPath:         repo.RelativePath + ".refs",
-					CustomHooksPath: filepath.Join(repo.RelativePath, "custom_hooks.tar"),
+					BundlePath:      repo.GetRelativePath() + ".bundle",
+					RefPath:         repo.GetRelativePath() + ".refs",
+					CustomHooksPath: filepath.Join(repo.GetRelativePath(), "custom_hooks.tar"),
 				},
 			},
 		}
@@ -63,9 +63,9 @@ func TestLegacyLocator(t *testing.T) {
 			ObjectFormat: git.ObjectHashSHA1.Format,
 			Steps: []Step{
 				{
-					BundlePath:      repo.RelativePath + ".bundle",
-					RefPath:         repo.RelativePath + ".refs",
-					CustomHooksPath: filepath.Join(repo.RelativePath, "custom_hooks.tar"),
+					BundlePath:      repo.GetRelativePath() + ".bundle",
+					RefPath:         repo.GetRelativePath() + ".refs",
+					CustomHooksPath: filepath.Join(repo.GetRelativePath(), "custom_hooks.tar"),
 				},
 			},
 		}
@@ -108,9 +108,9 @@ func TestPointerLocator(t *testing.T) {
 			ObjectFormat: git.ObjectHashSHA1.Format,
 			Steps: []Step{
 				{
-					BundlePath:      filepath.Join(repo.RelativePath, backupID, expectedIncrement+".bundle"),
-					RefPath:         filepath.Join(repo.RelativePath, backupID, expectedIncrement+".refs"),
-					CustomHooksPath: filepath.Join(repo.RelativePath, backupID, expectedIncrement+".custom_hooks.tar"),
+					BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, expectedIncrement+".bundle"),
+					RefPath:         filepath.Join(repo.GetRelativePath(), backupID, expectedIncrement+".refs"),
+					CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, expectedIncrement+".custom_hooks.tar"),
 				},
 			},
 		}
@@ -120,10 +120,10 @@ func TestPointerLocator(t *testing.T) {
 
 		require.NoError(t, l.Commit(ctx, full))
 
-		backupPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.RelativePath, "LATEST"))
+		backupPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"))
 		require.Equal(t, backupID, string(backupPointer))
 
-		incrementPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.RelativePath, backupID, "LATEST"))
+		incrementPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.GetRelativePath(), backupID, "LATEST"))
 		require.Equal(t, expectedIncrement, string(incrementPointer))
 	})
 
@@ -147,14 +147,12 @@ func TestPointerLocator(t *testing.T) {
 				expectedBackupID: "abc123",
 				expectedOffset:   1,
 				setup: func(tb testing.TB, ctx context.Context, backupPath string) {
-					require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath, "abc123"), mode.Directory))
-					require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, "LATEST"), []byte("abc123"), mode.File))
-					require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, "abc123", "LATEST"), []byte("001"), mode.File))
+					require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath(), "abc123"), mode.Directory))
+					require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"), []byte("abc123"), mode.File))
+					require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), "abc123", "LATEST"), []byte("001"), mode.File))
 				},
 			},
 		} {
-			tc := tc
-
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 
@@ -178,10 +176,10 @@ func TestPointerLocator(t *testing.T) {
 					for incrementID := 1; incrementID <= i+tc.expectedOffset; incrementID++ {
 						expectedIncrement = fmt.Sprintf("%03d", incrementID)
 						step := Step{
-							BundlePath:      filepath.Join(repo.RelativePath, tc.expectedBackupID, expectedIncrement+".bundle"),
-							RefPath:         filepath.Join(repo.RelativePath, tc.expectedBackupID, expectedIncrement+".refs"),
+							BundlePath:      filepath.Join(repo.GetRelativePath(), tc.expectedBackupID, expectedIncrement+".bundle"),
+							RefPath:         filepath.Join(repo.GetRelativePath(), tc.expectedBackupID, expectedIncrement+".refs"),
 							PreviousRefPath: previousRefPath,
-							CustomHooksPath: filepath.Join(repo.RelativePath, tc.expectedBackupID, expectedIncrement+".custom_hooks.tar"),
+							CustomHooksPath: filepath.Join(repo.GetRelativePath(), tc.expectedBackupID, expectedIncrement+".custom_hooks.tar"),
 						}
 						expected.Steps = append(expected.Steps, step)
 						previousRefPath = step.RefPath
@@ -193,10 +191,10 @@ func TestPointerLocator(t *testing.T) {
 
 					require.NoError(t, l.Commit(ctx, step))
 
-					backupPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.RelativePath, "LATEST"))
+					backupPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"))
 					require.Equal(t, tc.expectedBackupID, string(backupPointer))
 
-					incrementPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.RelativePath, tc.expectedBackupID, "LATEST"))
+					incrementPointer := testhelper.MustReadFile(t, filepath.Join(backupPath, repo.GetRelativePath(), tc.expectedBackupID, "LATEST"))
 					require.Equal(t, expectedIncrement, string(incrementPointer))
 				}
 			})
@@ -219,30 +217,30 @@ func TestPointerLocator(t *testing.T) {
 			_, err = l.FindLatest(ctx, repo)
 			require.ErrorIs(t, err, ErrDoesntExist)
 
-			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath, backupID), mode.Directory))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, "LATEST"), []byte(backupID), mode.File))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, backupID, "LATEST"), []byte("003"), mode.File))
+			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath(), backupID), mode.Directory))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"), []byte(backupID), mode.File))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), backupID, "LATEST"), []byte("003"), mode.File))
 			expected := &Backup{
 				ID:           backupID,
 				Repository:   repo,
 				ObjectFormat: git.ObjectHashSHA1.Format,
 				Steps: []Step{
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "001.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "001.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "001.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "001.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "001.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "001.custom_hooks.tar"),
 					},
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "002.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "002.refs"),
-						PreviousRefPath: filepath.Join(repo.RelativePath, backupID, "001.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "002.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "002.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "002.refs"),
+						PreviousRefPath: filepath.Join(repo.GetRelativePath(), backupID, "001.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "002.custom_hooks.tar"),
 					},
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "003.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "003.refs"),
-						PreviousRefPath: filepath.Join(repo.RelativePath, backupID, "002.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "003.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "003.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "003.refs"),
+						PreviousRefPath: filepath.Join(repo.GetRelativePath(), backupID, "002.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "003.custom_hooks.tar"),
 					},
 				},
 			}
@@ -269,9 +267,9 @@ func TestPointerLocator(t *testing.T) {
 				ObjectFormat: git.ObjectHashSHA1.Format,
 				Steps: []Step{
 					{
-						BundlePath:      repo.RelativePath + ".bundle",
-						RefPath:         repo.RelativePath + ".refs",
-						CustomHooksPath: filepath.Join(repo.RelativePath, "custom_hooks.tar"),
+						BundlePath:      repo.GetRelativePath() + ".bundle",
+						RefPath:         repo.GetRelativePath() + ".refs",
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), "custom_hooks.tar"),
 					},
 				},
 			}
@@ -280,18 +278,18 @@ func TestPointerLocator(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedFallback, fallbackFull)
 
-			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath, backupID), mode.Directory))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, "LATEST"), []byte(backupID), mode.File))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, backupID, "LATEST"), []byte("001"), mode.File))
+			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath(), backupID), mode.Directory))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"), []byte(backupID), mode.File))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), backupID, "LATEST"), []byte("001"), mode.File))
 			expected := &Backup{
 				ID:           backupID,
 				Repository:   repo,
 				ObjectFormat: git.ObjectHashSHA1.Format,
 				Steps: []Step{
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "001.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "001.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "001.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "001.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "001.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "001.custom_hooks.tar"),
 					},
 				},
 			}
@@ -314,8 +312,8 @@ func TestPointerLocator(t *testing.T) {
 			_, err = l.FindLatest(ctx, repo)
 			require.ErrorIs(t, err, ErrDoesntExist)
 
-			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath), mode.Directory))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, "LATEST"), []byte("invalid"), mode.File))
+			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath()), mode.Directory))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"), []byte("invalid"), mode.File))
 			_, err = l.FindLatest(ctx, repo)
 			require.EqualError(t, err, "pointer locator: find latest: find: find latest ID: storage service sink: new reader for \"TestPointerLocator/invalid/LATEST\": doesn't exist")
 		})
@@ -333,9 +331,9 @@ func TestPointerLocator(t *testing.T) {
 			_, err = l.FindLatest(ctx, repo)
 			require.ErrorIs(t, err, ErrDoesntExist)
 
-			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath, backupID), mode.Directory))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, "LATEST"), []byte(backupID), mode.File))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, backupID, "LATEST"), []byte("invalid"), mode.File))
+			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath(), backupID), mode.Directory))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), "LATEST"), []byte(backupID), mode.File))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), backupID, "LATEST"), []byte("invalid"), mode.File))
 
 			_, err = l.FindLatest(ctx, repo)
 			require.EqualError(t, err, "pointer locator: find latest: find: determine increment ID: strconv.Atoi: parsing \"invalid\": invalid syntax")
@@ -369,29 +367,29 @@ func TestPointerLocator(t *testing.T) {
 				Sink: sink,
 			}
 
-			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath, backupID), mode.Directory))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, backupID, "LATEST"), []byte("003"), mode.File))
+			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath(), backupID), mode.Directory))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), backupID, "LATEST"), []byte("003"), mode.File))
 			expected := &Backup{
 				ID:           backupID,
 				Repository:   repo,
 				ObjectFormat: git.ObjectHashSHA1.Format,
 				Steps: []Step{
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "001.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "001.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "001.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "001.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "001.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "001.custom_hooks.tar"),
 					},
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "002.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "002.refs"),
-						PreviousRefPath: filepath.Join(repo.RelativePath, backupID, "001.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "002.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "002.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "002.refs"),
+						PreviousRefPath: filepath.Join(repo.GetRelativePath(), backupID, "001.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "002.custom_hooks.tar"),
 					},
 					{
-						BundlePath:      filepath.Join(repo.RelativePath, backupID, "003.bundle"),
-						RefPath:         filepath.Join(repo.RelativePath, backupID, "003.refs"),
-						PreviousRefPath: filepath.Join(repo.RelativePath, backupID, "002.refs"),
-						CustomHooksPath: filepath.Join(repo.RelativePath, backupID, "003.custom_hooks.tar"),
+						BundlePath:      filepath.Join(repo.GetRelativePath(), backupID, "003.bundle"),
+						RefPath:         filepath.Join(repo.GetRelativePath(), backupID, "003.refs"),
+						PreviousRefPath: filepath.Join(repo.GetRelativePath(), backupID, "002.refs"),
+						CustomHooksPath: filepath.Join(repo.GetRelativePath(), backupID, "003.custom_hooks.tar"),
 					},
 				},
 			}
@@ -414,8 +412,8 @@ func TestPointerLocator(t *testing.T) {
 			_, err = l.Find(ctx, repo, backupID)
 			require.ErrorIs(t, err, ErrDoesntExist)
 
-			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.RelativePath, backupID), mode.Directory))
-			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.RelativePath, backupID, "LATEST"), []byte("invalid"), mode.File))
+			require.NoError(t, os.MkdirAll(filepath.Join(backupPath, repo.GetRelativePath(), backupID), mode.Directory))
+			require.NoError(t, os.WriteFile(filepath.Join(backupPath, repo.GetRelativePath(), backupID, "LATEST"), []byte("invalid"), mode.File))
 
 			_, err = l.Find(ctx, repo, backupID)
 			require.EqualError(t, err, "pointer locator: find: determine increment ID: strconv.Atoi: parsing \"invalid\": invalid syntax")
@@ -451,14 +449,14 @@ func TestManifestLocator_withFallback(t *testing.T) {
 		full := l.BeginFull(ctx, repo, backupID)
 		require.NoError(t, l.Commit(ctx, full))
 
-		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.StorageName, repo.RelativePath, backupID+".toml"))
+		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
 		require.Equal(t, fmt.Sprintf(`object_format = 'sha1'
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/001.bundle'
 ref_path = '%[1]s/%[2]s/001.refs'
 custom_hooks_path = '%[1]s/%[2]s/001.custom_hooks.tar'
-`, repo.RelativePath, backupID), string(manifest))
+`, repo.GetRelativePath(), backupID), string(manifest))
 	})
 
 	t.Run("BeginIncremental/Commit", func(t *testing.T) {
@@ -467,8 +465,8 @@ custom_hooks_path = '%[1]s/%[2]s/001.custom_hooks.tar'
 		backupPath := testhelper.TempDir(t)
 
 		testhelper.WriteFiles(t, backupPath, map[string]any{
-			filepath.Join(repo.RelativePath, "LATEST"):           "abc123",
-			filepath.Join(repo.RelativePath, "abc123", "LATEST"): "001",
+			filepath.Join(repo.GetRelativePath(), "LATEST"):           "abc123",
+			filepath.Join(repo.GetRelativePath(), "abc123", "LATEST"): "001",
 		})
 
 		sink, err := ResolveSink(ctx, backupPath)
@@ -482,8 +480,8 @@ custom_hooks_path = '%[1]s/%[2]s/001.custom_hooks.tar'
 		require.NoError(t, err)
 		require.NoError(t, l.Commit(ctx, incremental))
 
-		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.StorageName, repo.RelativePath, backupID+".toml"))
-		latestManifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.StorageName, repo.RelativePath, "+latest.toml"))
+		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
+		latestManifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"))
 
 		expectedManifest := fmt.Sprintf(`object_format = 'sha1'
 
@@ -497,7 +495,7 @@ bundle_path = '%[1]s/%[2]s/002.bundle'
 ref_path = '%[1]s/%[2]s/002.refs'
 previous_ref_path = '%[1]s/%[2]s/001.refs'
 custom_hooks_path = '%[1]s/%[2]s/002.custom_hooks.tar'
-`, repo.RelativePath, backupID)
+`, repo.GetRelativePath(), backupID)
 
 		require.Equal(t, expectedManifest, string(manifest))
 		require.Equal(t, expectedManifest, string(latestManifest))
@@ -529,14 +527,14 @@ func TestManifestLocator(t *testing.T) {
 		full := l.BeginFull(ctx, repo, backupID)
 		require.NoError(t, l.Commit(ctx, full))
 
-		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.StorageName, repo.RelativePath, backupID+".toml"))
+		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
 		require.Equal(t, fmt.Sprintf(`object_format = ''
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/%[3]s/001.bundle'
 ref_path = '%[1]s/%[2]s/%[3]s/001.refs'
 custom_hooks_path = '%[1]s/%[2]s/%[3]s/001.custom_hooks.tar'
-`, repo.StorageName, repo.RelativePath, backupID), string(manifest))
+`, repo.GetStorageName(), repo.GetRelativePath(), backupID), string(manifest))
 	})
 
 	t.Run("BeginIncremental/Commit", func(t *testing.T) {
@@ -545,14 +543,14 @@ custom_hooks_path = '%[1]s/%[2]s/%[3]s/001.custom_hooks.tar'
 		backupPath := testhelper.TempDir(t)
 
 		testhelper.WriteFiles(t, backupPath, map[string]any{
-			filepath.Join("manifests", repo.StorageName, repo.RelativePath, "+latest.toml"): fmt.Sprintf(`
+			filepath.Join("manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"): fmt.Sprintf(`
 object_format = 'sha1'
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/%[3]s/001.bundle'
 ref_path = '%[1]s/%[2]s/%[3]s/001.refs'
 custom_hooks_path = '%[1]s/%[2]s/%[3]s/001.custom_hooks.tar'
-`, repo.StorageName, repo.RelativePath, backupID),
+`, repo.GetStorageName(), repo.GetRelativePath(), backupID),
 		})
 
 		sink, err := ResolveSink(ctx, backupPath)
@@ -563,8 +561,8 @@ custom_hooks_path = '%[1]s/%[2]s/%[3]s/001.custom_hooks.tar'
 		require.NoError(t, err)
 		require.NoError(t, l.Commit(ctx, incremental))
 
-		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.StorageName, repo.RelativePath, backupID+".toml"))
-		latestManifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.StorageName, repo.RelativePath, "+latest.toml"))
+		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
+		latestManifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"))
 
 		expectedManifest := fmt.Sprintf(`object_format = 'sha1'
 
@@ -578,7 +576,7 @@ bundle_path = '%[1]s/%[2]s/%[3]s/002.bundle'
 ref_path = '%[1]s/%[2]s/%[3]s/002.refs'
 previous_ref_path = '%[1]s/%[2]s/%[3]s/001.refs'
 custom_hooks_path = '%[1]s/%[2]s/%[3]s/002.custom_hooks.tar'
-`, repo.StorageName, repo.RelativePath, backupID)
+`, repo.GetStorageName(), repo.GetRelativePath(), backupID)
 
 		require.Equal(t, expectedManifest, string(manifest))
 		require.Equal(t, expectedManifest, string(latestManifest))
@@ -679,7 +677,6 @@ custom_hooks_path = 'path/to/002.custom_hooks.tar'
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -794,7 +791,6 @@ custom_hooks_path = 'manifest-path/to/002.custom_hooks.tar'
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

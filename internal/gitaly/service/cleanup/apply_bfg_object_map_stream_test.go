@@ -116,9 +116,9 @@ func TestApplyBfgObjectMapStreamSuccess(t *testing.T) {
 func requireEntry(t *testing.T, entry *gitalypb.ApplyBfgObjectMapStreamResponse_Entry, oldOid, newOid git.ObjectID, objectType gitalypb.ObjectType) {
 	t.Helper()
 
-	require.Equal(t, objectType, entry.Type)
-	require.Equal(t, oldOid, git.ObjectID(entry.OldOid))
-	require.Equal(t, newOid, git.ObjectID(entry.NewOid))
+	require.Equal(t, objectType, entry.GetType())
+	require.Equal(t, oldOid, git.ObjectID(entry.GetOldOid()))
+	require.Equal(t, newOid, git.ObjectID(entry.GetNewOid()))
 }
 
 func TestApplyBfgObjectMapStreamFailsOnInvalidInput(t *testing.T) {

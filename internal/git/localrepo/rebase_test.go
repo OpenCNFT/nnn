@@ -943,8 +943,6 @@ func testRebase(t *testing.T, ctx context.Context) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -968,7 +966,7 @@ func testRebase(t *testing.T, ctx context.Context) {
 			upstreamRevision := git.Revision(fmt.Sprintf("%s~%d", rebaseResult.String(), data.expectedCommitsAhead))
 			upstreamCommit, err := repo.ReadCommit(ctx, upstreamRevision)
 			require.NoError(t, err)
-			require.Equal(t, data.upstream, upstreamCommit.Id)
+			require.Equal(t, data.upstream, upstreamCommit.GetId())
 		})
 	}
 }

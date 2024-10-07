@@ -76,7 +76,7 @@ func newStubPartitionFactory() PartitionFactory {
 								return ctx.Err()
 							}
 						},
-						rollback: func() error { return nil },
+						rollback: func(context.Context) error { return nil },
 					}, nil
 				},
 				close: func() {
@@ -134,14 +134,14 @@ func (m *mockPartition) Close() {
 type mockTransaction struct {
 	storage.Transaction
 	commit   func(context.Context) error
-	rollback func() error
+	rollback func(context.Context) error
 }
 
 func (m mockTransaction) Commit(ctx context.Context) error {
 	return m.commit(ctx)
 }
 
-func (m mockTransaction) Rollback() error { return m.rollback() }
+func (m mockTransaction) Rollback(ctx context.Context) error { return m.rollback(ctx) }
 
 // blockOnPartitionClosing checks if any partitions are currently in the process of
 // closing. If some are, the function waits for the closing process to complete before
@@ -822,7 +822,6 @@ func TestStorageManager(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -944,7 +943,7 @@ func TestStorageManager(t *testing.T) {
 					require.Contains(t, openTransactionData, step.transactionID, "test error: transaction rolled back before being started")
 
 					data := openTransactionData[step.transactionID]
-					require.ErrorIs(t, data.txn.Rollback(), step.expectedError)
+					require.ErrorIs(t, data.txn.Rollback(ctx), step.expectedError)
 
 					blockOnPartitionClosing(t, storageMgr, true)
 					checkExpectedState(t, storageMgr, step.expectedState)
@@ -1069,7 +1068,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		assert.NoError(t, tx.Rollback())
+		assert.NoError(t, tx.Rollback(ctx))
 	}()
 
 	// StorageManager may be closed if the server is shutting down.
@@ -1124,7 +1123,7 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 
 	t.Run("faulty key", func(t *testing.T) {
 		require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
-			require.NoError(t, tx.Set([]byte("p/\x00\x00\x00\x00\x05/applied_lsn"), nil))
+			require.NoError(t, tx.Set([]byte("p/\x00\x00\x00\x05/a"), nil))
 			return nil
 		}))
 
@@ -1146,7 +1145,7 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 
 		// Removing the faulty key to prevent being seen from other tests below
 		require.NoError(t, storageMgr.database.Update(func(tx keyvalue.ReadWriter) error {
-			require.NoError(t, tx.Delete([]byte("p/\x00\x00\x00\x00\x05/applied_lsn")))
+			require.NoError(t, tx.Delete([]byte("p/\x00\x00\x00\x05/a")))
 			return nil
 		}))
 	})

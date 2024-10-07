@@ -159,7 +159,7 @@ func (s *metadataStateMachine) updateEntry(cluster *gitalypb.Cluster, entry *sta
 func (s *metadataStateMachine) handleBootstrapClusterRequest(req *gitalypb.BootstrapClusterRequest, cluster *gitalypb.Cluster) (*statemachine.Result, error) {
 	var result statemachine.Result
 
-	if cluster.ClusterId == "" {
+	if cluster.GetClusterId() == "" {
 		cluster.ClusterId = req.GetClusterId()
 		cluster.NextStorageId = initialStorageID.ToUint64()
 		result.Value = uint64(resultClusterBootstrapSuccessful)
@@ -178,7 +178,7 @@ func (s *metadataStateMachine) handleBootstrapClusterRequest(req *gitalypb.Boots
 func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.RegisterStorageRequest, cluster *gitalypb.Cluster) (*statemachine.Result, error) {
 	var result statemachine.Result
 
-	if cluster.ClusterId == "" || cluster.NextStorageId == 0 {
+	if cluster.GetClusterId() == "" || cluster.GetNextStorageId() == 0 {
 		result.Value = uint64(resultRegisterStorageClusterNotBootstrappedYet)
 		return &result, nil
 	}
@@ -186,7 +186,7 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 	if cluster.Storages == nil {
 		cluster.Storages = map[uint64]*gitalypb.Storage{}
 	}
-	for _, storage := range cluster.Storages {
+	for _, storage := range cluster.GetStorages() {
 		if storage.GetName() == req.GetStorageName() {
 			result.Value = uint64(resultStorageAlreadyRegistered)
 			return &result, nil
@@ -194,14 +194,14 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 	}
 
 	newStorage := &gitalypb.Storage{
-		StorageId:         cluster.NextStorageId,
+		StorageId:         cluster.GetNextStorageId(),
 		Name:              req.GetStorageName(),
 		ReplicationFactor: req.GetReplicationFactor(),
 		NodeId:            req.GetNodeId(),
 	}
-	cluster.Storages[cluster.NextStorageId] = newStorage
+	cluster.Storages[cluster.GetNextStorageId()] = newStorage
 	cluster.NextStorageId++
-	s.replicaPlacement.apply(cluster.Storages)
+	s.replicaPlacement.apply(cluster.GetStorages())
 
 	response, err := anyProtoMarshal(&gitalypb.RegisterStorageResponse{Storage: newStorage})
 	if err != nil {
@@ -216,7 +216,7 @@ func (s *metadataStateMachine) handleRegisterStorageRequest(req *gitalypb.Regist
 func (s *metadataStateMachine) handleUpdateStorageRequest(req *gitalypb.UpdateStorageRequest, cluster *gitalypb.Cluster) (*statemachine.Result, error) {
 	var result statemachine.Result
 
-	if cluster.ClusterId == "" || cluster.NextStorageId == 0 {
+	if cluster.GetClusterId() == "" || cluster.GetNextStorageId() == 0 {
 		result.Value = uint64(resultUpdateStorageNotFound)
 		return &result, nil
 	}
@@ -225,7 +225,7 @@ func (s *metadataStateMachine) handleUpdateStorageRequest(req *gitalypb.UpdateSt
 		cluster.Storages = map[uint64]*gitalypb.Storage{}
 	}
 
-	storage := cluster.Storages[req.GetStorageId()]
+	storage := cluster.GetStorages()[req.GetStorageId()]
 	if storage == nil {
 		result.Value = uint64(resultUpdateStorageNotFound)
 		return &result, nil
@@ -233,7 +233,7 @@ func (s *metadataStateMachine) handleUpdateStorageRequest(req *gitalypb.UpdateSt
 
 	storage.ReplicationFactor = req.GetReplicationFactor()
 	storage.NodeId = req.GetNodeId()
-	s.replicaPlacement.apply(cluster.Storages)
+	s.replicaPlacement.apply(cluster.GetStorages())
 
 	response, err := anyProtoMarshal(&gitalypb.UpdateStorageResponse{Storage: storage})
 	if err != nil {

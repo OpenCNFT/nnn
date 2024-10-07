@@ -495,8 +495,6 @@ func TestRegisterStreamHandlers(t *testing.T) {
 			calls := map[string]int{}
 			registeredHandlers := map[string]grpc.StreamHandler{}
 			for name, handler := range tc.registeredHandlers {
-				name, handler := name, handler
-
 				// We wrap every handler so that we can easily count the number of
 				// times each of them has been invoked.
 				registeredHandlers[name] = func(srv interface{}, stream grpc.ServerStream) error {

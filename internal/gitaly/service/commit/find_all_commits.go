@@ -46,7 +46,7 @@ func validateFindAllCommitsRequest(ctx context.Context, locator storage.Locator,
 		return err
 	}
 
-	if err := git.ValidateRevision(in.Revision, git.AllowEmptyRevision()); err != nil {
+	if err := git.ValidateRevision(in.GetRevision(), git.AllowEmptyRevision()); err != nil {
 		return err
 	}
 

@@ -114,8 +114,6 @@ func TestStatushandler(t *testing.T) {
 			expectedErr: status.New(codes.OK, "").Err(),
 		},
 	} {
-		tc := tc
-
 		t.Run(desc, func(t *testing.T) {
 			t.Parallel()
 

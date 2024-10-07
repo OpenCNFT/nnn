@@ -201,7 +201,7 @@ func (keyer leaseKeyer) newPendingLease(ctx context.Context, repo *gitalypb.Repo
 
 // cacheDir is $STORAGE/+gitaly/cache
 func (keyer leaseKeyer) cacheDir(repo *gitalypb.Repository) (string, error) {
-	cacheDir, err := keyer.locator.CacheDir(repo.StorageName)
+	cacheDir, err := keyer.locator.CacheDir(repo.GetStorageName())
 	if err != nil {
 		return "", fmt.Errorf("cache dir not found for %v", repo)
 	}
@@ -210,12 +210,12 @@ func (keyer leaseKeyer) cacheDir(repo *gitalypb.Repository) (string, error) {
 }
 
 func (keyer leaseKeyer) getRepoStatePath(ctx context.Context, repo *gitalypb.Repository) (string, error) {
-	storagePath, err := keyer.locator.GetStorageByName(ctx, repo.StorageName)
+	storagePath, err := keyer.locator.GetStorageByName(ctx, repo.GetStorageName())
 	if err != nil {
 		return "", fmt.Errorf("getRepoStatePath: storage not found for %v", repo)
 	}
 
-	stateDir, err := keyer.locator.StateDir(repo.StorageName)
+	stateDir, err := keyer.locator.StateDir(repo.GetStorageName())
 	if err != nil {
 		return "", fmt.Errorf("getRepoStatePath: state dir not found for %v", repo)
 	}

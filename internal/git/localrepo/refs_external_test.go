@@ -93,8 +93,6 @@ func TestRepo_SetDefaultBranch(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -219,11 +217,14 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		}()
 		<-ch
 
+		objectHash, err := repo.ObjectHash(ctx)
+		require.NoError(t, err)
+
 		var stderr bytes.Buffer
 		err = repo.ExecAndWait(ctx, gitcmd.Command{
 			Name: "symbolic-ref",
 			Args: []string{"HEAD", "refs/heads/otherbranch"},
-		}, gitcmd.WithRefTxHook(repo), gitcmd.WithStderr(&stderr))
+		}, gitcmd.WithRefTxHook(objectHash, repo), gitcmd.WithStderr(&stderr))
 
 		code, ok := command.ExitStatus(err)
 		require.True(t, ok)

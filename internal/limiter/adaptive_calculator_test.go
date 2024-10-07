@@ -17,7 +17,7 @@ import (
 
 func TestAdaptiveCalculator_alreadyStarted(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		calculator := NewAdaptiveCalculator(10*time.Millisecond, testhelper.SharedLogger(t), nil, nil)
 
 		stop, err := calculator.Start(ctx)
@@ -33,7 +33,7 @@ func TestAdaptiveCalculator_alreadyStarted(t *testing.T) {
 
 func TestAdaptiveCalculator_realTimerTicker(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		logger := testhelper.NewLogger(t)
 		hook := testhelper.AddLoggerHook(logger)
 
@@ -55,7 +55,7 @@ func TestAdaptiveCalculator_realTimerTicker(t *testing.T) {
 
 func TestAdaptiveCalculator(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreInConcurrencyLimiter, featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
+	testhelper.NewFeatureSets(featureflag.UseResizableSemaphoreLifoStrategy).Run(t, func(t *testing.T, ctx context.Context) {
 		tests := []struct {
 			desc       string
 			limits     []AdaptiveLimiter

@@ -23,7 +23,7 @@ func (s *server) validateCommitLanguagesRequest(ctx context.Context, req *gitaly
 	if err := s.locator.ValidateRepository(ctx, req.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(req.Revision, git.AllowEmptyRevision()); err != nil {
+	if err := git.ValidateRevision(req.GetRevision(), git.AllowEmptyRevision()); err != nil {
 		return err
 	}
 	return nil
@@ -36,7 +36,7 @@ func (s *server) CommitLanguages(ctx context.Context, req *gitalypb.CommitLangua
 
 	repo := s.localrepo(req.GetRepository())
 
-	revision := string(req.Revision)
+	revision := string(req.GetRevision())
 	if revision == "" {
 		defaultBranch, err := repo.GetDefaultBranch(ctx)
 		if err != nil {
@@ -79,7 +79,7 @@ func (s *server) CommitLanguages(ctx context.Context, req *gitalypb.CommitLangua
 		resp.Languages = append(resp.Languages, l)
 	}
 
-	sort.Sort(languageSorter(resp.Languages))
+	sort.Sort(languageSorter(resp.GetLanguages()))
 
 	return resp, nil
 }
@@ -88,7 +88,7 @@ type languageSorter []*gitalypb.CommitLanguagesResponse_Language
 
 func (ls languageSorter) Len() int           { return len(ls) }
 func (ls languageSorter) Swap(i, j int)      { ls[i], ls[j] = ls[j], ls[i] }
-func (ls languageSorter) Less(i, j int) bool { return ls[i].Share > ls[j].Share }
+func (ls languageSorter) Less(i, j int) bool { return ls[i].GetShare() > ls[j].GetShare() }
 
 func (s *server) lookupRevision(ctx context.Context, repo gitcmd.RepositoryExecutor, revision string) (string, error) {
 	rev, err := s.checkRevision(ctx, repo, revision)

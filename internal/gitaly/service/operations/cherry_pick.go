@@ -41,15 +41,15 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	cherryCommit, err := quarantineRepo.ReadCommit(ctx, git.Revision(req.Commit.Id))
+	cherryCommit, err := quarantineRepo.ReadCommit(ctx, git.Revision(req.GetCommit().GetId()))
 	if err != nil {
 		if errors.Is(err, localrepo.ErrObjectNotFound) {
-			return nil, structerr.NewNotFound("cherry-pick: commit lookup: commit not found: %q", req.Commit.Id)
+			return nil, structerr.NewNotFound("cherry-pick: commit lookup: commit not found: %q", req.GetCommit().GetId())
 		}
 		return nil, fmt.Errorf("cherry pick: %w", err)
 	}
-	cherryDate := cherryCommit.Author.GetDate().AsTime()
-	loc, err := time.Parse("-0700", string(cherryCommit.Author.GetTimezone()))
+	cherryDate := cherryCommit.GetAuthor().GetDate().AsTime()
+	loc, err := time.Parse("-0700", string(cherryCommit.GetAuthor().GetTimezone()))
 	if err != nil {
 		return nil, fmt.Errorf("get cherry commit location: %w", err)
 	}
@@ -61,8 +61,8 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 	treeOID, err := quarantineRepo.MergeTree(
 		ctx,
 		startRevision.String(),
-		req.Commit.Id,
-		localrepo.WithMergeBase(git.Revision(req.Commit.Id+"^")),
+		req.GetCommit().GetId(),
+		localrepo.WithMergeBase(git.Revision(req.GetCommit().GetId()+"^")),
 		localrepo.WithConflictingFileNamesOnly(),
 	)
 	if err != nil {
@@ -104,10 +104,10 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 
 	cfg := localrepo.WriteCommitConfig{
 		TreeID:         treeOID,
-		Message:        string(req.Message),
+		Message:        string(req.GetMessage()),
 		Parents:        []git.ObjectID{startRevision},
-		AuthorName:     string(cherryCommit.Author.Name),
-		AuthorEmail:    string(cherryCommit.Author.Email),
+		AuthorName:     string(cherryCommit.GetAuthor().GetName()),
+		AuthorEmail:    string(cherryCommit.GetAuthor().GetEmail()),
 		AuthorDate:     cherryDate,
 		CommitterName:  committerSignature.Name,
 		CommitterEmail: committerSignature.Email,
@@ -116,9 +116,9 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 		Sign:           true,
 	}
 
-	if len(req.CommitAuthorName) != 0 && len(req.CommitAuthorEmail) != 0 {
-		cfg.AuthorName = strings.TrimSpace(string(req.CommitAuthorName))
-		cfg.AuthorEmail = strings.TrimSpace(string(req.CommitAuthorEmail))
+	if len(req.GetCommitAuthorName()) != 0 && len(req.GetCommitAuthorEmail()) != 0 {
+		cfg.AuthorName = strings.TrimSpace(string(req.GetCommitAuthorName()))
+		cfg.AuthorEmail = strings.TrimSpace(string(req.GetCommitAuthorEmail()))
 		cfg.AuthorDate = committerSignature.When
 	}
 
@@ -127,7 +127,7 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 		return nil, fmt.Errorf("write commit: %w", err)
 	}
 
-	referenceName := git.NewReferenceNameFromBranchName(string(req.BranchName))
+	referenceName := git.NewReferenceNameFromBranchName(string(req.GetBranchName()))
 	branchCreated := false
 	var oldrev git.ObjectID
 
@@ -159,7 +159,7 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 		}
 	}
 
-	if req.DryRun {
+	if req.GetDryRun() {
 		newrev = startRevision
 	}
 
@@ -182,7 +182,7 @@ func (s *Server) UserCherryPick(ctx context.Context, req *gitalypb.UserCherryPic
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.User, quarantineDir, referenceName, newrev, oldrev); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), quarantineDir, referenceName, newrev, oldrev); err != nil {
 		var customHookErr updateref.CustomHookError
 		if errors.As(err, &customHookErr) {
 			return nil, structerr.NewFailedPrecondition("access check failed").WithDetail(

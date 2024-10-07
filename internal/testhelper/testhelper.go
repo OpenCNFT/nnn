@@ -290,8 +290,6 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 
 	// Randomly enable mailmap
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.MailmapOptions, rnd.Int()%2 == 0)
-	// Randomly enable limiter.resizableSemaphore
-	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.UseResizableSemaphoreInConcurrencyLimiter, rnd.Int()%2 == 0)
 	// Disable LogGitTraces
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.LogGitTraces, false)
 	// Enable SymrefUpdates
@@ -300,6 +298,8 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	// Enable reftable backend, if env variable set
 	newRepoReftableEnabled := env.GetString("GIT_DEFAULT_REF_FORMAT", "files")
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.NewRepoReftableBackend, newRepoReftableEnabled == "reftable")
+
+	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.RemoveCatfileCacheSessionID, rnd.Int()%2 == 0)
 
 	for _, opt := range opts {
 		ctx = opt(ctx)

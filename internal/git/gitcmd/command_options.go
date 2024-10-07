@@ -10,6 +10,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -312,6 +313,14 @@ func WithFinalizer(finalizer func(context.Context, *command.Command)) CmdOpt {
 func WithWorktree(worktreePath string) CmdOpt {
 	return func(_ context.Context, _ config.Cfg, _ CommandFactory, c *cmdCfg) error {
 		c.worktreePath = worktreePath
+		return nil
+	}
+}
+
+// WithReferenceBackend sets the 'reference_backend' metric label on the command.
+func WithReferenceBackend(refBackend git.ReferenceBackend) CmdOpt {
+	return func(_ context.Context, _ config.Cfg, _ CommandFactory, c *cmdCfg) error {
+		c.commandOpts = append(c.commandOpts, command.WithReferenceBackend(refBackend))
 		return nil
 	}
 }

@@ -96,8 +96,6 @@ func TestListTagNamesContainingCommit(t *testing.T) {
 			expectedTags: []string{"lightweight"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -203,8 +201,6 @@ func TestListBranchNamesContainingCommit(t *testing.T) {
 			expectedBranches: nil,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

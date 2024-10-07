@@ -35,6 +35,19 @@ const (
 	// with any directory name that could be provided by a user. The '+'
 	// character is not allowed in GitLab namespaces or repositories.
 	GitalyDataPrefix = "+gitaly"
+
+	// defaultPackObjectsLimitingConcurrency defines the default concurrency for pack-objects limiting. Pack-objects
+	// limiting is scoped by remote IPs. This limit means a single IP could only issue at most 200 distinct requests
+	// at the same time. Requests fetching same data lead to only 1 pack-objects command; hence counted as 1.
+	defaultPackObjectsLimitingConcurrency = 200
+	// defaultPackObjectsLimitingQueueSize defines the default queue size for pack-objects limiting. A request is
+	// put into a queue when there are more concurrent requests than defined. This default prevents the queue from
+	// growing boundlessly.
+	defaultPackObjectsLimitingQueueSize = 200
+
+	// defaultConcurrencyQueueSize defines the default queue size for RPC concurrency limits. This type of limiter
+	// is scoped by the RPC and by repository.
+	defaultConcurrencyQueueSize = 500
 )
 
 // configKeyRegex is intended to verify config keys in their `core.gc` or
@@ -43,14 +56,14 @@ var configKeyRegex = regexp.MustCompile(`^[[:alnum:]]+(\.[*-/_:@a-zA-Z0-9]+)+$`)
 
 // DailyJob enables a daily task to be scheduled for specific storages
 type DailyJob struct {
-	Hour     uint              `toml:"start_hour,omitempty" json:"start_hour"`
-	Minute   uint              `toml:"start_minute,omitempty" json:"start_minute"`
-	Duration duration.Duration `toml:"duration,omitempty" json:"duration"`
-	Storages []string          `toml:"storages,omitempty" json:"storages"`
+	Hour     uint              `json:"start_hour"   toml:"start_hour,omitempty"`
+	Minute   uint              `json:"start_minute" toml:"start_minute,omitempty"`
+	Duration duration.Duration `json:"duration"     toml:"duration,omitempty"`
+	Storages []string          `json:"storages"     toml:"storages,omitempty"`
 
 	// Disabled will completely disable a daily job, even in cases where a
 	// default schedule is implied
-	Disabled bool `toml:"disabled,omitempty" json:"disabled"`
+	Disabled bool `json:"disabled" toml:"disabled,omitempty"`
 }
 
 // IsDisabled returns true if the daily job is disabled and should not run.
@@ -94,20 +107,20 @@ type Cfg struct {
 	// configuration to its standard output that we will then deserialize and merge back into
 	// the initially-loaded configuration again. This is an easy mechanism to generate parts of
 	// the configuration at runtime, like for example secrets.
-	ConfigCommand        string            `toml:"config_command,omitempty" json:"config_command"`
-	SocketPath           string            `toml:"socket_path,omitempty" json:"socket_path" split_words:"true"`
-	ListenAddr           string            `toml:"listen_addr,omitempty" json:"listen_addr" split_words:"true"`
-	TLSListenAddr        string            `toml:"tls_listen_addr,omitempty" json:"tls_listen_addr" split_words:"true"`
-	PrometheusListenAddr string            `toml:"prometheus_listen_addr,omitempty" json:"prometheus_listen_addr" split_words:"true"`
-	BinDir               string            `toml:"bin_dir,omitempty" json:"bin_dir"`
-	RuntimeDir           string            `toml:"runtime_dir,omitempty" json:"runtime_dir"`
-	Git                  Git               `toml:"git,omitempty" json:"git" envconfig:"git"`
-	Storages             []Storage         `toml:"storage,omitempty" json:"storage" envconfig:"storage"`
-	Logging              Logging           `toml:"logging,omitempty" json:"logging" envconfig:"logging"`
-	Prometheus           prometheus.Config `toml:"prometheus,omitempty" json:"prometheus"`
-	Auth                 auth.Config       `toml:"auth,omitempty" json:"auth"`
-	TLS                  TLS               `toml:"tls,omitempty" json:"tls"`
-	Gitlab               Gitlab            `toml:"gitlab,omitempty" json:"gitlab"`
+	ConfigCommand        string            `                    json:"config_command"                            toml:"config_command,omitempty"`
+	SocketPath           string            `                    json:"socket_path"            split_words:"true" toml:"socket_path,omitempty"`
+	ListenAddr           string            `                    json:"listen_addr"            split_words:"true" toml:"listen_addr,omitempty"`
+	TLSListenAddr        string            `                    json:"tls_listen_addr"        split_words:"true" toml:"tls_listen_addr,omitempty"`
+	PrometheusListenAddr string            `                    json:"prometheus_listen_addr" split_words:"true" toml:"prometheus_listen_addr,omitempty"`
+	BinDir               string            `                    json:"bin_dir"                                   toml:"bin_dir,omitempty"`
+	RuntimeDir           string            `                    json:"runtime_dir"                               toml:"runtime_dir,omitempty"`
+	Git                  Git               `envconfig:"git"     json:"git"                                       toml:"git,omitempty"`
+	Storages             []Storage         `envconfig:"storage" json:"storage"                                   toml:"storage,omitempty"`
+	Logging              Logging           `envconfig:"logging" json:"logging"                                   toml:"logging,omitempty"`
+	Prometheus           prometheus.Config `                    json:"prometheus"                                toml:"prometheus,omitempty"`
+	Auth                 auth.Config       `                    json:"auth"                                      toml:"auth,omitempty"`
+	TLS                  TLS               `                    json:"tls"                                       toml:"tls,omitempty"`
+	Gitlab               Gitlab            `                    json:"gitlab"                                    toml:"gitlab,omitempty"`
 	// GitlabShell contains the location of the gitlab-shell directory. This directory is expected to contain two
 	// things:
 	//
@@ -117,45 +130,45 @@ type Cfg struct {
 	// - The custom hooks directory "hooks". This should instead be configured via "hooks.custom_hooks_dir".
 	//
 	// This setting is thus deprecated and should ideally not be used anymore.
-	GitlabShell            GitlabShell         `toml:"gitlab-shell,omitempty" json:"gitlab-shell"`
-	Hooks                  Hooks               `toml:"hooks,omitempty" json:"hooks"`
-	Concurrency            []Concurrency       `toml:"concurrency,omitempty" json:"concurrency"`
-	RateLimiting           []RateLimiting      `toml:"rate_limiting,omitempty" json:"rate_limiting"`
-	GracefulRestartTimeout duration.Duration   `toml:"graceful_restart_timeout,omitempty" json:"graceful_restart_timeout"`
-	DailyMaintenance       DailyJob            `toml:"daily_maintenance,omitempty" json:"daily_maintenance"`
-	Cgroups                cgroups.Config      `toml:"cgroups,omitempty" json:"cgroups"`
-	PackObjectsCache       StreamCacheConfig   `toml:"pack_objects_cache,omitempty" json:"pack_objects_cache"`
-	PackObjectsLimiting    PackObjectsLimiting `toml:"pack_objects_limiting,omitempty" json:"pack_objects_limiting"`
-	Backup                 BackupConfig        `toml:"backup,omitempty" json:"backup"`
-	BundleURI              BundleURIConfig     `toml:"bundle_uri,omitempty" json:"bundle_uri"`
-	Timeout                TimeoutConfig       `toml:"timeout,omitempty" json:"timeout"`
-	Transactions           Transactions        `toml:"transactions,omitempty" json:"transactions,omitempty"`
-	AdaptiveLimiting       AdaptiveLimiting    `toml:"adaptive_limiting,omitempty" json:"adaptive_limiting,omitempty"`
-	Raft                   Raft                `toml:"raft,omitempty" json:"raft,omitempty"`
+	GitlabShell            GitlabShell         `json:"gitlab-shell"                toml:"gitlab-shell,omitempty"`
+	Hooks                  Hooks               `json:"hooks"                       toml:"hooks,omitempty"`
+	Concurrency            []Concurrency       `json:"concurrency"                 toml:"concurrency,omitempty"`
+	RateLimiting           []RateLimiting      `json:"rate_limiting"               toml:"rate_limiting,omitempty"`
+	GracefulRestartTimeout duration.Duration   `json:"graceful_restart_timeout"    toml:"graceful_restart_timeout,omitempty"`
+	DailyMaintenance       DailyJob            `json:"daily_maintenance"           toml:"daily_maintenance,omitempty"`
+	Cgroups                cgroups.Config      `json:"cgroups"                     toml:"cgroups,omitempty"`
+	PackObjectsCache       StreamCacheConfig   `json:"pack_objects_cache"          toml:"pack_objects_cache,omitempty"`
+	PackObjectsLimiting    PackObjectsLimiting `json:"pack_objects_limiting"       toml:"pack_objects_limiting,omitempty"`
+	Backup                 BackupConfig        `json:"backup"                      toml:"backup,omitempty"`
+	BundleURI              BundleURIConfig     `json:"bundle_uri"                  toml:"bundle_uri,omitempty"`
+	Timeout                TimeoutConfig       `json:"timeout"                     toml:"timeout,omitempty"`
+	Transactions           Transactions        `json:"transactions,omitempty"      toml:"transactions,omitempty"`
+	AdaptiveLimiting       AdaptiveLimiting    `json:"adaptive_limiting,omitempty" toml:"adaptive_limiting,omitempty"`
+	Raft                   Raft                `json:"raft,omitempty"              toml:"raft,omitempty"`
 }
 
 // Transactions configures transaction related options.
 type Transactions struct {
 	// Enabled enables transaction support. This option is experimental
 	// and intended for development only. Do not enable for other uses.
-	Enabled bool `toml:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty" toml:"enabled,omitempty"`
 }
 
 // TimeoutConfig represents negotiation timeouts for remote Git operations
 type TimeoutConfig struct {
 	// UploadPackNegotiation configures the timeout for git-upload-pack(1) when negotiating the packfile. This does not
 	// influence any potential timeouts when the packfile is being sent to the client.
-	UploadPackNegotiation duration.Duration `toml:"upload_pack_negotiation,omitempty" json:"upload_pack_negotiation,omitempty"`
+	UploadPackNegotiation duration.Duration `json:"upload_pack_negotiation,omitempty" toml:"upload_pack_negotiation,omitempty"`
 	// UploadArchiveNegotiation configures the timeout for git-upload-archive(1) when negotiating the archive. This does not
 	// influence any potential timeouts when the archive is being sent to the client.
-	UploadArchiveNegotiation duration.Duration `toml:"upload_archive_negotiation,omitempty" json:"upload_archive_negotiation,omitempty"`
+	UploadArchiveNegotiation duration.Duration `json:"upload_archive_negotiation,omitempty" toml:"upload_archive_negotiation,omitempty"`
 }
 
 // TLS configuration
 type TLS struct {
-	CertPath string `toml:"certificate_path,omitempty" json:"cert_path"`
-	KeyPath  string `toml:"key_path,omitempty" json:"key_path"`
-	Key      string `toml:"key,omitempty" json:"key"`
+	CertPath string `json:"cert_path" toml:"certificate_path,omitempty"`
+	KeyPath  string `json:"key_path"  toml:"key_path,omitempty"`
+	Key      string `json:"key"       toml:"key,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -230,7 +243,7 @@ func (t TLS) Certificate() (tls.Certificate, error) {
 
 // GitlabShell contains the settings required for executing `gitlab-shell`
 type GitlabShell struct {
-	Dir string `toml:"dir" json:"dir"`
+	Dir string `json:"dir" toml:"dir"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -246,12 +259,12 @@ func (gs GitlabShell) Validate() error {
 
 // Gitlab contains settings required to connect to the Gitlab api
 type Gitlab struct {
-	URL             string       `toml:"url,omitempty" json:"url"`
-	RelativeURLRoot string       `toml:"relative_url_root,omitempty" json:"relative_url_root"` // For UNIX sockets only
-	HTTPSettings    HTTPSettings `toml:"http-settings,omitempty" json:"http_settings"`
-	SecretFile      string       `toml:"secret_file,omitempty" json:"secret_file"`
+	URL             string       `json:"url"               toml:"url,omitempty"`
+	RelativeURLRoot string       `json:"relative_url_root" toml:"relative_url_root,omitempty"` // For UNIX sockets only
+	HTTPSettings    HTTPSettings `json:"http_settings"     toml:"http-settings,omitempty"`
+	SecretFile      string       `json:"secret_file"       toml:"secret_file,omitempty"`
 	// Secret contains the Gitlab secret directly. Should not be set if secret file is specified.
-	Secret string `toml:"secret,omitempty" json:"secret"`
+	Secret string `json:"secret" toml:"secret,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -281,17 +294,17 @@ func (gl Gitlab) Validate() error {
 
 // Hooks contains the settings required for hooks
 type Hooks struct {
-	CustomHooksDir string `toml:"custom_hooks_dir,omitempty" json:"custom_hooks_dir"`
+	CustomHooksDir string `json:"custom_hooks_dir" toml:"custom_hooks_dir,omitempty"`
 }
 
 // HTTPSettings contains configuration settings used to setup HTTP transport
 // and basic HTTP authorization.
 type HTTPSettings struct {
-	ReadTimeout uint64 `toml:"read_timeout,omitempty" json:"read_timeout"`
-	User        string `toml:"user,omitempty" json:"user"`
-	Password    string `toml:"password,omitempty" json:"password"`
-	CAFile      string `toml:"ca_file,omitempty" json:"ca_file"`
-	CAPath      string `toml:"ca_path,omitempty" json:"ca_path"`
+	ReadTimeout uint64 `json:"read_timeout" toml:"read_timeout,omitempty"`
+	User        string `json:"user"         toml:"user,omitempty"`
+	Password    string `json:"password"     toml:"password,omitempty"`
+	CAFile      string `json:"ca_file"      toml:"ca_file,omitempty"`
+	CAPath      string `json:"ca_path"      toml:"ca_path,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -316,19 +329,19 @@ func (ss HTTPSettings) Validate() error {
 
 // Git contains the settings for the Git executable
 type Git struct {
-	UseBundledBinaries bool        `toml:"use_bundled_binaries,omitempty" json:"use_bundled_binaries"`
-	BinPath            string      `toml:"bin_path,omitempty" json:"bin_path"`
-	CatfileCacheSize   int         `toml:"catfile_cache_size,omitempty" json:"catfile_cache_size"`
-	Config             []GitConfig `toml:"config,omitempty" json:"config"`
+	UseBundledBinaries bool        `json:"use_bundled_binaries" toml:"use_bundled_binaries,omitempty"`
+	BinPath            string      `json:"bin_path"             toml:"bin_path,omitempty"`
+	CatfileCacheSize   int         `json:"catfile_cache_size"   toml:"catfile_cache_size,omitempty"`
+	Config             []GitConfig `json:"config"               toml:"config,omitempty"`
 	// SigningKey is the private key used for signing commits created by Gitaly
-	SigningKey string `toml:"signing_key,omitempty" json:"signing_key"`
+	SigningKey string `json:"signing_key" toml:"signing_key,omitempty"`
 	// RotatedSigningKeys are the private keys that have used for commit signing before.
 	// The keys from the SigningKey field is moved into this field for some time to rotate signing keys.
-	RotatedSigningKeys []string `toml:"rotated_signing_keys,omitempty" json:"rotated_signing_keys"`
+	RotatedSigningKeys []string `json:"rotated_signing_keys" toml:"rotated_signing_keys,omitempty"`
 	// CommitterEmail is the committer email of the commits created by Gitaly, e.g. `noreply@gitlab.com`
-	CommitterEmail string `toml:"committer_email,omitempty" json:"committer_email"`
+	CommitterEmail string `json:"committer_email" toml:"committer_email,omitempty"`
 	// CommitterName is the committer name of the commits created by Gitaly, e.g. `GitLab`
-	CommitterName string `toml:"committer_name,omitempty" json:"committer_name"`
+	CommitterName string `json:"committer_name" toml:"committer_name,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -344,9 +357,9 @@ func (g Git) Validate() error {
 // GitConfig contains a key-value pair which is to be passed to git as configuration.
 type GitConfig struct {
 	// Key is the key of the config entry, e.g. `core.gc`.
-	Key string `toml:"key,omitempty" json:"key"`
+	Key string `json:"key" toml:"key,omitempty"`
 	// Value is the value of the config entry, e.g. `false`.
-	Value string `toml:"value,omitempty" json:"value"`
+	Value string `json:"value" toml:"value,omitempty"`
 }
 
 // Validate validates that the Git configuration conforms to a format that Git understands.
@@ -471,33 +484,33 @@ type Logging struct {
 // in a queue that is bounded by MaxQueueSize.
 type Concurrency struct {
 	// RPC is the name of the RPC to set concurrency limits for
-	RPC string `toml:"rpc" json:"rpc"`
+	RPC string `json:"rpc" toml:"rpc"`
 	// Adaptive determines the behavior of the concurrency limit. If set to true, the concurrency limit is dynamic
 	// and starts at InitialLimit, then adjusts within the range [MinLimit, MaxLimit] based on current resource
 	// usage. If set to false, the concurrency limit is static and is set to MaxPerRepo.
-	Adaptive bool `toml:"adaptive,omitempty" json:"adaptive,omitempty"`
+	Adaptive bool `json:"adaptive,omitempty" toml:"adaptive,omitempty"`
 	// InitialLimit is the concurrency limit to start with.
-	InitialLimit int `toml:"initial_limit,omitempty" json:"initial_limit,omitempty"`
+	InitialLimit int `json:"initial_limit,omitempty" toml:"initial_limit,omitempty"`
 	// MaxLimit is the minimum adaptive concurrency limit.
-	MaxLimit int `toml:"max_limit,omitempty" json:"max_limit,omitempty"`
+	MaxLimit int `json:"max_limit,omitempty" toml:"max_limit,omitempty"`
 	// MinLimit is the mini adaptive concurrency limit.
-	MinLimit int `toml:"min_limit,omitempty" json:"min_limit,omitempty"`
+	MinLimit int `json:"min_limit,omitempty" toml:"min_limit,omitempty"`
 	// MaxPerRepo is the maximum number of concurrent calls for a given repository. This config is used only
 	// if Adaptive is false.
-	MaxPerRepo int `toml:"max_per_repo" json:"max_per_repo"`
+	MaxPerRepo int `json:"max_per_repo" toml:"max_per_repo"`
 	// MaxQueueSize is the maximum number of requests in the queue waiting to be picked up
 	// after which subsequent requests will return with an error.
-	MaxQueueSize int `toml:"max_queue_size" json:"max_queue_size"`
+	MaxQueueSize int `json:"max_queue_size" toml:"max_queue_size"`
 	// MaxQueueWait is the maximum time a request can remain in the concurrency queue
 	// waiting to be picked up by Gitaly
-	MaxQueueWait duration.Duration `toml:"max_queue_wait" json:"max_queue_wait"`
+	MaxQueueWait duration.Duration `json:"max_queue_wait" toml:"max_queue_wait"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
 func (c Concurrency) Validate() error {
 	errs := cfgerror.New().
 		Append(cfgerror.Comparable(c.MaxPerRepo).GreaterOrEqual(0), "max_per_repo").
-		Append(cfgerror.Comparable(c.MaxQueueSize).GreaterOrEqual(0), "max_queue_size").
+		Append(cfgerror.Comparable(c.MaxQueueSize).GreaterThan(0), "max_queue_size").
 		Append(cfgerror.Comparable(c.MaxQueueWait.Duration()).GreaterOrEqual(0), "max_queue_wait")
 
 	if c.Adaptive {
@@ -516,11 +529,11 @@ type AdaptiveLimiting struct {
 	// CPUThrottledThreshold defines the CPU throttling ratio threshold for a backoff event. The resource watcher
 	// compares the recorded total throttled time between two polls. If the throttled time exceeds this threshold of
 	// the observation window, it returns a backoff event. By default, the threshold is 0.5 (50%).
-	CPUThrottledThreshold float64 `toml:"cpu_throttled_threshold" json:"cpu_throttled_threshold"`
+	CPUThrottledThreshold float64 `json:"cpu_throttled_threshold" toml:"cpu_throttled_threshold"`
 	// MemoryThreshold defines the memory threshold for a backoff event. The memory watcher compares the recorded
 	// memory usage (excluding high evictable page caches) to the defined limit. If the ratio exceeds this
 	// threshold, a backoff event is fired. By default, the threshold is 0.9 (90%).
-	MemoryThreshold float64 `toml:"memory_threshold" json:"memory_threshold"`
+	MemoryThreshold float64 `json:"memory_threshold" toml:"memory_threshold"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -539,12 +552,12 @@ func (c AdaptiveLimiting) Validate() error {
 // value.
 type RateLimiting struct {
 	// RPC is the full name of the RPC including the service name
-	RPC string `toml:"rpc" json:"rpc"`
+	RPC string `json:"rpc" toml:"rpc"`
 	// Interval sets the interval with which the token bucket will
 	// be refilled to what is configured in Burst.
-	Interval duration.Duration `toml:"interval" json:"interval"`
+	Interval duration.Duration `json:"interval" toml:"interval"`
 	// Burst sets the capacity of the token bucket (see above).
-	Burst int `toml:"burst" json:"burst"`
+	Burst int `json:"burst" toml:"burst"`
 }
 
 // PackObjectsLimiting allows the concurrency of pack objects processes to be limited
@@ -554,28 +567,28 @@ type PackObjectsLimiting struct {
 	// Adaptive determines the behavior of the concurrency limit. If set to true, the concurrency limit is dynamic
 	// and starts at InitialLimit, then adjusts within the range [MinLimit, MaxLimit] based on current resource
 	// usage. If set to false, the concurrency limit is static and is set to MaxConcurrency.
-	Adaptive bool `toml:"adaptive,omitempty" json:"adaptive,omitempty"`
+	Adaptive bool `json:"adaptive,omitempty" toml:"adaptive,omitempty"`
 	// InitialLimit is the concurrency limit to start with.
-	InitialLimit int `toml:"initial_limit,omitempty" json:"initial_limit,omitempty"`
+	InitialLimit int `json:"initial_limit,omitempty" toml:"initial_limit,omitempty"`
 	// MaxLimit is the minimum adaptive concurrency limit.
-	MaxLimit int `toml:"max_limit,omitempty" json:"max_limit,omitempty"`
+	MaxLimit int `json:"max_limit,omitempty" toml:"max_limit,omitempty"`
 	// MinLimit is the mini adaptive concurrency limit.
-	MinLimit int `toml:"min_limit,omitempty" json:"min_limit,omitempty"`
+	MinLimit int `json:"min_limit,omitempty" toml:"min_limit,omitempty"`
 	// MaxConcurrency is the static maximum number of concurrent pack objects processes for a given key. This config
 	// is used only if Adaptive is false.
-	MaxConcurrency int `toml:"max_concurrency,omitempty" json:"max_concurrency,omitempty"`
+	MaxConcurrency int `json:"max_concurrency,omitempty" toml:"max_concurrency,omitempty"`
 	// MaxQueueWait is the maximum time a request can remain in the concurrency queue
 	// waiting to be picked up by Gitaly.
-	MaxQueueWait duration.Duration `toml:"max_queue_wait,omitempty" json:"max_queue_wait,omitempty"`
+	MaxQueueWait duration.Duration `json:"max_queue_wait,omitempty" toml:"max_queue_wait,omitempty"`
 	// MaxQueueLength is the maximum length of the request queue
-	MaxQueueLength int `toml:"max_queue_length,omitempty" json:"max_queue_length,omitempty"`
+	MaxQueueLength int `json:"max_queue_length,omitempty" toml:"max_queue_length,omitempty"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
 func (pol PackObjectsLimiting) Validate() error {
 	return cfgerror.New().
 		Append(cfgerror.Comparable(pol.MaxConcurrency).GreaterOrEqual(0), "max_concurrency").
-		Append(cfgerror.Comparable(pol.MaxQueueLength).GreaterOrEqual(0), "max_queue_length").
+		Append(cfgerror.Comparable(pol.MaxQueueLength).GreaterThan(0), "max_queue_length").
 		Append(cfgerror.Comparable(pol.MaxQueueWait.Duration()).GreaterOrEqual(0), "max_queue_wait").
 		Append(cfgerror.Comparable(pol.MinLimit).GreaterOrEqual(0), "min_limit").
 		Append(cfgerror.Comparable(pol.MaxLimit).GreaterOrEqual(pol.InitialLimit), "max_limit").
@@ -587,14 +600,14 @@ func (pol PackObjectsLimiting) Validate() error {
 type BackupConfig struct {
 	// GoCloudURL is the blob storage GoCloud URL that will be used to store
 	// server-side backups.
-	GoCloudURL string `toml:"go_cloud_url,omitempty" json:"go_cloud_url,omitempty"`
+	GoCloudURL string `json:"go_cloud_url,omitempty" toml:"go_cloud_url,omitempty"`
 	// WALGoCloudURL is the blob storage GoCloud URL that will be used to store
 	// write-ahead log backups.
-	WALGoCloudURL string `toml:"wal_backup_go_cloud_url,omitempty" json:"wal_backup_go_cloud_url,omitempty"`
+	WALGoCloudURL string `json:"wal_backup_go_cloud_url,omitempty" toml:"wal_backup_go_cloud_url,omitempty"`
 	// WALWorkerCount controls the number of goroutines used to backup write-ahead log entries.
-	WALWorkerCount uint `toml:"wal_backup_worker_count,omitempty" json:"wal_backup_worker_count,omitempty"`
+	WALWorkerCount uint `json:"wal_backup_worker_count,omitempty" toml:"wal_backup_worker_count,omitempty"`
 	// Layout determines how backup files are located.
-	Layout string `toml:"layout,omitempty" json:"layout,omitempty"`
+	Layout string `json:"layout,omitempty" toml:"layout,omitempty"`
 }
 
 // Validate runs validation on all fields and returns any errors found.
@@ -622,7 +635,7 @@ func (bc BackupConfig) Validate() error {
 type BundleURIConfig struct {
 	// GoCloudURL is the blob storage GoCloud URL that will be used to store
 	// Git bundles for Bundle-URI use.
-	GoCloudURL string `toml:"go_cloud_url,omitempty" json:"go_cloud_url,omitempty"`
+	GoCloudURL string `json:"go_cloud_url,omitempty" toml:"go_cloud_url,omitempty"`
 }
 
 // Validate runs validation on all fields and returns any errors found.
@@ -641,10 +654,10 @@ func (bc BundleURIConfig) Validate() error {
 
 // StreamCacheConfig contains settings for a streamcache instance.
 type StreamCacheConfig struct {
-	Enabled        bool              `toml:"enabled" json:"enabled"` // Default: false
-	Dir            string            `toml:"dir" json:"dir"`         // Default: <FIRST STORAGE PATH>/+gitaly/PackObjectsCache
-	MaxAge         duration.Duration `toml:"max_age" json:"max_age"` // Default: 5m
-	MinOccurrences int               `toml:"min_occurrences" json:"min_occurrences"`
+	Enabled        bool              `json:"enabled"         toml:"enabled"` // Default: false
+	Dir            string            `json:"dir"             toml:"dir"`     // Default: <FIRST STORAGE PATH>/+gitaly/PackObjectsCache
+	MaxAge         duration.Duration `json:"max_age"         toml:"max_age"` // Default: 5m
+	MinOccurrences int               `json:"min_occurrences" toml:"min_occurrences"`
 }
 
 // Validate runs validation on all fields and compose all found errors.
@@ -672,15 +685,9 @@ func defaultPackObjectsCacheConfig() StreamCacheConfig {
 }
 
 func defaultPackObjectsLimiting() PackObjectsLimiting {
-	var maxConcurrency, maxQueueLength int
-
-	if maxConcurrency == 0 {
-		maxConcurrency = 200
-	}
-
 	return PackObjectsLimiting{
-		MaxConcurrency: maxConcurrency,
-		MaxQueueLength: maxQueueLength,
+		MaxConcurrency: defaultPackObjectsLimitingConcurrency,
+		MaxQueueLength: defaultPackObjectsLimitingQueueSize,
 		// Requests can stay in the queue as long as they want
 		MaxQueueWait: 0,
 	}
@@ -839,6 +846,16 @@ func (cfg *Cfg) Sanitize() error {
 
 		if cfg.PackObjectsCache.Dir == "" && len(cfg.Storages) > 0 {
 			cfg.PackObjectsCache.Dir = filepath.Join(cfg.Storages[0].Path, GitalyDataPrefix, "PackObjectsCache")
+		}
+	}
+
+	if cfg.PackObjectsLimiting.MaxQueueLength == 0 {
+		cfg.PackObjectsLimiting.MaxQueueLength = defaultPackObjectsLimitingQueueSize
+	}
+
+	for i := range cfg.Concurrency {
+		if cfg.Concurrency[i].MaxQueueSize == 0 {
+			cfg.Concurrency[i].MaxQueueSize = defaultConcurrencyQueueSize
 		}
 	}
 
@@ -1215,28 +1232,28 @@ func trySocketCreation(dir string) error {
 // Raft contains configuration for the experimental Gitaly Raft cluster.
 type Raft struct {
 	// Enabled enables the experimental Gitaly Raft cluster.
-	Enabled bool `toml:"enabled" json:"enabled"`
+	Enabled bool `json:"enabled" toml:"enabled"`
 	// ClusterID is the unique ID of the cluster. It ensures the current node joins the right cluster.
-	ClusterID string `toml:"cluster_id" json:"cluster_id"`
+	ClusterID string `json:"cluster_id" toml:"cluster_id"`
 	// NodeID is the unique ID of the node.
-	NodeID uint64 `toml:"node_id" json:"node_id"`
+	NodeID uint64 `json:"node_id" toml:"node_id"`
 	// RaftAddr is the exposed address used for all inter-node communication in the Raft protocol. This
 	// option is temporary until we implement a networking layer that allows Raft to co-exist with the
 	// cluster's gRPC port.
-	RaftAddr string `toml:"raft_addr" json:"raft_addr"`
+	RaftAddr string `json:"raft_addr" toml:"raft_addr"`
 	// InitialMembers contains the list of initial members of the cluster. It's a map of NodeID to
 	// RaftAddr. Due to limitations of the TOML format, it's not possible to set the map key as a uint64.
-	InitialMembers map[string]string `toml:"initial_members" json:"initial_members"`
+	InitialMembers map[string]string `json:"initial_members" toml:"initial_members"`
 	// ReplicationFactor defines the number of nodes where data of this storage are replicated,
 	// including the original storage.
-	ReplicationFactor uint64 `toml:"replication_factor" json:"replication_factor"`
+	ReplicationFactor uint64 `json:"replication_factor" toml:"replication_factor"`
 	// RTTMilliseconds is the maximum round trip between two nodes in the cluster. It's used to
 	// calculate multiple types of timeouts of Raft protocol.
-	RTTMilliseconds uint64 `toml:"rtt_milliseconds" json:"rtt_milliseconds"`
+	RTTMilliseconds uint64 `json:"rtt_milliseconds" toml:"rtt_milliseconds"`
 	// ElectionTicks is the minimum number of message RTT between elections.
-	ElectionTicks uint64 `toml:"election_rtt" json:"election_rtt"`
+	ElectionTicks uint64 `json:"election_rtt" toml:"election_rtt"`
 	// HeartbeatTicks is the number of message RTT between heartbeats
-	HeartbeatTicks uint64 `toml:"heartbeat_rtt" json:"heartbeat_rtt"`
+	HeartbeatTicks uint64 `json:"heartbeat_rtt" toml:"heartbeat_rtt"`
 }
 
 const (

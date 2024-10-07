@@ -1,33 +1,48 @@
 package gitcmd
 
 import (
-	"bytes"
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
-// DetectObjectHash detects the object-hash used by the given repository.
-func DetectObjectHash(ctx context.Context, gitCmdFactory CommandFactory, repository storage.Repository) (git.ObjectHash, error) {
-	var stdout, stderr bytes.Buffer
+var regexpObjectFormat = regexp.MustCompile(`^[ \t]*(?i:objectformat)[ \t]*=[ \t]*(.*)[ \t;#]?`)
 
-	revParseCmd, err := gitCmdFactory.New(ctx, repository, Command{
-		Name: "rev-parse",
-		Flags: []Option{
-			Flag{"--show-object-format"},
-		},
-	}, WithStdout(&stdout), WithStderr(&stderr))
+// DetectObjectHash detects the object-hash used by the given repository. It plucks out the first
+// objectformat configuration value from the repository's configuration file and doesn't validate
+// the configuration.
+//
+// Note: It is recommended to use localrepo.ObjectHash since that value is
+// cached for a given repository.
+func DetectObjectHash(ctx context.Context, repoPath string) (_ git.ObjectHash, returnedErr error) {
+	configFile, err := os.Open(filepath.Join(repoPath, "config"))
 	if err != nil {
-		return git.ObjectHash{}, fmt.Errorf("spawning rev-parse: %w", err)
+		return git.ObjectHash{}, fmt.Errorf("open: %w", err)
+	}
+	defer func() {
+		if err := configFile.Close(); err != nil {
+			returnedErr = errors.Join(returnedErr, fmt.Errorf("close: %w", err))
+		}
+	}()
+
+	objectFormat := git.ObjectHashSHA1.Format
+	scanner := bufio.NewScanner(configFile)
+	for scanner.Scan() {
+		if matches := regexpObjectFormat.FindSubmatch(scanner.Bytes()); len(matches) > 0 {
+			objectFormat = string(matches[1])
+			break
+		}
 	}
 
-	if err := revParseCmd.Wait(); err != nil {
-		return git.ObjectHash{}, structerr.New("reading object format: %w", err).WithMetadata("stderr", stderr.String())
+	if err := scanner.Err(); err != nil {
+		return git.ObjectHash{}, fmt.Errorf("scan: %w", err)
 	}
 
-	return git.ObjectHashByFormat(text.ChompBytes(stdout.Bytes()))
+	return git.ObjectHashByFormat(objectFormat)
 }

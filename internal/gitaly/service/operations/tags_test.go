@@ -278,7 +278,6 @@ func TestUserDeleteTag(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -300,8 +299,6 @@ func TestUserDeleteTag_hooks(t *testing.T) {
 	ctx, cfg, client := setupOperationsService(t, ctx)
 
 	for _, hookName := range GitlabHooks {
-		hookName := hookName
-
 		t.Run(hookName, func(t *testing.T) {
 			t.Parallel()
 
@@ -319,7 +316,7 @@ func TestUserDeleteTag_hooks(t *testing.T) {
 			require.NoError(t, err)
 
 			output := testhelper.MustReadFile(t, hookOutputTempPath)
-			require.Contains(t, string(output), "GL_USERNAME="+gittest.TestUser.GlUsername)
+			require.Contains(t, string(output), "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 		})
 	}
 }
@@ -814,7 +811,7 @@ func TestUserCreateTag_targetRevision(t *testing.T) {
 
 			testhelper.ProtoEqual(t, response, &gitalypb.UserCreateTagResponse{
 				Tag: &gitalypb.Tag{
-					Id:           expectedCommit.Id,
+					Id:           expectedCommit.GetId(),
 					Name:         []byte("tag"),
 					TargetCommit: expectedCommit,
 				},
@@ -823,7 +820,7 @@ func TestUserCreateTag_targetRevision(t *testing.T) {
 			// Perform another sanity check to verify that the tag really does point to
 			// the commit we expect it to.
 			parsedID := gittest.Exec(t, cfg, "-C", repoPath, "rev-parse", "tag")
-			require.Equal(t, response.Tag.TargetCommit.Id, text.ChompBytes(parsedID))
+			require.Equal(t, response.GetTag().GetTargetCommit().GetId(), text.ChompBytes(parsedID))
 		})
 	}
 }
@@ -908,7 +905,7 @@ func TestUserCreateTag_nonCommitTarget(t *testing.T) {
 
 			// We cannot know the object ID of the annotated tags beforehand, so we just
 			// fill in this detail now.
-			if len(tc.expectedTag.Id) == 0 {
+			if len(tc.expectedTag.GetId()) == 0 {
 				tc.expectedTag.Id = text.ChompBytes(gittest.Exec(t, cfg, "-C", repoPath, "rev-parse", tc.tagName))
 			}
 			testhelper.ProtoEqual(t, &gitalypb.UserCreateTagResponse{
@@ -984,15 +981,15 @@ func TestUserCreateTag_nestedTags(t *testing.T) {
 				createdIDStr := text.ChompBytes(createdID)
 				responseOk := &gitalypb.UserCreateTagResponse{
 					Tag: &gitalypb.Tag{
-						Name: request.TagName,
+						Name: request.GetTagName(),
 						Id:   createdIDStr,
 						// TargetCommit: is dynamically determined, filled in below
-						Message:     request.Message,
-						MessageSize: int64(len(request.Message)),
+						Message:     request.GetMessage(),
+						MessageSize: int64(len(request.GetMessage())),
 					},
 				}
 				// Fake it up for all levels, except for ^{} == "commit"
-				responseOk.Tag.TargetCommit = response.Tag.TargetCommit
+				responseOk.Tag.TargetCommit = response.GetTag().GetTargetCommit()
 				if tc.targetObjectType == "commit" {
 					responseOk.Tag.TargetCommit, err = repo.ReadCommit(ctx, git.Revision(tc.targetObject))
 					require.NoError(t, err)
@@ -1004,7 +1001,7 @@ func TestUserCreateTag_nestedTags(t *testing.T) {
 				require.Equal(t, tc.targetObject, peeledIDStr)
 
 				// Set up the next level of nesting...
-				targetObject = response.Tag.Id
+				targetObject = response.GetTag().GetId()
 
 				// Create a *lightweight* tag pointing
 				// to our N-level
@@ -1024,9 +1021,9 @@ func TestUserCreateTag_nestedTags(t *testing.T) {
 
 				responseOk = &gitalypb.UserCreateTagResponse{
 					Tag: &gitalypb.Tag{
-						Name:         request.TagName,
+						Name:         request.GetTagName(),
 						Id:           tc.targetObject,
-						TargetCommit: responseOk.Tag.TargetCommit,
+						TargetCommit: responseOk.GetTag().GetTargetCommit(),
 						Message:      nil,
 						MessageSize:  0,
 					},
@@ -1073,7 +1070,7 @@ func TestUserCreateTag_stableTagIDs(t *testing.T) {
 		Message:      []byte("my message"),
 		MessageSize:  10,
 		TargetCommit: commit,
-	}, response.Tag)
+	}, response.GetTag())
 }
 
 func TestUserCreateTag_prefixedTag(t *testing.T) {
@@ -1145,7 +1142,7 @@ func TestUserCreateTag_gitHooks(t *testing.T) {
 			}, response)
 
 			output := string(testhelper.MustReadFile(t, hookOutputTempPath))
-			require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GlUsername)
+			require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 			require.Contains(t, output, "GL_PROJECT_PATH=gitlab-org/gitlab-test")
 		})
 	}
@@ -1173,7 +1170,7 @@ func TestUserDeleteTag_hookFailure(t *testing.T) {
 				User:       gittest.TestUser,
 			})
 			require.NoError(t, err)
-			require.Contains(t, response.PreReceiveError, "GL_ID="+gittest.TestUser.GlId)
+			require.Contains(t, response.GetPreReceiveError(), "GL_ID="+gittest.TestUser.GetGlId())
 
 			tags := gittest.Exec(t, cfg, "-C", repoPath, "tag")
 			require.Contains(t, string(tags), "to-be-deleted", "tag name does not exist in tags list")
@@ -1220,7 +1217,7 @@ func TestUserCreateTag_hookFailure(t *testing.T) {
 						CustomHook: &gitalypb.CustomHookError{
 							HookType: tc.hookType,
 							Stdout: []byte(
-								"GL_ID=" + gittest.TestUser.GlId + "\n",
+								"GL_ID=" + gittest.TestUser.GetGlId() + "\n",
 							),
 						},
 					},
@@ -1479,9 +1476,6 @@ func TestTagHookOutput(t *testing.T) {
 				hookType: gitalypb.CustomHookError_HOOK_TYPE_UPDATE,
 			},
 		} {
-			tc := tc
-			hookTC := hookTC
-
 			t.Run(hookTC.hook+"/"+tc.desc, func(t *testing.T) {
 				t.Parallel()
 
@@ -1525,7 +1519,7 @@ func TestTagHookOutput(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					preReceiveErr := response.PreReceiveError
+					preReceiveErr := response.GetPreReceiveError()
 					response.PreReceiveError = ""
 					testhelper.ProtoEqual(t, &gitalypb.UserDeleteTagResponse{}, response)
 					require.Regexp(t, tc.expectedErrorRegexp, preReceiveErr)

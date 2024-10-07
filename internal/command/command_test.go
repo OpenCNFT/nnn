@@ -20,11 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/cgroups"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestNew_environment(t *testing.T) {
@@ -115,8 +111,6 @@ func TestNew_exportedEnvironment(t *testing.T) {
 			value: "https://excluded:5000",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.key, func(t *testing.T) {
 			if tc.key == "LD_LIBRARY_PATH" && runtime.GOOS == "darwin" {
 				t.Skip("System Integrity Protection prevents using dynamic linker (dyld) environment variables on macOS. https://apple.co/2XDH4iC")
@@ -167,47 +161,6 @@ func TestNew_rejectContextWithoutDone(t *testing.T) {
 		_, err := New(testhelper.ContextWithoutCancel(), testhelper.SharedLogger(t), []string{"true"})
 		require.NoError(t, err)
 	})
-}
-
-func TestNew_spawnTimeout(t *testing.T) {
-	t.Parallel()
-
-	ctx := testhelper.Context(t)
-	spawnTimeout := 200 * time.Millisecond
-	spawnTokenManager := NewSpawnTokenManager(SpawnConfig{
-		Timeout:     spawnTimeout,
-		MaxParallel: 0,
-	})
-
-	tick := time.After(spawnTimeout / 2)
-	errCh := make(chan error)
-	go func() {
-		_, err := New(ctx, testhelper.SharedLogger(t), []string{"true"}, WithSpawnTokenManager(spawnTokenManager))
-		errCh <- err
-	}()
-
-	select {
-	case <-errCh:
-		require.FailNow(t, "expected spawning to be delayed")
-	case <-tick:
-		// This is the happy case: we expect spawning of the command to be delayed by up to
-		// 200ms until it finally times out.
-	}
-
-	// And after some time we expect that spawning of the command fails due to the configured
-	// timeout.
-	err := <-errCh
-	var structErr structerr.Error
-	require.ErrorAs(t, err, &structErr)
-	details := structErr.Details()
-	require.Len(t, details, 1)
-
-	limitErr, ok := details[0].(*gitalypb.LimitError)
-	require.True(t, ok)
-
-	testhelper.RequireGrpcCode(t, err, codes.ResourceExhausted)
-	require.Equal(t, "process spawn timed out after 200ms", limitErr.ErrorMessage)
-	require.Equal(t, durationpb.New(0).AsDuration(), limitErr.RetryAfter.AsDuration())
 }
 
 func TestCommand_Wait_contextCancellationKillsCommand(t *testing.T) {
@@ -261,6 +214,31 @@ func TestNew_setupStdin(t *testing.T) {
 
 	require.NoError(t, cmd.Wait())
 	require.Equal(t, stdin, buf.String())
+}
+
+func TestCommand_closeStdin(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+
+	cmd, err := New(ctx, testhelper.SharedLogger(t), []string{"cat"}, WithSetupStdin(), WithSetupStdout())
+	require.NoError(t, err)
+
+	defer func() { require.NoError(t, cmd.Wait()) }()
+
+	input := []byte("test value")
+	_, err = cmd.Write(input)
+	require.NoError(t, err)
+
+	// Close stdin after writing the input. With stdin closed, we expect the `cat` command to return
+	// after outputting input. Since `cat` finished processing input from stdin, it will then exit
+	// closing its stdout. The closed stdout will lead to ReadAll unblocking.
+	require.NoError(t, cmd.Stdin().Close())
+
+	output, err := io.ReadAll(cmd)
+	require.NoError(t, err)
+
+	require.Equal(t, input, output)
 }
 
 func TestCommand_read(t *testing.T) {
@@ -318,143 +296,148 @@ func TestNew_missingBinary(t *testing.T) {
 	require.Nil(t, cmd)
 }
 
-func TestCommand_stderrLogging(t *testing.T) {
+func TestCommand_stderr(t *testing.T) {
 	t.Parallel()
 
-	binaryPath := testhelper.WriteExecutable(t, filepath.Join(testhelper.TempDir(t), "script"), []byte(`#!/usr/bin/env bash
-		for i in {1..5}
-		do
-			echo 'hello world' 1>&2
-		done
-		exit 1
-	`))
+	testCases := []struct {
+		name           string
+		script         string
+		expectedLevel  logrus.Level
+		expectedOutput string
+		expectedLen    int
+	}{
+		{
+			name: "basic stderr logging",
+			script: `#!/usr/bin/env bash
+				for i in {1..5}
+				do
+					echo 'hello world' 1>&2
+				done
+				exit 1
+			`,
+			expectedOutput: strings.Repeat("hello world\n", 5),
+			expectedLevel:  logrus.ErrorLevel,
+		},
+		{
+			name: "stderr logging truncation",
+			script: `#!/usr/bin/env bash
+				for i in {1..1000}
+				do
+					printf '%06d zzzzzzzzzz\n' $i >&2
+				done
+				exit 1
+			`,
+			expectedOutput: "",
+			expectedLevel:  logrus.ErrorLevel,
+			expectedLen:    maxStderrBytes,
+		},
+		{
+			name: "stderr logging with null bytes",
+			script: `#!/usr/bin/env bash
+				dd if=/dev/zero bs=1000 count=1000 status=none >&2
+				exit 1
+			`,
+			expectedOutput: strings.Repeat("\x00", maxStderrLineLength),
+			expectedLevel:  logrus.ErrorLevel,
+		},
+		{
+			name: "stderr with exit code 0",
+			script: `#!/usr/bin/env bash
+				echo "warning message" >&2
+				exit 0
+			`,
+			expectedLevel:  logrus.WarnLevel,
+			expectedOutput: "warning message\n",
+		},
+		{
+			name: "stderr with non-zero exit code",
+			script: `#!/usr/bin/env bash
+				echo "error message" >&2
+				exit 1
+			`,
+			expectedLevel:  logrus.ErrorLevel,
+			expectedOutput: "error message\n",
+		},
+		{
+			name: "stderr logging long line",
+			script: `#!/usr/bin/env bash
+				printf 'a%.0s' {1..8192} >&2
+				printf '\n' >&2
+				printf 'b%.0s' {1..8192} >&2
+				exit 1
+			`,
+			expectedOutput: strings.Join([]string{
+				strings.Repeat("a", maxStderrLineLength),
+				strings.Repeat("b", maxStderrLineLength),
+			}, "\n"),
+			expectedLevel: logrus.ErrorLevel,
+		},
+		{
+			name: "stderr logging max bytes",
+			script: `#!/usr/bin/env bash
+				# This script is used to test that a command writes at most maxBytes to stderr. It
+				# simulates the edge case where the logwriter has already written MaxStderrBytes-1
+				# (9999) bytes
 
-	logger := testhelper.NewLogger(t)
-	hook := testhelper.AddLoggerHook(logger)
-	ctx := testhelper.Context(t)
+				# This edge case happens when 9999 bytes are written. To simulate this,
+				# stderr_max_bytes_edge_case has 4 lines of the following format:
+				#
+				# line1: 3333 bytes long
+				# line2: 3331 bytes
+				# line3: 3331 bytes
+				# line4: 1 byte
+				#
+				# The first 3 lines sum up to 9999 bytes written, since we write a 2-byte escaped
+				# "\n" for each \n we see. The 4th line can be any data.
 
-	var stdout bytes.Buffer
-	cmd, err := New(ctx, logger, []string{binaryPath}, WithStdout(&stdout))
-	require.NoError(t, err)
+				printf 'a%.0s' {1..3333} >&2
+				printf '\n' >&2
+				printf 'a%.0s' {1..3331} >&2
+				printf '\n' >&2
+				printf 'a%.0s' {1..3331} >&2
+				printf '\na\n' >&2
+				exit 1
+			`,
+			expectedOutput: "",
+			expectedLevel:  logrus.ErrorLevel,
+			expectedLen:    maxStderrBytes,
+		},
+	}
 
-	require.EqualError(t, cmd.Wait(), "exit status 1")
-	require.Empty(t, stdout.Bytes())
-	require.Equal(t, strings.Repeat("hello world\n", 5), hook.LastEntry().Message)
-}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestCommand_stderrLoggingTruncation(t *testing.T) {
-	t.Parallel()
+			binaryPath := testhelper.WriteExecutable(t, filepath.Join(testhelper.TempDir(t), "script"), []byte(tc.script))
 
-	binaryPath := testhelper.WriteExecutable(t, filepath.Join(testhelper.TempDir(t), "script"), []byte(`#!/usr/bin/env bash
-		for i in {1..1000}
-		do
-			printf '%06d zzzzzzzzzz\n' $i >&2
-		done
-		exit 1
-	`))
+			logger := testhelper.NewLogger(t)
+			hook := testhelper.AddLoggerHook(logger)
+			ctx := testhelper.Context(t)
 
-	logger := testhelper.NewLogger(t)
-	hook := testhelper.AddLoggerHook(logger)
-	ctx := testhelper.Context(t)
+			var stdout bytes.Buffer
+			cmd, err := New(ctx, logger, []string{binaryPath}, WithStdout(&stdout))
+			require.NoError(t, err)
 
-	var stdout bytes.Buffer
-	cmd, err := New(ctx, logger, []string{binaryPath}, WithStdout(&stdout))
-	require.NoError(t, err)
+			err = cmd.Wait()
+			if tc.expectedLevel == logrus.ErrorLevel {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 
-	require.Error(t, cmd.Wait())
-	require.Empty(t, stdout.Bytes())
-	require.Len(t, hook.LastEntry().Message, maxStderrBytes)
-}
+			require.Empty(t, stdout.Bytes())
 
-func TestCommand_stderrLoggingWithNulBytes(t *testing.T) {
-	t.Parallel()
+			lastEntry := hook.LastEntry()
+			if tc.expectedLen > 0 {
+				require.Len(t, lastEntry.Message, tc.expectedLen)
+			}
 
-	binaryPath := testhelper.WriteExecutable(t, filepath.Join(testhelper.TempDir(t), "script"), []byte(`#!/usr/bin/env bash
-		dd if=/dev/zero bs=1000 count=1000 status=none >&2
-		exit 1
-	`))
-
-	logger := testhelper.NewLogger(t)
-	hook := testhelper.AddLoggerHook(logger)
-	ctx := testhelper.Context(t)
-
-	var stdout bytes.Buffer
-	cmd, err := New(ctx, logger, []string{binaryPath}, WithStdout(&stdout))
-	require.NoError(t, err)
-
-	require.Error(t, cmd.Wait())
-	require.Empty(t, stdout.Bytes())
-	require.Equal(t, strings.Repeat("\x00", maxStderrLineLength), hook.LastEntry().Message)
-}
-
-func TestCommand_stderrLoggingLongLine(t *testing.T) {
-	t.Parallel()
-
-	binaryPath := testhelper.WriteExecutable(t, filepath.Join(testhelper.TempDir(t), "script"), []byte(`#!/usr/bin/env bash
-		printf 'a%.0s' {1..8192} >&2
-		printf '\n' >&2
-		printf 'b%.0s' {1..8192} >&2
-		exit 1
-	`))
-
-	logger := testhelper.NewLogger(t)
-	hook := testhelper.AddLoggerHook(logger)
-	ctx := testhelper.Context(t)
-
-	var stdout bytes.Buffer
-	cmd, err := New(ctx, logger, []string{binaryPath}, WithStdout(&stdout))
-	require.NoError(t, err)
-
-	require.Error(t, cmd.Wait())
-	require.Empty(t, stdout.Bytes())
-	require.Equal(t,
-		strings.Join([]string{
-			strings.Repeat("a", maxStderrLineLength),
-			strings.Repeat("b", maxStderrLineLength),
-		}, "\n"),
-		hook.LastEntry().Message,
-	)
-}
-
-func TestCommand_stderrLoggingMaxBytes(t *testing.T) {
-	t.Parallel()
-
-	binaryPath := testhelper.WriteExecutable(t, filepath.Join(testhelper.TempDir(t), "script"), []byte(`#!/usr/bin/env bash
-		# This script is used to test that a command writes at most maxBytes to stderr. It
-		# simulates the edge case where the logwriter has already written MaxStderrBytes-1
-		# (9999) bytes
-
-		# This edge case happens when 9999 bytes are written. To simulate this,
-		# stderr_max_bytes_edge_case has 4 lines of the following format:
-		#
-		# line1: 3333 bytes long
-		# line2: 3331 bytes
-		# line3: 3331 bytes
-		# line4: 1 byte
-		#
-		# The first 3 lines sum up to 9999 bytes written, since we write a 2-byte escaped
-		# "\n" for each \n we see. The 4th line can be any data.
-
-		printf 'a%.0s' {1..3333} >&2
-		printf '\n' >&2
-		printf 'a%.0s' {1..3331} >&2
-		printf '\n' >&2
-		printf 'a%.0s' {1..3331} >&2
-		printf '\na\n' >&2
-		exit 1
-	`))
-
-	logger := testhelper.NewLogger(t)
-	hook := testhelper.AddLoggerHook(logger)
-	ctx := testhelper.Context(t)
-
-	var stdout bytes.Buffer
-	cmd, err := New(ctx, logger, []string{binaryPath}, WithStdout(&stdout))
-	require.NoError(t, err)
-	require.Error(t, cmd.Wait())
-
-	require.Empty(t, stdout.Bytes())
-	require.Len(t, hook.LastEntry().Message, maxStderrBytes)
+			if tc.expectedOutput != "" {
+				require.Equal(t, tc.expectedOutput, lastEntry.Message)
+			}
+			require.Equal(t, tc.expectedLevel, lastEntry.Level)
+		})
+	}
 }
 
 type mockCgroupManager struct {

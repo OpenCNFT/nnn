@@ -347,14 +347,13 @@ func TestTrackRepositoriesSubcommand(t *testing.T) {
 				trackedPath:   "already_tracked",
 			},
 		} {
-			tc := tc
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()
 				tempDir := testhelper.TempDir(t)
 				inputPath := filepath.Join(tempDir, "input_file")
 				f, err := os.Create(inputPath)
 				require.NoError(t, err)
-				_, err = f.Write([]byte(tc.input))
+				_, err = f.WriteString(tc.input)
 				require.NoError(t, err)
 				require.NoError(t, f.Close())
 

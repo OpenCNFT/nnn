@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
@@ -21,51 +20,6 @@ type semaphorer interface {
 	TryAcquire() error
 	Release()
 	Count() int
-}
-
-// staticSemaphore implements semaphorer interface. It is a wrapper for a buffer channel. When a caller wants to acquire
-// the semaphore, a token is pushed to the channel. In contrast, when it wants to release the semaphore, it pulls one
-// token from the channel.
-type staticSemaphore struct {
-	queue chan struct{}
-}
-
-// newStaticSemaphore initializes and returns a staticSemaphore instance.
-func newStaticSemaphore(size uint) *staticSemaphore {
-	return &staticSemaphore{queue: make(chan struct{}, size)}
-}
-
-// Acquire acquires the semaphore. The caller is blocked until there is a available resource or the context is cancelled.
-func (s *staticSemaphore) Acquire(ctx context.Context) error {
-	select {
-	case s.queue <- struct{}{}:
-		return nil
-	case <-ctx.Done():
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return ErrMaxQueueTime
-		}
-		return ctx.Err()
-	}
-}
-
-// TryAcquire tries to acquire the semaphore. If it fails to do so, it will immediately return ErrMaxQueueSize and no change is made to the semaphore.
-func (s *staticSemaphore) TryAcquire() error {
-	select {
-	case s.queue <- struct{}{}:
-		return nil
-	default:
-		return ErrMaxQueueSize
-	}
-}
-
-// Release releases the semaphore by pushing a token back to the underlying channel.
-func (s *staticSemaphore) Release() {
-	<-s.queue
-}
-
-// Count returns the amount of current concurrent access to the semaphore.
-func (s *staticSemaphore) Count() int {
-	return len(s.queue)
 }
 
 const (
@@ -247,11 +201,11 @@ func (c *ConcurrencyLimiter) Limit(ctx context.Context, limitingKey string, f Li
 	)
 	defer span.Finish()
 
-	if c.currentLimit(ctx) <= 0 {
+	if c.currentLimit() <= 0 {
 		return f()
 	}
 
-	sem := c.getConcurrencyLimit(ctx, limitingKey)
+	sem := c.getConcurrencyLimit(limitingKey)
 	defer c.putConcurrencyLimit(limitingKey)
 
 	start := time.Now()
@@ -285,35 +239,24 @@ func (c *ConcurrencyLimiter) Limit(ctx context.Context, limitingKey string, f Li
 
 // getConcurrencyLimit retrieves the concurrency limit for the given key. If no such limiter exists
 // it will be lazily constructed.
-func (c *ConcurrencyLimiter) getConcurrencyLimit(ctx context.Context, limitingKey string) *keyedConcurrencyLimiter {
+func (c *ConcurrencyLimiter) getConcurrencyLimit(limitingKey string) *keyedConcurrencyLimiter {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	// We use `gitaly_use_resizable_semaphore_in_concurrency_limiter` feature flag to swap between
-	// staticSemaphore and resizableSemaphore. By default, staticSemaphore is used. After the flag is
-	// enabled, this map keeps the reference to the prior semaphore system as soon as there are further operations
-	// using the same limiting key. During this period, they continue to use the old semaphore type. After there is
-	// no more operation and the limiter is removed, the subsequent operations gonna use the new type. The same
-	// behavior occurs when the flag is reverted.
-	// This "stickiness" allows two semaphore systems to co-exist during partial rollout while still ensures
-	// all operations of the same limiting key use the same semaphore. Otherwise, we need to detect feature
-	// flag change in the current request, then migrate all counting to the new alternative semaphore. The
-	// later approach is error-prone. It can also make the counting go back and forth constantly if the flag
-	// actor does not align with the limiting key.
 	if c.limitsByKey[limitingKey] == nil {
 		// Set up the queue tokens in case a maximum queue length was requested. As the
 		// queue tokens are kept during the whole lifetime of the concurrency-limited
 		// function we add the concurrency tokens to the number of available token.
 		var queueTokens semaphorer
 		if c.maxQueueLength > 0 {
-			queueTokens = c.createSemaphore(ctx, uint(c.currentLimit(ctx)+c.maxQueueLength))
+			queueTokens = c.createSemaphore(uint(c.currentLimit() + c.maxQueueLength))
 		}
 
 		c.limitsByKey[limitingKey] = &keyedConcurrencyLimiter{
 			monitor:               c.monitor,
 			maxQueueWait:          c.maxQueueWait,
 			setWaitTimeoutContext: c.SetWaitTimeoutContext,
-			concurrencyTokens:     c.createSemaphore(ctx, uint(c.currentLimit(ctx))),
+			concurrencyTokens:     c.createSemaphore(uint(c.currentLimit())),
 			queueTokens:           queueTokens,
 		}
 	}
@@ -352,24 +295,10 @@ func (c *ConcurrencyLimiter) countSemaphores() int {
 	return len(c.limitsByKey)
 }
 
-func (c *ConcurrencyLimiter) currentLimit(ctx context.Context) int {
-	// When `gitaly_use_resizable_semaphore_in_concurrency_limiter` flag is enabled, the resizable semaphore should
-	// use the current value of the adaptive limit. This limit is constantly calibrated by the adaptive calculator
-	// if the adaptiveness is enabled. In contrast, when the flag is disabled, the static semaphore should use the
-	// initial limit instead of the floating current limit.
-	// This situation is temporary during the rollout phase where the adaptive limiting is experimental. The
-	// aforementioned feature flag is used as an escape hatch to fallback to use static limiting if something goes
-	// wrong. When the feature enters a mature state, this feature flag and the static semaphore will be removed.
-	// The resizable semaphore can handle both static and adaptive limiting.
-	if featureflag.UseResizableSemaphoreInConcurrencyLimiter.IsEnabled(ctx) {
-		return c.limit.Current()
-	}
-	return c.limit.Initial()
+func (c *ConcurrencyLimiter) currentLimit() int {
+	return c.limit.Current()
 }
 
-func (c *ConcurrencyLimiter) createSemaphore(ctx context.Context, size uint) semaphorer {
-	if featureflag.UseResizableSemaphoreInConcurrencyLimiter.IsEnabled(ctx) {
-		return NewResizableSemaphore(size)
-	}
-	return newStaticSemaphore(size)
+func (c *ConcurrencyLimiter) createSemaphore(size uint) semaphorer {
+	return NewResizableSemaphore(size)
 }

@@ -34,7 +34,7 @@ func (s *server) SSHUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveSer
 func (s *server) sshUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveServer, req *gitalypb.SSHUploadArchiveRequest) error {
 	ctx := stream.Context()
 
-	repoPath, err := s.locator.GetRepoPath(ctx, req.Repository)
+	repoPath, err := s.locator.GetRepoPath(ctx, req.GetRepository())
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,9 @@ func (s *server) sshUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveSer
 
 	timeoutTicker := s.uploadArchiveRequestTimeoutTickerFactory()
 
-	if err := s.runUploadCommand(ctx, req.GetRepository(), stdin, stdout, stderr, timeoutTicker, pktline.PktFlush(), gitcmd.Command{
+	repo := s.localrepo(req.GetRepository())
+
+	if err := s.runUploadCommand(ctx, repo, stdin, stdout, stderr, timeoutTicker, pktline.PktFlush(), gitcmd.Command{
 		Name: "upload-archive",
 		Args: []string{repoPath},
 	}); err != nil {

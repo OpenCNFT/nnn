@@ -247,8 +247,6 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -305,14 +303,14 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 			}
 			require.NoError(t, err, "receive first response")
 
-			testhelper.ProtoEqual(t, data.firstExpectedResponse, firstResponse.BranchUpdate)
+			testhelper.ProtoEqual(t, data.firstExpectedResponse, firstResponse.GetBranchUpdate())
 
 			if data.secondRequest == nil {
 				return
 			}
 
-			if data.secondRequest.Apply && data.secondExpectedResponse != nil {
-				data.secondExpectedResponse.CommitId = firstResponse.CommitId
+			if data.secondRequest.GetApply() && data.secondExpectedResponse != nil {
+				data.secondExpectedResponse.CommitId = firstResponse.GetCommitId()
 			}
 
 			require.NoError(t, mergeBidi.Send(data.secondRequest), "apply merge")
@@ -325,7 +323,7 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 			}
 			require.NoError(t, err, "receive second response")
 
-			testhelper.ProtoEqual(t, data.secondExpectedResponse, secondResponse.BranchUpdate)
+			testhelper.ProtoEqual(t, data.secondExpectedResponse, secondResponse.GetBranchUpdate())
 
 			_, err = mergeBidi.Recv()
 			require.Equal(t, io.EOF, err)
@@ -334,18 +332,18 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 			commit, err := repo.ReadCommit(ctx, git.Revision(branchToMerge))
 			require.NoError(t, err, "look up git commit after call has finished")
 
-			require.Contains(t, commit.ParentIds, masterCommitID.String())
-			if data.firstRequest.Squash {
-				require.NotContains(t, commit.ParentIds, mergeCommitID.String())
+			require.Contains(t, commit.GetParentIds(), masterCommitID.String())
+			if data.firstRequest.GetSquash() {
+				require.NotContains(t, commit.GetParentIds(), mergeCommitID.String())
 			} else {
-				require.Contains(t, commit.ParentIds, mergeCommitID.String())
+				require.Contains(t, commit.GetParentIds(), mergeCommitID.String())
 			}
 
-			require.True(t, strings.HasPrefix(string(commit.Body), message), "expected %q to start with %q", commit.Body, message)
-			require.Equal(t, commit.TreeId, expectedTreeID.String())
+			require.True(t, strings.HasPrefix(string(commit.GetBody()), message), "expected %q to start with %q", commit.GetBody(), message)
+			require.Equal(t, commit.GetTreeId(), expectedTreeID.String())
 
 			if len(tc.hooks) > 0 {
-				expectedGlID := "GL_ID=" + gittest.TestUser.GlId
+				expectedGlID := "GL_ID=" + gittest.TestUser.GetGlId()
 				for i, h := range tc.hooks {
 					hookEnv := testhelper.MustReadFile(t, hookTempfiles[i])
 
@@ -450,10 +448,10 @@ func testUserMergeBranchFailure(t *testing.T, ctx context.Context) {
 				return &gitalypb.UserMergeBranchRequest{
 					Repository: repoProto,
 					User: &gitalypb.User{
-						GlId:       gittest.TestUser.GlId,
-						GlUsername: gittest.TestUser.GlUsername,
-						Email:      gittest.TestUser.Email,
-						Timezone:   gittest.TestUser.Timezone,
+						GlId:       gittest.TestUser.GetGlId(),
+						GlUsername: gittest.TestUser.GetGlUsername(),
+						Email:      gittest.TestUser.GetEmail(),
+						Timezone:   gittest.TestUser.GetTimezone(),
 					},
 					CommitId: master.Revision().String(),
 					Branch:   []byte(branchToMerge),
@@ -468,10 +466,10 @@ func testUserMergeBranchFailure(t *testing.T, ctx context.Context) {
 				return &gitalypb.UserMergeBranchRequest{
 					Repository: repoProto,
 					User: &gitalypb.User{
-						GlId:       gittest.TestUser.GlId,
-						GlUsername: gittest.TestUser.GlUsername,
-						Name:       gittest.TestUser.Name,
-						Timezone:   gittest.TestUser.Timezone,
+						GlId:       gittest.TestUser.GetGlId(),
+						GlUsername: gittest.TestUser.GetGlUsername(),
+						Name:       gittest.TestUser.GetName(),
+						Timezone:   gittest.TestUser.GetTimezone(),
 					},
 					CommitId: master.Revision().String(),
 					Branch:   []byte(branchToMerge),
@@ -583,20 +581,20 @@ func testUserMergeBranchQuarantine(t *testing.T, ctx context.Context) {
 
 	require.NoError(t, stream.Send(&gitalypb.UserMergeBranchRequest{Apply: true}), "apply merge")
 	secondResponse, err := stream.Recv()
-	testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("%s\n", firstResponse.CommitId).WithDetail(
+	testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("%s\n", firstResponse.GetCommitId()).WithDetail(
 		&gitalypb.UserMergeBranchError{
 			Error: &gitalypb.UserMergeBranchError_CustomHook{
 				CustomHook: &gitalypb.CustomHookError{
 					HookType: gitalypb.CustomHookError_HOOK_TYPE_PRERECEIVE,
 					Stdout:   []byte(fmt.Sprintf("%s\n", commits.left.String())),
-					Stderr:   []byte(fmt.Sprintf("%s\n", firstResponse.CommitId)),
+					Stderr:   []byte(fmt.Sprintf("%s\n", firstResponse.GetCommitId())),
 				},
 			},
 		},
 	), err)
 	require.Nil(t, secondResponse)
 
-	oid, err := gittest.DefaultObjectHash.FromHex(strings.TrimSpace(firstResponse.CommitId))
+	oid, err := gittest.DefaultObjectHash.FromHex(strings.TrimSpace(firstResponse.GetCommitId()))
 	require.NoError(t, err)
 	exists, err := repo.HasRevision(ctx, oid.Revision()+"^{commit}")
 	require.NoError(t, err)
@@ -641,12 +639,12 @@ func testUserMergeBranchStableMergeIDs(t *testing.T, ctx context.Context) {
 	require.NoError(t, stream.Send(firstRequest), "send first request")
 	response, err := stream.Recv()
 	require.NoError(t, err)
-	require.Equal(t, expectedMergeID, response.CommitId)
+	require.Equal(t, expectedMergeID, response.GetCommitId())
 
 	require.NoError(t, stream.Send(&gitalypb.UserMergeBranchRequest{Apply: true}))
 	response, err = stream.Recv()
 	require.NoError(t, err)
-	require.Equal(t, expectedMergeID, response.BranchUpdate.CommitId)
+	require.Equal(t, expectedMergeID, response.GetBranchUpdate().GetCommitId())
 
 	_, err = stream.Recv()
 	require.Equal(t, io.EOF, err)
@@ -667,15 +665,15 @@ func testUserMergeBranchStableMergeIDs(t *testing.T, ctx context.Context) {
 			"sha256": "9ff5a6fc7476b3297e176d8c7dec1c36a7a58dd68e387570229f94cce65d299c",
 		}),
 		Author: &gitalypb.CommitAuthor{
-			Name:  gittest.TestUser.Name,
-			Email: gittest.TestUser.Email,
+			Name:  gittest.TestUser.GetName(),
+			Email: gittest.TestUser.GetEmail(),
 			// Nanoseconds get ignored because commit timestamps aren't that granular.
 			Date:     &timestamppb.Timestamp{Seconds: 12},
 			Timezone: []byte(gittest.TimezoneOffset),
 		},
 		Committer: &gitalypb.CommitAuthor{
-			Name:  gittest.TestUser.Name,
-			Email: gittest.TestUser.Email,
+			Name:  gittest.TestUser.GetName(),
+			Email: gittest.TestUser.GetEmail(),
 			// Nanoseconds get ignored because commit timestamps aren't that granular.
 			Date:     &timestamppb.Timestamp{Seconds: 12},
 			Timezone: []byte(gittest.TimezoneOffset),
@@ -727,7 +725,7 @@ func testUserMergeBranchAbort(t *testing.T, ctx context.Context) {
 
 			firstResponse, err := mergeBidi.Recv()
 			require.NoError(t, err, "first response")
-			require.NotEqual(t, "", firstResponse.CommitId, "commit ID on first response")
+			require.NotEqual(t, "", firstResponse.GetCommitId(), "commit ID on first response")
 
 			if tc.req != nil {
 				require.NoError(t, mergeBidi.Send(tc.req), "send second request")
@@ -744,7 +742,7 @@ func testUserMergeBranchAbort(t *testing.T, ctx context.Context) {
 			commit, err := repo.ReadCommit(ctx, "refs/heads/branch")
 			require.NoError(t, err, "look up git commit after call has finished")
 
-			require.Equal(t, commits.left.String(), commit.Id, "branch should not change when the merge is aborted")
+			require.Equal(t, commits.left.String(), commit.GetId(), "branch should not change when the merge is aborted")
 		})
 	}
 }
@@ -785,7 +783,7 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 
 	// This concurrent update of the branch we are merging into should make the merge fail.
 	concurrentCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("branch"))
-	require.NotEqual(t, concurrentCommitID, firstResponse.CommitId)
+	require.NotEqual(t, concurrentCommitID, firstResponse.GetCommitId())
 
 	require.NoError(t, stream.Send(&gitalypb.UserMergeBranchRequest{Apply: true}), "apply merge")
 	require.NoError(t, stream.CloseSend(), "close send")
@@ -801,7 +799,7 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 			ReferenceUpdate: &gitalypb.ReferenceUpdateError{
 				ReferenceName: []byte("refs/heads/branch"),
 				OldOid:        commits.left.String(),
-				NewOid:        testhelper.WithOrWithoutWAL(mergeCommitOID.String(), firstResponse.CommitId),
+				NewOid:        testhelper.WithOrWithoutWAL(mergeCommitOID.String(), firstResponse.GetCommitId()),
 			},
 		},
 	}
@@ -838,7 +836,7 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 
 	commit, err := repo.ReadCommit(ctx, "refs/heads/branch")
 	require.NoError(t, err, "get commit after RPC finished")
-	require.Equal(t, concurrentCommitID.String(), commit.Id, "RPC should not have trampled concurrent update")
+	require.Equal(t, concurrentCommitID.String(), commit.GetId(), "RPC should not have trampled concurrent update")
 }
 
 func TestUserMergeBranch_ambiguousReference(t *testing.T) {
@@ -900,11 +898,11 @@ func testUserMergeBranchAmbiguousReference(t *testing.T, ctx context.Context) {
 	commit, err := repo.ReadCommit(ctx, git.Revision("refs/heads/branch"))
 	require.NoError(t, err, "look up git commit after call has finished")
 
-	testhelper.ProtoEqual(t, &gitalypb.OperationBranchUpdate{CommitId: commit.Id}, response.BranchUpdate)
-	require.Equal(t, mergeCommitMessage, string(commit.Body))
-	require.Equal(t, gittest.TestUser.Name, commit.Author.Name)
-	require.Equal(t, gittest.TestUser.Email, commit.Author.Email)
-	require.Equal(t, []string{commits.left.String(), commits.right.String()}, commit.ParentIds)
+	testhelper.ProtoEqual(t, &gitalypb.OperationBranchUpdate{CommitId: commit.GetId()}, response.GetBranchUpdate())
+	require.Equal(t, mergeCommitMessage, string(commit.GetBody()))
+	require.Equal(t, gittest.TestUser.GetName(), commit.GetAuthor().GetName())
+	require.Equal(t, gittest.TestUser.GetEmail(), commit.GetAuthor().GetEmail())
+	require.Equal(t, []string{commits.left.String(), commits.right.String()}, commit.GetParentIds())
 }
 
 func TestUserMergeBranch_failingHooks(t *testing.T) {
@@ -987,7 +985,7 @@ func testUserMergeBranchFailingHooks(t *testing.T, ctx context.Context) {
 			} else {
 				testhelper.ProtoEqual(t, &gitalypb.UserMergeBranchResponse{
 					BranchUpdate: &gitalypb.OperationBranchUpdate{
-						CommitId: firstResponse.CommitId,
+						CommitId: firstResponse.GetCommitId(),
 					},
 				}, secondResponse)
 				require.NoError(t, err)
@@ -999,7 +997,7 @@ func testUserMergeBranchFailingHooks(t *testing.T, ctx context.Context) {
 
 			currentBranchHead := gittest.ResolveRevision(t, cfg, repoPath, "refs/heads/branch")
 			if !tc.shouldFail {
-				require.Equal(t, firstResponse.CommitId, currentBranchHead.String(), "branch head updated")
+				require.Equal(t, firstResponse.GetCommitId(), currentBranchHead.String(), "branch head updated")
 			} else {
 				require.Equal(t, commits.left, currentBranchHead, "branch head updated")
 			}
@@ -1150,8 +1148,6 @@ func testUserMergeBranchAllowed(t *testing.T, ctx context.Context) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -1196,7 +1192,7 @@ func testUserMergeBranchAllowed(t *testing.T, ctx context.Context) {
 				Apply: true,
 			}))
 
-			expected := tc.setupExpected(t, "branch", commits.left.String(), response.CommitId)
+			expected := tc.setupExpected(t, "branch", commits.left.String(), response.GetCommitId())
 
 			response, err = stream.Recv()
 			testhelper.RequireGrpcError(t, expected.err, err)

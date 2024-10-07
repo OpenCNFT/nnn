@@ -391,15 +391,15 @@ func testWriteCommit(t *testing.T, ctx context.Context) {
 				commit, err := repo.ReadCommit(ctx, git.Revision(oid))
 				require.NoError(t, err)
 
-				require.Equal(t, gittest.DefaultCommitAuthor, commit.Author)
-				require.Equal(t, "my custom message", string(commit.Body))
+				require.Equal(t, gittest.DefaultCommitAuthor, commit.GetAuthor())
+				require.Equal(t, "my custom message", string(commit.GetBody()))
 
 				if featureflag.GPGSigning.IsEnabled(ctx) {
-					require.Equal(t, tc.expectedCommitterEmail, string(commit.Committer.Email))
-					require.Equal(t, tc.expectedCommitterName, string(commit.Committer.Name))
+					require.Equal(t, tc.expectedCommitterEmail, string(commit.GetCommitter().GetEmail()))
+					require.Equal(t, tc.expectedCommitterName, string(commit.GetCommitter().GetName()))
 				} else {
-					require.Equal(t, gittest.DefaultCommitterMail, string(commit.Committer.Email))
-					require.Equal(t, gittest.DefaultCommitterName, string(commit.Committer.Name))
+					require.Equal(t, gittest.DefaultCommitterMail, string(commit.GetCommitter().GetEmail()))
+					require.Equal(t, gittest.DefaultCommitterName, string(commit.GetCommitter().GetName()))
 				}
 			})
 		}
@@ -450,8 +450,8 @@ func testWriteCommit(t *testing.T, ctx context.Context) {
 					Email:    []byte(gittest.DefaultCommitterMail),
 					Date:     timestamppb.New(commitDate),
 					Timezone: []byte("+0000"),
-				}, commit.Author)
-				require.Equal(t, "my custom message", string(commit.Body))
+				}, commit.GetAuthor())
+				require.Equal(t, "my custom message", string(commit.GetBody()))
 
 				data, err := repo.ReadObject(ctx, oid)
 				require.NoError(t, err)

@@ -68,7 +68,7 @@ func TestReplicateRepository(t *testing.T) {
 		} else {
 			target = proto.Clone(source).(*gitalypb.Repository)
 			target.StorageName = cfg.Storages[1].Name
-			targetPath = filepath.Join(cfg.Storages[1].Path, target.RelativePath)
+			targetPath = filepath.Join(cfg.Storages[1].Path, target.GetRelativePath())
 		}
 
 		return source, sourcePath, target, targetPath
@@ -138,7 +138,7 @@ func TestReplicateRepository(t *testing.T) {
 				// replication is being used.
 				blobData, err := text.RandomHex(10)
 				require.NoError(t, err)
-				blobID := text.ChompBytes(gittest.ExecOpts(t, cfg, gittest.ExecConfig{Stdin: bytes.NewBuffer([]byte(blobData))},
+				blobID := text.ChompBytes(gittest.ExecOpts(t, cfg, gittest.ExecConfig{Stdin: bytes.NewBufferString(blobData)},
 					"-C", sourcePath, "hash-object", "-w", "--stdin",
 				))
 
@@ -391,7 +391,6 @@ func TestReplicateRepository(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -492,7 +491,7 @@ func TestReplicateRepository_transactional(t *testing.T) {
 	var votes []voting.Vote
 	txServer := testTransactionServer{
 		vote: func(request *gitalypb.VoteTransactionRequest) (*gitalypb.VoteTransactionResponse, error) {
-			vote, err := voting.VoteFromHash(request.ReferenceUpdatesHash)
+			vote, err := voting.VoteFromHash(request.GetReferenceUpdatesHash())
 			require.NoError(t, err)
 			votes = append(votes, vote)
 

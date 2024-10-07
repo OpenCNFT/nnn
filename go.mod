@@ -13,16 +13,16 @@ replace github.com/lni/vfs => gitlab.com/gl-gitaly/vfs v0.2.1-0.20240704101814-7
 
 require (
 	cloud.google.com/go/storage v1.43.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.0
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
 	github.com/ProtonMail/go-crypto v1.0.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.61.2
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.63.1
 	github.com/beevik/ntp v1.4.3
 	github.com/cloudflare/tableflip v1.2.3
 	github.com/containerd/cgroups/v3 v3.0.3
 	github.com/dgraph-io/badger/v4 v4.2.0
-	github.com/getsentry/sentry-go v0.28.1
+	github.com/getsentry/sentry-go v0.29.0
 	github.com/git-lfs/git-lfs/v3 v3.5.1
-	github.com/go-enry/go-enry/v2 v2.8.9
+	github.com/go-enry/go-enry/v2 v2.9.0
 	github.com/go-enry/go-license-detector/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-cmp v0.6.0
@@ -32,8 +32,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/yamux v0.1.2-0.20220728231024-8f49b6f63f18
-	github.com/jackc/pgx/v5 v5.6.0
-	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/jackc/pgx/v5 v5.7.0
 	github.com/lni/dragonboat/v4 v4.0.0-20231222133740-1d6e2d76cd57
 	github.com/miekg/dns v1.1.62
 	github.com/olekukonko/tablewriter v0.0.5
@@ -49,17 +48,17 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/urfave/cli/v2 v2.27.4
 	gitlab.com/gitlab-org/labkit v1.21.0
-	go.uber.org/automaxprocs v1.5.3
+	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/goleak v1.3.0
 	gocloud.dev v0.39.0
 	golang.org/x/crypto v0.27.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/sync v0.8.0
 	golang.org/x/sys v0.25.0
-	golang.org/x/text v0.18.0
+	golang.org/x/text v0.19.0
 	golang.org/x/time v0.6.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240812133136-8ffd90a71988
-	google.golang.org/grpc v1.66.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240930140551-af27646dc61f
+	google.golang.org/grpc v1.67.1
 	google.golang.org/protobuf v1.34.2
 )
 
@@ -100,24 +99,24 @@ require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.55.5 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.30.5 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.4 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.31.0 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.5 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.27.27 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.11 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.10 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.17 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.18 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.18 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.17 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.18 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.3.20 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.20 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.18 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.22.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.30.3 // indirect
-	github.com/aws/smithy-go v1.20.4 // indirect
+	github.com/aws/smithy-go v1.21.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -153,7 +152,7 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/glog v1.2.1 // indirect
+	github.com/golang/glog v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -174,7 +173,7 @@ require (
 	github.com/hashicorp/memberlist v0.3.1 // indirect
 	github.com/hhatto/gorst v0.0.0-20181029133204-ca9f730cac5b // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
@@ -235,14 +234,14 @@ require (
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/mod v0.19.0 // indirect
-	golang.org/x/net v0.28.0 // indirect
+	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
 	google.golang.org/api v0.191.0 // indirect
 	google.golang.org/genproto v0.0.0-20240812133136-8ffd90a71988 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240812133136-8ffd90a71988 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.32.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect

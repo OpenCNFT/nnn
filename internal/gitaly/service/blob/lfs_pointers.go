@@ -32,10 +32,10 @@ func (s *server) ListLFSPointers(in *gitalypb.ListLFSPointersRequest, stream git
 	if err := s.locator.ValidateRepository(stream.Context(), repository); err != nil {
 		return err
 	}
-	if len(in.Revisions) == 0 {
+	if len(in.GetRevisions()) == 0 {
 		return structerr.NewInvalidArgument("missing revisions")
 	}
-	for _, revision := range in.Revisions {
+	for _, revision := range in.GetRevisions() {
 		if err := git.ValidateRevision([]byte(revision), git.AllowPathScopedRevision(), git.AllowPseudoRevision()); err != nil {
 			return structerr.NewInvalidArgument("invalid revision: %w", err).WithMetadata("revision", revision)
 		}
@@ -68,7 +68,7 @@ func (s *server) ListLFSPointers(in *gitalypb.ListLFSPointersRequest, stream git
 		return structerr.NewInternal("creating object iterator: %w", err)
 	}
 
-	if err := sendLFSPointers(chunker, catfileObjectIter, int(in.Limit)); err != nil {
+	if err := sendLFSPointers(chunker, catfileObjectIter, int(in.GetLimit())); err != nil {
 		return err
 	}
 
@@ -112,7 +112,7 @@ func (s *server) ListAllLFSPointers(in *gitalypb.ListAllLFSPointersRequest, stre
 		return structerr.NewInternal("creating object iterator: %w", err)
 	}
 
-	if err := sendLFSPointers(chunker, catfileObjectIter, int(in.Limit)); err != nil {
+	if err := sendLFSPointers(chunker, catfileObjectIter, int(in.GetLimit())); err != nil {
 		return err
 	}
 

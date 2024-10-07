@@ -242,8 +242,8 @@ func (c *Coordinator) Collect(metrics chan<- prometheus.Metric) {
 
 func (c *Coordinator) directRepositoryScopedMessage(ctx context.Context, call grpcCall) (*proxy.StreamParameters, error) {
 	log.AddFields(ctx, log.Fields{
-		"virtual_storage": call.targetRepo.StorageName,
-		"relative_path":   call.targetRepo.RelativePath,
+		"virtual_storage": call.targetRepo.GetStorageName(),
+		"relative_path":   call.targetRepo.GetRelativePath(),
 	})
 
 	var err error
@@ -288,7 +288,7 @@ func shouldRouteRepositoryAccessorToPrimary(ctx context.Context, call grpcCall) 
 
 func (c *Coordinator) accessorStreamParameters(ctx context.Context, call grpcCall) (*proxy.StreamParameters, error) {
 	repoPath := call.targetRepo.GetRelativePath()
-	virtualStorage := call.targetRepo.StorageName
+	virtualStorage := call.targetRepo.GetStorageName()
 
 	route, err := c.router.RouteRepositoryAccessor(
 		ctx, virtualStorage, repoPath, shouldRouteRepositoryAccessorToPrimary(ctx, call),
@@ -355,7 +355,7 @@ type nodeErrors struct {
 
 func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall) (*proxy.StreamParameters, error) {
 	targetRepo := call.targetRepo
-	virtualStorage := call.targetRepo.StorageName
+	virtualStorage := call.targetRepo.GetStorageName()
 
 	change, params, err := getReplicationDetails(call.fullMethodName, call.msg)
 	if err != nil {
@@ -409,7 +409,7 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 	var route RepositoryMutatorRoute
 	switch change {
 	case datastore.CreateRepo:
-		route, err = c.router.RouteRepositoryCreation(ctx, virtualStorage, targetRepo.RelativePath, additionalRepoRelativePath)
+		route, err = c.router.RouteRepositoryCreation(ctx, virtualStorage, targetRepo.GetRelativePath(), additionalRepoRelativePath)
 
 		// These RPCs are repository upserts. They should work if the
 		// repository ID already exists in Praefect.
@@ -417,13 +417,13 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 			call.fullMethodName == "/gitaly.RepositoryService/RestoreRepository") &&
 			errors.Is(err, datastore.ErrRepositoryAlreadyExists) {
 			change = datastore.UpdateRepo
-			route, err = c.router.RouteRepositoryMutator(ctx, virtualStorage, targetRepo.RelativePath, additionalRepoRelativePath)
+			route, err = c.router.RouteRepositoryMutator(ctx, virtualStorage, targetRepo.GetRelativePath(), additionalRepoRelativePath)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("route repository creation: %w", err)
 		}
 	default:
-		route, err = c.router.RouteRepositoryMutator(ctx, virtualStorage, targetRepo.RelativePath, additionalRepoRelativePath)
+		route, err = c.router.RouteRepositoryMutator(ctx, virtualStorage, targetRepo.GetRelativePath(), additionalRepoRelativePath)
 		if err != nil {
 			if errors.Is(err, ErrRepositoryReadOnly) {
 				return nil, err
@@ -481,7 +481,6 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 		}
 
 		for _, secondary := range route.Secondaries {
-			secondary := secondary
 			secondaryMsg, err := rewrittenRepositoryMessage(call.methodInfo, call.msg, secondary.Storage, route.ReplicaPath, route.AdditionalReplicaPath)
 			if err != nil {
 				return nil, err
@@ -568,7 +567,7 @@ func (c *Coordinator) mutatorStreamParameters(ctx context.Context, call grpcCall
 // context, we just pick the first node returned by the router to be the primary. Returns an error
 // in case any of the nodes has failed to perform the maintenance RPC.
 func (c *Coordinator) maintenanceStreamParameters(ctx context.Context, call grpcCall) (*proxy.StreamParameters, error) {
-	route, err := c.router.RouteRepositoryMaintenance(ctx, call.targetRepo.StorageName, call.targetRepo.RelativePath)
+	route, err := c.router.RouteRepositoryMaintenance(ctx, call.targetRepo.GetStorageName(), call.targetRepo.GetRelativePath())
 	if err != nil {
 		return nil, fmt.Errorf("routing repository maintenance: %w", err)
 	}
@@ -583,8 +582,6 @@ func (c *Coordinator) maintenanceStreamParameters(ctx context.Context, call grpc
 	}
 
 	for _, node := range route.Nodes {
-		node := node
-
 		nodeMsg, err := rewrittenRepositoryMessage(call.methodInfo, call.msg, node.Storage, route.ReplicaPath, "")
 		if err != nil {
 			return nil, err
@@ -723,7 +720,7 @@ func (c *Coordinator) StreamDirector(ctx context.Context, fullMethodName string,
 			}
 
 			if errors.Is(err, datastore.ErrRepositoryNotFound) {
-				return nil, storage.NewRepositoryNotFoundError(targetRepo.StorageName, targetRepo.RelativePath)
+				return nil, storage.NewRepositoryNotFoundError(targetRepo.GetStorageName(), targetRepo.GetRelativePath())
 			}
 
 			if errors.Is(err, datastore.ErrRepositoryAlreadyExists) {
@@ -1182,7 +1179,7 @@ func (c *Coordinator) validateTargetRepo(repo *gitalypb.Repository) error {
 		return storage.ErrRepositoryPathNotSet
 	}
 
-	if _, found := c.conf.StorageNames()[repo.StorageName]; !found {
+	if _, found := c.conf.StorageNames()[repo.GetStorageName()]; !found {
 		return storage.NewStorageNotFoundError(repo.GetStorageName())
 	}
 

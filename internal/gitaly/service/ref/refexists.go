@@ -16,13 +16,15 @@ func (s *server) RefExists(ctx context.Context, in *gitalypb.RefExistsRequest) (
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
-	ref := string(in.Ref)
+	ref := string(in.GetRef())
 
 	if !isValidRefName(ref) {
 		return nil, structerr.NewInvalidArgument("invalid refname")
 	}
 
-	exists, err := s.refExists(ctx, in.Repository, ref)
+	repo := s.localrepo(in.GetRepository())
+
+	exists, err := s.refExists(ctx, repo, ref)
 	if err != nil {
 		return nil, structerr.NewInternal("%w", err)
 	}
@@ -30,8 +32,8 @@ func (s *server) RefExists(ctx context.Context, in *gitalypb.RefExistsRequest) (
 	return &gitalypb.RefExistsResponse{Value: exists}, nil
 }
 
-func (s *server) refExists(ctx context.Context, repo *gitalypb.Repository, ref string) (bool, error) {
-	cmd, err := s.gitCmdFactory.New(ctx, repo, gitcmd.Command{
+func (s *server) refExists(ctx context.Context, repo gitcmd.RepositoryExecutor, ref string) (bool, error) {
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  "show-ref",
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--verify"}, gitcmd.Flag{Name: "--quiet"}},
 		Args:  []string{ref},

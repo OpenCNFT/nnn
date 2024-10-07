@@ -37,6 +37,10 @@ func TestSearchFilesByContent(t *testing.T) {
 		gittest.TreeEntry{Path: "huge-utf8", Mode: "100644", Content: strings.Repeat("你今天吃了什么东西?\n", 70000)},
 	))
 
+	largeLineCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+		gittest.TreeEntry{Path: "huge-line-file", Mode: "100644", Content: strings.Repeat("abcdefghi", 1024*64) + "\n"},
+	))
+
 	dashedCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
 		gittest.TreeEntry{Path: "-dashed", Mode: "100644", Content: "-dashed\n"},
 	))
@@ -172,6 +176,17 @@ func TestSearchFilesByContent(t *testing.T) {
 			},
 		},
 		{
+			desc: "file with large line",
+			request: &gitalypb.SearchFilesByContentRequest{
+				Repository: repoProto,
+				Query:      "abcdefg",
+				Ref:        []byte(largeLineCommit),
+			},
+			expectedMatches: []string{
+				generateMatch(largeLineCommit.String(), "huge-line-file", 1, 1, staticLine(strings.Repeat("abcdefghi", 1024*64))),
+			},
+		},
+		{
 			desc: "query with leading dash",
 			request: &gitalypb.SearchFilesByContentRequest{
 				Repository: repoProto,
@@ -183,8 +198,6 @@ func TestSearchFilesByContent(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -525,8 +538,6 @@ func TestSearchFilesByName(t *testing.T) {
 			expectedFiles: []string{"-dashed"},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -553,8 +564,8 @@ func consumeFilenameByContentChunked(stream gitalypb.RepositoryService_SearchFil
 			return nil, err
 		}
 
-		match = append(match, resp.MatchData...)
-		if resp.EndOfMatch {
+		match = append(match, resp.GetMatchData()...)
+		if resp.GetEndOfMatch() {
 			matches = append(matches, string(match))
 			match = nil
 		}
@@ -574,7 +585,7 @@ func consumeFilenameByName(stream gitalypb.RepositoryService_SearchFilesByNameCl
 			return nil, err
 		}
 
-		for _, file := range resp.Files {
+		for _, file := range resp.GetFiles() {
 			filenames = append(filenames, string(file))
 		}
 	}

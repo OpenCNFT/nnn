@@ -107,8 +107,8 @@ func TestListUntrackedRepositoriesCommand(t *testing.T) {
 		assert.Empty(t, stderr)
 		exp := []string{
 			"The following repositories were found on disk, but missing from the tracking database:",
-			fmt.Sprintf(`{"relative_path":%q,"storage":"gitaly-1","virtual_storage":"praefect"}`, repo1.RelativePath),
-			fmt.Sprintf(`{"relative_path":%q,"storage":"gitaly-1","virtual_storage":"praefect"}`, repo2.RelativePath),
+			fmt.Sprintf(`{"relative_path":%q,"storage":"gitaly-1","virtual_storage":"praefect"}`, repo1.GetRelativePath()),
+			fmt.Sprintf(`{"relative_path":%q,"storage":"gitaly-1","virtual_storage":"praefect"}`, repo2.GetRelativePath()),
 			"", // an empty extra element required as each line ends with "delimiter" and strings.Split returns all parts
 		}
 		elems := strings.Split(stdout, "~")

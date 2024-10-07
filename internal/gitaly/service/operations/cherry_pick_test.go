@@ -66,7 +66,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:       gittest.TestUser,
 						Commit:     data.cherryPickedCommit,
 						BranchName: []byte(destinationBranch),
-						Message:    []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:    []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 					},
 					&gitalypb.UserCherryPickResponse{
 						BranchUpdate: &gitalypb.OperationBranchUpdate{},
@@ -84,7 +84,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:           gittest.TestUser,
 						Commit:         data.cherryPickedCommit,
 						BranchName:     []byte(destinationBranch),
-						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						ExpectedOldOid: data.mainCommit,
 					},
 					&gitalypb.UserCherryPickResponse{
@@ -101,7 +101,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 					},
 					&gitalypb.UserCherryPickResponse{
@@ -118,7 +118,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 						StartRepository: data.copyRepoProto,
 					},
@@ -136,7 +136,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 					},
 					&gitalypb.UserCherryPickResponse{
@@ -155,7 +155,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 						DryRun:          true,
 					},
@@ -173,7 +173,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 						DryRun:          true,
 					},
@@ -191,7 +191,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 						StartRepository: data.copyRepoProto,
 						DryRun:          true,
@@ -210,7 +210,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:            gittest.TestUser,
 						Commit:          data.cherryPickedCommit,
 						BranchName:      []byte(destinationBranch),
-						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:         []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						StartBranchName: []byte(git.DefaultBranch),
 						DryRun:          true,
 					},
@@ -230,7 +230,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:           gittest.TestUser,
 						Commit:         data.cherryPickedCommit,
 						BranchName:     []byte(destinationBranch),
-						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						ExpectedOldOid: "foobar",
 					},
 					&gitalypb.UserCherryPickResponse{},
@@ -249,7 +249,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:           gittest.TestUser,
 						Commit:         data.cherryPickedCommit,
 						BranchName:     []byte(destinationBranch),
-						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
 					},
 					&gitalypb.UserCherryPickResponse{},
@@ -276,7 +276,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 						User:           gittest.TestUser,
 						Commit:         data.cherryPickedCommit,
 						BranchName:     []byte(git.DefaultBranch),
-						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.Id),
+						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
 						ExpectedOldOid: data.mainCommit,
 					},
 					&gitalypb.UserCherryPickResponse{},
@@ -291,8 +291,6 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -349,7 +347,7 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 
 			headCommit, err := repo.ReadCommit(ctx, git.Revision(destinationBranch))
 			require.NoError(t, err)
-			expectedResp.BranchUpdate.CommitId = headCommit.Id
+			expectedResp.BranchUpdate.CommitId = headCommit.GetId()
 
 			testhelper.ProtoEqual(t, expectedResp, resp)
 		})
@@ -394,7 +392,7 @@ func testServerUserCherryPickSuccessfulGitHooks(t *testing.T, ctx context.Contex
 		User:       gittest.TestUser,
 		Commit:     cherryPickedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+		Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 	}
 
 	var hookOutputFiles []string
@@ -408,7 +406,7 @@ func testServerUserCherryPickSuccessfulGitHooks(t *testing.T, ctx context.Contex
 
 	for _, file := range hookOutputFiles {
 		output := string(testhelper.MustReadFile(t, file))
-		require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GlUsername)
+		require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 	}
 }
 
@@ -495,13 +493,13 @@ func testServerUserCherryPickMergeCommit(t *testing.T, ctx context.Context) {
 		User:       gittest.TestUser,
 		Commit:     cherryPickedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+		Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 	}
 
 	response, err := client.UserCherryPick(ctx, request)
 	require.NoError(t, err)
 
-	gittest.RequireTree(t, cfg, repoPath, response.BranchUpdate.CommitId,
+	gittest.RequireTree(t, cfg, repoPath, response.GetBranchUpdate().GetCommitId(),
 		[]gittest.TreeEntry{
 			{Mode: "100644", Path: "a", Content: "apple"},
 			{Mode: "100644", Path: "c", Content: "coconut"},
@@ -510,7 +508,7 @@ func testServerUserCherryPickMergeCommit(t *testing.T, ctx context.Context) {
 		})
 
 	if featureflag.GPGSigning.IsEnabled(ctx) {
-		data, err := repo.ReadObject(ctx, git.ObjectID(response.BranchUpdate.CommitId))
+		data, err := repo.ReadObject(ctx, git.ObjectID(response.GetBranchUpdate().GetCommitId()))
 		require.NoError(t, err)
 
 		gpgsig, dataWithoutGpgSig := signature.ExtractSignature(t, ctx, data)
@@ -552,15 +550,15 @@ func testServerUserCherryPickStableID(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc:              "when commit author name and email are specified",
-			commitAuthorName:  gittest.TestUser.Name,
-			commitAuthorEmail: gittest.TestUser.Email,
+			commitAuthorName:  gittest.TestUser.GetName(),
+			commitAuthorEmail: gittest.TestUser.GetEmail(),
 			expectedCommitID: gittest.ObjectHashDependent(t, map[string]string{
 				"sha1":   "6a7a5c497966ebabda9518c9271d73863288e047",
 				"sha256": "0074c3a0c3a1fe99b9eb2d1331e9716afcc15c08f477d19e66794950363dfebb",
 			}),
 			expectedCommitAuthor: &gitalypb.CommitAuthor{
-				Name:  gittest.TestUser.Name,
-				Email: gittest.TestUser.Email,
+				Name:  gittest.TestUser.GetName(),
+				Email: gittest.TestUser.GetEmail(),
 				Date: &timestamppb.Timestamp{
 					Seconds: 12345,
 				},
@@ -604,7 +602,7 @@ func testServerUserCherryPickStableID(t *testing.T, ctx context.Context) {
 				User:              gittest.TestUser,
 				Commit:            cherryPickedCommit,
 				BranchName:        []byte(destinationBranch),
-				Message:           []byte("Cherry-picking " + cherryPickedCommit.Id),
+				Message:           []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 				Timestamp:         &timestamppb.Timestamp{Seconds: 12345},
 				CommitAuthorName:  tc.commitAuthorName,
 				CommitAuthorEmail: tc.commitAuthorEmail,
@@ -613,14 +611,14 @@ func testServerUserCherryPickStableID(t *testing.T, ctx context.Context) {
 			response, err := client.UserCherryPick(ctx, request)
 			require.NoError(t, err)
 
-			require.Equal(t, tc.expectedCommitID, response.BranchUpdate.CommitId)
+			require.Equal(t, tc.expectedCommitID, response.GetBranchUpdate().GetCommitId())
 
-			pickCommit, err := repo.ReadCommit(ctx, git.Revision(response.BranchUpdate.CommitId))
+			pickCommit, err := repo.ReadCommit(ctx, git.Revision(response.GetBranchUpdate().GetCommitId()))
 			require.NoError(t, err)
 			testhelper.ProtoEqual(t, &gitalypb.GitCommit{
 				Id:      tc.expectedCommitID,
-				Subject: []byte("Cherry-picking " + cherryPickedCommit.Id),
-				Body:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+				Subject: []byte("Cherry-picking " + cherryPickedCommit.GetId()),
+				Body:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 				BodySize: gittest.ObjectHashDependent(t, map[string]int64{
 					"sha1":   55,
 					"sha256": 79,
@@ -635,8 +633,8 @@ func testServerUserCherryPickStableID(t *testing.T, ctx context.Context) {
 				}),
 				Author: tc.expectedCommitAuthor,
 				Committer: &gitalypb.CommitAuthor{
-					Name:  gittest.TestUser.Name,
-					Email: gittest.TestUser.Email,
+					Name:  gittest.TestUser.GetName(),
+					Email: gittest.TestUser.GetEmail(),
 					Date: &timestamppb.Timestamp{
 						Seconds: 12345,
 					},
@@ -699,7 +697,7 @@ func testServerUserCherryPickFailedValidations(t *testing.T, ctx context.Context
 				User:       nil,
 				Commit:     cherryPickedCommit,
 				BranchName: []byte(destinationBranch),
-				Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+				Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 			},
 			expectedErr: status.Error(codes.InvalidArgument, "empty User"),
 		},
@@ -710,7 +708,7 @@ func testServerUserCherryPickFailedValidations(t *testing.T, ctx context.Context
 				User:       gittest.TestUser,
 				Commit:     nil,
 				BranchName: []byte(destinationBranch),
-				Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+				Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 			},
 			expectedErr: status.Error(codes.InvalidArgument, "empty Commit"),
 		},
@@ -721,7 +719,7 @@ func testServerUserCherryPickFailedValidations(t *testing.T, ctx context.Context
 				User:       gittest.TestUser,
 				Commit:     cherryPickedCommit,
 				BranchName: nil,
-				Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+				Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 			},
 			expectedErr: status.Error(codes.InvalidArgument, "empty BranchName"),
 		},
@@ -795,7 +793,7 @@ func testServerUserCherryPickFailedWithPreReceiveError(t *testing.T, ctx context
 		User:       gittest.TestUser,
 		Commit:     cherryPickedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+		Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 	}
 
 	hookContent := []byte("#!/bin/sh\necho GL_ID=$GL_ID\nexit 1")
@@ -858,7 +856,7 @@ func testServerUserCherryPickFailedWithCreateTreeError(t *testing.T, ctx context
 		User:       gittest.TestUser,
 		Commit:     cherryPickedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+		Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 	}
 
 	response, err := client.UserCherryPick(ctx, request)
@@ -911,7 +909,7 @@ func testServerUserCherryPickFailedWithCommitError(t *testing.T, ctx context.Con
 		User:            gittest.TestUser,
 		Commit:          cherryPickedCommit,
 		BranchName:      []byte(sourceBranch),
-		Message:         []byte("Cherry-picking " + cherryPickedCommit.Id),
+		Message:         []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 		StartBranchName: []byte(destinationBranch),
 	}
 
@@ -925,9 +923,9 @@ func testServerUserCherryPickFailedWithCommitError(t *testing.T, ctx context.Con
 	detailedErr, ok := details[0].(*gitalypb.UserCherryPickError)
 	require.True(t, ok)
 
-	targetBranchDivergedErr, ok := detailedErr.Error.(*gitalypb.UserCherryPickError_TargetBranchDiverged)
+	targetBranchDivergedErr, ok := detailedErr.GetError().(*gitalypb.UserCherryPickError_TargetBranchDiverged)
 	require.True(t, ok)
-	assert.Equal(t, []byte(cherryPickCommitID.String()), targetBranchDivergedErr.TargetBranchDiverged.ParentRevision)
+	assert.Equal(t, []byte(cherryPickCommitID.String()), targetBranchDivergedErr.TargetBranchDiverged.GetParentRevision())
 }
 
 func TestServer_UserCherryPick_failedWithConflict(t *testing.T) {
@@ -975,7 +973,7 @@ func testServerUserCherryPickFailedWithConflict(t *testing.T, ctx context.Contex
 		User:       gittest.TestUser,
 		Commit:     cherryPickedCommit,
 		BranchName: []byte(destinationBranch),
-		Message:    []byte("Cherry-picking " + cherryPickedCommit.Id),
+		Message:    []byte("Cherry-picking " + cherryPickedCommit.GetId()),
 	}
 
 	response, err := client.UserCherryPick(ctx, request)
@@ -988,10 +986,10 @@ func testServerUserCherryPickFailedWithConflict(t *testing.T, ctx context.Contex
 	detailedErr, ok := details[0].(*gitalypb.UserCherryPickError)
 	require.True(t, ok)
 
-	conflictErr, ok := detailedErr.Error.(*gitalypb.UserCherryPickError_CherryPickConflict)
+	conflictErr, ok := detailedErr.GetError().(*gitalypb.UserCherryPickError_CherryPickConflict)
 	require.True(t, ok)
-	require.Len(t, conflictErr.CherryPickConflict.ConflictingFiles, 1)
-	assert.Equal(t, []byte("foo"), conflictErr.CherryPickConflict.ConflictingFiles[0])
+	require.Len(t, conflictErr.CherryPickConflict.GetConflictingFiles(), 1)
+	assert.Equal(t, []byte("foo"), conflictErr.CherryPickConflict.GetConflictingFiles()[0])
 }
 
 func TestServer_UserCherryPick_successfulWithGivenCommits(t *testing.T) {
@@ -1058,13 +1056,13 @@ func testServerUserCherryPickSuccessfulWithGivenCommits(t *testing.T, ctx contex
 			require.NoError(t, err)
 
 			expectedResponse := &gitalypb.UserCherryPickResponse{
-				BranchUpdate: &gitalypb.OperationBranchUpdate{CommitId: newHead.Id},
+				BranchUpdate: &gitalypb.OperationBranchUpdate{CommitId: newHead.GetId()},
 			}
 
 			testhelper.ProtoEqual(t, expectedResponse, response)
 
-			require.Equal(t, request.Message, newHead.Subject)
-			require.Equal(t, testCase.startRevision.String(), newHead.ParentIds[0])
+			require.Equal(t, request.GetMessage(), newHead.GetSubject())
+			require.Equal(t, testCase.startRevision.String(), newHead.GetParentIds()[0])
 		})
 	}
 }
@@ -1202,13 +1200,13 @@ func testServerUserCherryPickReverse(t *testing.T, ctx context.Context) {
 			User:       gittest.TestUser,
 			Commit:     cherryPickCommit,
 			BranchName: []byte(destinationBranch),
-			Message:    []byte("Cherry-picking " + cherryPickCommit.Id),
+			Message:    []byte("Cherry-picking " + cherryPickCommit.GetId()),
 		}
 
 		response, err := client.UserCherryPick(ctx, request)
 		require.NoError(t, err)
 
-		gittest.RequireTree(t, cfg, repoPath, response.BranchUpdate.CommitId,
+		gittest.RequireTree(t, cfg, repoPath, response.GetBranchUpdate().GetCommitId(),
 			append(destinationTree, treeEntries[i+2:]...),
 		)
 	}

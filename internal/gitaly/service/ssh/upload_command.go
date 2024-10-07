@@ -11,7 +11,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 // runUploadCommand runs an uploading command like git-upload-pack(1) or git-upload-archive(1). It serves multiple
@@ -26,7 +25,7 @@ import (
 //     what is to be sent at a later point when permissions of the user might have changed.
 func (s *server) runUploadCommand(
 	rpcContext context.Context,
-	repo *gitalypb.Repository,
+	repo gitcmd.RepositoryExecutor,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 	timeoutTicker helper.Ticker,
@@ -49,7 +48,7 @@ func (s *server) runUploadCommand(
 		return fmt.Errorf("create monitor: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, repo, sc, append([]gitcmd.CmdOpt{
+	cmd, err := repo.Exec(ctx, sc, append([]gitcmd.CmdOpt{
 		gitcmd.WithStdin(stdinPipe),
 		gitcmd.WithStdout(stdout),
 		gitcmd.WithStderr(stderr),

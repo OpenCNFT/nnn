@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -209,10 +208,10 @@ func TestRepo_QuarantineOnly(t *testing.T) {
 		require.NoError(t, err)
 
 		expectedRepo := &gitalypb.Repository{
-			StorageName:                   repoProto.StorageName,
-			RelativePath:                  repoProto.RelativePath,
-			GlRepository:                  repoProto.GlRepository,
-			GlProjectPath:                 repoProto.GlProjectPath,
+			StorageName:                   repoProto.GetStorageName(),
+			RelativePath:                  repoProto.GetRelativePath(),
+			GlRepository:                  repoProto.GetGlRepository(),
+			GlProjectPath:                 repoProto.GetGlProjectPath(),
 			GitObjectDirectory:            "quarantine-directory",
 			GitAlternateObjectDirectories: []string{"objects"},
 		}
@@ -261,43 +260,23 @@ func TestRepo_ObjectHash(t *testing.T) {
 	t.Cleanup(catfileCache.Stop)
 	locator := config.NewLocator(cfg)
 
-	outputFile := filepath.Join(testhelper.TempDir(t), "output")
-
-	// We create an intercepting command factory that detects when we run our object hash
-	// detection logic and, if so, writes a sentinel value into our output file. Like this we
-	// can test how often the logic runs.
-	gitCmdFactory := gittest.NewInterceptingCommandFactory(t, ctx, cfg, func(execEnv gitcmd.ExecutionEnvironment) string {
-		return fmt.Sprintf(`#!/bin/sh
-		( echo "$@" | grep --silent -- '--show-object-format' ) && echo detection-logic >>%q
-		exec %q "$@"`, outputFile, execEnv.BinaryPath)
-	})
-
-	repoProto, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+	repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 		SkipCreationViaService: true,
 	})
-	repo := New(testhelper.NewLogger(t), locator, gitCmdFactory, catfileCache, repoProto)
+
+	repo := New(testhelper.NewLogger(t), locator, gittest.NewCommandFactory(t, cfg), catfileCache, repoProto)
 
 	objectHash, err := repo.ObjectHash(ctx)
 	require.NoError(t, err)
 	require.Equal(t, gittest.DefaultObjectHash.EmptyTreeOID, objectHash.EmptyTreeOID)
 
-	// We should see that the detection logic has been executed once.
-	// But if we're adding the `attr.tree` config, we also check the object
-	// hash there to get the empty tree OID, so the logic would be executed
-	// once more.
-	require.Equal(t, "detection-logic\ndetection-logic\n",
-		string(testhelper.MustReadFile(t, outputFile)),
-	)
+	// The first call to ObjectHash should have cached the value. Set the object format to an unsupported
+	// one so it would break if we read it for the second time and didn't use the cached value.
+	gittest.Exec(t, cfg, "-C", repoPath, "config", "extensions.objectformat", "unsupported-hash")
 
 	// Verify that running this a second time continues to return the object hash alright
 	// regardless of the cache.
 	objectHash, err = repo.ObjectHash(ctx)
 	require.NoError(t, err)
 	require.Equal(t, gittest.DefaultObjectHash.EmptyTreeOID, objectHash.EmptyTreeOID)
-
-	// But the detection logic should not have been executed a second time.
-	// Read the comment in the first check for logic regarding the flag.
-	require.Equal(t, "detection-logic\ndetection-logic\n",
-		string(testhelper.MustReadFile(t, outputFile)),
-	)
 }

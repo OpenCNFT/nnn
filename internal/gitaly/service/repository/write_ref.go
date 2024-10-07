@@ -28,7 +28,7 @@ func (s *server) WriteRef(ctx context.Context, req *gitalypb.WriteRefRequest) (*
 func (s *server) writeRef(ctx context.Context, req *gitalypb.WriteRefRequest) error {
 	repo := s.localrepo(req.GetRepository())
 
-	if string(req.Ref) == "HEAD" {
+	if string(req.GetRef()) == "HEAD" {
 		if err := repo.SetDefaultBranch(ctx, s.txManager, git.ReferenceName(req.GetRevision())); err != nil {
 			return fmt.Errorf("setting default branch: %w", err)
 		}
@@ -125,19 +125,19 @@ func validateWriteRefRequest(ctx context.Context, locator storage.Locator, req *
 	if err := locator.ValidateRepository(ctx, req.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(req.Ref); err != nil {
+	if err := git.ValidateRevision(req.GetRef()); err != nil {
 		return fmt.Errorf("invalid ref: %w", err)
 	}
-	if err := git.ValidateRevision(req.Revision); err != nil {
+	if err := git.ValidateRevision(req.GetRevision()); err != nil {
 		return fmt.Errorf("invalid revision: %w", err)
 	}
-	if len(req.OldRevision) > 0 {
-		if err := git.ValidateRevision(req.OldRevision); err != nil {
+	if len(req.GetOldRevision()) > 0 {
+		if err := git.ValidateRevision(req.GetOldRevision()); err != nil {
 			return fmt.Errorf("invalid OldRevision: %w", err)
 		}
 	}
 
-	if !bytes.Equal(req.Ref, []byte("HEAD")) && !bytes.HasPrefix(req.Ref, []byte("refs/")) {
+	if !bytes.Equal(req.GetRef(), []byte("HEAD")) && !bytes.HasPrefix(req.GetRef(), []byte("refs/")) {
 		return fmt.Errorf("ref has to be a full reference")
 	}
 	return nil

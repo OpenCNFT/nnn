@@ -81,13 +81,11 @@ func TestRemove(t *testing.T) {
 
 				return gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
-					RelativePath:           repo.RelativePath,
+					RelativePath:           repo.GetRelativePath(),
 				})
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

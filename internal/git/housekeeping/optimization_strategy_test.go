@@ -595,8 +595,6 @@ func TestHeuristicalOptimizationStrategy_ShouldRepackReftables(t *testing.T) {
 			expectedRepacking: true,
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

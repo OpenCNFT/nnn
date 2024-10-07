@@ -88,7 +88,6 @@ custom_hooks_path = 'path/to/002.custom_hooks.tar'
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -164,7 +163,6 @@ custom_hooks_path = 'path/to/002.custom_hooks.tar'
 `,
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

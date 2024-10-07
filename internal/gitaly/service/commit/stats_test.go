@@ -185,8 +185,6 @@ func TestCommitStatsSuccess(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

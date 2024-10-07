@@ -116,7 +116,7 @@ func (s *server) rewriteHistory(
 	}
 
 	// Check state of source repository prior to running filter-repo.
-	initialChecksum, err := checksumRepo(ctx, s.gitCmdFactory, repo)
+	initialChecksum, err := checksumRepo(ctx, repo)
 	if err != nil {
 		return fmt.Errorf("calculate initial checksum: %w", err)
 	}
@@ -128,7 +128,7 @@ func (s *server) rewriteHistory(
 	// Recheck repository state to confirm no changes occurred while filter-repo ran. The
 	// repository may not be fully rewritten if it was modified after git-fast-export(1)
 	// completed.
-	validationChecksum, err := checksumRepo(ctx, s.gitCmdFactory, repo)
+	validationChecksum, err := checksumRepo(ctx, repo)
 	if err != nil {
 		return fmt.Errorf("recalculate checksum: %w", err)
 	}
@@ -138,6 +138,11 @@ func (s *server) rewriteHistory(
 			structerr.MetadataItem{Key: "initial checksum", Value: initialChecksum},
 			structerr.MetadataItem{Key: "validation checksum", Value: validationChecksum},
 		)
+	}
+
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
 	var stderr strings.Builder
@@ -167,7 +172,7 @@ func (s *server) rewriteHistory(
 				git.MirrorRefSpec,
 			),
 		},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(objectHash, repo),
 		gitcmd.WithStderr(&stderr),
 		gitcmd.WithConfig(gitcmd.ConfigPair{
 			Key: "advice.fetchShowForcedUpdates", Value: "false",
@@ -324,9 +329,9 @@ func writeArgFile(name string, dir string, input []byte) (string, error) {
 	return path, nil
 }
 
-func checksumRepo(ctx context.Context, cmdFactory gitcmd.CommandFactory, repo *localrepo.Repo) (string, error) {
+func checksumRepo(ctx context.Context, repo *localrepo.Repo) (string, error) {
 	var stderr strings.Builder
-	cmd, err := cmdFactory.New(ctx, repo, gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "show-ref",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--head"},

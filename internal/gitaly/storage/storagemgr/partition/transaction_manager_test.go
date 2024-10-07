@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
@@ -84,21 +85,21 @@ func buildReftableDirectory(data map[int][]git.ReferenceUpdates) testhelper.Dire
 
 				// If there are reftables being created, we need to account for
 				// N tables and +2 for the tables.list being updated.
-				require.Equal(tb, numTables+2, uint(len(logEntry.Operations)))
+				require.Equal(tb, numTables+2, uint(len(logEntry.GetOperations())))
 
 				// The reftables should only be created.
 				for i := uint(0); i < numTables; i++ {
-					create := logEntry.Operations[i].GetCreateHardLink()
+					create := logEntry.GetOperations()[i].GetCreateHardLink()
 					require.NotNil(tb, create)
-					require.True(tb, git.ReftableTableNameRegex.Match(create.DestinationPath))
+					require.True(tb, git.ReftableTableNameRegex.Match(create.GetDestinationPath()))
 				}
 
 				// The tables.list should be deleted and create (updated).
-				delete := logEntry.Operations[numTables].GetRemoveDirectoryEntry()
+				delete := logEntry.GetOperations()[numTables].GetRemoveDirectoryEntry()
 				require.NotNil(tb, delete)
 				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
 
-				create := logEntry.Operations[numTables].GetRemoveDirectoryEntry()
+				create := logEntry.GetOperations()[numTables].GetRemoveDirectoryEntry()
 				require.NotNil(tb, create)
 				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
 
@@ -363,7 +364,6 @@ func testTransactionManager(t *testing.T, ctx context.Context) {
 
 	for desc, tests := range subTests {
 		for _, tc := range tests {
-			tc := tc
 			t.Run(fmt.Sprintf("%s/%s", desc, tc.desc), func(t *testing.T) {
 				t.Parallel()
 
@@ -1750,19 +1750,19 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				expectedEntry := expected[i].entry
 
 				if testhelper.IsReftableEnabled() {
-					for idx, op := range expectedEntry.Operations {
+					for idx, op := range expectedEntry.GetOperations() {
 						if chl := op.GetCreateHardLink(); chl != nil {
-							actualCHL := actualEntry.Operations[idx].GetCreateHardLink()
+							actualCHL := actualEntry.GetOperations()[idx].GetCreateHardLink()
 							require.NotNil(t, actualCHL)
 
-							if filepath.Base(string(actualCHL.DestinationPath)) == "tables.list" {
+							if filepath.Base(string(actualCHL.GetDestinationPath())) == "tables.list" {
 								continue
 							}
 
 							// We can't predict the table names, but we can verify
 							// the regex.
-							require.True(t, git.ReftableTableNameRegex.Match(actualCHL.DestinationPath))
-							chl.DestinationPath = actualCHL.DestinationPath
+							require.True(t, git.ReftableTableNameRegex.Match(actualCHL.GetDestinationPath()))
+							chl.DestinationPath = actualCHL.GetDestinationPath()
 						}
 					}
 				}
@@ -2288,7 +2288,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					require.NoError(t, tm.appendLogEntry(map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
+					require.NoError(t, tm.appendLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
@@ -2367,13 +2367,13 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionSize:      1,
 		},
 		{
-			numberOfRepositories: 10,
-			concurrentUpdaters:   1,
+			numberOfRepositories: 1,
+			concurrentUpdaters:   10,
 			transactionSize:      1,
 		},
 		{
-			numberOfRepositories: 1,
-			concurrentUpdaters:   10,
+			numberOfRepositories: 10,
+			concurrentUpdaters:   1,
 			transactionSize:      1,
 		},
 		{
@@ -2393,6 +2393,13 @@ func BenchmarkTransactionManager(b *testing.B) {
 			tc.transactionSize,
 		)
 		b.Run(desc, func(b *testing.B) {
+			traceFile, err := os.OpenFile("trace.bin", os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
+			require.NoError(b, err)
+			defer traceFile.Close()
+
+			require.NoError(b, trace.Start(traceFile))
+			defer trace.Stop()
+
 			ctx := testhelper.Context(b)
 
 			cfg := testcfg.Build(b)
@@ -2440,7 +2447,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 				repo, repoPath := gittest.CreateRepository(b, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
 				})
-				relativePaths = append(relativePaths, repo.RelativePath)
+				relativePaths = append(relativePaths, repo.GetRelativePath())
 
 				// Set up two commits that the updaters update their references back and forth.
 				// The commit IDs are the same across all repositories as the parameters used to
@@ -2475,12 +2482,13 @@ func BenchmarkTransactionManager(b *testing.B) {
 					assert.NoError(b, manager.Run())
 				}()
 
-				objectHash, err := repositoryFactory.Build(repo.RelativePath).ObjectHash(ctx)
+				objectHash, err := repositoryFactory.Build(repo.GetRelativePath()).ObjectHash(ctx)
 				require.NoError(b, err)
 
 				for j := 0; j < tc.concurrentUpdaters; j++ {
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
-						RelativePaths: []string{repo.RelativePath},
+						Write:         true,
+						RelativePaths: []string{repo.GetRelativePath()},
 					})
 					require.NoError(b, err)
 					transaction.UpdateReferences(getReferenceUpdates(j, objectHash.ZeroOID, commit1))
@@ -2493,7 +2501,6 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionChan := make(chan struct{})
 
 			for i, manager := range managers {
-				manager := manager
 				relativePath := relativePaths[i]
 				for i := 0; i < tc.concurrentUpdaters; i++ {
 
@@ -2502,6 +2509,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 					nextReferences := getReferenceUpdates(i, commit2, commit1)
 
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
+						Write:         true,
 						RelativePaths: []string{relativePath},
 					})
 					require.NoError(b, err)
@@ -2516,6 +2524,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 
 						for range transactionChan {
 							transaction, err := manager.Begin(ctx, storage.BeginOptions{
+								Write:         true,
 								RelativePaths: []string{relativePath},
 							})
 							require.NoError(b, err)

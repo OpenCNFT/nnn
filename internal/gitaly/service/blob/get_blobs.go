@@ -30,9 +30,9 @@ func sendGetBlobsResponse(
 
 	tef := catfile.NewTreeEntryFinder(objectReader)
 
-	for _, revisionPath := range req.RevisionPaths {
-		revision := revisionPath.Revision
-		path := revisionPath.Path
+	for _, revisionPath := range req.GetRevisionPaths() {
+		revision := revisionPath.GetRevision()
+		path := revisionPath.GetPath()
 
 		if len(path) > 1 {
 			path = bytes.TrimRight(path, "/")
@@ -45,7 +45,7 @@ func sendGetBlobsResponse(
 
 		response := &gitalypb.GetBlobsResponse{Revision: revision, Path: path}
 
-		if treeEntry == nil || len(treeEntry.Oid) == 0 {
+		if treeEntry == nil || len(treeEntry.GetOid()) == 0 {
 			if err := stream.Send(response); err != nil {
 				return structerr.NewAborted("send: %w", err)
 			}
@@ -53,10 +53,10 @@ func sendGetBlobsResponse(
 			continue
 		}
 
-		response.Mode = treeEntry.Mode
-		response.Oid = treeEntry.Oid
+		response.Mode = treeEntry.GetMode()
+		response.Oid = treeEntry.GetOid()
 
-		if treeEntry.Type == gitalypb.TreeEntry_COMMIT {
+		if treeEntry.GetType() == gitalypb.TreeEntry_COMMIT {
 			response.IsSubmodule = true
 			response.Type = gitalypb.ObjectType_COMMIT
 
@@ -67,7 +67,7 @@ func sendGetBlobsResponse(
 			continue
 		}
 
-		objectInfo, err := objectInfoReader.Info(ctx, git.Revision(treeEntry.Oid))
+		objectInfo, err := objectInfoReader.Info(ctx, git.Revision(treeEntry.GetOid()))
 		if err != nil {
 			return structerr.NewInternal("read object info: %w", err)
 		}
@@ -75,13 +75,13 @@ func sendGetBlobsResponse(
 		response.Size = objectInfo.Size
 
 		var ok bool
-		response.Type, ok = treeEntryToObjectType[treeEntry.Type]
+		response.Type, ok = treeEntryToObjectType[treeEntry.GetType()]
 
 		if !ok {
 			continue
 		}
 
-		if response.Type != gitalypb.ObjectType_BLOB {
+		if response.GetType() != gitalypb.ObjectType_BLOB {
 			if err := stream.Send(response); err != nil {
 				return structerr.NewAborted("send: %w", err)
 			}
@@ -105,8 +105,8 @@ func sendBlobTreeEntry(
 	ctx := stream.Context()
 
 	var readLimit int64
-	if limit < 0 || limit > response.Size {
-		readLimit = response.Size
+	if limit < 0 || limit > response.GetSize() {
+		readLimit = response.GetSize()
 	} else {
 		readLimit = limit
 	}
@@ -121,7 +121,7 @@ func sendBlobTreeEntry(
 		return nil
 	}
 
-	blobObj, err := objectReader.Object(ctx, git.Revision(response.Oid))
+	blobObj, err := objectReader.Object(ctx, git.Revision(response.GetOid()))
 	if err != nil {
 		return structerr.NewInternal("read object: %w", err)
 	}
@@ -181,12 +181,12 @@ func validateGetBlobsRequest(ctx context.Context, locator storage.Locator, req *
 		return err
 	}
 
-	if len(req.RevisionPaths) == 0 {
+	if len(req.GetRevisionPaths()) == 0 {
 		return errors.New("empty RevisionPaths")
 	}
 
-	for _, rp := range req.RevisionPaths {
-		if err := git.ValidateRevision([]byte(rp.Revision)); err != nil {
+	for _, rp := range req.GetRevisionPaths() {
+		if err := git.ValidateRevision([]byte(rp.GetRevision())); err != nil {
 			return err
 		}
 	}

@@ -29,10 +29,10 @@ func (s *server) CountCommits(ctx context.Context, in *gitalypb.CountCommitsRequ
 	}
 
 	if before := in.GetBefore(); before != nil {
-		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--before=" + timestampToRFC3339(before.Seconds)})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--before=" + timestampToRFC3339(before.GetSeconds())})
 	}
 	if after := in.GetAfter(); after != nil {
-		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--after=" + timestampToRFC3339(after.Seconds)})
+		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: "--after=" + timestampToRFC3339(after.GetSeconds())})
 	}
 	if maxCount := in.GetMaxCount(); maxCount != 0 {
 		subCmd.Flags = append(subCmd.Flags, gitcmd.Flag{Name: fmt.Sprintf("--max-count=%d", maxCount)})
@@ -44,8 +44,10 @@ func (s *server) CountCommits(ctx context.Context, in *gitalypb.CountCommitsRequ
 		subCmd.PostSepArgs = []string{string(path)}
 	}
 
+	repo := s.localrepo(in.GetRepository())
+
 	opts := gitcmd.ConvertGlobalOptions(in.GetGlobalOptions())
-	cmd, err := s.gitCmdFactory.New(ctx, in.Repository, subCmd, append(opts, gitcmd.WithSetupStdout())...)
+	cmd, err := repo.Exec(ctx, subCmd, append(opts, gitcmd.WithSetupStdout())...)
 	if err != nil {
 		return nil, structerr.NewInternal("cmd: %w", err)
 	}
@@ -76,7 +78,7 @@ func validateCountCommitsRequest(ctx context.Context, locator storage.Locator, i
 		return err
 	}
 
-	if err := git.ValidateRevision(in.Revision, git.AllowEmptyRevision()); err != nil {
+	if err := git.ValidateRevision(in.GetRevision(), git.AllowEmptyRevision()); err != nil {
 		return err
 	}
 

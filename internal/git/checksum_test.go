@@ -33,7 +33,7 @@ func TestRefsAllowed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.ref, func(t *testing.T) {
-			match := refsAllowed.Match([]byte(tc.ref))
+			match := refsAllowed.MatchString(tc.ref)
 			require.Equal(t, match, tc.match)
 		})
 	}

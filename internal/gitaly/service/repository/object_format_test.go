@@ -149,20 +149,15 @@ func TestObjectFormat(t *testing.T) {
 						Repository: repoProto,
 					},
 					requireError: func(actual error) {
-						testhelper.RequireStatusWithErrorMetadataRegexp(t,
-							structerr.NewInternal("detecting object hash: reading object format: exit status 128"),
+						testhelper.RequireGrpcError(t,
+							structerr.NewInternal(`detecting object hash: unknown object format: "blake2b"`),
 							actual,
-							map[string]string{
-								"stderr": "^error: invalid value for 'extensions.objectformat': 'blake2b'\nfatal: bad config line 5 in file .+/config\n$",
-							},
 						)
 					},
 				}
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -85,8 +85,8 @@ func TestReplMgr_ProcessBacklog(t *testing.T) {
 
 	repoClient := newRepositoryClient(t, backupCfg.SocketPath, backupCfg.Auth.Token)
 	_, err := repoClient.ReplicateRepository(injectedCtx, &gitalypb.ReplicateRepositoryRequest{
-		Repository: targetObjectPoolRepo.Repository,
-		Source:     poolRepository.Repository,
+		Repository: targetObjectPoolRepo.GetRepository(),
+		Source:     poolRepository.GetRepository(),
 	})
 	require.NoError(t, err)
 
@@ -269,7 +269,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 				sourceRepo, _ := gittest.CreateRepository(t, ctx, sourceCfg)
 				return setupData{
 					job: datastore.ReplicationJob{
-						ReplicaPath:       sourceRepo.RelativePath,
+						ReplicaPath:       sourceRepo.GetRelativePath(),
 						TargetNodeStorage: targetStorage,
 						SourceNodeStorage: sourceStorage,
 					},
@@ -289,13 +289,13 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 				// Create object pool on target Gitaly with the same relative path
 				// as the source object pool.
 				gittest.CreateRepository(t, ctx, targetCfg, gittest.CreateRepositoryConfig{
-					RelativePath: sourcePool.Repository.RelativePath,
+					RelativePath: sourcePool.GetRepository().GetRelativePath(),
 				})
 
 				expectedPool := &gitalypb.ObjectPool{
 					Repository: &gitalypb.Repository{
 						StorageName:  targetStorage,
-						RelativePath: sourcePool.Repository.RelativePath,
+						RelativePath: sourcePool.GetRepository().GetRelativePath(),
 					},
 				}
 
@@ -307,7 +307,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 
 				return setupData{
 					job: datastore.ReplicationJob{
-						ReplicaPath:       sourceRepo.RelativePath,
+						ReplicaPath:       sourceRepo.GetRelativePath(),
 						TargetNodeStorage: targetStorage,
 						SourceNodeStorage: sourceStorage,
 					},
@@ -325,7 +325,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 				// Create repository on target Gitaly with the same relative path as
 				// the source repository and link it to an object pool.
 				targetRepo, _ := gittest.CreateRepository(t, ctx, targetCfg, gittest.CreateRepositoryConfig{
-					RelativePath: sourceRepo.RelativePath,
+					RelativePath: sourceRepo.GetRelativePath(),
 				})
 				gittest.CreateObjectPool(t, ctx, targetCfg, targetRepo, gittest.CreateObjectPoolConfig{
 					LinkRepositoryToObjectPool: true,
@@ -333,7 +333,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 
 				return setupData{
 					job: datastore.ReplicationJob{
-						ReplicaPath:       sourceRepo.RelativePath,
+						ReplicaPath:       sourceRepo.GetRelativePath(),
 						TargetNodeStorage: targetStorage,
 						SourceNodeStorage: sourceStorage,
 					},
@@ -353,7 +353,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 				// Create repository on target Gitaly with a relative path different from the source
 				// repository and link it to an object pool.
 				targetRepo, _ := gittest.CreateRepository(t, ctx, targetCfg, gittest.CreateRepositoryConfig{
-					RelativePath: sourceRepo.RelativePath,
+					RelativePath: sourceRepo.GetRelativePath(),
 				})
 				gittest.CreateObjectPool(t, ctx, targetCfg, targetRepo, gittest.CreateObjectPoolConfig{
 					LinkRepositoryToObjectPool: true,
@@ -362,13 +362,13 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 				// Create object pool on target Gitaly with the same relative path as the source
 				// object pool. This repository will eventually be linked to the target repository.
 				gittest.CreateRepository(t, ctx, targetCfg, gittest.CreateRepositoryConfig{
-					RelativePath: sourcePool.Repository.RelativePath,
+					RelativePath: sourcePool.GetRepository().GetRelativePath(),
 				})
 
 				expectedPool := &gitalypb.ObjectPool{
 					Repository: &gitalypb.Repository{
 						StorageName:  targetStorage,
-						RelativePath: sourcePool.Repository.RelativePath,
+						RelativePath: sourcePool.GetRepository().GetRelativePath(),
 					},
 				}
 
@@ -380,7 +380,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 
 				return setupData{
 					job: datastore.ReplicationJob{
-						ReplicaPath:       sourceRepo.RelativePath,
+						ReplicaPath:       sourceRepo.GetRelativePath(),
 						TargetNodeStorage: targetStorage,
 						SourceNodeStorage: sourceStorage,
 					},
@@ -410,7 +410,7 @@ func TestDefaultReplicator_Replicate(t *testing.T) {
 				Repository: targetRepo,
 			})
 			require.NoError(t, err)
-			require.True(t, existsResp.Exists)
+			require.True(t, existsResp.GetExists())
 
 			// If the source repository has linked to an object pool, the target should
 			// also be linked to an object pool with the same relative path.
@@ -593,7 +593,7 @@ func TestProcessBacklog_FailedJobs(t *testing.T) {
 	okJob := datastore.ReplicationJob{
 		RepositoryID:      1,
 		Change:            datastore.UpdateRepo,
-		RelativePath:      testRepo.RelativePath,
+		RelativePath:      testRepo.GetRelativePath(),
 		TargetNodeStorage: secondary.Storage,
 		SourceNodeStorage: primary.Storage,
 		VirtualStorage:    "praefect",

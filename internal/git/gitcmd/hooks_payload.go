@@ -123,7 +123,7 @@ type jsonHooksPayload struct {
 // passed to Git hooks.
 func NewHooksPayload(
 	cfg config.Cfg,
-	repo *gitalypb.Repository,
+	repo storage.Repository,
 	objectHash git.ObjectHash,
 	tx *txinfo.Transaction,
 	userDetails *UserDetails,
@@ -140,7 +140,14 @@ func NewHooksPayload(
 	}
 
 	return HooksPayload{
-		Repo:                  repo,
+		Repo: &gitalypb.Repository{
+			StorageName:                   repo.GetStorageName(),
+			RelativePath:                  repo.GetRelativePath(),
+			GitObjectDirectory:            repo.GetGitObjectDirectory(),
+			GitAlternateObjectDirectories: repo.GetGitAlternateObjectDirectories(),
+			GlRepository:                  repo.GetGlRepository(),
+			GlProjectPath:                 repo.GetGlProjectPath(),
+		},
 		ObjectFormat:          objectHash.Format,
 		RuntimeDir:            cfg.RuntimeDir,
 		InternalSocket:        cfg.InternalSocketPath(),

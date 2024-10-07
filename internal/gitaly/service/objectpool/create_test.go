@@ -92,7 +92,7 @@ func TestCreate_emptySource(t *testing.T) {
 
 	objectPoolProto := &gitalypb.ObjectPool{
 		Repository: &gitalypb.Repository{
-			StorageName:  repoProto.StorageName,
+			StorageName:  repoProto.GetStorageName(),
 			RelativePath: gittest.NewObjectPoolName(t),
 		},
 	}
@@ -104,7 +104,7 @@ func TestCreate_emptySource(t *testing.T) {
 	require.NoError(t, err)
 	testhelper.ProtoEqual(t, &gitalypb.CreateObjectPoolResponse{}, response)
 
-	objectPoolRepo := localrepo.NewTestRepo(t, cfg, objectPoolProto.Repository)
+	objectPoolRepo := localrepo.NewTestRepo(t, cfg, objectPoolProto.GetRepository())
 
 	// Assert that the created object pool is indeed empty.
 	info, err := stats.RepositoryInfoForRepository(ctx, objectPoolRepo)
@@ -313,5 +313,5 @@ func TestCreate_atomic(t *testing.T) {
 		Origin:     repo,
 	})
 	testhelper.RequireGrpcError(t, structerr.NewInternal("creating object pool: cloning to pool: exit status 123, stderr: %q", ""), err)
-	require.NoDirExists(t, filepath.Join(cfg.Storages[0].Path, objectPool.Repository.RelativePath))
+	require.NoDirExists(t, filepath.Join(cfg.Storages[0].Path, objectPool.GetRepository().GetRelativePath()))
 }

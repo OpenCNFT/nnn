@@ -76,7 +76,7 @@ func UploadPackWithSidechannel(
 		return result, err
 	}
 	result.ExitCode = 0
-	result.PackfileNegotiationStatistics = resp.PackfileNegotiationStatistics
+	result.PackfileNegotiationStatistics = resp.GetPackfileNegotiationStatistics()
 
 	if err := wt.Close(); err != nil {
 		return result, err

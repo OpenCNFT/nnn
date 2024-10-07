@@ -719,7 +719,7 @@ func TestFetchRemote(t *testing.T) {
 					request: &gitalypb.FetchRemoteRequest{
 						Repository: &gitalypb.Repository{
 							StorageName:  "foobar",
-							RelativePath: repoProto.RelativePath,
+							RelativePath: repoProto.GetRelativePath(),
 						},
 						RemoteParams: &gitalypb.Remote{Url: remoteRepoPath},
 					},
@@ -914,8 +914,6 @@ func TestFetchRemote(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

@@ -242,8 +242,6 @@ func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository Get
 			expectedName: git.NewReferenceNameFromBranchName("feature"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 			name, err := tc.repo(t).HeadReference(ctx)

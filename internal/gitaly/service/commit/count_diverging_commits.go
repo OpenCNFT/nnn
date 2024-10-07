@@ -20,9 +20,11 @@ func (s *server) CountDivergingCommits(ctx context.Context, req *gitalypb.CountD
 		return nil, structerr.NewInvalidArgument("%w", err)
 	}
 
+	repo := s.localrepo(req.GetRepository())
 	from, to := string(req.GetFrom()), string(req.GetTo())
 	maxCount := int(req.GetMaxCount())
-	left, right, err := s.findLeftRightCount(ctx, req.GetRepository(), from, to, maxCount)
+
+	left, right, err := s.findLeftRightCount(ctx, repo, from, to, maxCount)
 	if err != nil {
 		return nil, structerr.NewInternal("%w", err)
 	}
@@ -55,8 +57,8 @@ func buildRevListCountCmd(from, to string, maxCount int) gitcmd.Command {
 	return subCmd
 }
 
-func (s *server) findLeftRightCount(ctx context.Context, repo *gitalypb.Repository, from, to string, maxCount int) (int32, int32, error) {
-	cmd, err := s.gitCmdFactory.New(ctx, repo, buildRevListCountCmd(from, to, maxCount), gitcmd.WithSetupStdout())
+func (s *server) findLeftRightCount(ctx context.Context, repo gitcmd.RepositoryExecutor, from, to string, maxCount int) (int32, int32, error) {
+	cmd, err := repo.Exec(ctx, buildRevListCountCmd(from, to, maxCount), gitcmd.WithSetupStdout())
 	if err != nil {
 		return 0, 0, fmt.Errorf("git rev-list cmd: %w", err)
 	}

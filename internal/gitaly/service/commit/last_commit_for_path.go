@@ -52,7 +52,7 @@ func (s *server) lastCommitForPath(ctx context.Context, in *gitalypb.LastCommitF
 		options.LiteralPathspecs = true
 	}
 
-	commit, err := log.LastCommitForPath(ctx, s.gitCmdFactory, objectReader, repo, git.Revision(in.GetRevision()), path, options)
+	commit, err := log.LastCommitForPath(ctx, objectReader, repo, git.Revision(in.GetRevision()), path, options)
 	if err != nil {
 		if errors.As(err, &catfile.NotFoundError{}) {
 			return &gitalypb.LastCommitForPathResponse{}, nil
@@ -67,7 +67,7 @@ func validateLastCommitForPathRequest(ctx context.Context, locator storage.Locat
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(in.Revision); err != nil {
+	if err := git.ValidateRevision(in.GetRevision()); err != nil {
 		return err
 	}
 

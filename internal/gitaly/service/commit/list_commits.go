@@ -20,7 +20,7 @@ func verifyListCommitsRequest(ctx context.Context, locator storage.Locator, requ
 	if len(request.GetRevisions()) == 0 {
 		return errors.New("missing revisions")
 	}
-	for _, revision := range request.Revisions {
+	for _, revision := range request.GetRevisions() {
 		if err := git.ValidateRevision([]byte(revision), git.AllowPseudoRevision()); err != nil {
 			return structerr.NewInvalidArgument("invalid revision: %w", err).WithMetadata("revision", revision)
 		}
@@ -86,6 +86,10 @@ func (s *server) ListCommits(
 
 	if request.GetIgnoreCase() {
 		revlistOptions = append(revlistOptions, gitpipe.WithIgnoreCase(request.GetIgnoreCase()))
+	}
+
+	if request.GetSkip() > 0 {
+		revlistOptions = append(revlistOptions, gitpipe.WithSkip(uint(request.GetSkip())))
 	}
 
 	if len(request.GetCommitMessagePatterns()) > 0 {

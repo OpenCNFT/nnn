@@ -28,7 +28,7 @@ func (s *server) GetBlob(in *gitalypb.GetBlobRequest, stream gitalypb.BlobServic
 	}
 	defer cancel()
 
-	blob, err := objectReader.Object(ctx, git.Revision(in.Oid))
+	blob, err := objectReader.Object(ctx, git.Revision(in.GetOid()))
 	if err != nil {
 		if errors.As(err, &catfile.NotFoundError{}) {
 			if err := stream.Send(&gitalypb.GetBlobResponse{}); err != nil {
@@ -48,8 +48,8 @@ func (s *server) GetBlob(in *gitalypb.GetBlobRequest, stream gitalypb.BlobServic
 	}
 
 	readLimit := blob.Size
-	if in.Limit >= 0 && in.Limit < readLimit {
-		readLimit = in.Limit
+	if in.GetLimit() >= 0 && in.GetLimit() < readLimit {
+		readLimit = in.GetLimit()
 	}
 	firstMessage := &gitalypb.GetBlobResponse{
 		Size: blob.Size,

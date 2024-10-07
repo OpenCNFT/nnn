@@ -69,7 +69,7 @@ func TestPipeline(t *testing.T) {
 				strategy := MockStrategy{
 					CreateFunc: func(ctx context.Context, req *CreateRequest) error {
 						mu.Lock()
-						callsPerStorage[req.Repository.StorageName]++
+						callsPerStorage[req.Repository.GetStorageName()]++
 						allCalls := 0
 						for _, v := range callsPerStorage {
 							allCalls += v
@@ -77,12 +77,12 @@ func TestPipeline(t *testing.T) {
 						// We ensure that the concurrency for each storage is not above the
 						// parallelStorage threshold, and also that the total number of concurrent
 						// jobs is not above the parallel threshold.
-						require.LessOrEqual(t, callsPerStorage[req.Repository.StorageName], tc.expectedMaxStorageParallel)
+						require.LessOrEqual(t, callsPerStorage[req.Repository.GetStorageName()], tc.expectedMaxStorageParallel)
 						require.LessOrEqual(t, allCalls, tc.expectedMaxParallel)
 						mu.Unlock()
 						defer func() {
 							mu.Lock()
-							callsPerStorage[req.Repository.StorageName]--
+							callsPerStorage[req.Repository.GetStorageName()]--
 							mu.Unlock()
 						}()
 
@@ -146,7 +146,7 @@ func (s MockStrategy) Restore(ctx context.Context, req *RestoreRequest) error {
 func testPipeline(t *testing.T, init func() *Pipeline) {
 	strategy := MockStrategy{
 		CreateFunc: func(_ context.Context, req *CreateRequest) error {
-			switch req.Repository.StorageName {
+			switch req.Repository.GetStorageName() {
 			case "normal":
 				return nil
 			case "skip":
@@ -154,7 +154,7 @@ func testPipeline(t *testing.T, init func() *Pipeline) {
 			case "error":
 				return assert.AnError
 			}
-			require.Failf(t, "unexpected call to Create", "StorageName = %q", req.Repository.StorageName)
+			require.Failf(t, "unexpected call to Create", "StorageName = %q", req.Repository.GetStorageName())
 			return nil
 		},
 	}
@@ -199,8 +199,6 @@ func testPipeline(t *testing.T, init func() *Pipeline) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			logger := testhelper.SharedLogger(t)
 			loggerHook := testhelper.AddLoggerHook(logger)
@@ -232,7 +230,7 @@ func testPipeline(t *testing.T, init func() *Pipeline) {
 
 		strategy := MockStrategy{
 			RestoreFunc: func(_ context.Context, req *RestoreRequest) error {
-				switch req.Repository.StorageName {
+				switch req.Repository.GetStorageName() {
 				case "normal":
 					return nil
 				case "skip":
@@ -240,7 +238,7 @@ func testPipeline(t *testing.T, init func() *Pipeline) {
 				case "error":
 					return assert.AnError
 				}
-				require.Failf(t, "unexpected call to Restore", "StorageName = %q", req.Repository.StorageName)
+				require.Failf(t, "unexpected call to Restore", "StorageName = %q", req.Repository.GetStorageName())
 				return nil
 			},
 		}

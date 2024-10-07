@@ -108,12 +108,12 @@ func (p *Ping) isConsistent(ctx context.Context, cc *grpc.ClientConn) bool {
 		return false
 	}
 
-	if len(resp.StorageStatuses) == 0 {
+	if len(resp.GetStorageStatuses()) == 0 {
 		p.log("ERROR: remote has no configured storages")
 		return false
 	}
 
-	storagesSet := make(map[gitalyStorage]bool, len(resp.StorageStatuses))
+	storagesSet := make(map[gitalyStorage]bool, len(resp.GetStorageStatuses()))
 
 	knownStoragesSet := make(map[gitalyStorage]bool, len(p.storages))
 	for k := range p.storages {
@@ -121,8 +121,8 @@ func (p *Ping) isConsistent(ctx context.Context, cc *grpc.ClientConn) bool {
 	}
 
 	consistent := true
-	for _, status := range resp.StorageStatuses {
-		gStorage := gitalyStorage(status.StorageName)
+	for _, status := range resp.GetStorageStatuses() {
+		gStorage := gitalyStorage(status.GetStorageName())
 
 		// only proceed if the gitaly storage belongs to a configured
 		// virtual storage
@@ -131,21 +131,21 @@ func (p *Ping) isConsistent(ctx context.Context, cc *grpc.ClientConn) bool {
 		}
 
 		if storagesSet[gStorage] {
-			p.log("ERROR: remote has duplicated storage: %q", status.StorageName)
+			p.log("ERROR: remote has duplicated storage: %q", status.GetStorageName())
 			consistent = false
 			continue
 		}
 		storagesSet[gStorage] = true
 
-		if status.Readable && status.Writeable {
+		if status.GetReadable() && status.GetWriteable() {
 			p.log(
 				"SUCCESS: confirmed Gitaly storage %q in virtual storages %v is served",
-				status.StorageName,
+				status.GetStorageName(),
 				p.storages[gStorage],
 			)
 			delete(knownStoragesSet, gStorage) // storage found
 		} else {
-			p.log("ERROR: storage %q is not readable or writable", status.StorageName)
+			p.log("ERROR: storage %q is not readable or writable", status.GetStorageName())
 			consistent = false
 		}
 	}

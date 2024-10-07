@@ -68,7 +68,7 @@ func (s *server) listLastCommitsForTree(in *gitalypb.ListLastCommitsForTreeReque
 	}
 
 	for _, entry := range entries[offset:limit] {
-		commit, err := log.LastCommitForPath(ctx, s.gitCmdFactory, objectReader, repo, git.Revision(in.GetRevision()), entry.Path, in.GetGlobalOptions())
+		commit, err := log.LastCommitForPath(ctx, objectReader, repo, git.Revision(in.GetRevision()), entry.Path, in.GetGlobalOptions())
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func validateListLastCommitsForTreeRequest(ctx context.Context, locator storage.
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision([]byte(in.Revision)); err != nil {
+	if err := git.ValidateRevision([]byte(in.GetRevision())); err != nil {
 		return err
 	}
 	if in.GetOffset() < 0 {

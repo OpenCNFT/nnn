@@ -278,7 +278,6 @@ func TestParser_Parse(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			trace, err := Parse(testhelper.Context(t), strings.NewReader(tc.events))
 

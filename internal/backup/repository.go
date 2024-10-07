@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -188,7 +189,7 @@ func (s *createBundleFromRefListSender) Reset() {
 func (s *createBundleFromRefListSender) Append(msg proto.Message) {
 	req := msg.(*gitalypb.CreateBundleFromRefListRequest)
 	s.chunk.Repository = req.GetRepository()
-	s.chunk.Patterns = append(s.chunk.Patterns, req.Patterns...)
+	s.chunk.Patterns = append(s.chunk.Patterns, req.GetPatterns()...)
 }
 
 // Send should send the current response message
@@ -421,7 +422,7 @@ func (rr *remoteRepository) ObjectHash(ctx context.Context) (git.ObjectHash, err
 		return git.ObjectHash{}, fmt.Errorf("remote repository: object hash: %w", err)
 	}
 
-	return git.ObjectHashByProto(response.Format)
+	return git.ObjectHashByProto(response.GetFormat())
 }
 
 // HeadReference returns the current value of HEAD.
@@ -436,7 +437,7 @@ func (rr *remoteRepository) HeadReference(ctx context.Context) (git.ReferenceNam
 		return "", fmt.Errorf("remote repository: head reference: %w", err)
 	}
 
-	return git.ReferenceName(response.Name), nil
+	return git.ReferenceName(response.GetName()), nil
 }
 
 func (rr *remoteRepository) newRepoClient() gitalypb.RepositoryServiceClient {
@@ -453,6 +454,7 @@ type localRepository struct {
 	gitCmdFactory gitcmd.CommandFactory
 	txManager     transaction.Manager
 	repoCounter   *counter.RepositoryCounter
+	catfileCache  catfile.Cache
 	repo          *localrepo.Repo
 }
 
@@ -464,6 +466,7 @@ func NewLocalRepository(
 	gitCmdFactory gitcmd.CommandFactory,
 	txManager transaction.Manager,
 	repoCounter *counter.RepositoryCounter,
+	catfileCache catfile.Cache,
 	repo *localrepo.Repo,
 ) *localRepository {
 	return &localRepository{
@@ -472,6 +475,7 @@ func NewLocalRepository(
 		gitCmdFactory: gitCmdFactory,
 		txManager:     txManager,
 		repoCounter:   repoCounter,
+		catfileCache:  catfileCache,
 		repo:          repo,
 	}
 }
@@ -543,6 +547,7 @@ func (r *localRepository) Create(ctx context.Context, hash git.ObjectHash, defau
 		r.logger,
 		r.locator,
 		r.gitCmdFactory,
+		r.catfileCache,
 		r.txManager,
 		r.repoCounter,
 		r.repo,
@@ -552,6 +557,11 @@ func (r *localRepository) Create(ctx context.Context, hash git.ObjectHash, defau
 	); err != nil {
 		return fmt.Errorf("local repository: create: %w", err)
 	}
+
+	// Recreate the local repository, since the cache of object hash and ref-format needs
+	// to be invalidated.
+	r.repo = localrepo.New(r.logger, r.locator, r.gitCmdFactory, r.catfileCache, r.repo)
+
 	return nil
 }
 

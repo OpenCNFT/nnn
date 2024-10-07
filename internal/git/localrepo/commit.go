@@ -67,7 +67,7 @@ func (repo *Repo) ReadCommit(ctx context.Context, revision git.Revision, opts ..
 
 	var commit *gitalypb.GitCommit
 	if cfg.withTrailers {
-		commit, err = catfile.GetCommitWithTrailers(ctx, repo.gitCmdFactory, repo, objectReader, revision)
+		commit, err = catfile.GetCommitWithTrailers(ctx, repo, objectReader, revision)
 	} else {
 		var c *catfile.Commit
 		if c, err = catfile.GetCommit(ctx, objectReader, revision); err == nil {

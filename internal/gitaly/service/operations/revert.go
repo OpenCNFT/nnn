@@ -51,20 +51,20 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 
 		return nil, structerr.NewInternal("read commit: %w", err)
 	}
-	revertCommit, err := quarantineRepo.ReadCommit(ctx, git.Revision(req.Commit.Id))
+	revertCommit, err := quarantineRepo.ReadCommit(ctx, git.Revision(req.GetCommit().GetId()))
 	if err != nil {
 		if errors.Is(err, localrepo.ErrObjectNotFound) {
 			return nil, structerr.NewNotFound("revert commit lookup: commit not found").
-				WithMetadata("revision", req.Commit.Id)
+				WithMetadata("revision", req.GetCommit().GetId())
 		}
 
 		return nil, structerr.NewInternal("read commit: %w", err)
 	}
 
 	var theirs git.ObjectID
-	if len(revertCommit.ParentIds) > 0 {
+	if len(revertCommit.GetParentIds()) > 0 {
 		// Use the first parent as `theirs` to implement mainline = 1.
-		theirs = git.ObjectID(revertCommit.ParentIds[0])
+		theirs = git.ObjectID(revertCommit.GetParentIds()[0])
 	} else {
 		// It is a root commit, use empty tree oid as `theirs`.
 		hash, err := quarantineRepo.ObjectHash(ctx)
@@ -78,9 +78,9 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 	// patch to "ours", thus reverting the commit.
 	treeOID, err := quarantineRepo.MergeTree(
 		ctx,
-		oursCommit.Id,
+		oursCommit.GetId(),
 		theirs.String(),
-		localrepo.WithMergeBase(git.Revision(revertCommit.Id)),
+		localrepo.WithMergeBase(git.Revision(revertCommit.GetId())),
 		localrepo.WithConflictingFileNamesOnly(),
 	)
 	if err != nil {
@@ -103,7 +103,7 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 		return nil, structerr.NewInternal("merge-tree: %w", err)
 	}
 
-	if oursCommit.TreeId == treeOID.String() {
+	if oursCommit.GetTreeId() == treeOID.String() {
 		return nil, structerr.NewFailedPrecondition("revert: could not apply because the result was empty").WithDetail(
 			&gitalypb.UserRevertError{
 				Error: &gitalypb.UserRevertError_ChangesAlreadyApplied{
@@ -116,7 +116,7 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 		ctx,
 		localrepo.WriteCommitConfig{
 			TreeID:         treeOID,
-			Message:        string(req.Message),
+			Message:        string(req.GetMessage()),
 			Parents:        []git.ObjectID{startRevision},
 			AuthorName:     committerSignature.Name,
 			AuthorEmail:    committerSignature.Email,
@@ -132,7 +132,7 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 		return nil, structerr.NewInternal("write commit: %w", err)
 	}
 
-	referenceName := git.NewReferenceNameFromBranchName(string(req.BranchName))
+	referenceName := git.NewReferenceNameFromBranchName(string(req.GetBranchName()))
 	branchCreated := false
 	var oldrev git.ObjectID
 
@@ -164,7 +164,7 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 		}
 	}
 
-	if req.DryRun {
+	if req.GetDryRun() {
 		newrev = startRevision
 	}
 
@@ -186,7 +186,7 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.User, quarantineDir, referenceName, newrev, oldrev); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, req.GetRepository(), req.GetUser(), quarantineDir, referenceName, newrev, oldrev); err != nil {
 		var customHookErr updateref.CustomHookError
 		if errors.As(err, &customHookErr) {
 			return nil, structerr.NewPermissionDenied("revert: custom hook error").WithDetail(

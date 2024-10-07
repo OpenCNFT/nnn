@@ -28,15 +28,15 @@ func sendTreeEntry(
 		return err
 	}
 
-	if treeEntry == nil || len(treeEntry.Oid) == 0 {
+	if treeEntry == nil || len(treeEntry.GetOid()) == 0 {
 		return structerr.NewNotFound("tree entry not found").WithMetadata("path", path)
 	}
 
-	if treeEntry.Type == gitalypb.TreeEntry_COMMIT {
+	if treeEntry.GetType() == gitalypb.TreeEntry_COMMIT {
 		response := &gitalypb.TreeEntryResponse{
 			Type: gitalypb.TreeEntryResponse_COMMIT,
-			Mode: treeEntry.Mode,
-			Oid:  treeEntry.Oid,
+			Mode: treeEntry.GetMode(),
+			Oid:  treeEntry.GetOid(),
 		}
 		if err := stream.Send(response); err != nil {
 			return structerr.NewAborted("send: %w", err)
@@ -45,17 +45,17 @@ func sendTreeEntry(
 		return nil
 	}
 
-	if treeEntry.Type == gitalypb.TreeEntry_TREE {
-		treeInfo, err := objectInfoReader.Info(ctx, git.Revision(treeEntry.Oid))
+	if treeEntry.GetType() == gitalypb.TreeEntry_TREE {
+		treeInfo, err := objectInfoReader.Info(ctx, git.Revision(treeEntry.GetOid()))
 		if err != nil {
 			return err
 		}
 
 		response := &gitalypb.TreeEntryResponse{
 			Type: gitalypb.TreeEntryResponse_TREE,
-			Oid:  treeEntry.Oid,
+			Oid:  treeEntry.GetOid(),
 			Size: treeInfo.Size,
-			Mode: treeEntry.Mode,
+			Mode: treeEntry.GetMode(),
 		}
 
 		if err := stream.Send(response); err != nil {
@@ -65,15 +65,15 @@ func sendTreeEntry(
 		return nil
 	}
 
-	objectInfo, err := objectInfoReader.Info(ctx, git.Revision(treeEntry.Oid))
+	objectInfo, err := objectInfoReader.Info(ctx, git.Revision(treeEntry.GetOid()))
 	if err != nil {
 		return structerr.NewInternal("%w", err)
 	}
 
-	if strings.ToLower(treeEntry.Type.String()) != objectInfo.Type {
+	if strings.ToLower(treeEntry.GetType().String()) != objectInfo.Type {
 		return structerr.NewInternal(
 			"mismatched object type: tree-oid=%s object-oid=%s entry-type=%s object-type=%s",
-			treeEntry.Oid, objectInfo.Oid, treeEntry.Type.String(), objectInfo.Type,
+			treeEntry.GetOid(), objectInfo.Oid, treeEntry.GetType().String(), objectInfo.Type,
 		)
 	}
 
@@ -94,7 +94,7 @@ func sendTreeEntry(
 		Type: gitalypb.TreeEntryResponse_BLOB,
 		Oid:  objectInfo.Oid.String(),
 		Size: objectInfo.Size,
-		Mode: treeEntry.Mode,
+		Mode: treeEntry.GetMode(),
 	}
 	if dataLength == 0 {
 		if err := stream.Send(response); err != nil {
@@ -162,7 +162,7 @@ func validateRequest(ctx context.Context, locator storage.Locator, in *gitalypb.
 	if err := locator.ValidateRepository(ctx, in.GetRepository()); err != nil {
 		return err
 	}
-	if err := git.ValidateRevision(in.Revision); err != nil {
+	if err := git.ValidateRevision(in.GetRevision()); err != nil {
 		return err
 	}
 

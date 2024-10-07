@@ -99,7 +99,7 @@ func TestDialNodes(t *testing.T) {
 			}
 
 			if resp != nil {
-				assertion.status = resp.Status
+				assertion.status = resp.GetStatus()
 			}
 
 			actualNodes = append(actualNodes, assertion)

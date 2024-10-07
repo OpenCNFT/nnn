@@ -484,7 +484,6 @@ func TestHealthManager(t *testing.T) {
 					for virtualStorage, nodeHealths := range hc.LocalStatus {
 						clients[virtualStorage] = make(map[string]grpc_health_v1.HealthClient, len(nodeHealths))
 						for node := range nodeHealths {
-							virtualStorage, node := virtualStorage, node
 							clients[virtualStorage][node] = mockHealthClient{
 								CheckFunc: func(context.Context, *grpc_health_v1.HealthCheckRequest, ...grpc.CallOption) (*grpc_health_v1.HealthCheckResponse, error) {
 									return &grpc_health_v1.HealthCheckResponse{Status: healthStatus[virtualStorage+node]}, nil

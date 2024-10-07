@@ -194,8 +194,6 @@ func TestUserUpdateBranch(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -246,7 +244,7 @@ func TestUserUpdateBranch_successfulGitHooks(t *testing.T) {
 			testhelper.ProtoEqual(t, &gitalypb.UserUpdateBranchResponse{}, response)
 
 			output := string(testhelper.MustReadFile(t, hookoutputPath))
-			require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GlUsername)
+			require.Contains(t, output, "GL_USERNAME="+gittest.TestUser.GetGlUsername())
 		})
 	}
 }
@@ -278,12 +276,12 @@ func TestUserUpdateBranch_failingGitHooks(t *testing.T) {
 				User:       gittest.TestUser,
 			})
 			require.NoError(t, err)
-			require.Contains(t, response.PreReceiveError, "GL_USERNAME="+gittest.TestUser.GlUsername+"\n")
-			require.Contains(t, response.PreReceiveError, "GIT_DIR=")
-			require.Contains(t, response.PreReceiveError, "PWD=")
+			require.Contains(t, response.GetPreReceiveError(), "GL_USERNAME="+gittest.TestUser.GetGlUsername()+"\n")
+			require.Contains(t, response.GetPreReceiveError(), "GIT_DIR=")
+			require.Contains(t, response.GetPreReceiveError(), "PWD=")
 
 			testhelper.ProtoEqual(t, &gitalypb.UserUpdateBranchResponse{
-				PreReceiveError: response.PreReceiveError,
+				PreReceiveError: response.GetPreReceiveError(),
 			}, response)
 		})
 	}
@@ -434,8 +432,6 @@ func TestUserUpdateBranch_failures(t *testing.T) {
 			expectedErr:      structerr.NewFailedPrecondition("Could not update %v. Please refresh and try again.", "refs/heads/branch"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -450,7 +446,7 @@ func TestUserUpdateBranch_failures(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			require.Equal(t, tc.expectedCommitID.String(), branchCommit.Id)
+			require.Equal(t, tc.expectedCommitID.String(), branchCommit.GetId())
 		})
 	}
 }

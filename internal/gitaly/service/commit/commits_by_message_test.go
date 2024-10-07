@@ -152,8 +152,6 @@ Commit #1`), gittest.WithBranch("few-commits"), gittest.WithParents(commit10ID))
 			expectedErr: status.Error(codes.InvalidArgument, "revision can't start with '-'"),
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			c, err := client.CommitsByMessage(ctx, tc.request)
 			require.NoError(t, err)

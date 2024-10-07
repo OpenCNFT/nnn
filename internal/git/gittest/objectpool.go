@@ -54,7 +54,7 @@ func CreateObjectPool(
 	// actually have the storage configuration for it.
 	var storage config.Storage
 	for _, s := range cfg.Storages {
-		if s.Name == source.StorageName {
+		if s.Name == source.GetStorageName() {
 			storage = s
 			break
 		}
@@ -87,5 +87,5 @@ func CreateObjectPool(
 		require.NoError(tb, err)
 	}
 
-	return poolProto, filepath.Join(storage.Path, getReplicaPath(tb, ctx, conn, poolProto.Repository))
+	return poolProto, filepath.Join(storage.Path, getReplicaPath(tb, ctx, conn, poolProto.GetRepository()))
 }

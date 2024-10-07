@@ -89,9 +89,11 @@ func TestCalculateChecksum(t *testing.T) {
 					request: &gitalypb.CalculateChecksumRequest{
 						Repository: repo,
 					},
-					requireError: func(err error) {
-						require.Regexp(t, `^rpc error: code = DataLoss desc = not a git repository '.+'$`, err.Error())
-						testhelper.RequireGrpcCode(t, err, codes.DataLoss)
+					requireError: func(actual error) {
+						testhelper.RequireGrpcCode(t, actual, codes.DataLoss)
+						// The error includes the repository path. We don't match against it as it
+						// changes with the transaction's snapshot directory.
+						require.ErrorContains(t, actual, "not a git repository")
 					},
 				}
 			},
@@ -214,8 +216,6 @@ func TestCalculateChecksum(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

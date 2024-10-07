@@ -48,10 +48,10 @@ func TestAccess_verifyParams(t *testing.T) {
 	repo.GitObjectDirectory = "object/dir"
 	repo.GitAlternateObjectDirectories = []string{"alt/object/dir1", "alt/object/dir2"}
 
-	gitObjectDirFull := filepath.Join(repoPath, repo.GitObjectDirectory)
+	gitObjectDirFull := filepath.Join(repoPath, repo.GetGitObjectDirectory())
 	var gitAlternateObjectDirsFull []string
 
-	for _, gitAlternateObjectDirRel := range repo.GitAlternateObjectDirectories {
+	for _, gitAlternateObjectDirRel := range repo.GetGitAlternateObjectDirectories() {
 		gitAlternateObjectDirsFull = append(gitAlternateObjectDirsFull, filepath.Join(repoPath, gitAlternateObjectDirRel))
 	}
 
@@ -130,9 +130,9 @@ func TestAccess_verifyParams(t *testing.T) {
 
 	for _, tc := range testCases {
 		allowed, _, err := c.Allowed(ctx, AllowedParams{
-			RepoPath:                      tc.repo.RelativePath,
-			GitObjectDirectory:            tc.repo.GitObjectDirectory,
-			GitAlternateObjectDirectories: tc.repo.GitAlternateObjectDirectories,
+			RepoPath:                      tc.repo.GetRelativePath(),
+			GitObjectDirectory:            tc.repo.GetGitObjectDirectory(),
+			GitAlternateObjectDirectories: tc.repo.GetGitAlternateObjectDirectories(),
 			GLRepository:                  tc.glRepository,
 			GLID:                          tc.glID,
 			GLProtocol:                    tc.protocol,
@@ -161,10 +161,10 @@ func TestAccess_escapedAndRelativeURLs(t *testing.T) {
 	repo.GitObjectDirectory = "object/dir"
 	repo.GitAlternateObjectDirectories = []string{"alt/object/dir1", "alt/object/dir2"}
 
-	gitObjectDirFull := filepath.Join(repoPath, repo.GitObjectDirectory)
+	gitObjectDirFull := filepath.Join(repoPath, repo.GetGitObjectDirectory())
 	var gitAlternateObjectDirsFull []string
 
-	for _, gitAlternateObjectDirRel := range repo.GitAlternateObjectDirectories {
+	for _, gitAlternateObjectDirRel := range repo.GetGitAlternateObjectDirectories() {
 		gitAlternateObjectDirsFull = append(gitAlternateObjectDirsFull, filepath.Join(repoPath, gitAlternateObjectDirRel))
 	}
 
@@ -243,9 +243,9 @@ func TestAccess_escapedAndRelativeURLs(t *testing.T) {
 			require.NoError(t, err)
 
 			allowed, _, err := c.Allowed(ctx, AllowedParams{
-				RepoPath:                      repo.RelativePath,
-				GitObjectDirectory:            repo.GitObjectDirectory,
-				GitAlternateObjectDirectories: repo.GitAlternateObjectDirectories,
+				RepoPath:                      repo.GetRelativePath(),
+				GitObjectDirectory:            repo.GetGitObjectDirectory(),
+				GitAlternateObjectDirectories: repo.GetGitAlternateObjectDirectories(),
 				GLID:                          glID,
 				GLRepository:                  glRepository,
 				GLProtocol:                    protocol,
@@ -291,7 +291,7 @@ func TestAccess_allowedResponseHandling(t *testing.T) {
 				// Validate client sends repository relative path.
 				var reqBody allowedRequest
 				require.NoError(t, json.NewDecoder(r.Body).Decode(&reqBody))
-				require.Equal(t, repo.RelativePath, reqBody.RelativePath)
+				require.Equal(t, repo.GetRelativePath(), reqBody.RelativePath)
 				require.Equal(t, pushOptions, reqBody.PushOptions)
 
 				w.Header().Set("Content-Type", "application/json")
@@ -410,9 +410,9 @@ func TestAccess_allowedResponseHandling(t *testing.T) {
 
 			allowed, message, err := c.Allowed(ctx, AllowedParams{
 				RepoPath:                      repoPath,
-				RelativePath:                  repo.RelativePath,
-				GitObjectDirectory:            repo.GitObjectDirectory,
-				GitAlternateObjectDirectories: repo.GitAlternateObjectDirectories,
+				RelativePath:                  repo.GetRelativePath(),
+				GitObjectDirectory:            repo.GetGitObjectDirectory(),
+				GitAlternateObjectDirectories: repo.GetGitAlternateObjectDirectories(),
 				GLRepository:                  "repo-1",
 				GLID:                          "key-123",
 				GLProtocol:                    "http",
@@ -663,7 +663,6 @@ func TestNewHTTPClient_gitlabSecretConfig(t *testing.T) {
 			expectedToken: "secret_token",
 		},
 	} {
-		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

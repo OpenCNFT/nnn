@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/bundleuri"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/pktline"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -24,7 +25,9 @@ func (s *server) InfoRefsUploadPack(in *gitalypb.InfoRefsRequest, stream gitalyp
 	if err := s.locator.ValidateRepository(stream.Context(), repository); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
-	repoPath, err := s.locator.GetRepoPath(stream.Context(), repository)
+
+	repo := s.localrepo(in.GetRepository())
+	repoPath, err := repo.Path(stream.Context())
 	if err != nil {
 		return err
 	}
@@ -34,7 +37,7 @@ func (s *server) InfoRefsUploadPack(in *gitalypb.InfoRefsRequest, stream gitalyp
 	})
 
 	return s.infoRefCache.tryCache(stream.Context(), in, w, func(w io.Writer) error {
-		return s.handleInfoRefs(stream.Context(), uploadPackSvc, repoPath, in, w)
+		return s.handleInfoRefs(stream.Context(), uploadPackSvc, repoPath, repo, in, w)
 	})
 }
 
@@ -43,17 +46,19 @@ func (s *server) InfoRefsReceivePack(in *gitalypb.InfoRefsRequest, stream gitaly
 	if err := s.locator.ValidateRepository(stream.Context(), repository); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
-	repoPath, err := s.locator.GetRepoPath(stream.Context(), repository)
+
+	repo := s.localrepo(in.GetRepository())
+	repoPath, err := repo.Path(stream.Context())
 	if err != nil {
 		return err
 	}
 	w := streamio.NewWriter(func(p []byte) error {
 		return stream.Send(&gitalypb.InfoRefsResponse{Data: p})
 	})
-	return s.handleInfoRefs(stream.Context(), receivePackSvc, repoPath, in, w)
+	return s.handleInfoRefs(stream.Context(), receivePackSvc, repoPath, repo, in, w)
 }
 
-func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, req *gitalypb.InfoRefsRequest, w io.Writer) error {
+func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, repo *localrepo.Repo, req *gitalypb.InfoRefsRequest, w io.Writer) error {
 	s.logger.WithFields(log.Fields{
 		"service": service,
 	}).DebugContext(ctx, "handleInfoRefs")
@@ -63,7 +68,7 @@ func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, r
 		cmdOpts = append(cmdOpts, gitcmd.WithDisabledHooks())
 	}
 
-	gitConfig, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
+	gitConfig, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
 		return err
 	}
@@ -79,7 +84,7 @@ func (s *server) handleInfoRefs(ctx context.Context, service, repoPath string, r
 		return structerr.NewInternal("pktFlush: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name:  service,
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}, gitcmd.Flag{Name: "--advertise-refs"}},
 		Args:  []string{repoPath},

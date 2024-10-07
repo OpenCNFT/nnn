@@ -81,9 +81,9 @@ func TestFsck(t *testing.T) {
 
 				setupData := setupData{
 					repo: repo,
-					requireResponse: func(actual *gitalypb.FsckResponse) {
-						require.Regexp(t, "^fatal: not a git repository: '.+'\n$", string(actual.Error))
-					},
+					requireResponse: equalResponse(t, &gitalypb.FsckResponse{
+						Error: []byte("fatal: not a git repository: '" + repoPath + "'\n"),
+					}),
 				}
 
 				if testhelper.IsWALEnabled() {
@@ -170,8 +170,6 @@ func TestFsck(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 

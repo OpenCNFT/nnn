@@ -40,7 +40,6 @@ func UnpackAuxiliaryBinaries(destinationDir string, shouldInclude func(binaryNam
 
 	g := &errgroup.Group{}
 	for _, entry := range entries {
-		entry := entry
 		if !shouldInclude(entry.Name()) {
 			continue
 		}

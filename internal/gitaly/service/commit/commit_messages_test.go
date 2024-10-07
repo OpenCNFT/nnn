@@ -107,14 +107,14 @@ func readAllMessagesFromClient(t *testing.T, c gitalypb.CommitService_GetCommitM
 		}
 		require.NoError(t, err)
 
-		if resp.CommitId != "" {
+		if resp.GetCommitId() != "" {
 			messages = append(messages, resp)
 			// first message contains a chunk of the message, so no need to append anything
 			continue
 		}
 
 		currentMessage := messages[len(messages)-1]
-		currentMessage.Message = append(currentMessage.Message, resp.Message...)
+		currentMessage.Message = append(currentMessage.Message, resp.GetMessage()...)
 	}
 
 	return

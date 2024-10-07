@@ -36,7 +36,9 @@ func (s *server) SearchFilesByContent(req *gitalypb.SearchFilesByContentRequest,
 		return structerr.NewInvalidArgument("%w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
+	repo := s.localrepo(req.GetRepository())
+
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "grep",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--ignore-case"},
@@ -65,7 +67,7 @@ func (s *server) SearchFilesByContent(req *gitalypb.SearchFilesByContentRequest,
 
 func sendMatchInChunks(buf []byte, stream gitalypb.RepositoryService_SearchFilesByContentServer) error {
 	sw := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.SearchFilesByContentResponse{MatchData: p})
+		return stream.Send(&gitalypb.SearchFilesByContentResponse{MatchData: bytes.Clone(p)})
 	})
 
 	if _, err := io.Copy(sw, bytes.NewReader(buf)); err != nil {
@@ -77,16 +79,17 @@ func sendMatchInChunks(buf []byte, stream gitalypb.RepositoryService_SearchFiles
 
 func sendSearchFilesResultChunked(cmd *command.Command, stream gitalypb.RepositoryService_SearchFilesByContentServer) error {
 	var buf []byte
-	scanner := bufio.NewScanner(cmd)
+	reader := bufio.NewReader(cmd)
 
-	for scanner.Scan() {
-		// Intentionally avoid scanner.Bytes() because that returns a []byte that
-		// becomes invalid on the next loop iteration, and we want to hold on to
-		// the contents of the current line for a while. Scanner.Text() is a
-		// string and hence immutable.
-		line := scanner.Text() + "\n"
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return fmt.Errorf("readbytes: %w", err)
+		}
 
-		if line == string(contentDelimiter) {
+		if bytes.Equal(line, contentDelimiter) {
 			if err := sendMatchInChunks(buf, stream); err != nil {
 				return err
 			}
@@ -131,7 +134,7 @@ func (s *server) SearchFilesByName(req *gitalypb.SearchFilesByNameRequest, strea
 		return fmt.Errorf("detecting object hash: %w", err)
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(), gitcmd.Command{
+	cmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "ls-tree",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--full-tree"},

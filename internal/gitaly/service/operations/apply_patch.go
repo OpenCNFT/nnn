@@ -58,15 +58,15 @@ func (s *Server) UserApplyPatch(stream gitalypb.OperationService_UserApplyPatchS
 }
 
 func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyPatchRequest_Header, stream gitalypb.OperationService_UserApplyPatchServer) error {
-	path, err := s.locator.GetRepoPath(ctx, header.Repository)
+	path, err := s.locator.GetRepoPath(ctx, header.GetRepository())
 	if err != nil {
 		return err
 	}
 
 	branchCreated := false
-	targetBranch := git.NewReferenceNameFromBranchName(string(header.TargetBranch))
+	targetBranch := git.NewReferenceNameFromBranchName(string(header.GetTargetBranch()))
 
-	repo := s.localrepo(header.Repository)
+	repo := s.localrepo(header.GetRepository())
 
 	objectHash, err := repo.ObjectHash(ctx)
 	if err != nil {
@@ -109,7 +109,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		defer cancel()
 
 		worktreeName := filepath.Base(worktreePath)
-		if err := s.removeWorktree(ctx, header.Repository, worktreeName); err != nil {
+		if err := s.removeWorktree(ctx, repo, worktreeName); err != nil {
 			s.logger.WithField("worktree_name", worktreeName).WithError(err).ErrorContext(ctx, "failed to remove worktree")
 		}
 	}()
@@ -134,7 +134,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		})),
 		gitcmd.WithStdout(&stdout),
 		gitcmd.WithStderr(&stderr),
-		gitcmd.WithRefTxHook(header.Repository),
+		gitcmd.WithRefTxHook(objectHash, repo),
 		gitcmd.WithWorktree(worktreePath),
 	); err != nil {
 		// The Ruby implementation doesn't include stderr in errors, which makes
@@ -197,7 +197,7 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		}
 	}
 
-	if err := s.updateReferenceWithHooks(ctx, header.Repository, header.User, nil, targetBranch, patchedCommit, currentCommit); err != nil {
+	if err := s.updateReferenceWithHooks(ctx, header.GetRepository(), header.GetUser(), nil, targetBranch, patchedCommit, currentCommit); err != nil {
 		return fmt.Errorf("update reference: %w", err)
 	}
 
@@ -238,28 +238,38 @@ func (s *Server) addWorktree(ctx context.Context, repo *localrepo.Repo, worktree
 		flags = append(flags, gitcmd.Flag{Name: "--no-checkout"})
 	}
 
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
 	var stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx, gitcmd.Command{
 		Name:   "worktree",
 		Action: "add",
 		Flags:  flags,
 		Args:   args,
-	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(repo)); err != nil {
+	}, gitcmd.WithStderr(&stderr), gitcmd.WithRefTxHook(objectHash, repo)); err != nil {
 		return fmt.Errorf("adding worktree: %w", gitError{ErrMsg: stderr.String(), Err: err})
 	}
 
 	return nil
 }
 
-func (s *Server) removeWorktree(ctx context.Context, repo *gitalypb.Repository, worktreeName string) error {
-	cmd, err := s.gitCmdFactory.New(ctx, repo,
+func (s *Server) removeWorktree(ctx context.Context, repo gitcmd.RepositoryExecutor, worktreeName string) error {
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:   "worktree",
 			Action: "remove",
 			Flags:  []gitcmd.Option{gitcmd.Flag{Name: "--force"}},
 			Args:   []string{worktreeName},
 		},
-		gitcmd.WithRefTxHook(repo),
+		gitcmd.WithRefTxHook(objectHash, repo),
 	)
 	if err != nil {
 		return fmt.Errorf("creation of 'worktree remove': %w", err)

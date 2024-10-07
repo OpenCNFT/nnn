@@ -304,8 +304,6 @@ func TestFindCommit(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -331,13 +329,13 @@ func benchmarkFindCommit(b *testing.B, withCache bool) {
 
 	cfg, client := setupCommitService(b, ctx)
 
-	repo, _ := gittest.CreateRepository(b, ctx, cfg, gittest.CreateRepositoryConfig{
+	repoProto, _ := gittest.CreateRepository(b, ctx, cfg, gittest.CreateRepositoryConfig{
 		Seed: "benchmark.git",
 	})
+	repo := localrepo.NewTestRepo(b, cfg, repoProto)
 
 	// get a list of revisions
-	gitCmdFactory := gittest.NewCommandFactory(b, cfg)
-	logCmd, err := gitCmdFactory.New(ctx, repo, gitcmd.Command{
+	logCmd, err := repo.Exec(ctx, gitcmd.Command{
 		Name: "log",
 		Flags: []gitcmd.Option{
 			gitcmd.Flag{Name: "--format=format:%H"},
@@ -364,7 +362,7 @@ func benchmarkFindCommit(b *testing.B, withCache bool) {
 			ctx = metadata.NewOutgoingContext(ctx, md)
 		}
 		_, err := client.FindCommit(ctx, &gitalypb.FindCommitRequest{
-			Repository: repo,
+			Repository: repoProto,
 			Revision:   []byte(revision),
 		})
 		require.NoError(b, err)

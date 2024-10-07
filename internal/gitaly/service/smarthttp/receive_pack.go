@@ -3,6 +3,7 @@ package smarthttp
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
@@ -24,10 +25,10 @@ func (s *server) PostReceivePack(stream gitalypb.SmartHTTPService_PostReceivePac
 	}
 
 	s.logger.WithFields(log.Fields{
-		"GlID":             req.GlId,
-		"GlRepository":     req.GlRepository,
-		"GlUsername":       req.GlUsername,
-		"GitConfigOptions": req.GitConfigOptions,
+		"GlID":             req.GetGlId(),
+		"GlRepository":     req.GetGlRepository(),
+		"GlUsername":       req.GetGlUsername(),
+		"GitConfigOptions": req.GetGitConfigOptions(),
 	}).DebugContext(ctx, "PostReceivePack")
 
 	if err := validateReceivePackRequest(ctx, s.locator, req); err != nil {
@@ -76,12 +77,14 @@ func (s *server) postReceivePack(
 		return stream.Send(&gitalypb.PostReceivePackResponse{Data: p})
 	})
 
-	repoPath, err := s.locator.GetRepoPath(ctx, req.Repository)
+	repo := s.localrepo(req.GetRepository())
+
+	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return err
 	}
 
-	config, err := gitcmd.ConvertConfigOptions(req.GitConfigOptions)
+	config, err := gitcmd.ConvertConfigOptions(req.GetGitConfigOptions())
 	if err != nil {
 		return err
 	}
@@ -89,7 +92,6 @@ func (s *server) postReceivePack(
 	transactionID := storage.ExtractTransactionID(ctx)
 	transactionsEnabled := transactionID > 0
 	if transactionsEnabled {
-		repo := s.localrepo(req.GetRepository())
 		procReceiveCleanup, err := receivepack.RegisterProcReceiveHook(
 			ctx, s.logger, s.cfg, req, repo, s.hookManager, hook.NewTransactionRegistry(s.txRegistry), transactionID,
 		)
@@ -103,7 +105,12 @@ func (s *server) postReceivePack(
 		}()
 	}
 
-	cmd, err := s.gitCmdFactory.New(ctx, req.GetRepository(),
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("detecting object hash: %w", err)
+	}
+
+	cmd, err := repo.Exec(ctx,
 		gitcmd.Command{
 			Name:  "receive-pack",
 			Flags: []gitcmd.Option{gitcmd.Flag{Name: "--stateless-rpc"}},
@@ -111,7 +118,7 @@ func (s *server) postReceivePack(
 		},
 		gitcmd.WithStdin(stdin),
 		gitcmd.WithStdout(stdout),
-		gitcmd.WithReceivePackHooks(req, "http", transactionsEnabled),
+		gitcmd.WithReceivePackHooks(objectHash, req, "http", transactionsEnabled),
 		gitcmd.WithGitProtocol(s.logger, req),
 		gitcmd.WithConfig(config...),
 	)
@@ -127,7 +134,7 @@ func (s *server) postReceivePack(
 }
 
 func validateReceivePackRequest(ctx context.Context, locator storage.Locator, req *gitalypb.PostReceivePackRequest) error {
-	if req.GlId == "" {
+	if req.GetGlId() == "" {
 		return structerr.NewInvalidArgument("empty GlId")
 	}
 	if req.Data != nil {

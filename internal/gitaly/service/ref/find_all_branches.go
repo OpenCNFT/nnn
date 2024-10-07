@@ -30,7 +30,7 @@ func (s *server) findAllBranches(in *gitalypb.FindAllBranchesRequest, stream git
 
 	patterns := []string{"refs/heads", "refs/remotes"}
 
-	if in.MergedOnly {
+	if in.GetMergedOnly() {
 		defaultBranch, err := repo.GetDefaultBranch(stream.Context())
 		if err != nil {
 			return fmt.Errorf("default branch name: %w", err)
@@ -38,10 +38,10 @@ func (s *server) findAllBranches(in *gitalypb.FindAllBranchesRequest, stream git
 
 		args = append(args, gitcmd.Flag{Name: fmt.Sprintf("--merged=%s", defaultBranch.String())})
 
-		if len(in.MergedBranches) > 0 {
+		if len(in.GetMergedBranches()) > 0 {
 			patterns = nil
 
-			for _, mergedBranch := range in.MergedBranches {
+			for _, mergedBranch := range in.GetMergedBranches() {
 				patterns = append(patterns, string(mergedBranch))
 			}
 		}

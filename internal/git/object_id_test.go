@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -97,7 +97,6 @@ func TestDetectObjectHash(t *testing.T) {
 
 	cfg := testcfg.Build(t)
 	ctx := testhelper.Context(t)
-	gitCmdFactory := gittest.NewCommandFactory(t, cfg)
 
 	for _, tc := range []struct {
 		desc         string
@@ -158,24 +157,6 @@ func TestDetectObjectHash(t *testing.T) {
 			expectedHash: git.ObjectHashSHA256,
 		},
 		{
-			desc: "invalid repository configuration",
-			setup: func(t *testing.T) *gitalypb.Repository {
-				testhelper.SkipWithReftable(t, "creating a repository with reftables sets the core.repositoryformatversion to 1")
-
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
-					SkipCreationViaService: true,
-					ObjectFormat:           "sha1",
-				})
-
-				gittest.Exec(t, cfg, "-C", repoPath, "config", "extensions.objectFormat", "sha1")
-
-				return repo
-			},
-			expectedErr: structerr.New("reading object format: exit status 128").WithMetadata(
-				"stderr", "fatal: repo version is 0, but v1-only extension found:\n\tobjectformat\n",
-			),
-		},
-		{
 			desc: "unknown hash",
 			setup: func(t *testing.T) *gitalypb.Repository {
 				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -187,15 +168,14 @@ func TestDetectObjectHash(t *testing.T) {
 
 				return repo
 			},
-			expectedErr: structerr.New("reading object format: exit status 128").WithMetadata(
-				"stderr", "error: invalid value for 'extensions.objectformat'",
-			),
+			expectedErr: structerr.New(`unknown object format: "blake2"`),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			repoProto := tc.setup(t)
+			repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
-			hash, err := gitcmd.DetectObjectHash(ctx, gitCmdFactory, repoProto)
+			hash, err := repo.ObjectHash(ctx)
 			if tc.expectedErr != nil {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.expectedErr.Error())
@@ -383,8 +363,6 @@ func TestObjectHash_HashData(t *testing.T) {
 			expectedSHA256OID: "1307990e6ba5ca145eb35e99182a9bec46531bc54ddf656a602c780fa0240dee",
 		},
 	} {
-		tc := tc
-
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Run("sha1", func(t *testing.T) {
 				require.Equal(t, tc.expectedSHA1OID, git.ObjectHashSHA1.HashData(tc.data))

@@ -65,10 +65,10 @@ func (c infoRefCache) tryCache(ctx context.Context, in *gitalypb.InfoRefsRequest
 		// to point to the transaction's repository, the handler sees each request as different even if they point to
 		// the same repository. Restore the original request to ensure identical requests get the same key.
 		in = proto.Clone(in).(*gitalypb.InfoRefsRequest)
-		in.Repository = tx.OriginalRepository(in.Repository)
+		in.Repository = tx.OriginalRepository(in.GetRepository())
 	}
 
-	stream, err := c.streamer.GetStream(ctx, in.Repository, in)
+	stream, err := c.streamer.GetStream(ctx, in.GetRepository(), in)
 	switch {
 	case err == nil:
 		defer stream.Close()
@@ -96,7 +96,7 @@ func (c infoRefCache) tryCache(ctx context.Context, in *gitalypb.InfoRefsRequest
 			defer wg.Done()
 
 			tr := io.TeeReader(pr, w)
-			if err := c.streamer.PutStream(ctx, in.Repository, in, tr); err != nil {
+			if err := c.streamer.PutStream(ctx, in.GetRepository(), in, tr); err != nil {
 				c.logger.WithError(err).ErrorContext(ctx, "unable to store InfoRefsUploadPack response in cache")
 
 				// discard remaining bytes if caching stream

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -163,9 +164,9 @@ func (tx *finalizableTransaction) Commit(ctx context.Context) error {
 }
 
 // Rollback rolls back the transaction and runs the finalizer.
-func (tx *finalizableTransaction) Rollback() error {
+func (tx *finalizableTransaction) Rollback(ctx context.Context) error {
 	defer tx.finalize()
-	return tx.Transaction.Rollback()
+	return tx.Transaction.Rollback(ctx)
 }
 
 // newFinalizableTransaction returns a wrapped transaction that executes finalize when the transaction
@@ -550,14 +551,15 @@ func (pi *partitionIterator) Close() {
 // extractPartitionID returns the partition ID by extracting it from the key.
 // If key structure is different than expected, it returns error.
 func (pi *partitionIterator) extractPartitionID() (storage.PartitionID, error) {
+	var partitionID storage.PartitionID
+
 	key := pi.it.Item().Key()
-	keyParts := bytes.Split(key, []byte("/"))
-	if len(keyParts) < 2 || len(keyParts[1]) != 8 {
-		return invalidPartitionID, fmt.Errorf("invalid partition key")
+	unprefixedKey, hasPrefix := bytes.CutPrefix(key, []byte(prefixPartition))
+	if !hasPrefix || len(unprefixedKey) < binary.Size(partitionID) {
+		return invalidPartitionID, fmt.Errorf("invalid partition key format: %q", key)
 	}
 
-	var partitionID storage.PartitionID
-	partitionID.UnmarshalBinary(keyParts[1])
+	partitionID.UnmarshalBinary(unprefixedKey[:binary.Size(partitionID)])
 
 	return partitionID, nil
 }
