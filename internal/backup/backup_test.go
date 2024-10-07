@@ -157,6 +157,7 @@ func TestManager_Create(t *testing.T) {
 						expectedBackup: &backup.Backup{
 							ID:            backupID,
 							Repository:    vanityRepo,
+							Empty:         true,
 							ObjectFormat:  gittest.DefaultObjectHash.Format,
 							HeadReference: git.DefaultRef.String(),
 							Steps: []backup.Step{
@@ -183,12 +184,24 @@ func TestManager_Create(t *testing.T) {
 					return setupData{
 						repo:     nonexistentRepo,
 						repoPath: repoPath,
+						expectedBackup: &backup.Backup{
+							ID:          backupID,
+							Repository:  vanityRepo,
+							NonExistent: true,
+							Empty:       true,
+							Steps: []backup.Step{
+								{
+									BundlePath:      joinBackupPath(t, "", vanityRepo, backupID, "001.bundle"),
+									RefPath:         joinBackupPath(t, "", vanityRepo, backupID, "001.refs"),
+									CustomHooksPath: joinBackupPath(t, "", vanityRepo, backupID, "001.custom_hooks.tar"),
+								},
+							},
+						},
 					}
 				},
 				createsRefList:     false,
 				createsBundle:      false,
 				createsCustomHooks: false,
-				err:                fmt.Errorf("manager: repository not found: %w", backup.ErrSkipped),
 			},
 		} {
 			t.Run(tc.desc, func(t *testing.T) {
@@ -225,6 +238,8 @@ func TestManager_Create(t *testing.T) {
 					require.Equal(t, tc.err, err)
 				}
 
+				require.FileExists(t, manifestPath)
+
 				if tc.createsBundle {
 					require.FileExists(t, refsPath)
 					require.FileExists(t, bundlePath)
@@ -243,12 +258,6 @@ func TestManager_Create(t *testing.T) {
 					require.FileExists(t, refsPath)
 				} else {
 					require.NoFileExists(t, refsPath)
-				}
-
-				if tc.createsBundle || tc.createsRefList {
-					require.FileExists(t, manifestPath)
-				} else {
-					require.NoFileExists(t, manifestPath)
 				}
 
 				if tc.createsCustomHooks {
