@@ -70,6 +70,10 @@ type Backup struct {
 	ID string `toml:"-"`
 	// Repository is the repository being backed up.
 	Repository storage.Repository `toml:"-"`
+	// Empty is true if the repository is empty
+	Empty bool `toml:"empty"`
+	// NonExistent is true if the repository does not exist
+	NonExistent bool `toml:"non_existent"`
 	// Steps are the ordered list of steps required to restore this backup
 	Steps []Step `toml:"steps"`
 	// ObjectFormat is the name of the object hash used by the repository.
@@ -246,10 +250,14 @@ func (mgr *Manager) Create(ctx context.Context, req *CreateRequest) error {
 	hash, err := repo.ObjectHash(ctx)
 	switch {
 	case status.Code(err) == codes.NotFound:
-		return fmt.Errorf("manager: repository not found: %w", ErrSkipped)
+		backup.NonExistent = true
+		backup.Empty = true
+		return mgr.locator.Commit(ctx, backup)
+
 	case err != nil:
 		return fmt.Errorf("manager: %w", err)
 	}
+
 	backup.ObjectFormat = hash.Format
 
 	headRef, err := repo.HeadReference(ctx)
@@ -262,6 +270,7 @@ func (mgr *Manager) Create(ctx context.Context, req *CreateRequest) error {
 	if err != nil {
 		return fmt.Errorf("manager: %w", err)
 	}
+	backup.Empty = len(refs) == 0
 
 	step := &backup.Steps[len(backup.Steps)-1]
 
@@ -301,7 +310,7 @@ func (mgr *Manager) Restore(ctx context.Context, req *RestoreRequest) error {
 		backup, err = mgr.locator.FindLatest(ctx, req.VanityRepository)
 		switch {
 		case errors.Is(err, ErrDoesntExist):
-			return repositorySkipped(ctx, repo, req.AlwaysCreate, err)
+			return removeRepository(ctx, repo, err)
 		case err != nil:
 			return fmt.Errorf("manager: %w", err)
 		}
@@ -309,7 +318,7 @@ func (mgr *Manager) Restore(ctx context.Context, req *RestoreRequest) error {
 		backup, err = mgr.locator.Find(ctx, req.VanityRepository, req.BackupID)
 		switch {
 		case errors.Is(err, ErrDoesntExist):
-			return fmt.Errorf("manager: %w: %w", ErrSkipped, err)
+			return fmt.Errorf("manager: %w: %w", ErrDoesntExist, err)
 		case err != nil:
 			return fmt.Errorf("manager: %w", err)
 		}
@@ -319,18 +328,31 @@ func (mgr *Manager) Restore(ctx context.Context, req *RestoreRequest) error {
 		return fmt.Errorf("manager: no backup steps")
 	}
 
-	// Restore Git objects, potentially from increments.
-	if err := mgr.restoreFromRefs(ctx, repo, backup); err != nil {
-		mgr.logger.WithFields(log.Fields{
-			"storage":       req.Repository.GetStorageName(),
-			"relative_path": req.Repository.GetRelativePath(),
-			"backup_id":     backup.ID,
-			logrus.ErrorKey: err,
-		}).Warn("unable to reset refs. Proceeding with a normal restore")
+	switch {
+	case backup.NonExistent:
+		return nil // Nothing to restore for non-existent repositories
+	case backup.Empty:
+		if _, err := recreateRepo(ctx, repo, backup); err != nil {
+			return fmt.Errorf("manager: recreate empty repo: %w", err)
+		}
 
-		// If we can't reset the refs, perform a full restore by recreating the repo and cloning from the bundle.
-		if err := mgr.restoreFromBundle(ctx, repo, backup, req.AlwaysCreate); err != nil {
-			return fmt.Errorf("manager: restore from bundle: %w", err)
+	}
+
+	// Git bundles can not be created for empty repositories.
+	if !backup.Empty {
+		// Restore Git objects, potentially from increments.
+		if err := mgr.restoreFromRefs(ctx, repo, backup); err != nil {
+			mgr.logger.WithFields(log.Fields{
+				"storage":       req.Repository.GetStorageName(),
+				"relative_path": req.Repository.GetRelativePath(),
+				"backup_id":     backup.ID,
+				logrus.ErrorKey: err,
+			}).Warn("unable to reset refs. Proceeding with a normal restore")
+
+			// If we can't reset the refs, perform a full restore by recreating the repo and cloning from the bundle.
+			if err := mgr.restoreFromBundle(ctx, repo, backup); err != nil {
+				return fmt.Errorf("manager: restore from bundle: %w", err)
+			}
 		}
 	}
 
@@ -365,32 +387,21 @@ func (mgr *Manager) restoreFromRefs(ctx context.Context, repo Repository, backup
 	return repo.SetHeadReference(ctx, headRef)
 }
 
-func (mgr *Manager) restoreFromBundle(ctx context.Context, repo Repository, backup *Backup, alwaysCreate bool) error {
-	hash, err := git.ObjectHashByFormat(backup.ObjectFormat)
+func (mgr *Manager) restoreFromBundle(ctx context.Context, repo Repository, backup *Backup) error {
+	defaultBranchKnown, err := recreateRepo(ctx, repo, backup)
 	if err != nil {
-		return err
-	}
-
-	defaultBranch, defaultBranchKnown := git.ReferenceName(backup.HeadReference).Branch()
-
-	if err := repo.Remove(ctx); err != nil {
-		return err
-	}
-	if err := repo.Create(ctx, hash, defaultBranch); err != nil {
-		return err
+		return fmt.Errorf("recreate repo: %w", err)
 	}
 
 	for _, step := range backup.Steps {
 		refs, err := mgr.readRefs(ctx, step.RefPath)
-		switch {
-		case errors.Is(err, ErrDoesntExist):
-			return repositorySkipped(ctx, repo, alwaysCreate, err)
-		case err != nil:
+		if err != nil {
 			return fmt.Errorf("read refs: %w", err)
 		}
 
-		// Git bundles can not be created for empty repositories. Since empty
-		// repository backups do not contain a bundle, skip bundle restoration.
+		// In case old manifest gets loaded and since empty repository
+		// backups do not contain a bundle, skip bundle restoration.
+		// TODO: Remove refs check after couple of releases.
 		if len(refs) > 0 {
 			if err := mgr.restoreBundle(ctx, repo, step.BundlePath, !defaultBranchKnown); err != nil {
 				return fmt.Errorf("restore bundle: %w", err)
@@ -401,22 +412,12 @@ func (mgr *Manager) restoreFromBundle(ctx context.Context, repo Repository, back
 	return nil
 }
 
-func repositorySkipped(ctx context.Context, repo Repository, alwaysCreate bool, cause error) error {
-	// For compatibility with existing backups we need to make sure the
-	// repository exists even if there's no bundle for project
-	// repositories (not wiki or snippet repositories).  Gitaly does
-	// not know which repository is which type so here we accept a
-	// parameter to tell us to employ this behaviour. Since the
-	// repository has already been created, we simply skip cleaning up.
-	if alwaysCreate {
-		return nil
-	}
-
+func removeRepository(ctx context.Context, repo Repository, cause error) error {
 	if err := repo.Remove(ctx); err != nil {
-		return fmt.Errorf("manager: remove on skipped: %w", err)
+		return fmt.Errorf("manager: repository removed: %w", err)
 	}
 
-	return fmt.Errorf("%w: %w", ErrSkipped, cause)
+	return cause
 }
 
 // setContextServerInfo overwrites server with gitaly connection info from ctx metadata when server is zero.
@@ -618,4 +619,22 @@ func (mgr *Manager) writeRefs(ctx context.Context, path string, refs []git.Refer
 	}
 
 	return nil
+}
+
+func recreateRepo(ctx context.Context, repo Repository, backup *Backup) (bool, error) {
+	hash, err := git.ObjectHashByFormat(backup.ObjectFormat)
+	if err != nil {
+		return false, err
+	}
+
+	defaultBranch, defaultBranchKnown := git.ReferenceName(backup.HeadReference).Branch()
+
+	if err := repo.Remove(ctx); err != nil {
+		return defaultBranchKnown, err
+	}
+	if err := repo.Create(ctx, hash, defaultBranch); err != nil {
+		return defaultBranchKnown, err
+	}
+
+	return defaultBranchKnown, nil
 }

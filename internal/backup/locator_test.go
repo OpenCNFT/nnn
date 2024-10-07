@@ -450,7 +450,9 @@ func TestManifestLocator_withFallback(t *testing.T) {
 		require.NoError(t, l.Commit(ctx, full))
 
 		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
-		require.Equal(t, fmt.Sprintf(`object_format = 'sha1'
+		require.Equal(t, fmt.Sprintf(`empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/001.bundle'
@@ -483,7 +485,9 @@ custom_hooks_path = '%[1]s/%[2]s/001.custom_hooks.tar'
 		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
 		latestManifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"))
 
-		expectedManifest := fmt.Sprintf(`object_format = 'sha1'
+		expectedManifest := fmt.Sprintf(`empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/001.bundle'
@@ -528,7 +532,9 @@ func TestManifestLocator(t *testing.T) {
 		require.NoError(t, l.Commit(ctx, full))
 
 		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
-		require.Equal(t, fmt.Sprintf(`object_format = ''
+		require.Equal(t, fmt.Sprintf(`empty = false
+non_existent = false
+object_format = ''
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/%[3]s/001.bundle'
@@ -545,6 +551,8 @@ custom_hooks_path = '%[1]s/%[2]s/%[3]s/001.custom_hooks.tar'
 		testhelper.WriteFiles(t, backupPath, map[string]any{
 			filepath.Join("manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"): fmt.Sprintf(`
 object_format = 'sha1'
+empty = false
+non_existent = false
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/%[3]s/001.bundle'
@@ -564,7 +572,9 @@ custom_hooks_path = '%[1]s/%[2]s/%[3]s/001.custom_hooks.tar'
 		manifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"))
 		latestManifest := testhelper.MustReadFile(t, filepath.Join(backupPath, "manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"))
 
-		expectedManifest := fmt.Sprintf(`object_format = 'sha1'
+		expectedManifest := fmt.Sprintf(`empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = '%[1]s/%[2]s/%[3]s/001.bundle'
@@ -604,7 +614,9 @@ func TestManifestLocator_Find(t *testing.T) {
 				testhelper.WriteFiles(t, backupPath, map[string]any{
 					"vanity/repo/LATEST":        "abc123",
 					"vanity/repo/abc123/LATEST": "002",
-					"manifests/default/vanity/repo.git/abc123.toml": `object_format = 'sha1'
+					"manifests/default/vanity/repo.git/abc123.toml": `empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = 'path/to/001.bundle'
@@ -719,7 +731,9 @@ func TestManifestLocator_FindLatest(t *testing.T) {
 				testhelper.WriteFiles(t, backupPath, map[string]any{
 					"vanity/repo/LATEST":        "abc123",
 					"vanity/repo/abc123/LATEST": "002",
-					"manifests/default/vanity/repo.git/+latest.toml": `object_format = 'sha1'
+					"manifests/default/vanity/repo.git/+latest.toml": `empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = 'manifest-path/to/001.bundle'
