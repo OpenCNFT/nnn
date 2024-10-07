@@ -50,7 +50,9 @@ func TestManifestLoader_ReadManifest(t *testing.T) {
 			},
 			setup: func(t *testing.T, ctx context.Context, sinkRoot string) {
 				testhelper.WriteFiles(t, sinkRoot, map[string]any{
-					"manifests/default/my/cool/repo.git/abc123.toml": `object_format = 'sha1'
+					"manifests/default/my/cool/repo.git/abc123.toml": `empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = 'path/to/001.bundle'
@@ -148,7 +150,9 @@ func TestManifestLoader_WriteManifest(t *testing.T) {
 					},
 				},
 			},
-			expectedManifest: `object_format = 'sha1'
+			expectedManifest: `empty = false
+non_existent = false
+object_format = 'sha1'
 
 [[steps]]
 bundle_path = 'path/to/001.bundle'
