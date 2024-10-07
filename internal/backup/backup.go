@@ -70,6 +70,10 @@ type Backup struct {
 	ID string `toml:"-"`
 	// Repository is the repository being backed up.
 	Repository storage.Repository `toml:"-"`
+	// Empty is true if the repository is empty
+	Empty bool `toml:"empty"`
+	// NonExistent is true if the repository does not exist
+	NonExistent bool `toml:"non_existent"`
 	// Steps are the ordered list of steps required to restore this backup
 	Steps []Step `toml:"steps"`
 	// ObjectFormat is the name of the object hash used by the repository.
@@ -246,10 +250,14 @@ func (mgr *Manager) Create(ctx context.Context, req *CreateRequest) error {
 	hash, err := repo.ObjectHash(ctx)
 	switch {
 	case status.Code(err) == codes.NotFound:
-		return fmt.Errorf("manager: repository not found: %w", ErrSkipped)
+		backup.NonExistent = true
+		backup.Empty = true
+		return mgr.locator.Commit(ctx, backup)
+
 	case err != nil:
 		return fmt.Errorf("manager: %w", err)
 	}
+
 	backup.ObjectFormat = hash.Format
 
 	headRef, err := repo.HeadReference(ctx)
@@ -262,6 +270,7 @@ func (mgr *Manager) Create(ctx context.Context, req *CreateRequest) error {
 	if err != nil {
 		return fmt.Errorf("manager: %w", err)
 	}
+	backup.Empty = len(refs) == 0
 
 	step := &backup.Steps[len(backup.Steps)-1]
 
