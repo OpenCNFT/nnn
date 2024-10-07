@@ -247,7 +247,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	logger.WithField("duration_ms", time.Since(began).Milliseconds()).Info("finished initializing bootstrap")
 
 	began = time.Now()
-	gitCmdFactory, cleanup, err := gitcmd.NewExecCommandFactory(cfg, logger)
+	gitCmdFactory, cleanup, err := gitcmd.NewExecCommandFactory(cfg, logger, gitcmd.WithCgroupsManager(cgroupMgr))
 	if err != nil {
 		return fmt.Errorf("creating Git command factory: %w", err)
 	}
