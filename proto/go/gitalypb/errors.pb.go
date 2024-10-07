@@ -1296,6 +1296,45 @@ func (x *InvalidRevisionRange) GetRange() []byte {
 	return nil
 }
 
+// RemoteNotFoundError is an error returned when a repository is not found at given remote URL.
+type RemoteNotFoundError struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *RemoteNotFoundError) Reset() {
+	*x = RemoteNotFoundError{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_errors_proto_msgTypes[19]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RemoteNotFoundError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoteNotFoundError) ProtoMessage() {}
+
+func (x *RemoteNotFoundError) ProtoReflect() protoreflect.Message {
+	mi := &file_errors_proto_msgTypes[19]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoteNotFoundError.ProtoReflect.Descriptor instead.
+func (*RemoteNotFoundError) Descriptor() ([]byte, []int) {
+	return file_errors_proto_rawDescGZIP(), []int{19}
+}
+
 var File_errors_proto protoreflect.FileDescriptor
 
 var file_errors_proto_rawDesc = []byte{
@@ -1432,11 +1471,12 @@ var file_errors_proto_rawDesc = []byte{
 	0x0c, 0x52, 0x06, 0x62, 0x61, 0x64, 0x4f, 0x69, 0x64, 0x22, 0x2c, 0x0a, 0x14, 0x49, 0x6e, 0x76,
 	0x61, 0x6c, 0x69, 0x64, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x52, 0x61, 0x6e, 0x67,
 	0x65, 0x12, 0x14, 0x0a, 0x05, 0x72, 0x61, 0x6e, 0x67, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x05, 0x72, 0x61, 0x6e, 0x67, 0x65, 0x42, 0x34, 0x5a, 0x32, 0x67, 0x69, 0x74, 0x6c, 0x61,
-	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x67, 0x69, 0x74, 0x6c, 0x61, 0x62, 0x2d, 0x6f, 0x72, 0x67,
-	0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2f, 0x76, 0x31, 0x36, 0x2f, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x2f, 0x67, 0x6f, 0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x70, 0x62, 0x62, 0x06, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x52, 0x05, 0x72, 0x61, 0x6e, 0x67, 0x65, 0x22, 0x15, 0x0a, 0x13, 0x52, 0x65, 0x6d, 0x6f, 0x74,
+	0x65, 0x4e, 0x6f, 0x74, 0x46, 0x6f, 0x75, 0x6e, 0x64, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x42, 0x34,
+	0x5a, 0x32, 0x67, 0x69, 0x74, 0x6c, 0x61, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x67, 0x69, 0x74,
+	0x6c, 0x61, 0x62, 0x2d, 0x6f, 0x72, 0x67, 0x2f, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2f, 0x76,
+	0x31, 0x36, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x2f, 0x67, 0x69, 0x74, 0x61,
+	0x6c, 0x79, 0x70, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1452,7 +1492,7 @@ func file_errors_proto_rawDescGZIP() []byte {
 }
 
 var file_errors_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_errors_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_errors_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_errors_proto_goTypes = []any{
 	(IndexError_ErrorType)(0),           // 0: gitaly.IndexError.ErrorType
 	(CustomHookError_HookType)(0),       // 1: gitaly.CustomHookError.HookType
@@ -1476,11 +1516,12 @@ var file_errors_proto_goTypes = []any{
 	(*AmbiguousReferenceError)(nil),     // 19: gitaly.AmbiguousReferenceError
 	(*BadObjectError)(nil),              // 20: gitaly.BadObjectError
 	(*InvalidRevisionRange)(nil),        // 21: gitaly.InvalidRevisionRange
-	(*durationpb.Duration)(nil),         // 22: google.protobuf.Duration
+	(*RemoteNotFoundError)(nil),         // 22: gitaly.RemoteNotFoundError
+	(*durationpb.Duration)(nil),         // 23: google.protobuf.Duration
 }
 var file_errors_proto_depIdxs = []int32{
 	0,  // 0: gitaly.IndexError.error_type:type_name -> gitaly.IndexError.ErrorType
-	22, // 1: gitaly.LimitError.retry_after:type_name -> google.protobuf.Duration
+	23, // 1: gitaly.LimitError.retry_after:type_name -> google.protobuf.Duration
 	1,  // 2: gitaly.CustomHookError.hook_type:type_name -> gitaly.CustomHookError.HookType
 	2,  // 3: gitaly.PathError.error_type:type_name -> gitaly.PathError.ErrorType
 	4,  // [4:4] is the sub-list for method output_type
@@ -1724,6 +1765,18 @@ func file_errors_proto_init() {
 				return nil
 			}
 		}
+		file_errors_proto_msgTypes[19].Exporter = func(v any, i int) any {
+			switch v := v.(*RemoteNotFoundError); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1731,7 +1784,7 @@ func file_errors_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_errors_proto_rawDesc,
 			NumEnums:      3,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
