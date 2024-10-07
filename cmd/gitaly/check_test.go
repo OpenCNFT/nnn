@@ -12,8 +12,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
 
-func TestCheckOK(t *testing.T) {
-	user, password := "user123", "password321"
+func createTestServer(t *testing.T) (user, password, url string, cleanup func()) {
+	user, password = "user123", "password321"
 
 	c := gitlab.TestServerOptions{
 		User:                        user,
@@ -24,7 +24,14 @@ func TestCheckOK(t *testing.T) {
 		PostReceiveCounterDecreased: false,
 		Protocol:                    "ssh",
 	}
+
 	serverURL, cleanup := gitlab.NewTestServer(t, c)
+
+	return user, password, serverURL, cleanup
+}
+
+func TestCheckOK(t *testing.T) {
+	user, password, serverURL, cleanup := createTestServer(t)
 	defer cleanup()
 
 	cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
@@ -57,19 +64,7 @@ func TestCheckOK(t *testing.T) {
 }
 
 func TestCheckBadCreds(t *testing.T) {
-	user, password := "user123", "password321"
-
-	c := gitlab.TestServerOptions{
-		User:                        user,
-		Password:                    password,
-		SecretToken:                 "",
-		GLRepository:                "",
-		Changes:                     "",
-		PostReceiveCounterDecreased: false,
-		Protocol:                    "ssh",
-		GitPushOptions:              nil,
-	}
-	serverURL, cleanup := gitlab.NewTestServer(t, c)
+	_, password, serverURL, cleanup := createTestServer(t)
 	defer cleanup()
 
 	cfg := testcfg.Build(t, testcfg.WithBase(config.Cfg{
