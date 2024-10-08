@@ -142,9 +142,7 @@ func TestRestoreRepository(t *testing.T) {
 					backupID: "",
 				}
 			},
-			expectedErr: structerr.NewFailedPrecondition("restore repository: manager: restore from bundle: repository skipped: read refs: storage service sink: new reader for \"@test/restore/latest/missing.refs\": doesn't exist").WithDetail(
-				&gitalypb.RestoreRepositoryResponse_SkippedError{},
-			),
+			expectedErr: structerr.NewInternal("restore repository: manifest: find latest: read manifest: storage service sink: new reader for \"manifests/default/@test/restore/latest/missing.git/+latest.toml\": doesn't exist"),
 		},
 		{
 			desc: "missing repository",
@@ -216,7 +214,7 @@ func TestRestoreRepository(t *testing.T) {
 			backupSink, err := backup.ResolveSink(ctx, backupRoot)
 			require.NoError(t, err)
 
-			backupLocator, err := backup.ResolveLocator("pointer", backupSink)
+			backupLocator, err := backup.ResolveLocator("manifest", backupSink)
 			require.NoError(t, err)
 
 			data := tc.setup(t, ctx, backupSink, backupLocator)
