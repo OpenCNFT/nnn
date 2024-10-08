@@ -131,6 +131,7 @@ func testUploadPackTimeout(t *testing.T, ctx context.Context, opts ...testcfg.Op
 
 	client := newSSHClient(t, cfg.SocketPath)
 
+	//nolint:staticcheck
 	stream, err := client.SSHUploadPack(ctx)
 	require.NoError(t, err)
 
@@ -526,6 +527,7 @@ func testUploadPackValidation(t *testing.T, ctx context.Context) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			//nolint:staticcheck
 			stream, err := client.SSHUploadPack(ctx)
 			require.NoError(t, err)
 			require.NoError(t, stream.Send(tc.request))
@@ -840,6 +842,7 @@ func testUploadPackGitFailure(t *testing.T, ctx context.Context) {
 	require.NoError(t, os.Remove(configPath))
 	require.NoError(t, os.WriteFile(configPath, []byte("Not a valid gitconfig"), mode.File))
 
+	//nolint:staticcheck
 	stream, err := client.SSHUploadPack(ctx)
 	require.NoError(t, err)
 	require.NoError(t, stream.Send(&gitalypb.SSHUploadPackRequest{Repository: repo}))

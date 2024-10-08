@@ -31,6 +31,7 @@ const (
 //
 // SSHService is a service that provides RPCs required for SSH-based Git clones.
 type SSHServiceClient interface {
+	// Deprecated: Do not use.
 	// SSHUploadPack is an RPC to forward git-upload-pack(1) to Gitaly for SSH sessions. The RPC uses
 	// bidirectional streaming so the client can stream stdin and the server can stream stdout and
 	// stderr for git-upload-pack(1).
@@ -58,6 +59,7 @@ func NewSSHServiceClient(cc grpc.ClientConnInterface) SSHServiceClient {
 	return &sSHServiceClient{cc}
 }
 
+// Deprecated: Do not use.
 func (c *sSHServiceClient) SSHUploadPack(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SSHUploadPackRequest, SSHUploadPackResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &SSHService_ServiceDesc.Streams[0], SSHService_SSHUploadPack_FullMethodName, cOpts...)
@@ -113,6 +115,7 @@ type SSHService_SSHUploadArchiveClient = grpc.BidiStreamingClient[SSHUploadArchi
 //
 // SSHService is a service that provides RPCs required for SSH-based Git clones.
 type SSHServiceServer interface {
+	// Deprecated: Do not use.
 	// SSHUploadPack is an RPC to forward git-upload-pack(1) to Gitaly for SSH sessions. The RPC uses
 	// bidirectional streaming so the client can stream stdin and the server can stream stdout and
 	// stderr for git-upload-pack(1).

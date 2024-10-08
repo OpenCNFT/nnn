@@ -264,11 +264,10 @@ func Benchmark(b *testing.B) {
 					go testhelper.MustServe(b, srv, ln)
 					ctx := testhelper.Context(b)
 
-					opts := []grpc.DialOption{grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials())}
+					opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 					if tc.multiplexed {
 						clientHandshaker := NewClientHandshaker(testhelper.SharedLogger(b), func() Server { return grpc.NewServer() }, DefaultConfiguration())
 						opts = []grpc.DialOption{
-							grpc.WithBlock(),
 							grpc.WithTransportCredentials(clientHandshaker.ClientHandshake(insecure.NewCredentials())),
 						}
 					}
@@ -278,6 +277,7 @@ func Benchmark(b *testing.B) {
 
 					defer cc.Close()
 
+					//nolint:staticcheck
 					client, err := gitalypb.NewSSHServiceClient(cc).SSHUploadPack(ctx)
 					require.NoError(b, err)
 

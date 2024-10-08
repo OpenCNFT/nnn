@@ -18,7 +18,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/labkit/correlation"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -218,40 +217,10 @@ func WithGlobalOption(opts ...GlobalOption) CmdOpt {
 	}
 }
 
-// WithInternalFetch returns an option which sets up git-fetch(1) to fetch from another internal
-// Gitaly node.
-func WithInternalFetch(req *gitalypb.SSHUploadPackRequest) CmdOpt {
-	return withInternalFetch(req, false)
-}
-
 // WithInternalFetchWithSidechannel returns an option which sets up git-fetch(1) to fetch from
 // another internal Gitaly node. In contrast to WithInternalFetch, this will call
 // SSHUploadPackWithSidechannel instead of SSHUploadPack.
 func WithInternalFetchWithSidechannel(req *gitalypb.SSHUploadPackWithSidechannelRequest) CmdOpt {
-	return withInternalFetch(req, true)
-}
-
-// WithGitalyGPG sets gpg.prgoram to gitaly-gpg for commit signing
-func WithGitalyGPG() CmdOpt {
-	return func(_ context.Context, cfg config.Cfg, _ CommandFactory, c *cmdCfg) error {
-		c.globals = append(
-			c.globals,
-			&ConfigPair{
-				Key:   "gpg.program",
-				Value: cfg.BinaryPath("gitaly-gpg"),
-			},
-		)
-
-		return nil
-	}
-}
-
-type repoScopedRequest interface {
-	proto.Message
-	GetRepository() *gitalypb.Repository
-}
-
-func withInternalFetch(req repoScopedRequest, withSidechannel bool) func(ctx context.Context, cfg config.Cfg, _ CommandFactory, c *cmdCfg) error {
 	return func(ctx context.Context, cfg config.Cfg, _ CommandFactory, c *cmdCfg) error {
 		payload, err := protojson.Marshal(req)
 		if err != nil {
@@ -290,11 +259,23 @@ func withInternalFetch(req repoScopedRequest, withSidechannel bool) func(ctx con
 			// system certs to trust
 			fmt.Sprintf("%s=%s", x509.SSLCertDir, os.Getenv(x509.SSLCertDir)),
 			fmt.Sprintf("%s=%s", x509.SSLCertFile, os.Getenv(x509.SSLCertFile)),
+			"GITALY_USE_SIDECHANNEL=1",
 		)
 
-		if withSidechannel {
-			c.env = append(c.env, "GITALY_USE_SIDECHANNEL=1")
-		}
+		return nil
+	}
+}
+
+// WithGitalyGPG sets gpg.prgoram to gitaly-gpg for commit signing
+func WithGitalyGPG() CmdOpt {
+	return func(_ context.Context, cfg config.Cfg, _ CommandFactory, c *cmdCfg) error {
+		c.globals = append(
+			c.globals,
+			&ConfigPair{
+				Key:   "gpg.program",
+				Value: cfg.BinaryPath("gitaly-gpg"),
+			},
+		)
 
 		return nil
 	}

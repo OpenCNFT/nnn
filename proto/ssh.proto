@@ -17,6 +17,9 @@ service SSHService {
     option (op_type) = {
       op: ACCESSOR
     };
+    // SSHUploadPackWithSidechannel is a perfect replacemet.
+    // https://gitlab.com/gitlab-org/gitaly/-/issues/6410
+    option deprecated = true;
   }
 
   // SSHUploadPackWithSidechannel is an RPC to forward git-upload-pack(1) to Gitaly for SSH

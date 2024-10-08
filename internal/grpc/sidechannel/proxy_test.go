@@ -202,7 +202,7 @@ func TestStreamProxy_noCloseWrite(t *testing.T) { testStreamProxy(t, false) }
 func TestStreamProxy_upstreamError(t *testing.T) {
 	upstreamAddr := startStreamServer(
 		t,
-		func(stream gitalypb.SSHService_SSHUploadPackServer) error {
+		func(stream gitalypb.SSHService_SSHUploadArchiveServer) error {
 			conn, err := OpenSidechannel(stream.Context())
 			if err != nil {
 				return err
@@ -226,7 +226,7 @@ func TestStreamProxy_upstreamError(t *testing.T) {
 
 	proxyAddr := startStreamServer(
 		t,
-		func(stream gitalypb.SSHService_SSHUploadPackServer) error {
+		func(stream gitalypb.SSHService_SSHUploadArchiveServer) error {
 			conn, err := dialProxy(t, upstreamAddr)
 			if err != nil {
 				return err
@@ -234,7 +234,7 @@ func TestStreamProxy_upstreamError(t *testing.T) {
 			defer conn.Close()
 
 			ctxOut := metadata.IncomingToOutgoing(stream.Context())
-			client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadPack(ctxOut)
+			client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadArchive(ctxOut)
 			if err != nil {
 				return err
 			}
@@ -273,7 +273,7 @@ func TestStreamProxy_upstreamError(t *testing.T) {
 	})
 	defer testhelper.MustClose(t, waiter)
 
-	client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadPack(ctx)
+	client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadArchive(ctx)
 	require.NoError(t, err)
 
 	_, err = client.Recv()
@@ -285,14 +285,14 @@ func TestStreamProxy_upstreamError(t *testing.T) {
 func testStreamProxy(t *testing.T, closeWrite bool) {
 	upstreamAddr := startStreamServer(
 		t,
-		func(stream gitalypb.SSHService_SSHUploadPackServer) error {
+		func(stream gitalypb.SSHService_SSHUploadArchiveServer) error {
 			return testProxyServer(stream.Context(), closeWrite)
 		},
 	)
 
 	proxyAddr := startStreamServer(
 		t,
-		func(stream gitalypb.SSHService_SSHUploadPackServer) error {
+		func(stream gitalypb.SSHService_SSHUploadArchiveServer) error {
 			conn, err := dialProxy(t, upstreamAddr)
 			if err != nil {
 				return err
@@ -300,7 +300,7 @@ func testStreamProxy(t *testing.T, closeWrite bool) {
 			defer conn.Close()
 
 			ctxOut := metadata.IncomingToOutgoing(stream.Context())
-			client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadPack(ctxOut)
+			client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadArchive(ctxOut)
 			if err != nil {
 				return err
 			}
@@ -318,7 +318,7 @@ func testStreamProxy(t *testing.T, closeWrite bool) {
 	ctx, waiter := RegisterSidechannel(ctx, registry, testProxyClient(closeWrite))
 	defer testhelper.MustClose(t, waiter)
 
-	client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadPack(ctx)
+	client, err := gitalypb.NewSSHServiceClient(conn).SSHUploadArchive(ctx)
 	require.NoError(t, err)
 
 	_, err = client.Recv()
@@ -328,15 +328,15 @@ func testStreamProxy(t *testing.T, closeWrite bool) {
 }
 
 type mockSSHService struct {
-	sshUploadPackFunc func(gitalypb.SSHService_SSHUploadPackServer) error
+	SSHUploadArchiveFunc func(gitalypb.SSHService_SSHUploadArchiveServer) error
 	gitalypb.UnimplementedSSHServiceServer
 }
 
-func (m mockSSHService) SSHUploadPack(stream gitalypb.SSHService_SSHUploadPackServer) error {
-	return m.sshUploadPackFunc(stream)
+func (m mockSSHService) SSHUploadArchive(stream gitalypb.SSHService_SSHUploadArchiveServer) error {
+	return m.SSHUploadArchiveFunc(stream)
 }
 
-func startStreamServer(t *testing.T, handler func(gitalypb.SSHService_SSHUploadPackServer) error) string {
+func startStreamServer(t *testing.T, handler func(gitalypb.SSHService_SSHUploadArchiveServer) error) string {
 	t.Helper()
 
 	lm := listenmux.New(insecure.NewCredentials())
@@ -346,7 +346,7 @@ func startStreamServer(t *testing.T, handler func(gitalypb.SSHService_SSHUploadP
 
 	srv := grpc.NewServer(grpc.Creds(lm))
 	gitalypb.RegisterSSHServiceServer(srv, &mockSSHService{
-		sshUploadPackFunc: handler,
+		SSHUploadArchiveFunc: handler,
 	})
 
 	ln, err := net.Listen("tcp", "localhost:0")
