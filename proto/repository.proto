@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package gitaly;
 
+import "errors.proto";
 import "lint.proto";
 import "shared.proto";
 
@@ -245,8 +246,8 @@ service RepositoryService {
   // CreateRepositoryFromSnapshot creates a new repository based on a snapshot created with
   // the GetSnapshot RPC. The snapshot is fetched via HTTP.
   //
-  // Due to the inherent structure of the TAR format, it's challenging to definitively verify 
-  // if a provided TAR file is complete or truncated/malformed. While basic integrity checks 
+  // Due to the inherent structure of the TAR format, it's challenging to definitively verify
+  // if a provided TAR file is complete or truncated/malformed. While basic integrity checks
   // are performed, users should ensure the completeness and integrity of their TAR files.
   rpc CreateRepositoryFromSnapshot(CreateRepositoryFromSnapshotRequest) returns (CreateRepositoryFromSnapshotResponse) {
     option (op_type) = {
@@ -806,6 +807,15 @@ message CreateRepositoryFromURLRequest {
 
 // CreateRepositoryFromURLResponse is a response for the CreateRepositoryFromURL RPC.
 message CreateRepositoryFromURLResponse {
+}
+
+// CreateRepositoryFromURLError is an error that will be returned by the CreateRepositoryFromURL RPC under specific error
+// CreateRepositoryFromURLError.
+message CreateRepositoryFromURLError {
+  oneof error {
+    // remote_not_found indicates that the remote repository was not found.
+    RemoteNotFoundError remote_not_found = 1;
+  }
 }
 
 // CreateBundleRequest is a request for the CreateBundle RPC.

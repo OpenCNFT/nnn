@@ -144,7 +144,7 @@ func (x GetRawChangesResponse_RawChange_Operation) Number() protoreflect.EnumNum
 
 // Deprecated: Use GetRawChangesResponse_RawChange_Operation.Descriptor instead.
 func (GetRawChangesResponse_RawChange_Operation) EnumDescriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{63, 0, 0}
+	return file_repository_proto_rawDescGZIP(), []int{64, 0, 0}
 }
 
 // Strategy determines how the repository shall be optimized.
@@ -201,7 +201,7 @@ func (x OptimizeRepositoryRequest_Strategy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OptimizeRepositoryRequest_Strategy.Descriptor instead.
 func (OptimizeRepositoryRequest_Strategy) EnumDescriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{75, 0}
+	return file_repository_proto_rawDescGZIP(), []int{76, 0}
 }
 
 // RepositoryExistsRequest is a request for the RepositoryExists RPC.
@@ -2199,6 +2199,76 @@ func (*CreateRepositoryFromURLResponse) Descriptor() ([]byte, []int) {
 	return file_repository_proto_rawDescGZIP(), []int{33}
 }
 
+// CreateRepositoryFromURLError is an error that will be returned by the CreateRepositoryFromURL RPC under specific error
+// CreateRepositoryFromURLError.
+type CreateRepositoryFromURLError struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Error:
+	//
+	//	*CreateRepositoryFromURLError_RemoteNotFound
+	Error isCreateRepositoryFromURLError_Error `protobuf_oneof:"error"`
+}
+
+func (x *CreateRepositoryFromURLError) Reset() {
+	*x = CreateRepositoryFromURLError{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_repository_proto_msgTypes[34]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CreateRepositoryFromURLError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRepositoryFromURLError) ProtoMessage() {}
+
+func (x *CreateRepositoryFromURLError) ProtoReflect() protoreflect.Message {
+	mi := &file_repository_proto_msgTypes[34]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRepositoryFromURLError.ProtoReflect.Descriptor instead.
+func (*CreateRepositoryFromURLError) Descriptor() ([]byte, []int) {
+	return file_repository_proto_rawDescGZIP(), []int{34}
+}
+
+func (m *CreateRepositoryFromURLError) GetError() isCreateRepositoryFromURLError_Error {
+	if m != nil {
+		return m.Error
+	}
+	return nil
+}
+
+func (x *CreateRepositoryFromURLError) GetRemoteNotFound() *RemoteNotFoundError {
+	if x, ok := x.GetError().(*CreateRepositoryFromURLError_RemoteNotFound); ok {
+		return x.RemoteNotFound
+	}
+	return nil
+}
+
+type isCreateRepositoryFromURLError_Error interface {
+	isCreateRepositoryFromURLError_Error()
+}
+
+type CreateRepositoryFromURLError_RemoteNotFound struct {
+	// remote_not_found indicates that the remote repository was not found.
+	RemoteNotFound *RemoteNotFoundError `protobuf:"bytes,1,opt,name=remote_not_found,json=remoteNotFound,proto3,oneof"`
+}
+
+func (*CreateRepositoryFromURLError_RemoteNotFound) isCreateRepositoryFromURLError_Error() {}
+
 // CreateBundleRequest is a request for the CreateBundle RPC.
 type CreateBundleRequest struct {
 	state         protoimpl.MessageState
@@ -2213,7 +2283,7 @@ type CreateBundleRequest struct {
 func (x *CreateBundleRequest) Reset() {
 	*x = CreateBundleRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[34]
+		mi := &file_repository_proto_msgTypes[35]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2226,7 +2296,7 @@ func (x *CreateBundleRequest) String() string {
 func (*CreateBundleRequest) ProtoMessage() {}
 
 func (x *CreateBundleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[34]
+	mi := &file_repository_proto_msgTypes[35]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2239,7 +2309,7 @@ func (x *CreateBundleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBundleRequest.ProtoReflect.Descriptor instead.
 func (*CreateBundleRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{34}
+	return file_repository_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *CreateBundleRequest) GetRepository() *Repository {
@@ -2262,7 +2332,7 @@ type CreateBundleResponse struct {
 func (x *CreateBundleResponse) Reset() {
 	*x = CreateBundleResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[35]
+		mi := &file_repository_proto_msgTypes[36]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2275,7 +2345,7 @@ func (x *CreateBundleResponse) String() string {
 func (*CreateBundleResponse) ProtoMessage() {}
 
 func (x *CreateBundleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[35]
+	mi := &file_repository_proto_msgTypes[36]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2288,7 +2358,7 @@ func (x *CreateBundleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBundleResponse.ProtoReflect.Descriptor instead.
 func (*CreateBundleResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{35}
+	return file_repository_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *CreateBundleResponse) GetData() []byte {
@@ -2315,7 +2385,7 @@ type CreateBundleFromRefListRequest struct {
 func (x *CreateBundleFromRefListRequest) Reset() {
 	*x = CreateBundleFromRefListRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[36]
+		mi := &file_repository_proto_msgTypes[37]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2328,7 +2398,7 @@ func (x *CreateBundleFromRefListRequest) String() string {
 func (*CreateBundleFromRefListRequest) ProtoMessage() {}
 
 func (x *CreateBundleFromRefListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[36]
+	mi := &file_repository_proto_msgTypes[37]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2341,7 +2411,7 @@ func (x *CreateBundleFromRefListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBundleFromRefListRequest.ProtoReflect.Descriptor instead.
 func (*CreateBundleFromRefListRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{36}
+	return file_repository_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *CreateBundleFromRefListRequest) GetRepository() *Repository {
@@ -2371,7 +2441,7 @@ type CreateBundleFromRefListResponse struct {
 func (x *CreateBundleFromRefListResponse) Reset() {
 	*x = CreateBundleFromRefListResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[37]
+		mi := &file_repository_proto_msgTypes[38]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2384,7 +2454,7 @@ func (x *CreateBundleFromRefListResponse) String() string {
 func (*CreateBundleFromRefListResponse) ProtoMessage() {}
 
 func (x *CreateBundleFromRefListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[37]
+	mi := &file_repository_proto_msgTypes[38]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2397,7 +2467,7 @@ func (x *CreateBundleFromRefListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBundleFromRefListResponse.ProtoReflect.Descriptor instead.
 func (*CreateBundleFromRefListResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{37}
+	return file_repository_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *CreateBundleFromRefListResponse) GetData() []byte {
@@ -2420,7 +2490,7 @@ type GenerateBundleURIRequest struct {
 func (x *GenerateBundleURIRequest) Reset() {
 	*x = GenerateBundleURIRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[38]
+		mi := &file_repository_proto_msgTypes[39]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2433,7 +2503,7 @@ func (x *GenerateBundleURIRequest) String() string {
 func (*GenerateBundleURIRequest) ProtoMessage() {}
 
 func (x *GenerateBundleURIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[38]
+	mi := &file_repository_proto_msgTypes[39]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2446,7 +2516,7 @@ func (x *GenerateBundleURIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateBundleURIRequest.ProtoReflect.Descriptor instead.
 func (*GenerateBundleURIRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{38}
+	return file_repository_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GenerateBundleURIRequest) GetRepository() *Repository {
@@ -2466,7 +2536,7 @@ type GenerateBundleURIResponse struct {
 func (x *GenerateBundleURIResponse) Reset() {
 	*x = GenerateBundleURIResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[39]
+		mi := &file_repository_proto_msgTypes[40]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2479,7 +2549,7 @@ func (x *GenerateBundleURIResponse) String() string {
 func (*GenerateBundleURIResponse) ProtoMessage() {}
 
 func (x *GenerateBundleURIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[39]
+	mi := &file_repository_proto_msgTypes[40]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2492,7 +2562,7 @@ func (x *GenerateBundleURIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateBundleURIResponse.ProtoReflect.Descriptor instead.
 func (*GenerateBundleURIResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{39}
+	return file_repository_proto_rawDescGZIP(), []int{40}
 }
 
 // GetConfigRequest is a request for the GetConfig RPC.
@@ -2509,7 +2579,7 @@ type GetConfigRequest struct {
 func (x *GetConfigRequest) Reset() {
 	*x = GetConfigRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[40]
+		mi := &file_repository_proto_msgTypes[41]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2522,7 +2592,7 @@ func (x *GetConfigRequest) String() string {
 func (*GetConfigRequest) ProtoMessage() {}
 
 func (x *GetConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[40]
+	mi := &file_repository_proto_msgTypes[41]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2535,7 +2605,7 @@ func (x *GetConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetConfigRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{40}
+	return file_repository_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetConfigRequest) GetRepository() *Repository {
@@ -2558,7 +2628,7 @@ type GetConfigResponse struct {
 func (x *GetConfigResponse) Reset() {
 	*x = GetConfigResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[41]
+		mi := &file_repository_proto_msgTypes[42]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2571,7 +2641,7 @@ func (x *GetConfigResponse) String() string {
 func (*GetConfigResponse) ProtoMessage() {}
 
 func (x *GetConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[41]
+	mi := &file_repository_proto_msgTypes[42]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2584,7 +2654,7 @@ func (x *GetConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConfigResponse.ProtoReflect.Descriptor instead.
 func (*GetConfigResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{41}
+	return file_repository_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetConfigResponse) GetData() []byte {
@@ -2609,7 +2679,7 @@ type RestoreCustomHooksRequest struct {
 func (x *RestoreCustomHooksRequest) Reset() {
 	*x = RestoreCustomHooksRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[42]
+		mi := &file_repository_proto_msgTypes[43]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2622,7 +2692,7 @@ func (x *RestoreCustomHooksRequest) String() string {
 func (*RestoreCustomHooksRequest) ProtoMessage() {}
 
 func (x *RestoreCustomHooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[42]
+	mi := &file_repository_proto_msgTypes[43]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2635,7 +2705,7 @@ func (x *RestoreCustomHooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestoreCustomHooksRequest.ProtoReflect.Descriptor instead.
 func (*RestoreCustomHooksRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{42}
+	return file_repository_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *RestoreCustomHooksRequest) GetRepository() *Repository {
@@ -2668,7 +2738,7 @@ type SetCustomHooksRequest struct {
 func (x *SetCustomHooksRequest) Reset() {
 	*x = SetCustomHooksRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[43]
+		mi := &file_repository_proto_msgTypes[44]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2681,7 +2751,7 @@ func (x *SetCustomHooksRequest) String() string {
 func (*SetCustomHooksRequest) ProtoMessage() {}
 
 func (x *SetCustomHooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[43]
+	mi := &file_repository_proto_msgTypes[44]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2694,7 +2764,7 @@ func (x *SetCustomHooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetCustomHooksRequest.ProtoReflect.Descriptor instead.
 func (*SetCustomHooksRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{43}
+	return file_repository_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *SetCustomHooksRequest) GetRepository() *Repository {
@@ -2721,7 +2791,7 @@ type RestoreCustomHooksResponse struct {
 func (x *RestoreCustomHooksResponse) Reset() {
 	*x = RestoreCustomHooksResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[44]
+		mi := &file_repository_proto_msgTypes[45]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2734,7 +2804,7 @@ func (x *RestoreCustomHooksResponse) String() string {
 func (*RestoreCustomHooksResponse) ProtoMessage() {}
 
 func (x *RestoreCustomHooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[44]
+	mi := &file_repository_proto_msgTypes[45]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2747,7 +2817,7 @@ func (x *RestoreCustomHooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestoreCustomHooksResponse.ProtoReflect.Descriptor instead.
 func (*RestoreCustomHooksResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{44}
+	return file_repository_proto_rawDescGZIP(), []int{45}
 }
 
 // SetCustomHooksResponse is a response for the SetCustomHooks RPC.
@@ -2760,7 +2830,7 @@ type SetCustomHooksResponse struct {
 func (x *SetCustomHooksResponse) Reset() {
 	*x = SetCustomHooksResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[45]
+		mi := &file_repository_proto_msgTypes[46]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2773,7 +2843,7 @@ func (x *SetCustomHooksResponse) String() string {
 func (*SetCustomHooksResponse) ProtoMessage() {}
 
 func (x *SetCustomHooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[45]
+	mi := &file_repository_proto_msgTypes[46]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2786,7 +2856,7 @@ func (x *SetCustomHooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetCustomHooksResponse.ProtoReflect.Descriptor instead.
 func (*SetCustomHooksResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{45}
+	return file_repository_proto_rawDescGZIP(), []int{46}
 }
 
 // BackupCustomHooksRequest ...
@@ -2802,7 +2872,7 @@ type BackupCustomHooksRequest struct {
 func (x *BackupCustomHooksRequest) Reset() {
 	*x = BackupCustomHooksRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[46]
+		mi := &file_repository_proto_msgTypes[47]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2815,7 +2885,7 @@ func (x *BackupCustomHooksRequest) String() string {
 func (*BackupCustomHooksRequest) ProtoMessage() {}
 
 func (x *BackupCustomHooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[46]
+	mi := &file_repository_proto_msgTypes[47]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2828,7 +2898,7 @@ func (x *BackupCustomHooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BackupCustomHooksRequest.ProtoReflect.Descriptor instead.
 func (*BackupCustomHooksRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{46}
+	return file_repository_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *BackupCustomHooksRequest) GetRepository() *Repository {
@@ -2852,7 +2922,7 @@ type GetCustomHooksRequest struct {
 func (x *GetCustomHooksRequest) Reset() {
 	*x = GetCustomHooksRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[47]
+		mi := &file_repository_proto_msgTypes[48]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2865,7 +2935,7 @@ func (x *GetCustomHooksRequest) String() string {
 func (*GetCustomHooksRequest) ProtoMessage() {}
 
 func (x *GetCustomHooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[47]
+	mi := &file_repository_proto_msgTypes[48]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2878,7 +2948,7 @@ func (x *GetCustomHooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCustomHooksRequest.ProtoReflect.Descriptor instead.
 func (*GetCustomHooksRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{47}
+	return file_repository_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetCustomHooksRequest) GetRepository() *Repository {
@@ -2901,7 +2971,7 @@ type BackupCustomHooksResponse struct {
 func (x *BackupCustomHooksResponse) Reset() {
 	*x = BackupCustomHooksResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[48]
+		mi := &file_repository_proto_msgTypes[49]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2914,7 +2984,7 @@ func (x *BackupCustomHooksResponse) String() string {
 func (*BackupCustomHooksResponse) ProtoMessage() {}
 
 func (x *BackupCustomHooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[48]
+	mi := &file_repository_proto_msgTypes[49]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2927,7 +2997,7 @@ func (x *BackupCustomHooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BackupCustomHooksResponse.ProtoReflect.Descriptor instead.
 func (*BackupCustomHooksResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{48}
+	return file_repository_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *BackupCustomHooksResponse) GetData() []byte {
@@ -2950,7 +3020,7 @@ type GetCustomHooksResponse struct {
 func (x *GetCustomHooksResponse) Reset() {
 	*x = GetCustomHooksResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[49]
+		mi := &file_repository_proto_msgTypes[50]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2963,7 +3033,7 @@ func (x *GetCustomHooksResponse) String() string {
 func (*GetCustomHooksResponse) ProtoMessage() {}
 
 func (x *GetCustomHooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[49]
+	mi := &file_repository_proto_msgTypes[50]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2976,7 +3046,7 @@ func (x *GetCustomHooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCustomHooksResponse.ProtoReflect.Descriptor instead.
 func (*GetCustomHooksResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{49}
+	return file_repository_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *GetCustomHooksResponse) GetData() []byte {
@@ -3002,7 +3072,7 @@ type CreateRepositoryFromBundleRequest struct {
 func (x *CreateRepositoryFromBundleRequest) Reset() {
 	*x = CreateRepositoryFromBundleRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[50]
+		mi := &file_repository_proto_msgTypes[51]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3015,7 +3085,7 @@ func (x *CreateRepositoryFromBundleRequest) String() string {
 func (*CreateRepositoryFromBundleRequest) ProtoMessage() {}
 
 func (x *CreateRepositoryFromBundleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[50]
+	mi := &file_repository_proto_msgTypes[51]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3028,7 +3098,7 @@ func (x *CreateRepositoryFromBundleRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use CreateRepositoryFromBundleRequest.ProtoReflect.Descriptor instead.
 func (*CreateRepositoryFromBundleRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{50}
+	return file_repository_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *CreateRepositoryFromBundleRequest) GetRepository() *Repository {
@@ -3055,7 +3125,7 @@ type CreateRepositoryFromBundleResponse struct {
 func (x *CreateRepositoryFromBundleResponse) Reset() {
 	*x = CreateRepositoryFromBundleResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[51]
+		mi := &file_repository_proto_msgTypes[52]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3068,7 +3138,7 @@ func (x *CreateRepositoryFromBundleResponse) String() string {
 func (*CreateRepositoryFromBundleResponse) ProtoMessage() {}
 
 func (x *CreateRepositoryFromBundleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[51]
+	mi := &file_repository_proto_msgTypes[52]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3081,7 +3151,7 @@ func (x *CreateRepositoryFromBundleResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CreateRepositoryFromBundleResponse.ProtoReflect.Descriptor instead.
 func (*CreateRepositoryFromBundleResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{51}
+	return file_repository_proto_rawDescGZIP(), []int{52}
 }
 
 // FindLicenseRequest asks to detect the license for the given repository.
@@ -3097,7 +3167,7 @@ type FindLicenseRequest struct {
 func (x *FindLicenseRequest) Reset() {
 	*x = FindLicenseRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[52]
+		mi := &file_repository_proto_msgTypes[53]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3110,7 +3180,7 @@ func (x *FindLicenseRequest) String() string {
 func (*FindLicenseRequest) ProtoMessage() {}
 
 func (x *FindLicenseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[52]
+	mi := &file_repository_proto_msgTypes[53]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3123,7 +3193,7 @@ func (x *FindLicenseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindLicenseRequest.ProtoReflect.Descriptor instead.
 func (*FindLicenseRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{52}
+	return file_repository_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *FindLicenseRequest) GetRepository() *Repository {
@@ -3161,7 +3231,7 @@ type FindLicenseResponse struct {
 func (x *FindLicenseResponse) Reset() {
 	*x = FindLicenseResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[53]
+		mi := &file_repository_proto_msgTypes[54]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3174,7 +3244,7 @@ func (x *FindLicenseResponse) String() string {
 func (*FindLicenseResponse) ProtoMessage() {}
 
 func (x *FindLicenseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[53]
+	mi := &file_repository_proto_msgTypes[54]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3187,7 +3257,7 @@ func (x *FindLicenseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindLicenseResponse.ProtoReflect.Descriptor instead.
 func (*FindLicenseResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{53}
+	return file_repository_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *FindLicenseResponse) GetLicenseShortName() string {
@@ -3238,7 +3308,7 @@ type GetInfoAttributesRequest struct {
 func (x *GetInfoAttributesRequest) Reset() {
 	*x = GetInfoAttributesRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[54]
+		mi := &file_repository_proto_msgTypes[55]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3251,7 +3321,7 @@ func (x *GetInfoAttributesRequest) String() string {
 func (*GetInfoAttributesRequest) ProtoMessage() {}
 
 func (x *GetInfoAttributesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[54]
+	mi := &file_repository_proto_msgTypes[55]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3264,7 +3334,7 @@ func (x *GetInfoAttributesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInfoAttributesRequest.ProtoReflect.Descriptor instead.
 func (*GetInfoAttributesRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{54}
+	return file_repository_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *GetInfoAttributesRequest) GetRepository() *Repository {
@@ -3287,7 +3357,7 @@ type GetInfoAttributesResponse struct {
 func (x *GetInfoAttributesResponse) Reset() {
 	*x = GetInfoAttributesResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[55]
+		mi := &file_repository_proto_msgTypes[56]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3300,7 +3370,7 @@ func (x *GetInfoAttributesResponse) String() string {
 func (*GetInfoAttributesResponse) ProtoMessage() {}
 
 func (x *GetInfoAttributesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[55]
+	mi := &file_repository_proto_msgTypes[56]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3313,7 +3383,7 @@ func (x *GetInfoAttributesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInfoAttributesResponse.ProtoReflect.Descriptor instead.
 func (*GetInfoAttributesResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{55}
+	return file_repository_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *GetInfoAttributesResponse) GetAttributes() []byte {
@@ -3337,7 +3407,7 @@ type CalculateChecksumRequest struct {
 func (x *CalculateChecksumRequest) Reset() {
 	*x = CalculateChecksumRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[56]
+		mi := &file_repository_proto_msgTypes[57]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3350,7 +3420,7 @@ func (x *CalculateChecksumRequest) String() string {
 func (*CalculateChecksumRequest) ProtoMessage() {}
 
 func (x *CalculateChecksumRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[56]
+	mi := &file_repository_proto_msgTypes[57]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3363,7 +3433,7 @@ func (x *CalculateChecksumRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculateChecksumRequest.ProtoReflect.Descriptor instead.
 func (*CalculateChecksumRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{56}
+	return file_repository_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *CalculateChecksumRequest) GetRepository() *Repository {
@@ -3386,7 +3456,7 @@ type CalculateChecksumResponse struct {
 func (x *CalculateChecksumResponse) Reset() {
 	*x = CalculateChecksumResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[57]
+		mi := &file_repository_proto_msgTypes[58]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3399,7 +3469,7 @@ func (x *CalculateChecksumResponse) String() string {
 func (*CalculateChecksumResponse) ProtoMessage() {}
 
 func (x *CalculateChecksumResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[57]
+	mi := &file_repository_proto_msgTypes[58]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3412,7 +3482,7 @@ func (x *CalculateChecksumResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalculateChecksumResponse.ProtoReflect.Descriptor instead.
 func (*CalculateChecksumResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{57}
+	return file_repository_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *CalculateChecksumResponse) GetChecksum() string {
@@ -3436,7 +3506,7 @@ type GetSnapshotRequest struct {
 func (x *GetSnapshotRequest) Reset() {
 	*x = GetSnapshotRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[58]
+		mi := &file_repository_proto_msgTypes[59]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3449,7 +3519,7 @@ func (x *GetSnapshotRequest) String() string {
 func (*GetSnapshotRequest) ProtoMessage() {}
 
 func (x *GetSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[58]
+	mi := &file_repository_proto_msgTypes[59]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3462,7 +3532,7 @@ func (x *GetSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{58}
+	return file_repository_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *GetSnapshotRequest) GetRepository() *Repository {
@@ -3485,7 +3555,7 @@ type GetSnapshotResponse struct {
 func (x *GetSnapshotResponse) Reset() {
 	*x = GetSnapshotResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[59]
+		mi := &file_repository_proto_msgTypes[60]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3498,7 +3568,7 @@ func (x *GetSnapshotResponse) String() string {
 func (*GetSnapshotResponse) ProtoMessage() {}
 
 func (x *GetSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[59]
+	mi := &file_repository_proto_msgTypes[60]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3511,7 +3581,7 @@ func (x *GetSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{59}
+	return file_repository_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *GetSnapshotResponse) GetData() []byte {
@@ -3546,7 +3616,7 @@ type CreateRepositoryFromSnapshotRequest struct {
 func (x *CreateRepositoryFromSnapshotRequest) Reset() {
 	*x = CreateRepositoryFromSnapshotRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[60]
+		mi := &file_repository_proto_msgTypes[61]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3559,7 +3629,7 @@ func (x *CreateRepositoryFromSnapshotRequest) String() string {
 func (*CreateRepositoryFromSnapshotRequest) ProtoMessage() {}
 
 func (x *CreateRepositoryFromSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[60]
+	mi := &file_repository_proto_msgTypes[61]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3572,7 +3642,7 @@ func (x *CreateRepositoryFromSnapshotRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CreateRepositoryFromSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*CreateRepositoryFromSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{60}
+	return file_repository_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *CreateRepositoryFromSnapshotRequest) GetRepository() *Repository {
@@ -3613,7 +3683,7 @@ type CreateRepositoryFromSnapshotResponse struct {
 func (x *CreateRepositoryFromSnapshotResponse) Reset() {
 	*x = CreateRepositoryFromSnapshotResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[61]
+		mi := &file_repository_proto_msgTypes[62]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3626,7 +3696,7 @@ func (x *CreateRepositoryFromSnapshotResponse) String() string {
 func (*CreateRepositoryFromSnapshotResponse) ProtoMessage() {}
 
 func (x *CreateRepositoryFromSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[61]
+	mi := &file_repository_proto_msgTypes[62]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3639,7 +3709,7 @@ func (x *CreateRepositoryFromSnapshotResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use CreateRepositoryFromSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*CreateRepositoryFromSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{61}
+	return file_repository_proto_rawDescGZIP(), []int{62}
 }
 
 // GetRawChangesRequest is a request for the GetRawChanges RPC.
@@ -3660,7 +3730,7 @@ type GetRawChangesRequest struct {
 func (x *GetRawChangesRequest) Reset() {
 	*x = GetRawChangesRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[62]
+		mi := &file_repository_proto_msgTypes[63]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3673,7 +3743,7 @@ func (x *GetRawChangesRequest) String() string {
 func (*GetRawChangesRequest) ProtoMessage() {}
 
 func (x *GetRawChangesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[62]
+	mi := &file_repository_proto_msgTypes[63]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3686,7 +3756,7 @@ func (x *GetRawChangesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRawChangesRequest.ProtoReflect.Descriptor instead.
 func (*GetRawChangesRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{62}
+	return file_repository_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *GetRawChangesRequest) GetRepository() *Repository {
@@ -3723,7 +3793,7 @@ type GetRawChangesResponse struct {
 func (x *GetRawChangesResponse) Reset() {
 	*x = GetRawChangesResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[63]
+		mi := &file_repository_proto_msgTypes[64]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3736,7 +3806,7 @@ func (x *GetRawChangesResponse) String() string {
 func (*GetRawChangesResponse) ProtoMessage() {}
 
 func (x *GetRawChangesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[63]
+	mi := &file_repository_proto_msgTypes[64]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3749,7 +3819,7 @@ func (x *GetRawChangesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRawChangesResponse.ProtoReflect.Descriptor instead.
 func (*GetRawChangesResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{63}
+	return file_repository_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *GetRawChangesResponse) GetRawChanges() []*GetRawChangesResponse_RawChange {
@@ -3788,7 +3858,7 @@ type SearchFilesByNameRequest struct {
 func (x *SearchFilesByNameRequest) Reset() {
 	*x = SearchFilesByNameRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[64]
+		mi := &file_repository_proto_msgTypes[65]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3801,7 +3871,7 @@ func (x *SearchFilesByNameRequest) String() string {
 func (*SearchFilesByNameRequest) ProtoMessage() {}
 
 func (x *SearchFilesByNameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[64]
+	mi := &file_repository_proto_msgTypes[65]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3814,7 +3884,7 @@ func (x *SearchFilesByNameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchFilesByNameRequest.ProtoReflect.Descriptor instead.
 func (*SearchFilesByNameRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{64}
+	return file_repository_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *SearchFilesByNameRequest) GetRepository() *Repository {
@@ -3872,7 +3942,7 @@ type SearchFilesByNameResponse struct {
 func (x *SearchFilesByNameResponse) Reset() {
 	*x = SearchFilesByNameResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[65]
+		mi := &file_repository_proto_msgTypes[66]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3885,7 +3955,7 @@ func (x *SearchFilesByNameResponse) String() string {
 func (*SearchFilesByNameResponse) ProtoMessage() {}
 
 func (x *SearchFilesByNameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[65]
+	mi := &file_repository_proto_msgTypes[66]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3898,7 +3968,7 @@ func (x *SearchFilesByNameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchFilesByNameResponse.ProtoReflect.Descriptor instead.
 func (*SearchFilesByNameResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{65}
+	return file_repository_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *SearchFilesByNameResponse) GetFiles() [][]byte {
@@ -3927,7 +3997,7 @@ type SearchFilesByContentRequest struct {
 func (x *SearchFilesByContentRequest) Reset() {
 	*x = SearchFilesByContentRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[66]
+		mi := &file_repository_proto_msgTypes[67]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -3940,7 +4010,7 @@ func (x *SearchFilesByContentRequest) String() string {
 func (*SearchFilesByContentRequest) ProtoMessage() {}
 
 func (x *SearchFilesByContentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[66]
+	mi := &file_repository_proto_msgTypes[67]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3953,7 +4023,7 @@ func (x *SearchFilesByContentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchFilesByContentRequest.ProtoReflect.Descriptor instead.
 func (*SearchFilesByContentRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{66}
+	return file_repository_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *SearchFilesByContentRequest) GetRepository() *Repository {
@@ -3994,7 +4064,7 @@ type SearchFilesByContentResponse struct {
 func (x *SearchFilesByContentResponse) Reset() {
 	*x = SearchFilesByContentResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[67]
+		mi := &file_repository_proto_msgTypes[68]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4007,7 +4077,7 @@ func (x *SearchFilesByContentResponse) String() string {
 func (*SearchFilesByContentResponse) ProtoMessage() {}
 
 func (x *SearchFilesByContentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[67]
+	mi := &file_repository_proto_msgTypes[68]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4020,7 +4090,7 @@ func (x *SearchFilesByContentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchFilesByContentResponse.ProtoReflect.Descriptor instead.
 func (*SearchFilesByContentResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{67}
+	return file_repository_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *SearchFilesByContentResponse) GetMatchData() []byte {
@@ -4072,7 +4142,7 @@ type Remote struct {
 func (x *Remote) Reset() {
 	*x = Remote{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[68]
+		mi := &file_repository_proto_msgTypes[69]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4085,7 +4155,7 @@ func (x *Remote) String() string {
 func (*Remote) ProtoMessage() {}
 
 func (x *Remote) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[68]
+	mi := &file_repository_proto_msgTypes[69]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4098,7 +4168,7 @@ func (x *Remote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Remote.ProtoReflect.Descriptor instead.
 func (*Remote) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{68}
+	return file_repository_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *Remote) GetUrl() string {
@@ -4143,7 +4213,7 @@ type GetObjectDirectorySizeRequest struct {
 func (x *GetObjectDirectorySizeRequest) Reset() {
 	*x = GetObjectDirectorySizeRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[69]
+		mi := &file_repository_proto_msgTypes[70]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4156,7 +4226,7 @@ func (x *GetObjectDirectorySizeRequest) String() string {
 func (*GetObjectDirectorySizeRequest) ProtoMessage() {}
 
 func (x *GetObjectDirectorySizeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[69]
+	mi := &file_repository_proto_msgTypes[70]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4169,7 +4239,7 @@ func (x *GetObjectDirectorySizeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetObjectDirectorySizeRequest.ProtoReflect.Descriptor instead.
 func (*GetObjectDirectorySizeRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{69}
+	return file_repository_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *GetObjectDirectorySizeRequest) GetRepository() *Repository {
@@ -4192,7 +4262,7 @@ type GetObjectDirectorySizeResponse struct {
 func (x *GetObjectDirectorySizeResponse) Reset() {
 	*x = GetObjectDirectorySizeResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[70]
+		mi := &file_repository_proto_msgTypes[71]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4205,7 +4275,7 @@ func (x *GetObjectDirectorySizeResponse) String() string {
 func (*GetObjectDirectorySizeResponse) ProtoMessage() {}
 
 func (x *GetObjectDirectorySizeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[70]
+	mi := &file_repository_proto_msgTypes[71]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4218,7 +4288,7 @@ func (x *GetObjectDirectorySizeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetObjectDirectorySizeResponse.ProtoReflect.Descriptor instead.
 func (*GetObjectDirectorySizeResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{70}
+	return file_repository_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *GetObjectDirectorySizeResponse) GetSize() int64 {
@@ -4242,7 +4312,7 @@ type RemoveRepositoryRequest struct {
 func (x *RemoveRepositoryRequest) Reset() {
 	*x = RemoveRepositoryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[71]
+		mi := &file_repository_proto_msgTypes[72]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4255,7 +4325,7 @@ func (x *RemoveRepositoryRequest) String() string {
 func (*RemoveRepositoryRequest) ProtoMessage() {}
 
 func (x *RemoveRepositoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[71]
+	mi := &file_repository_proto_msgTypes[72]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4268,7 +4338,7 @@ func (x *RemoveRepositoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRepositoryRequest.ProtoReflect.Descriptor instead.
 func (*RemoveRepositoryRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{71}
+	return file_repository_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *RemoveRepositoryRequest) GetRepository() *Repository {
@@ -4288,7 +4358,7 @@ type RemoveRepositoryResponse struct {
 func (x *RemoveRepositoryResponse) Reset() {
 	*x = RemoveRepositoryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[72]
+		mi := &file_repository_proto_msgTypes[73]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4301,7 +4371,7 @@ func (x *RemoveRepositoryResponse) String() string {
 func (*RemoveRepositoryResponse) ProtoMessage() {}
 
 func (x *RemoveRepositoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[72]
+	mi := &file_repository_proto_msgTypes[73]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4314,7 +4384,7 @@ func (x *RemoveRepositoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveRepositoryResponse.ProtoReflect.Descriptor instead.
 func (*RemoveRepositoryResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{72}
+	return file_repository_proto_rawDescGZIP(), []int{73}
 }
 
 // ReplicateRepositoryRequest is a request for the ReplicateRepository RPC.
@@ -4334,7 +4404,7 @@ type ReplicateRepositoryRequest struct {
 func (x *ReplicateRepositoryRequest) Reset() {
 	*x = ReplicateRepositoryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[73]
+		mi := &file_repository_proto_msgTypes[74]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4347,7 +4417,7 @@ func (x *ReplicateRepositoryRequest) String() string {
 func (*ReplicateRepositoryRequest) ProtoMessage() {}
 
 func (x *ReplicateRepositoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[73]
+	mi := &file_repository_proto_msgTypes[74]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4360,7 +4430,7 @@ func (x *ReplicateRepositoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicateRepositoryRequest.ProtoReflect.Descriptor instead.
 func (*ReplicateRepositoryRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{73}
+	return file_repository_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *ReplicateRepositoryRequest) GetRepository() *Repository {
@@ -4387,7 +4457,7 @@ type ReplicateRepositoryResponse struct {
 func (x *ReplicateRepositoryResponse) Reset() {
 	*x = ReplicateRepositoryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[74]
+		mi := &file_repository_proto_msgTypes[75]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4400,7 +4470,7 @@ func (x *ReplicateRepositoryResponse) String() string {
 func (*ReplicateRepositoryResponse) ProtoMessage() {}
 
 func (x *ReplicateRepositoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[74]
+	mi := &file_repository_proto_msgTypes[75]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4413,7 +4483,7 @@ func (x *ReplicateRepositoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicateRepositoryResponse.ProtoReflect.Descriptor instead.
 func (*ReplicateRepositoryResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{74}
+	return file_repository_proto_rawDescGZIP(), []int{75}
 }
 
 // OptimizeRepositoryRequest is a request for the OptimizeRepository RPC.
@@ -4431,7 +4501,7 @@ type OptimizeRepositoryRequest struct {
 func (x *OptimizeRepositoryRequest) Reset() {
 	*x = OptimizeRepositoryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[75]
+		mi := &file_repository_proto_msgTypes[76]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4444,7 +4514,7 @@ func (x *OptimizeRepositoryRequest) String() string {
 func (*OptimizeRepositoryRequest) ProtoMessage() {}
 
 func (x *OptimizeRepositoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[75]
+	mi := &file_repository_proto_msgTypes[76]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4457,7 +4527,7 @@ func (x *OptimizeRepositoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptimizeRepositoryRequest.ProtoReflect.Descriptor instead.
 func (*OptimizeRepositoryRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{75}
+	return file_repository_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *OptimizeRepositoryRequest) GetRepository() *Repository {
@@ -4484,7 +4554,7 @@ type OptimizeRepositoryResponse struct {
 func (x *OptimizeRepositoryResponse) Reset() {
 	*x = OptimizeRepositoryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[76]
+		mi := &file_repository_proto_msgTypes[77]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4497,7 +4567,7 @@ func (x *OptimizeRepositoryResponse) String() string {
 func (*OptimizeRepositoryResponse) ProtoMessage() {}
 
 func (x *OptimizeRepositoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[76]
+	mi := &file_repository_proto_msgTypes[77]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4510,7 +4580,7 @@ func (x *OptimizeRepositoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptimizeRepositoryResponse.ProtoReflect.Descriptor instead.
 func (*OptimizeRepositoryResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{76}
+	return file_repository_proto_rawDescGZIP(), []int{77}
 }
 
 // PruneUnreachableObjectsRequest is a request for the PruneUnreachableObjects
@@ -4528,7 +4598,7 @@ type PruneUnreachableObjectsRequest struct {
 func (x *PruneUnreachableObjectsRequest) Reset() {
 	*x = PruneUnreachableObjectsRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[77]
+		mi := &file_repository_proto_msgTypes[78]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4541,7 +4611,7 @@ func (x *PruneUnreachableObjectsRequest) String() string {
 func (*PruneUnreachableObjectsRequest) ProtoMessage() {}
 
 func (x *PruneUnreachableObjectsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[77]
+	mi := &file_repository_proto_msgTypes[78]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4554,7 +4624,7 @@ func (x *PruneUnreachableObjectsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PruneUnreachableObjectsRequest.ProtoReflect.Descriptor instead.
 func (*PruneUnreachableObjectsRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{77}
+	return file_repository_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *PruneUnreachableObjectsRequest) GetRepository() *Repository {
@@ -4575,7 +4645,7 @@ type PruneUnreachableObjectsResponse struct {
 func (x *PruneUnreachableObjectsResponse) Reset() {
 	*x = PruneUnreachableObjectsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[78]
+		mi := &file_repository_proto_msgTypes[79]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4588,7 +4658,7 @@ func (x *PruneUnreachableObjectsResponse) String() string {
 func (*PruneUnreachableObjectsResponse) ProtoMessage() {}
 
 func (x *PruneUnreachableObjectsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[78]
+	mi := &file_repository_proto_msgTypes[79]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4601,7 +4671,7 @@ func (x *PruneUnreachableObjectsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PruneUnreachableObjectsResponse.ProtoReflect.Descriptor instead.
 func (*PruneUnreachableObjectsResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{78}
+	return file_repository_proto_rawDescGZIP(), []int{79}
 }
 
 // BackupRepositoryRequest is a request for the BackupRepository RPC.
@@ -4624,7 +4694,7 @@ type BackupRepositoryRequest struct {
 func (x *BackupRepositoryRequest) Reset() {
 	*x = BackupRepositoryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[79]
+		mi := &file_repository_proto_msgTypes[80]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4637,7 +4707,7 @@ func (x *BackupRepositoryRequest) String() string {
 func (*BackupRepositoryRequest) ProtoMessage() {}
 
 func (x *BackupRepositoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[79]
+	mi := &file_repository_proto_msgTypes[80]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4650,7 +4720,7 @@ func (x *BackupRepositoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BackupRepositoryRequest.ProtoReflect.Descriptor instead.
 func (*BackupRepositoryRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{79}
+	return file_repository_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *BackupRepositoryRequest) GetRepository() *Repository {
@@ -4691,7 +4761,7 @@ type BackupRepositoryResponse struct {
 func (x *BackupRepositoryResponse) Reset() {
 	*x = BackupRepositoryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[80]
+		mi := &file_repository_proto_msgTypes[81]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4704,7 +4774,7 @@ func (x *BackupRepositoryResponse) String() string {
 func (*BackupRepositoryResponse) ProtoMessage() {}
 
 func (x *BackupRepositoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[80]
+	mi := &file_repository_proto_msgTypes[81]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4717,7 +4787,7 @@ func (x *BackupRepositoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BackupRepositoryResponse.ProtoReflect.Descriptor instead.
 func (*BackupRepositoryResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{80}
+	return file_repository_proto_rawDescGZIP(), []int{81}
 }
 
 // RestoreRepositoryRequest is a request for the RestoreRepository RPC.
@@ -4741,7 +4811,7 @@ type RestoreRepositoryRequest struct {
 func (x *RestoreRepositoryRequest) Reset() {
 	*x = RestoreRepositoryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[81]
+		mi := &file_repository_proto_msgTypes[82]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4754,7 +4824,7 @@ func (x *RestoreRepositoryRequest) String() string {
 func (*RestoreRepositoryRequest) ProtoMessage() {}
 
 func (x *RestoreRepositoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[81]
+	mi := &file_repository_proto_msgTypes[82]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4767,7 +4837,7 @@ func (x *RestoreRepositoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestoreRepositoryRequest.ProtoReflect.Descriptor instead.
 func (*RestoreRepositoryRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{81}
+	return file_repository_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *RestoreRepositoryRequest) GetRepository() *Repository {
@@ -4808,7 +4878,7 @@ type RestoreRepositoryResponse struct {
 func (x *RestoreRepositoryResponse) Reset() {
 	*x = RestoreRepositoryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[82]
+		mi := &file_repository_proto_msgTypes[83]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4821,7 +4891,7 @@ func (x *RestoreRepositoryResponse) String() string {
 func (*RestoreRepositoryResponse) ProtoMessage() {}
 
 func (x *RestoreRepositoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[82]
+	mi := &file_repository_proto_msgTypes[83]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4834,7 +4904,7 @@ func (x *RestoreRepositoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestoreRepositoryResponse.ProtoReflect.Descriptor instead.
 func (*RestoreRepositoryResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{82}
+	return file_repository_proto_rawDescGZIP(), []int{83}
 }
 
 // GetFileAttributesRequest is a request for the GetFileAttributes RPC.
@@ -4856,7 +4926,7 @@ type GetFileAttributesRequest struct {
 func (x *GetFileAttributesRequest) Reset() {
 	*x = GetFileAttributesRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[83]
+		mi := &file_repository_proto_msgTypes[84]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4869,7 +4939,7 @@ func (x *GetFileAttributesRequest) String() string {
 func (*GetFileAttributesRequest) ProtoMessage() {}
 
 func (x *GetFileAttributesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[83]
+	mi := &file_repository_proto_msgTypes[84]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4882,7 +4952,7 @@ func (x *GetFileAttributesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFileAttributesRequest.ProtoReflect.Descriptor instead.
 func (*GetFileAttributesRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{83}
+	return file_repository_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *GetFileAttributesRequest) GetRepository() *Repository {
@@ -4926,7 +4996,7 @@ type GetFileAttributesResponse struct {
 func (x *GetFileAttributesResponse) Reset() {
 	*x = GetFileAttributesResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[84]
+		mi := &file_repository_proto_msgTypes[85]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4939,7 +5009,7 @@ func (x *GetFileAttributesResponse) String() string {
 func (*GetFileAttributesResponse) ProtoMessage() {}
 
 func (x *GetFileAttributesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[84]
+	mi := &file_repository_proto_msgTypes[85]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4952,7 +5022,7 @@ func (x *GetFileAttributesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFileAttributesResponse.ProtoReflect.Descriptor instead.
 func (*GetFileAttributesResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{84}
+	return file_repository_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *GetFileAttributesResponse) GetAttributeInfos() []*GetFileAttributesResponse_AttributeInfo {
@@ -4975,7 +5045,7 @@ type FastExportRequest struct {
 func (x *FastExportRequest) Reset() {
 	*x = FastExportRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[85]
+		mi := &file_repository_proto_msgTypes[86]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4988,7 +5058,7 @@ func (x *FastExportRequest) String() string {
 func (*FastExportRequest) ProtoMessage() {}
 
 func (x *FastExportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[85]
+	mi := &file_repository_proto_msgTypes[86]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5001,7 +5071,7 @@ func (x *FastExportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FastExportRequest.ProtoReflect.Descriptor instead.
 func (*FastExportRequest) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{85}
+	return file_repository_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *FastExportRequest) GetRepository() *Repository {
@@ -5024,7 +5094,7 @@ type FastExportResponse struct {
 func (x *FastExportResponse) Reset() {
 	*x = FastExportResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[86]
+		mi := &file_repository_proto_msgTypes[87]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5037,7 +5107,7 @@ func (x *FastExportResponse) String() string {
 func (*FastExportResponse) ProtoMessage() {}
 
 func (x *FastExportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[86]
+	mi := &file_repository_proto_msgTypes[87]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5050,7 +5120,7 @@ func (x *FastExportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FastExportResponse.ProtoReflect.Descriptor instead.
 func (*FastExportResponse) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{86}
+	return file_repository_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *FastExportResponse) GetData() []byte {
@@ -5084,7 +5154,7 @@ type RepositoryInfoResponse_ReferencesInfo struct {
 func (x *RepositoryInfoResponse_ReferencesInfo) Reset() {
 	*x = RepositoryInfoResponse_ReferencesInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[87]
+		mi := &file_repository_proto_msgTypes[88]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5097,7 +5167,7 @@ func (x *RepositoryInfoResponse_ReferencesInfo) String() string {
 func (*RepositoryInfoResponse_ReferencesInfo) ProtoMessage() {}
 
 func (x *RepositoryInfoResponse_ReferencesInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[87]
+	mi := &file_repository_proto_msgTypes[88]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5163,7 +5233,7 @@ type RepositoryInfoResponse_ObjectsInfo struct {
 func (x *RepositoryInfoResponse_ObjectsInfo) Reset() {
 	*x = RepositoryInfoResponse_ObjectsInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[88]
+		mi := &file_repository_proto_msgTypes[89]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5176,7 +5246,7 @@ func (x *RepositoryInfoResponse_ObjectsInfo) String() string {
 func (*RepositoryInfoResponse_ObjectsInfo) ProtoMessage() {}
 
 func (x *RepositoryInfoResponse_ObjectsInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[88]
+	mi := &file_repository_proto_msgTypes[89]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5246,7 +5316,7 @@ type GetRawChangesResponse_RawChange struct {
 func (x *GetRawChangesResponse_RawChange) Reset() {
 	*x = GetRawChangesResponse_RawChange{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[89]
+		mi := &file_repository_proto_msgTypes[90]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5259,7 +5329,7 @@ func (x *GetRawChangesResponse_RawChange) String() string {
 func (*GetRawChangesResponse_RawChange) ProtoMessage() {}
 
 func (x *GetRawChangesResponse_RawChange) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[89]
+	mi := &file_repository_proto_msgTypes[90]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5272,7 +5342,7 @@ func (x *GetRawChangesResponse_RawChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRawChangesResponse_RawChange.ProtoReflect.Descriptor instead.
 func (*GetRawChangesResponse_RawChange) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{63, 0}
+	return file_repository_proto_rawDescGZIP(), []int{64, 0}
 }
 
 func (x *GetRawChangesResponse_RawChange) GetBlobId() string {
@@ -5334,7 +5404,7 @@ type BackupRepositoryResponse_SkippedError struct {
 func (x *BackupRepositoryResponse_SkippedError) Reset() {
 	*x = BackupRepositoryResponse_SkippedError{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[90]
+		mi := &file_repository_proto_msgTypes[91]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5347,7 +5417,7 @@ func (x *BackupRepositoryResponse_SkippedError) String() string {
 func (*BackupRepositoryResponse_SkippedError) ProtoMessage() {}
 
 func (x *BackupRepositoryResponse_SkippedError) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[90]
+	mi := &file_repository_proto_msgTypes[91]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5360,7 +5430,7 @@ func (x *BackupRepositoryResponse_SkippedError) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use BackupRepositoryResponse_SkippedError.ProtoReflect.Descriptor instead.
 func (*BackupRepositoryResponse_SkippedError) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{80, 0}
+	return file_repository_proto_rawDescGZIP(), []int{81, 0}
 }
 
 // SkippedError is returned when the repository restore has been skipped.
@@ -5373,7 +5443,7 @@ type RestoreRepositoryResponse_SkippedError struct {
 func (x *RestoreRepositoryResponse_SkippedError) Reset() {
 	*x = RestoreRepositoryResponse_SkippedError{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[91]
+		mi := &file_repository_proto_msgTypes[92]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5386,7 +5456,7 @@ func (x *RestoreRepositoryResponse_SkippedError) String() string {
 func (*RestoreRepositoryResponse_SkippedError) ProtoMessage() {}
 
 func (x *RestoreRepositoryResponse_SkippedError) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[91]
+	mi := &file_repository_proto_msgTypes[92]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5399,7 +5469,7 @@ func (x *RestoreRepositoryResponse_SkippedError) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use RestoreRepositoryResponse_SkippedError.ProtoReflect.Descriptor instead.
 func (*RestoreRepositoryResponse_SkippedError) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{82, 0}
+	return file_repository_proto_rawDescGZIP(), []int{83, 0}
 }
 
 // AttributeInfo is a specified git attribute for a given path.
@@ -5421,7 +5491,7 @@ type GetFileAttributesResponse_AttributeInfo struct {
 func (x *GetFileAttributesResponse_AttributeInfo) Reset() {
 	*x = GetFileAttributesResponse_AttributeInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_repository_proto_msgTypes[92]
+		mi := &file_repository_proto_msgTypes[93]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -5434,7 +5504,7 @@ func (x *GetFileAttributesResponse_AttributeInfo) String() string {
 func (*GetFileAttributesResponse_AttributeInfo) ProtoMessage() {}
 
 func (x *GetFileAttributesResponse_AttributeInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_repository_proto_msgTypes[92]
+	mi := &file_repository_proto_msgTypes[93]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5447,7 +5517,7 @@ func (x *GetFileAttributesResponse_AttributeInfo) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use GetFileAttributesResponse_AttributeInfo.ProtoReflect.Descriptor instead.
 func (*GetFileAttributesResponse_AttributeInfo) Descriptor() ([]byte, []int) {
-	return file_repository_proto_rawDescGZIP(), []int{84, 0}
+	return file_repository_proto_rawDescGZIP(), []int{85, 0}
 }
 
 func (x *GetFileAttributesResponse_AttributeInfo) GetPath() string {
@@ -5475,247 +5545,255 @@ var File_repository_proto protoreflect.FileDescriptor
 
 var file_repository_proto_rawDesc = []byte{
 	0x0a, 0x10, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x12, 0x06, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x1a, 0x0a, 0x6c, 0x69, 0x6e, 0x74,
-	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x0c, 0x73, 0x68, 0x61, 0x72, 0x65, 0x64, 0x2e, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x22, 0x53, 0x0a, 0x17, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
-	0x72, 0x79, 0x45, 0x78, 0x69, 0x73, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72,
-	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x32, 0x0a, 0x18, 0x52, 0x65, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x45, 0x78, 0x69, 0x73, 0x74, 0x73, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x65, 0x78, 0x69, 0x73, 0x74, 0x73, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x65, 0x78, 0x69, 0x73, 0x74, 0x73, 0x22, 0x51, 0x0a,
-	0x15, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x53, 0x69, 0x7a, 0x65, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69,
-	0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74,
-	0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04,
-	0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
-	0x22, 0x2c, 0x0a, 0x16, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x53, 0x69,
-	0x7a, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69,
-	0x7a, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0x51,
-	0x0a, 0x15, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x49, 0x6e, 0x66, 0x6f,
+	0x74, 0x6f, 0x12, 0x06, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x1a, 0x0c, 0x65, 0x72, 0x72, 0x6f,
+	0x72, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x0a, 0x6c, 0x69, 0x6e, 0x74, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x0c, 0x73, 0x68, 0x61, 0x72, 0x65, 0x64, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x22, 0x53, 0x0a, 0x17, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
+	0x45, 0x78, 0x69, 0x73, 0x74, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a,
+	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73,
+	0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70,
+	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x32, 0x0a, 0x18, 0x52, 0x65, 0x70, 0x6f, 0x73,
+	0x69, 0x74, 0x6f, 0x72, 0x79, 0x45, 0x78, 0x69, 0x73, 0x74, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x65, 0x78, 0x69, 0x73, 0x74, 0x73, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x08, 0x52, 0x06, 0x65, 0x78, 0x69, 0x73, 0x74, 0x73, 0x22, 0x51, 0x0a, 0x15, 0x52,
+	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
+	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c,
+	0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6,
+	0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x2c,
+	0x0a, 0x16, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x53, 0x69, 0x7a, 0x65,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0x51, 0x0a, 0x15,
+	0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74,
+	0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61,
+	0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98,
+	0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22,
+	0x95, 0x03, 0x0a, 0x16, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x49, 0x6e,
+	0x66, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69,
+	0x7a, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x12, 0x4d,
+	0x0a, 0x0a, 0x72, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x2d, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f,
+	0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x2e, 0x52, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x49, 0x6e, 0x66,
+	0x6f, 0x52, 0x0a, 0x72, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x12, 0x44, 0x0a,
+	0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2a,
+	0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
+	0x72, 0x79, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x4f,
+	0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x07, 0x6f, 0x62, 0x6a, 0x65,
+	0x63, 0x74, 0x73, 0x1a, 0x52, 0x0a, 0x0e, 0x52, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65,
+	0x73, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x1f, 0x0a, 0x0b, 0x6c, 0x6f, 0x6f, 0x73, 0x65, 0x5f, 0x63,
+	0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x6c, 0x6f, 0x6f, 0x73,
+	0x65, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x70, 0x61, 0x63, 0x6b, 0x65, 0x64,
+	0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x70, 0x61, 0x63,
+	0x6b, 0x65, 0x64, 0x53, 0x69, 0x7a, 0x65, 0x1a, 0x7e, 0x0a, 0x0b, 0x4f, 0x62, 0x6a, 0x65, 0x63,
+	0x74, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x12, 0x1f, 0x0a, 0x0b, 0x72, 0x65,
+	0x63, 0x65, 0x6e, 0x74, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52,
+	0x0a, 0x72, 0x65, 0x63, 0x65, 0x6e, 0x74, 0x53, 0x69, 0x7a, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x73,
+	0x74, 0x61, 0x6c, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52,
+	0x09, 0x73, 0x74, 0x61, 0x6c, 0x65, 0x53, 0x69, 0x7a, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x6b, 0x65,
+	0x65, 0x70, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x08, 0x6b,
+	0x65, 0x65, 0x70, 0x53, 0x69, 0x7a, 0x65, 0x22, 0x6c, 0x0a, 0x12, 0x4f, 0x62, 0x6a, 0x65, 0x63,
+	0x74, 0x73, 0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a,
+	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73,
+	0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70,
+	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x76, 0x69, 0x73,
+	0x69, 0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x09, 0x72, 0x65, 0x76, 0x69,
+	0x73, 0x69, 0x6f, 0x6e, 0x73, 0x22, 0x29, 0x0a, 0x13, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73,
+	0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04,
+	0x73, 0x69, 0x7a, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65,
+	0x22, 0x4f, 0x0a, 0x13, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74,
 	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73,
 	0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69,
 	0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42,
 	0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72,
-	0x79, 0x22, 0x95, 0x03, 0x0a, 0x16, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
-	0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04,
-	0x73, 0x69, 0x7a, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65,
-	0x12, 0x4d, 0x0a, 0x0a, 0x72, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x18, 0x02,
-	0x20, 0x01, 0x28, 0x0b, 0x32, 0x2d, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65,
-	0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70,
-	0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x52, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x49,
-	0x6e, 0x66, 0x6f, 0x52, 0x0a, 0x72, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x12,
-	0x44, 0x0a, 0x07, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x2a, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69,
-	0x74, 0x6f, 0x72, 0x79, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x07, 0x6f, 0x62,
-	0x6a, 0x65, 0x63, 0x74, 0x73, 0x1a, 0x52, 0x0a, 0x0e, 0x52, 0x65, 0x66, 0x65, 0x72, 0x65, 0x6e,
-	0x63, 0x65, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x1f, 0x0a, 0x0b, 0x6c, 0x6f, 0x6f, 0x73, 0x65,
-	0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x6c, 0x6f,
-	0x6f, 0x73, 0x65, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x1f, 0x0a, 0x0b, 0x70, 0x61, 0x63, 0x6b,
-	0x65, 0x64, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x70,
-	0x61, 0x63, 0x6b, 0x65, 0x64, 0x53, 0x69, 0x7a, 0x65, 0x1a, 0x7e, 0x0a, 0x0b, 0x4f, 0x62, 0x6a,
-	0x65, 0x63, 0x74, 0x73, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x12, 0x1f, 0x0a, 0x0b,
-	0x72, 0x65, 0x63, 0x65, 0x6e, 0x74, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x0a, 0x72, 0x65, 0x63, 0x65, 0x6e, 0x74, 0x53, 0x69, 0x7a, 0x65, 0x12, 0x1d, 0x0a,
-	0x0a, 0x73, 0x74, 0x61, 0x6c, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x09, 0x73, 0x74, 0x61, 0x6c, 0x65, 0x53, 0x69, 0x7a, 0x65, 0x12, 0x1b, 0x0a, 0x09,
-	0x6b, 0x65, 0x65, 0x70, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04, 0x52,
-	0x08, 0x6b, 0x65, 0x65, 0x70, 0x53, 0x69, 0x7a, 0x65, 0x22, 0x6c, 0x0a, 0x12, 0x4f, 0x62, 0x6a,
-	0x65, 0x63, 0x74, 0x73, 0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
+	0x79, 0x22, 0x44, 0x0a, 0x14, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61,
+	0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2c, 0x0a, 0x06, 0x66, 0x6f, 0x72,
+	0x6d, 0x61, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x14, 0x2e, 0x67, 0x69, 0x74, 0x61,
+	0x6c, 0x79, 0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x52,
+	0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x22, 0x71, 0x0a, 0x19, 0x41, 0x70, 0x70, 0x6c, 0x79,
+	0x47, 0x69, 0x74, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x73, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
+	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c,
+	0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6,
+	0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1a,
+	0x0a, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x1c, 0x0a, 0x1a, 0x41, 0x70,
+	0x70, 0x6c, 0x79, 0x47, 0x69, 0x74, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x73,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x83, 0x01, 0x0a, 0x12, 0x46, 0x65, 0x74,
+	0x63, 0x68, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
 	0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20,
 	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70,
 	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72,
-	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x65, 0x76,
-	0x69, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x09, 0x72, 0x65,
-	0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x22, 0x29, 0x0a, 0x13, 0x4f, 0x62, 0x6a, 0x65, 0x63,
-	0x74, 0x73, 0x53, 0x69, 0x7a, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12,
-	0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x04, 0x73, 0x69,
-	0x7a, 0x65, 0x22, 0x4f, 0x0a, 0x13, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d,
-	0x61, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e,
-	0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72,
-	0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74,
-	0x6f, 0x72, 0x79, 0x22, 0x44, 0x0a, 0x14, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72,
-	0x6d, 0x61, 0x74, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x2c, 0x0a, 0x06, 0x66,
-	0x6f, 0x72, 0x6d, 0x61, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x14, 0x2e, 0x67, 0x69,
-	0x74, 0x61, 0x6c, 0x79, 0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61,
-	0x74, 0x52, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x22, 0x71, 0x0a, 0x19, 0x41, 0x70, 0x70,
-	0x6c, 0x79, 0x47, 0x69, 0x74, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74, 0x65, 0x73, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69,
-	0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74,
-	0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04,
-	0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
-	0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x1c, 0x0a, 0x1a,
-	0x41, 0x70, 0x70, 0x6c, 0x79, 0x47, 0x69, 0x74, 0x61, 0x74, 0x74, 0x72, 0x69, 0x62, 0x75, 0x74,
-	0x65, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x83, 0x01, 0x0a, 0x12, 0x46,
-	0x65, 0x74, 0x63, 0x68, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74,
+	0x61, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x12, 0x1f, 0x0a,
+	0x0b, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x5f, 0x68, 0x65, 0x61, 0x64, 0x18, 0x03, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x0a, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x48, 0x65, 0x61, 0x64, 0x22, 0x15,
+	0x0a, 0x13, 0x46, 0x65, 0x74, 0x63, 0x68, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xe3, 0x02, 0x0a, 0x12, 0x46, 0x65, 0x74, 0x63, 0x68, 0x52,
+	0x65, 0x6d, 0x6f, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a,
+	0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69,
+	0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f,
+	0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x66, 0x6f, 0x72, 0x63, 0x65, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x66, 0x6f, 0x72, 0x63, 0x65, 0x12, 0x17, 0x0a, 0x07,
+	0x6e, 0x6f, 0x5f, 0x74, 0x61, 0x67, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x6e,
+	0x6f, 0x54, 0x61, 0x67, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74,
+	0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75, 0x74, 0x12,
+	0x17, 0x0a, 0x07, 0x73, 0x73, 0x68, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x06, 0x73, 0x73, 0x68, 0x4b, 0x65, 0x79, 0x12, 0x1f, 0x0a, 0x0b, 0x6b, 0x6e, 0x6f, 0x77,
+	0x6e, 0x5f, 0x68, 0x6f, 0x73, 0x74, 0x73, 0x18, 0x07, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x6b,
+	0x6e, 0x6f, 0x77, 0x6e, 0x48, 0x6f, 0x73, 0x74, 0x73, 0x12, 0x19, 0x0a, 0x08, 0x6e, 0x6f, 0x5f,
+	0x70, 0x72, 0x75, 0x6e, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x6e, 0x6f, 0x50,
+	0x72, 0x75, 0x6e, 0x65, 0x12, 0x33, 0x0a, 0x0d, 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x5f, 0x70,
+	0x61, 0x72, 0x61, 0x6d, 0x73, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e, 0x67, 0x69,
+	0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x52, 0x0c, 0x72, 0x65, 0x6d,
+	0x6f, 0x74, 0x65, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x2c, 0x0a, 0x12, 0x63, 0x68, 0x65,
+	0x63, 0x6b, 0x5f, 0x74, 0x61, 0x67, 0x73, 0x5f, 0x63, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x64, 0x18,
+	0x0b, 0x20, 0x01, 0x28, 0x08, 0x52, 0x10, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x54, 0x61, 0x67, 0x73,
+	0x43, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x64, 0x4a, 0x04, 0x08, 0x08, 0x10, 0x09, 0x4a, 0x04, 0x08,
+	0x02, 0x10, 0x03, 0x52, 0x06, 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x22, 0x38, 0x0a, 0x13, 0x46,
+	0x65, 0x74, 0x63, 0x68, 0x52, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x74, 0x61, 0x67, 0x73, 0x5f, 0x63, 0x68, 0x61, 0x6e, 0x67,
+	0x65, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0b, 0x74, 0x61, 0x67, 0x73, 0x43, 0x68,
+	0x61, 0x6e, 0x67, 0x65, 0x64, 0x22, 0xb5, 0x01, 0x0a, 0x17, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
+	0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
 	0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52,
 	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52,
-	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x12, 0x0a, 0x04, 0x64,
-	0x61, 0x74, 0x61, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x12,
-	0x1f, 0x0a, 0x0b, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x5f, 0x68, 0x65, 0x61, 0x64, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x08, 0x52, 0x0a, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x48, 0x65, 0x61, 0x64,
-	0x22, 0x15, 0x0a, 0x13, 0x46, 0x65, 0x74, 0x63, 0x68, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xe3, 0x02, 0x0a, 0x12, 0x46, 0x65, 0x74, 0x63,
-	0x68, 0x52, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38,
+	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x25, 0x0a, 0x0e, 0x64,
+	0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x5f, 0x62, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x0d, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x42, 0x72, 0x61, 0x6e,
+	0x63, 0x68, 0x12, 0x39, 0x0a, 0x0d, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x5f, 0x66, 0x6f, 0x72,
+	0x6d, 0x61, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x14, 0x2e, 0x67, 0x69, 0x74, 0x61,
+	0x6c, 0x79, 0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x52,
+	0x0c, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x22, 0x1a, 0x0a,
+	0x18, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72,
+	0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xea, 0x02, 0x0a, 0x11, 0x47, 0x65,
+	0x74, 0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
+	0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70,
+	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72,
+	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1b, 0x0a, 0x09, 0x63, 0x6f, 0x6d,
+	0x6d, 0x69, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x63, 0x6f,
+	0x6d, 0x6d, 0x69, 0x74, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x70, 0x72, 0x65, 0x66, 0x69, 0x78,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x70, 0x72, 0x65, 0x66, 0x69, 0x78, 0x12, 0x38,
+	0x0a, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x20,
+	0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x47, 0x65, 0x74, 0x41, 0x72, 0x63, 0x68, 0x69,
+	0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x2e, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74,
+	0x52, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68,
+	0x18, 0x05, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x12, 0x18, 0x0a, 0x07,
+	0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x18, 0x06, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x07, 0x65,
+	0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x65, 0x6c, 0x69, 0x64, 0x65, 0x5f,
+	0x70, 0x61, 0x74, 0x68, 0x18, 0x07, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x65, 0x6c, 0x69, 0x64,
+	0x65, 0x50, 0x61, 0x74, 0x68, 0x12, 0x2a, 0x0a, 0x11, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65,
+	0x5f, 0x6c, 0x66, 0x73, 0x5f, 0x62, 0x6c, 0x6f, 0x62, 0x73, 0x18, 0x08, 0x20, 0x01, 0x28, 0x08,
+	0x52, 0x0f, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x4c, 0x66, 0x73, 0x42, 0x6c, 0x6f, 0x62,
+	0x73, 0x22, 0x33, 0x0a, 0x06, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x12, 0x07, 0x0a, 0x03, 0x5a,
+	0x49, 0x50, 0x10, 0x00, 0x12, 0x07, 0x0a, 0x03, 0x54, 0x41, 0x52, 0x10, 0x01, 0x12, 0x0a, 0x0a,
+	0x06, 0x54, 0x41, 0x52, 0x5f, 0x47, 0x5a, 0x10, 0x02, 0x12, 0x0b, 0x0a, 0x07, 0x54, 0x41, 0x52,
+	0x5f, 0x42, 0x5a, 0x32, 0x10, 0x03, 0x22, 0x28, 0x0a, 0x12, 0x47, 0x65, 0x74, 0x41, 0x72, 0x63,
+	0x68, 0x69, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04,
+	0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61,
+	0x22, 0x53, 0x0a, 0x17, 0x48, 0x61, 0x73, 0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x42, 0x72, 0x61, 0x6e,
+	0x63, 0x68, 0x65, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72,
+	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32,
+	0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74,
+	0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73,
+	0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x30, 0x0a, 0x18, 0x48, 0x61, 0x73, 0x4c, 0x6f, 0x63, 0x61,
+	0x6c, 0x42, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x65, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08,
+	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x90, 0x02, 0x0a, 0x18, 0x46, 0x65, 0x74, 0x63,
+	0x68, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x42, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
+	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c,
+	0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6,
+	0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x3f,
+	0x0a, 0x11, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74,
+	0x6f, 0x72, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61,
+	0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x10, 0x73,
+	0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12,
+	0x23, 0x0a, 0x0d, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x62, 0x72, 0x61, 0x6e, 0x63, 0x68,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0c, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x42, 0x72,
+	0x61, 0x6e, 0x63, 0x68, 0x12, 0x1d, 0x0a, 0x0a, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x5f, 0x72,
+	0x65, 0x66, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74,
+	0x52, 0x65, 0x66, 0x12, 0x35, 0x0a, 0x17, 0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x65, 0x64, 0x5f,
+	0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x5f, 0x6f, 0x6c, 0x64, 0x5f, 0x6f, 0x69, 0x64, 0x18, 0x05,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x14, 0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x65, 0x64, 0x54, 0x61,
+	0x72, 0x67, 0x65, 0x74, 0x4f, 0x6c, 0x64, 0x4f, 0x69, 0x64, 0x22, 0x33, 0x0a, 0x19, 0x46, 0x65,
+	0x74, 0x63, 0x68, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x42, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x52,
+	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c,
+	0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x22,
+	0x47, 0x0a, 0x0b, 0x46, 0x73, 0x63, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38,
 	0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01,
 	0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f,
 	0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65,
-	0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x66, 0x6f, 0x72, 0x63,
-	0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x66, 0x6f, 0x72, 0x63, 0x65, 0x12, 0x17,
-	0x0a, 0x07, 0x6e, 0x6f, 0x5f, 0x74, 0x61, 0x67, 0x73, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52,
-	0x06, 0x6e, 0x6f, 0x54, 0x61, 0x67, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f,
-	0x75, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07, 0x74, 0x69, 0x6d, 0x65, 0x6f, 0x75,
-	0x74, 0x12, 0x17, 0x0a, 0x07, 0x73, 0x73, 0x68, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x06, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x06, 0x73, 0x73, 0x68, 0x4b, 0x65, 0x79, 0x12, 0x1f, 0x0a, 0x0b, 0x6b, 0x6e,
-	0x6f, 0x77, 0x6e, 0x5f, 0x68, 0x6f, 0x73, 0x74, 0x73, 0x18, 0x07, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x0a, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x48, 0x6f, 0x73, 0x74, 0x73, 0x12, 0x19, 0x0a, 0x08, 0x6e,
-	0x6f, 0x5f, 0x70, 0x72, 0x75, 0x6e, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x6e,
-	0x6f, 0x50, 0x72, 0x75, 0x6e, 0x65, 0x12, 0x33, 0x0a, 0x0d, 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65,
-	0x5f, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0e, 0x2e,
-	0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x52, 0x0c, 0x72,
-	0x65, 0x6d, 0x6f, 0x74, 0x65, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x2c, 0x0a, 0x12, 0x63,
-	0x68, 0x65, 0x63, 0x6b, 0x5f, 0x74, 0x61, 0x67, 0x73, 0x5f, 0x63, 0x68, 0x61, 0x6e, 0x67, 0x65,
-	0x64, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x08, 0x52, 0x10, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x54, 0x61,
-	0x67, 0x73, 0x43, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x64, 0x4a, 0x04, 0x08, 0x08, 0x10, 0x09, 0x4a,
-	0x04, 0x08, 0x02, 0x10, 0x03, 0x52, 0x06, 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x22, 0x38, 0x0a,
-	0x13, 0x46, 0x65, 0x74, 0x63, 0x68, 0x52, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x52, 0x65, 0x73, 0x70,
-	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x21, 0x0a, 0x0c, 0x74, 0x61, 0x67, 0x73, 0x5f, 0x63, 0x68, 0x61,
-	0x6e, 0x67, 0x65, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0b, 0x74, 0x61, 0x67, 0x73,
-	0x43, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x64, 0x22, 0xb5, 0x01, 0x0a, 0x17, 0x43, 0x72, 0x65, 0x61,
-	0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72,
-	0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79,
-	0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c,
-	0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x25, 0x0a,
-	0x0e, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x5f, 0x62, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0d, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x42, 0x72,
-	0x61, 0x6e, 0x63, 0x68, 0x12, 0x39, 0x0a, 0x0d, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x5f, 0x66,
-	0x6f, 0x72, 0x6d, 0x61, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x14, 0x2e, 0x67, 0x69,
-	0x74, 0x61, 0x6c, 0x79, 0x2e, 0x4f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61,
-	0x74, 0x52, 0x0c, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x22,
-	0x1a, 0x0a, 0x18, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74,
-	0x6f, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xea, 0x02, 0x0a, 0x11,
-	0x47, 0x65, 0x74, 0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
-	0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52,
-	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52,
-	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1b, 0x0a, 0x09, 0x63,
-	0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08,
-	0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x70, 0x72, 0x65, 0x66,
-	0x69, 0x78, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x70, 0x72, 0x65, 0x66, 0x69, 0x78,
-	0x12, 0x38, 0x0a, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0e,
-	0x32, 0x20, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x47, 0x65, 0x74, 0x41, 0x72, 0x63,
-	0x68, 0x69, 0x76, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x2e, 0x46, 0x6f, 0x72, 0x6d,
-	0x61, 0x74, 0x52, 0x06, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61,
-	0x74, 0x68, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x12, 0x18,
-	0x0a, 0x07, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x18, 0x06, 0x20, 0x03, 0x28, 0x0c, 0x52,
-	0x07, 0x65, 0x78, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x12, 0x1d, 0x0a, 0x0a, 0x65, 0x6c, 0x69, 0x64,
-	0x65, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x18, 0x07, 0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x65, 0x6c,
-	0x69, 0x64, 0x65, 0x50, 0x61, 0x74, 0x68, 0x12, 0x2a, 0x0a, 0x11, 0x69, 0x6e, 0x63, 0x6c, 0x75,
-	0x64, 0x65, 0x5f, 0x6c, 0x66, 0x73, 0x5f, 0x62, 0x6c, 0x6f, 0x62, 0x73, 0x18, 0x08, 0x20, 0x01,
-	0x28, 0x08, 0x52, 0x0f, 0x69, 0x6e, 0x63, 0x6c, 0x75, 0x64, 0x65, 0x4c, 0x66, 0x73, 0x42, 0x6c,
-	0x6f, 0x62, 0x73, 0x22, 0x33, 0x0a, 0x06, 0x46, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x12, 0x07, 0x0a,
-	0x03, 0x5a, 0x49, 0x50, 0x10, 0x00, 0x12, 0x07, 0x0a, 0x03, 0x54, 0x41, 0x52, 0x10, 0x01, 0x12,
-	0x0a, 0x0a, 0x06, 0x54, 0x41, 0x52, 0x5f, 0x47, 0x5a, 0x10, 0x02, 0x12, 0x0b, 0x0a, 0x07, 0x54,
-	0x41, 0x52, 0x5f, 0x42, 0x5a, 0x32, 0x10, 0x03, 0x22, 0x28, 0x0a, 0x12, 0x47, 0x65, 0x74, 0x41,
-	0x72, 0x63, 0x68, 0x69, 0x76, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12,
-	0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61,
-	0x74, 0x61, 0x22, 0x53, 0x0a, 0x17, 0x48, 0x61, 0x73, 0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x42, 0x72,
-	0x61, 0x6e, 0x63, 0x68, 0x65, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a,
+	0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x24, 0x0a, 0x0c, 0x46, 0x73, 0x63, 0x6b,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72, 0x72, 0x6f,
+	0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x22, 0xaf,
+	0x01, 0x0a, 0x0f, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x66, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e,
+	0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01,
+	0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03,
+	0x72, 0x65, 0x66, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x03, 0x72, 0x65, 0x66, 0x12, 0x1a,
+	0x0a, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x21, 0x0a, 0x0c, 0x6f, 0x6c,
+	0x64, 0x5f, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x0b, 0x6f, 0x6c, 0x64, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x4a, 0x04, 0x08,
+	0x05, 0x10, 0x06, 0x4a, 0x04, 0x08, 0x06, 0x10, 0x07, 0x52, 0x05, 0x66, 0x6f, 0x72, 0x63, 0x65,
+	0x22, 0x18, 0x0a, 0x10, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x66, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x4a, 0x04, 0x08, 0x01, 0x10, 0x02, 0x22, 0x6e, 0x0a, 0x14, 0x46, 0x69,
+	0x6e, 0x64, 0x4d, 0x65, 0x72, 0x67, 0x65, 0x42, 0x61, 0x73, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e,
+	0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01,
+	0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1c, 0x0a, 0x09,
+	0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0c, 0x52,
+	0x09, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x22, 0x2b, 0x0a, 0x15, 0x46, 0x69,
+	0x6e, 0x64, 0x4d, 0x65, 0x72, 0x67, 0x65, 0x42, 0x61, 0x73, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f,
+	0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x62, 0x61, 0x73, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x04, 0x62, 0x61, 0x73, 0x65, 0x22, 0xaa, 0x01, 0x0a, 0x11, 0x43, 0x72, 0x65, 0x61,
+	0x74, 0x65, 0x46, 0x6f, 0x72, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a,
 	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28,
 	0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73,
 	0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x30, 0x0a, 0x18, 0x48, 0x61, 0x73, 0x4c, 0x6f,
-	0x63, 0x61, 0x6c, 0x42, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x65, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f,
-	0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x90, 0x02, 0x0a, 0x18, 0x46, 0x65,
-	0x74, 0x63, 0x68, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x42, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69,
-	0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74,
-	0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04,
-	0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
-	0x12, 0x3f, 0x0a, 0x11, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x73,
-	0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69,
-	0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x52,
-	0x10, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72,
-	0x79, 0x12, 0x23, 0x0a, 0x0d, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x62, 0x72, 0x61, 0x6e,
-	0x63, 0x68, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0c, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
-	0x42, 0x72, 0x61, 0x6e, 0x63, 0x68, 0x12, 0x1d, 0x0a, 0x0a, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74,
-	0x5f, 0x72, 0x65, 0x66, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x74, 0x61, 0x72, 0x67,
-	0x65, 0x74, 0x52, 0x65, 0x66, 0x12, 0x35, 0x0a, 0x17, 0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x65,
-	0x64, 0x5f, 0x74, 0x61, 0x72, 0x67, 0x65, 0x74, 0x5f, 0x6f, 0x6c, 0x64, 0x5f, 0x6f, 0x69, 0x64,
-	0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x14, 0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x65, 0x64,
-	0x54, 0x61, 0x72, 0x67, 0x65, 0x74, 0x4f, 0x6c, 0x64, 0x4f, 0x69, 0x64, 0x22, 0x33, 0x0a, 0x19,
-	0x46, 0x65, 0x74, 0x63, 0x68, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x42, 0x72, 0x61, 0x6e, 0x63,
-	0x68, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x72, 0x65, 0x73,
-	0x75, 0x6c, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c,
-	0x74, 0x22, 0x47, 0x0a, 0x0b, 0x46, 0x73, 0x63, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
-	0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65,
-	0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a,
-	0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x22, 0x24, 0x0a, 0x0c, 0x46, 0x73,
-	0x63, 0x6b, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x65, 0x72,
-	0x72, 0x6f, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72,
-	0x22, 0xaf, 0x01, 0x0a, 0x0f, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x66, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
-	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c,
-	0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6,
-	0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x10,
-	0x0a, 0x03, 0x72, 0x65, 0x66, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x03, 0x72, 0x65, 0x66,
-	0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x08, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x21, 0x0a, 0x0c,
-	0x6f, 0x6c, 0x64, 0x5f, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x04, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x0b, 0x6f, 0x6c, 0x64, 0x52, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x4a,
-	0x04, 0x08, 0x05, 0x10, 0x06, 0x4a, 0x04, 0x08, 0x06, 0x10, 0x07, 0x52, 0x05, 0x66, 0x6f, 0x72,
-	0x63, 0x65, 0x22, 0x18, 0x0a, 0x10, 0x57, 0x72, 0x69, 0x74, 0x65, 0x52, 0x65, 0x66, 0x52, 0x65,
-	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x4a, 0x04, 0x08, 0x01, 0x10, 0x02, 0x22, 0x6e, 0x0a, 0x14,
-	0x46, 0x69, 0x6e, 0x64, 0x4d, 0x65, 0x72, 0x67, 0x65, 0x42, 0x61, 0x73, 0x65, 0x52, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f,
-	0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c,
-	0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6,
-	0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1c,
-	0x0a, 0x09, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28,
-	0x0c, 0x52, 0x09, 0x72, 0x65, 0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x73, 0x22, 0x2b, 0x0a, 0x15,
-	0x46, 0x69, 0x6e, 0x64, 0x4d, 0x65, 0x72, 0x67, 0x65, 0x42, 0x61, 0x73, 0x65, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x62, 0x61, 0x73, 0x65, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x04, 0x62, 0x61, 0x73, 0x65, 0x22, 0xaa, 0x01, 0x0a, 0x11, 0x43, 0x72,
-	0x65, 0x61, 0x74, 0x65, 0x46, 0x6f, 0x72, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72,
-	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x3f, 0x0a, 0x11, 0x73, 0x6f, 0x75,
-	0x72, 0x63, 0x65, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x02,
-	0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65,
-	0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x10, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
-	0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65,
-	0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x08, 0x72, 0x65,
-	0x76, 0x69, 0x73, 0x69, 0x6f, 0x6e, 0x22, 0x14, 0x0a, 0x12, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65,
-	0x46, 0x6f, 0x72, 0x6b, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xfc, 0x01, 0x0a,
-	0x1e, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72,
-	0x79, 0x46, 0x72, 0x6f, 0x6d, 0x55, 0x52, 0x4c, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70,
-	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72,
-	0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x75, 0x72, 0x6c,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x75, 0x72, 0x6c, 0x12, 0x3a, 0x0a, 0x19, 0x68,
-	0x74, 0x74, 0x70, 0x5f, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x5f, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x17,
-	0x68, 0x74, 0x74, 0x70, 0x41, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x48, 0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x16, 0x0a, 0x06, 0x6d, 0x69, 0x72, 0x72, 0x6f,
-	0x72, 0x18, 0x05, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x6d, 0x69, 0x72, 0x72, 0x6f, 0x72, 0x12,
-	0x29, 0x0a, 0x10, 0x72, 0x65, 0x73, 0x6f, 0x6c, 0x76, 0x65, 0x64, 0x5f, 0x61, 0x64, 0x64, 0x72,
-	0x65, 0x73, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x72, 0x65, 0x73, 0x6f, 0x6c,
-	0x76, 0x65, 0x64, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x4a, 0x04, 0x08, 0x03, 0x10, 0x04,
-	0x52, 0x09, 0x68, 0x74, 0x74, 0x70, 0x5f, 0x68, 0x6f, 0x73, 0x74, 0x22, 0x21, 0x0a, 0x1f, 0x43,
+	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x3f, 0x0a, 0x11, 0x73, 0x6f, 0x75, 0x72, 0x63,
+	0x65, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f,
+	0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x10, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x65,
+	0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65, 0x76, 0x69,
+	0x73, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x08, 0x72, 0x65, 0x76, 0x69,
+	0x73, 0x69, 0x6f, 0x6e, 0x22, 0x14, 0x0a, 0x12, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x46, 0x6f,
+	0x72, 0x6b, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0xfc, 0x01, 0x0a, 0x1e, 0x43,
 	0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x46,
-	0x72, 0x6f, 0x6d, 0x55, 0x52, 0x4c, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x4f,
+	0x72, 0x6f, 0x6d, 0x55, 0x52, 0x4c, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a,
+	0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e, 0x52, 0x65, 0x70, 0x6f, 0x73,
+	0x69, 0x74, 0x6f, 0x72, 0x79, 0x42, 0x04, 0x98, 0xc6, 0x2c, 0x01, 0x52, 0x0a, 0x72, 0x65, 0x70,
+	0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x75, 0x72, 0x6c, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x75, 0x72, 0x6c, 0x12, 0x3a, 0x0a, 0x19, 0x68, 0x74, 0x74,
+	0x70, 0x5f, 0x61, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
+	0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x17, 0x68, 0x74,
+	0x74, 0x70, 0x41, 0x75, 0x74, 0x68, 0x6f, 0x72, 0x69, 0x7a, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x48,
+	0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x16, 0x0a, 0x06, 0x6d, 0x69, 0x72, 0x72, 0x6f, 0x72, 0x18,
+	0x05, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x6d, 0x69, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x29, 0x0a,
+	0x10, 0x72, 0x65, 0x73, 0x6f, 0x6c, 0x76, 0x65, 0x64, 0x5f, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73,
+	0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x72, 0x65, 0x73, 0x6f, 0x6c, 0x76, 0x65,
+	0x64, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x4a, 0x04, 0x08, 0x03, 0x10, 0x04, 0x52, 0x09,
+	0x68, 0x74, 0x74, 0x70, 0x5f, 0x68, 0x6f, 0x73, 0x74, 0x22, 0x21, 0x0a, 0x1f, 0x43, 0x72, 0x65,
+	0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79, 0x46, 0x72, 0x6f,
+	0x6d, 0x55, 0x52, 0x4c, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x70, 0x0a, 0x1c,
+	0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74, 0x6f, 0x72, 0x79,
+	0x46, 0x72, 0x6f, 0x6d, 0x55, 0x52, 0x4c, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x12, 0x47, 0x0a, 0x10,
+	0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x5f, 0x6e, 0x6f, 0x74, 0x5f, 0x66, 0x6f, 0x75, 0x6e, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1b, 0x2e, 0x67, 0x69, 0x74, 0x61, 0x6c, 0x79, 0x2e,
+	0x52, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x4e, 0x6f, 0x74, 0x46, 0x6f, 0x75, 0x6e, 0x64, 0x45, 0x72,
+	0x72, 0x6f, 0x72, 0x48, 0x00, 0x52, 0x0e, 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x4e, 0x6f, 0x74,
+	0x46, 0x6f, 0x75, 0x6e, 0x64, 0x42, 0x07, 0x0a, 0x05, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x22, 0x4f,
 	0x0a, 0x13, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x42, 0x75, 0x6e, 0x64, 0x6c, 0x65, 0x52, 0x65,
 	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x38, 0x0a, 0x0a, 0x72, 0x65, 0x70, 0x6f, 0x73, 0x69, 0x74,
 	0x6f, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x67, 0x69, 0x74, 0x61,
@@ -6330,7 +6408,7 @@ func file_repository_proto_rawDescGZIP() []byte {
 }
 
 var file_repository_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_repository_proto_msgTypes = make([]protoimpl.MessageInfo, 93)
+var file_repository_proto_msgTypes = make([]protoimpl.MessageInfo, 94)
 var file_repository_proto_goTypes = []any{
 	(GetArchiveRequest_Format)(0),                   // 0: gitaly.GetArchiveRequest.Format
 	(GetRawChangesResponse_RawChange_Operation)(0),  // 1: gitaly.GetRawChangesResponse.RawChange.Operation
@@ -6369,218 +6447,221 @@ var file_repository_proto_goTypes = []any{
 	(*CreateForkResponse)(nil),                      // 34: gitaly.CreateForkResponse
 	(*CreateRepositoryFromURLRequest)(nil),          // 35: gitaly.CreateRepositoryFromURLRequest
 	(*CreateRepositoryFromURLResponse)(nil),         // 36: gitaly.CreateRepositoryFromURLResponse
-	(*CreateBundleRequest)(nil),                     // 37: gitaly.CreateBundleRequest
-	(*CreateBundleResponse)(nil),                    // 38: gitaly.CreateBundleResponse
-	(*CreateBundleFromRefListRequest)(nil),          // 39: gitaly.CreateBundleFromRefListRequest
-	(*CreateBundleFromRefListResponse)(nil),         // 40: gitaly.CreateBundleFromRefListResponse
-	(*GenerateBundleURIRequest)(nil),                // 41: gitaly.GenerateBundleURIRequest
-	(*GenerateBundleURIResponse)(nil),               // 42: gitaly.GenerateBundleURIResponse
-	(*GetConfigRequest)(nil),                        // 43: gitaly.GetConfigRequest
-	(*GetConfigResponse)(nil),                       // 44: gitaly.GetConfigResponse
-	(*RestoreCustomHooksRequest)(nil),               // 45: gitaly.RestoreCustomHooksRequest
-	(*SetCustomHooksRequest)(nil),                   // 46: gitaly.SetCustomHooksRequest
-	(*RestoreCustomHooksResponse)(nil),              // 47: gitaly.RestoreCustomHooksResponse
-	(*SetCustomHooksResponse)(nil),                  // 48: gitaly.SetCustomHooksResponse
-	(*BackupCustomHooksRequest)(nil),                // 49: gitaly.BackupCustomHooksRequest
-	(*GetCustomHooksRequest)(nil),                   // 50: gitaly.GetCustomHooksRequest
-	(*BackupCustomHooksResponse)(nil),               // 51: gitaly.BackupCustomHooksResponse
-	(*GetCustomHooksResponse)(nil),                  // 52: gitaly.GetCustomHooksResponse
-	(*CreateRepositoryFromBundleRequest)(nil),       // 53: gitaly.CreateRepositoryFromBundleRequest
-	(*CreateRepositoryFromBundleResponse)(nil),      // 54: gitaly.CreateRepositoryFromBundleResponse
-	(*FindLicenseRequest)(nil),                      // 55: gitaly.FindLicenseRequest
-	(*FindLicenseResponse)(nil),                     // 56: gitaly.FindLicenseResponse
-	(*GetInfoAttributesRequest)(nil),                // 57: gitaly.GetInfoAttributesRequest
-	(*GetInfoAttributesResponse)(nil),               // 58: gitaly.GetInfoAttributesResponse
-	(*CalculateChecksumRequest)(nil),                // 59: gitaly.CalculateChecksumRequest
-	(*CalculateChecksumResponse)(nil),               // 60: gitaly.CalculateChecksumResponse
-	(*GetSnapshotRequest)(nil),                      // 61: gitaly.GetSnapshotRequest
-	(*GetSnapshotResponse)(nil),                     // 62: gitaly.GetSnapshotResponse
-	(*CreateRepositoryFromSnapshotRequest)(nil),     // 63: gitaly.CreateRepositoryFromSnapshotRequest
-	(*CreateRepositoryFromSnapshotResponse)(nil),    // 64: gitaly.CreateRepositoryFromSnapshotResponse
-	(*GetRawChangesRequest)(nil),                    // 65: gitaly.GetRawChangesRequest
-	(*GetRawChangesResponse)(nil),                   // 66: gitaly.GetRawChangesResponse
-	(*SearchFilesByNameRequest)(nil),                // 67: gitaly.SearchFilesByNameRequest
-	(*SearchFilesByNameResponse)(nil),               // 68: gitaly.SearchFilesByNameResponse
-	(*SearchFilesByContentRequest)(nil),             // 69: gitaly.SearchFilesByContentRequest
-	(*SearchFilesByContentResponse)(nil),            // 70: gitaly.SearchFilesByContentResponse
-	(*Remote)(nil),                                  // 71: gitaly.Remote
-	(*GetObjectDirectorySizeRequest)(nil),           // 72: gitaly.GetObjectDirectorySizeRequest
-	(*GetObjectDirectorySizeResponse)(nil),          // 73: gitaly.GetObjectDirectorySizeResponse
-	(*RemoveRepositoryRequest)(nil),                 // 74: gitaly.RemoveRepositoryRequest
-	(*RemoveRepositoryResponse)(nil),                // 75: gitaly.RemoveRepositoryResponse
-	(*ReplicateRepositoryRequest)(nil),              // 76: gitaly.ReplicateRepositoryRequest
-	(*ReplicateRepositoryResponse)(nil),             // 77: gitaly.ReplicateRepositoryResponse
-	(*OptimizeRepositoryRequest)(nil),               // 78: gitaly.OptimizeRepositoryRequest
-	(*OptimizeRepositoryResponse)(nil),              // 79: gitaly.OptimizeRepositoryResponse
-	(*PruneUnreachableObjectsRequest)(nil),          // 80: gitaly.PruneUnreachableObjectsRequest
-	(*PruneUnreachableObjectsResponse)(nil),         // 81: gitaly.PruneUnreachableObjectsResponse
-	(*BackupRepositoryRequest)(nil),                 // 82: gitaly.BackupRepositoryRequest
-	(*BackupRepositoryResponse)(nil),                // 83: gitaly.BackupRepositoryResponse
-	(*RestoreRepositoryRequest)(nil),                // 84: gitaly.RestoreRepositoryRequest
-	(*RestoreRepositoryResponse)(nil),               // 85: gitaly.RestoreRepositoryResponse
-	(*GetFileAttributesRequest)(nil),                // 86: gitaly.GetFileAttributesRequest
-	(*GetFileAttributesResponse)(nil),               // 87: gitaly.GetFileAttributesResponse
-	(*FastExportRequest)(nil),                       // 88: gitaly.FastExportRequest
-	(*FastExportResponse)(nil),                      // 89: gitaly.FastExportResponse
-	(*RepositoryInfoResponse_ReferencesInfo)(nil),   // 90: gitaly.RepositoryInfoResponse.ReferencesInfo
-	(*RepositoryInfoResponse_ObjectsInfo)(nil),      // 91: gitaly.RepositoryInfoResponse.ObjectsInfo
-	(*GetRawChangesResponse_RawChange)(nil),         // 92: gitaly.GetRawChangesResponse.RawChange
-	(*BackupRepositoryResponse_SkippedError)(nil),   // 93: gitaly.BackupRepositoryResponse.SkippedError
-	(*RestoreRepositoryResponse_SkippedError)(nil),  // 94: gitaly.RestoreRepositoryResponse.SkippedError
-	(*GetFileAttributesResponse_AttributeInfo)(nil), // 95: gitaly.GetFileAttributesResponse.AttributeInfo
-	(*Repository)(nil),                              // 96: gitaly.Repository
-	(ObjectFormat)(0),                               // 97: gitaly.ObjectFormat
+	(*CreateRepositoryFromURLError)(nil),            // 37: gitaly.CreateRepositoryFromURLError
+	(*CreateBundleRequest)(nil),                     // 38: gitaly.CreateBundleRequest
+	(*CreateBundleResponse)(nil),                    // 39: gitaly.CreateBundleResponse
+	(*CreateBundleFromRefListRequest)(nil),          // 40: gitaly.CreateBundleFromRefListRequest
+	(*CreateBundleFromRefListResponse)(nil),         // 41: gitaly.CreateBundleFromRefListResponse
+	(*GenerateBundleURIRequest)(nil),                // 42: gitaly.GenerateBundleURIRequest
+	(*GenerateBundleURIResponse)(nil),               // 43: gitaly.GenerateBundleURIResponse
+	(*GetConfigRequest)(nil),                        // 44: gitaly.GetConfigRequest
+	(*GetConfigResponse)(nil),                       // 45: gitaly.GetConfigResponse
+	(*RestoreCustomHooksRequest)(nil),               // 46: gitaly.RestoreCustomHooksRequest
+	(*SetCustomHooksRequest)(nil),                   // 47: gitaly.SetCustomHooksRequest
+	(*RestoreCustomHooksResponse)(nil),              // 48: gitaly.RestoreCustomHooksResponse
+	(*SetCustomHooksResponse)(nil),                  // 49: gitaly.SetCustomHooksResponse
+	(*BackupCustomHooksRequest)(nil),                // 50: gitaly.BackupCustomHooksRequest
+	(*GetCustomHooksRequest)(nil),                   // 51: gitaly.GetCustomHooksRequest
+	(*BackupCustomHooksResponse)(nil),               // 52: gitaly.BackupCustomHooksResponse
+	(*GetCustomHooksResponse)(nil),                  // 53: gitaly.GetCustomHooksResponse
+	(*CreateRepositoryFromBundleRequest)(nil),       // 54: gitaly.CreateRepositoryFromBundleRequest
+	(*CreateRepositoryFromBundleResponse)(nil),      // 55: gitaly.CreateRepositoryFromBundleResponse
+	(*FindLicenseRequest)(nil),                      // 56: gitaly.FindLicenseRequest
+	(*FindLicenseResponse)(nil),                     // 57: gitaly.FindLicenseResponse
+	(*GetInfoAttributesRequest)(nil),                // 58: gitaly.GetInfoAttributesRequest
+	(*GetInfoAttributesResponse)(nil),               // 59: gitaly.GetInfoAttributesResponse
+	(*CalculateChecksumRequest)(nil),                // 60: gitaly.CalculateChecksumRequest
+	(*CalculateChecksumResponse)(nil),               // 61: gitaly.CalculateChecksumResponse
+	(*GetSnapshotRequest)(nil),                      // 62: gitaly.GetSnapshotRequest
+	(*GetSnapshotResponse)(nil),                     // 63: gitaly.GetSnapshotResponse
+	(*CreateRepositoryFromSnapshotRequest)(nil),     // 64: gitaly.CreateRepositoryFromSnapshotRequest
+	(*CreateRepositoryFromSnapshotResponse)(nil),    // 65: gitaly.CreateRepositoryFromSnapshotResponse
+	(*GetRawChangesRequest)(nil),                    // 66: gitaly.GetRawChangesRequest
+	(*GetRawChangesResponse)(nil),                   // 67: gitaly.GetRawChangesResponse
+	(*SearchFilesByNameRequest)(nil),                // 68: gitaly.SearchFilesByNameRequest
+	(*SearchFilesByNameResponse)(nil),               // 69: gitaly.SearchFilesByNameResponse
+	(*SearchFilesByContentRequest)(nil),             // 70: gitaly.SearchFilesByContentRequest
+	(*SearchFilesByContentResponse)(nil),            // 71: gitaly.SearchFilesByContentResponse
+	(*Remote)(nil),                                  // 72: gitaly.Remote
+	(*GetObjectDirectorySizeRequest)(nil),           // 73: gitaly.GetObjectDirectorySizeRequest
+	(*GetObjectDirectorySizeResponse)(nil),          // 74: gitaly.GetObjectDirectorySizeResponse
+	(*RemoveRepositoryRequest)(nil),                 // 75: gitaly.RemoveRepositoryRequest
+	(*RemoveRepositoryResponse)(nil),                // 76: gitaly.RemoveRepositoryResponse
+	(*ReplicateRepositoryRequest)(nil),              // 77: gitaly.ReplicateRepositoryRequest
+	(*ReplicateRepositoryResponse)(nil),             // 78: gitaly.ReplicateRepositoryResponse
+	(*OptimizeRepositoryRequest)(nil),               // 79: gitaly.OptimizeRepositoryRequest
+	(*OptimizeRepositoryResponse)(nil),              // 80: gitaly.OptimizeRepositoryResponse
+	(*PruneUnreachableObjectsRequest)(nil),          // 81: gitaly.PruneUnreachableObjectsRequest
+	(*PruneUnreachableObjectsResponse)(nil),         // 82: gitaly.PruneUnreachableObjectsResponse
+	(*BackupRepositoryRequest)(nil),                 // 83: gitaly.BackupRepositoryRequest
+	(*BackupRepositoryResponse)(nil),                // 84: gitaly.BackupRepositoryResponse
+	(*RestoreRepositoryRequest)(nil),                // 85: gitaly.RestoreRepositoryRequest
+	(*RestoreRepositoryResponse)(nil),               // 86: gitaly.RestoreRepositoryResponse
+	(*GetFileAttributesRequest)(nil),                // 87: gitaly.GetFileAttributesRequest
+	(*GetFileAttributesResponse)(nil),               // 88: gitaly.GetFileAttributesResponse
+	(*FastExportRequest)(nil),                       // 89: gitaly.FastExportRequest
+	(*FastExportResponse)(nil),                      // 90: gitaly.FastExportResponse
+	(*RepositoryInfoResponse_ReferencesInfo)(nil),   // 91: gitaly.RepositoryInfoResponse.ReferencesInfo
+	(*RepositoryInfoResponse_ObjectsInfo)(nil),      // 92: gitaly.RepositoryInfoResponse.ObjectsInfo
+	(*GetRawChangesResponse_RawChange)(nil),         // 93: gitaly.GetRawChangesResponse.RawChange
+	(*BackupRepositoryResponse_SkippedError)(nil),   // 94: gitaly.BackupRepositoryResponse.SkippedError
+	(*RestoreRepositoryResponse_SkippedError)(nil),  // 95: gitaly.RestoreRepositoryResponse.SkippedError
+	(*GetFileAttributesResponse_AttributeInfo)(nil), // 96: gitaly.GetFileAttributesResponse.AttributeInfo
+	(*Repository)(nil),                              // 97: gitaly.Repository
+	(ObjectFormat)(0),                               // 98: gitaly.ObjectFormat
+	(*RemoteNotFoundError)(nil),                     // 99: gitaly.RemoteNotFoundError
 }
 var file_repository_proto_depIdxs = []int32{
-	96,  // 0: gitaly.RepositoryExistsRequest.repository:type_name -> gitaly.Repository
-	96,  // 1: gitaly.RepositorySizeRequest.repository:type_name -> gitaly.Repository
-	96,  // 2: gitaly.RepositoryInfoRequest.repository:type_name -> gitaly.Repository
-	90,  // 3: gitaly.RepositoryInfoResponse.references:type_name -> gitaly.RepositoryInfoResponse.ReferencesInfo
-	91,  // 4: gitaly.RepositoryInfoResponse.objects:type_name -> gitaly.RepositoryInfoResponse.ObjectsInfo
-	96,  // 5: gitaly.ObjectsSizeRequest.repository:type_name -> gitaly.Repository
-	96,  // 6: gitaly.ObjectFormatRequest.repository:type_name -> gitaly.Repository
-	97,  // 7: gitaly.ObjectFormatResponse.format:type_name -> gitaly.ObjectFormat
-	96,  // 8: gitaly.ApplyGitattributesRequest.repository:type_name -> gitaly.Repository
-	96,  // 9: gitaly.FetchBundleRequest.repository:type_name -> gitaly.Repository
-	96,  // 10: gitaly.FetchRemoteRequest.repository:type_name -> gitaly.Repository
-	71,  // 11: gitaly.FetchRemoteRequest.remote_params:type_name -> gitaly.Remote
-	96,  // 12: gitaly.CreateRepositoryRequest.repository:type_name -> gitaly.Repository
-	97,  // 13: gitaly.CreateRepositoryRequest.object_format:type_name -> gitaly.ObjectFormat
-	96,  // 14: gitaly.GetArchiveRequest.repository:type_name -> gitaly.Repository
+	97,  // 0: gitaly.RepositoryExistsRequest.repository:type_name -> gitaly.Repository
+	97,  // 1: gitaly.RepositorySizeRequest.repository:type_name -> gitaly.Repository
+	97,  // 2: gitaly.RepositoryInfoRequest.repository:type_name -> gitaly.Repository
+	91,  // 3: gitaly.RepositoryInfoResponse.references:type_name -> gitaly.RepositoryInfoResponse.ReferencesInfo
+	92,  // 4: gitaly.RepositoryInfoResponse.objects:type_name -> gitaly.RepositoryInfoResponse.ObjectsInfo
+	97,  // 5: gitaly.ObjectsSizeRequest.repository:type_name -> gitaly.Repository
+	97,  // 6: gitaly.ObjectFormatRequest.repository:type_name -> gitaly.Repository
+	98,  // 7: gitaly.ObjectFormatResponse.format:type_name -> gitaly.ObjectFormat
+	97,  // 8: gitaly.ApplyGitattributesRequest.repository:type_name -> gitaly.Repository
+	97,  // 9: gitaly.FetchBundleRequest.repository:type_name -> gitaly.Repository
+	97,  // 10: gitaly.FetchRemoteRequest.repository:type_name -> gitaly.Repository
+	72,  // 11: gitaly.FetchRemoteRequest.remote_params:type_name -> gitaly.Remote
+	97,  // 12: gitaly.CreateRepositoryRequest.repository:type_name -> gitaly.Repository
+	98,  // 13: gitaly.CreateRepositoryRequest.object_format:type_name -> gitaly.ObjectFormat
+	97,  // 14: gitaly.GetArchiveRequest.repository:type_name -> gitaly.Repository
 	0,   // 15: gitaly.GetArchiveRequest.format:type_name -> gitaly.GetArchiveRequest.Format
-	96,  // 16: gitaly.HasLocalBranchesRequest.repository:type_name -> gitaly.Repository
-	96,  // 17: gitaly.FetchSourceBranchRequest.repository:type_name -> gitaly.Repository
-	96,  // 18: gitaly.FetchSourceBranchRequest.source_repository:type_name -> gitaly.Repository
-	96,  // 19: gitaly.FsckRequest.repository:type_name -> gitaly.Repository
-	96,  // 20: gitaly.WriteRefRequest.repository:type_name -> gitaly.Repository
-	96,  // 21: gitaly.FindMergeBaseRequest.repository:type_name -> gitaly.Repository
-	96,  // 22: gitaly.CreateForkRequest.repository:type_name -> gitaly.Repository
-	96,  // 23: gitaly.CreateForkRequest.source_repository:type_name -> gitaly.Repository
-	96,  // 24: gitaly.CreateRepositoryFromURLRequest.repository:type_name -> gitaly.Repository
-	96,  // 25: gitaly.CreateBundleRequest.repository:type_name -> gitaly.Repository
-	96,  // 26: gitaly.CreateBundleFromRefListRequest.repository:type_name -> gitaly.Repository
-	96,  // 27: gitaly.GenerateBundleURIRequest.repository:type_name -> gitaly.Repository
-	96,  // 28: gitaly.GetConfigRequest.repository:type_name -> gitaly.Repository
-	96,  // 29: gitaly.RestoreCustomHooksRequest.repository:type_name -> gitaly.Repository
-	96,  // 30: gitaly.SetCustomHooksRequest.repository:type_name -> gitaly.Repository
-	96,  // 31: gitaly.BackupCustomHooksRequest.repository:type_name -> gitaly.Repository
-	96,  // 32: gitaly.GetCustomHooksRequest.repository:type_name -> gitaly.Repository
-	96,  // 33: gitaly.CreateRepositoryFromBundleRequest.repository:type_name -> gitaly.Repository
-	96,  // 34: gitaly.FindLicenseRequest.repository:type_name -> gitaly.Repository
-	96,  // 35: gitaly.GetInfoAttributesRequest.repository:type_name -> gitaly.Repository
-	96,  // 36: gitaly.CalculateChecksumRequest.repository:type_name -> gitaly.Repository
-	96,  // 37: gitaly.GetSnapshotRequest.repository:type_name -> gitaly.Repository
-	96,  // 38: gitaly.CreateRepositoryFromSnapshotRequest.repository:type_name -> gitaly.Repository
-	96,  // 39: gitaly.GetRawChangesRequest.repository:type_name -> gitaly.Repository
-	92,  // 40: gitaly.GetRawChangesResponse.raw_changes:type_name -> gitaly.GetRawChangesResponse.RawChange
-	96,  // 41: gitaly.SearchFilesByNameRequest.repository:type_name -> gitaly.Repository
-	96,  // 42: gitaly.SearchFilesByContentRequest.repository:type_name -> gitaly.Repository
-	96,  // 43: gitaly.GetObjectDirectorySizeRequest.repository:type_name -> gitaly.Repository
-	96,  // 44: gitaly.RemoveRepositoryRequest.repository:type_name -> gitaly.Repository
-	96,  // 45: gitaly.ReplicateRepositoryRequest.repository:type_name -> gitaly.Repository
-	96,  // 46: gitaly.ReplicateRepositoryRequest.source:type_name -> gitaly.Repository
-	96,  // 47: gitaly.OptimizeRepositoryRequest.repository:type_name -> gitaly.Repository
-	2,   // 48: gitaly.OptimizeRepositoryRequest.strategy:type_name -> gitaly.OptimizeRepositoryRequest.Strategy
-	96,  // 49: gitaly.PruneUnreachableObjectsRequest.repository:type_name -> gitaly.Repository
-	96,  // 50: gitaly.BackupRepositoryRequest.repository:type_name -> gitaly.Repository
-	96,  // 51: gitaly.BackupRepositoryRequest.vanity_repository:type_name -> gitaly.Repository
-	96,  // 52: gitaly.RestoreRepositoryRequest.repository:type_name -> gitaly.Repository
-	96,  // 53: gitaly.RestoreRepositoryRequest.vanity_repository:type_name -> gitaly.Repository
-	96,  // 54: gitaly.GetFileAttributesRequest.repository:type_name -> gitaly.Repository
-	95,  // 55: gitaly.GetFileAttributesResponse.attribute_infos:type_name -> gitaly.GetFileAttributesResponse.AttributeInfo
-	96,  // 56: gitaly.FastExportRequest.repository:type_name -> gitaly.Repository
-	1,   // 57: gitaly.GetRawChangesResponse.RawChange.operation:type_name -> gitaly.GetRawChangesResponse.RawChange.Operation
-	3,   // 58: gitaly.RepositoryService.RepositoryExists:input_type -> gitaly.RepositoryExistsRequest
-	5,   // 59: gitaly.RepositoryService.RepositorySize:input_type -> gitaly.RepositorySizeRequest
-	7,   // 60: gitaly.RepositoryService.RepositoryInfo:input_type -> gitaly.RepositoryInfoRequest
-	9,   // 61: gitaly.RepositoryService.ObjectsSize:input_type -> gitaly.ObjectsSizeRequest
-	11,  // 62: gitaly.RepositoryService.ObjectFormat:input_type -> gitaly.ObjectFormatRequest
-	13,  // 63: gitaly.RepositoryService.ApplyGitattributes:input_type -> gitaly.ApplyGitattributesRequest
-	17,  // 64: gitaly.RepositoryService.FetchRemote:input_type -> gitaly.FetchRemoteRequest
-	19,  // 65: gitaly.RepositoryService.CreateRepository:input_type -> gitaly.CreateRepositoryRequest
-	21,  // 66: gitaly.RepositoryService.GetArchive:input_type -> gitaly.GetArchiveRequest
-	23,  // 67: gitaly.RepositoryService.HasLocalBranches:input_type -> gitaly.HasLocalBranchesRequest
-	25,  // 68: gitaly.RepositoryService.FetchSourceBranch:input_type -> gitaly.FetchSourceBranchRequest
-	27,  // 69: gitaly.RepositoryService.Fsck:input_type -> gitaly.FsckRequest
-	29,  // 70: gitaly.RepositoryService.WriteRef:input_type -> gitaly.WriteRefRequest
-	31,  // 71: gitaly.RepositoryService.FindMergeBase:input_type -> gitaly.FindMergeBaseRequest
-	33,  // 72: gitaly.RepositoryService.CreateFork:input_type -> gitaly.CreateForkRequest
-	35,  // 73: gitaly.RepositoryService.CreateRepositoryFromURL:input_type -> gitaly.CreateRepositoryFromURLRequest
-	37,  // 74: gitaly.RepositoryService.CreateBundle:input_type -> gitaly.CreateBundleRequest
-	39,  // 75: gitaly.RepositoryService.CreateBundleFromRefList:input_type -> gitaly.CreateBundleFromRefListRequest
-	41,  // 76: gitaly.RepositoryService.GenerateBundleURI:input_type -> gitaly.GenerateBundleURIRequest
-	15,  // 77: gitaly.RepositoryService.FetchBundle:input_type -> gitaly.FetchBundleRequest
-	53,  // 78: gitaly.RepositoryService.CreateRepositoryFromBundle:input_type -> gitaly.CreateRepositoryFromBundleRequest
-	43,  // 79: gitaly.RepositoryService.GetConfig:input_type -> gitaly.GetConfigRequest
-	55,  // 80: gitaly.RepositoryService.FindLicense:input_type -> gitaly.FindLicenseRequest
-	57,  // 81: gitaly.RepositoryService.GetInfoAttributes:input_type -> gitaly.GetInfoAttributesRequest
-	59,  // 82: gitaly.RepositoryService.CalculateChecksum:input_type -> gitaly.CalculateChecksumRequest
-	61,  // 83: gitaly.RepositoryService.GetSnapshot:input_type -> gitaly.GetSnapshotRequest
-	63,  // 84: gitaly.RepositoryService.CreateRepositoryFromSnapshot:input_type -> gitaly.CreateRepositoryFromSnapshotRequest
-	65,  // 85: gitaly.RepositoryService.GetRawChanges:input_type -> gitaly.GetRawChangesRequest
-	69,  // 86: gitaly.RepositoryService.SearchFilesByContent:input_type -> gitaly.SearchFilesByContentRequest
-	67,  // 87: gitaly.RepositoryService.SearchFilesByName:input_type -> gitaly.SearchFilesByNameRequest
-	45,  // 88: gitaly.RepositoryService.RestoreCustomHooks:input_type -> gitaly.RestoreCustomHooksRequest
-	46,  // 89: gitaly.RepositoryService.SetCustomHooks:input_type -> gitaly.SetCustomHooksRequest
-	49,  // 90: gitaly.RepositoryService.BackupCustomHooks:input_type -> gitaly.BackupCustomHooksRequest
-	50,  // 91: gitaly.RepositoryService.GetCustomHooks:input_type -> gitaly.GetCustomHooksRequest
-	72,  // 92: gitaly.RepositoryService.GetObjectDirectorySize:input_type -> gitaly.GetObjectDirectorySizeRequest
-	74,  // 93: gitaly.RepositoryService.RemoveRepository:input_type -> gitaly.RemoveRepositoryRequest
-	76,  // 94: gitaly.RepositoryService.ReplicateRepository:input_type -> gitaly.ReplicateRepositoryRequest
-	78,  // 95: gitaly.RepositoryService.OptimizeRepository:input_type -> gitaly.OptimizeRepositoryRequest
-	80,  // 96: gitaly.RepositoryService.PruneUnreachableObjects:input_type -> gitaly.PruneUnreachableObjectsRequest
-	82,  // 97: gitaly.RepositoryService.BackupRepository:input_type -> gitaly.BackupRepositoryRequest
-	84,  // 98: gitaly.RepositoryService.RestoreRepository:input_type -> gitaly.RestoreRepositoryRequest
-	86,  // 99: gitaly.RepositoryService.GetFileAttributes:input_type -> gitaly.GetFileAttributesRequest
-	88,  // 100: gitaly.RepositoryService.FastExport:input_type -> gitaly.FastExportRequest
-	4,   // 101: gitaly.RepositoryService.RepositoryExists:output_type -> gitaly.RepositoryExistsResponse
-	6,   // 102: gitaly.RepositoryService.RepositorySize:output_type -> gitaly.RepositorySizeResponse
-	8,   // 103: gitaly.RepositoryService.RepositoryInfo:output_type -> gitaly.RepositoryInfoResponse
-	10,  // 104: gitaly.RepositoryService.ObjectsSize:output_type -> gitaly.ObjectsSizeResponse
-	12,  // 105: gitaly.RepositoryService.ObjectFormat:output_type -> gitaly.ObjectFormatResponse
-	14,  // 106: gitaly.RepositoryService.ApplyGitattributes:output_type -> gitaly.ApplyGitattributesResponse
-	18,  // 107: gitaly.RepositoryService.FetchRemote:output_type -> gitaly.FetchRemoteResponse
-	20,  // 108: gitaly.RepositoryService.CreateRepository:output_type -> gitaly.CreateRepositoryResponse
-	22,  // 109: gitaly.RepositoryService.GetArchive:output_type -> gitaly.GetArchiveResponse
-	24,  // 110: gitaly.RepositoryService.HasLocalBranches:output_type -> gitaly.HasLocalBranchesResponse
-	26,  // 111: gitaly.RepositoryService.FetchSourceBranch:output_type -> gitaly.FetchSourceBranchResponse
-	28,  // 112: gitaly.RepositoryService.Fsck:output_type -> gitaly.FsckResponse
-	30,  // 113: gitaly.RepositoryService.WriteRef:output_type -> gitaly.WriteRefResponse
-	32,  // 114: gitaly.RepositoryService.FindMergeBase:output_type -> gitaly.FindMergeBaseResponse
-	34,  // 115: gitaly.RepositoryService.CreateFork:output_type -> gitaly.CreateForkResponse
-	36,  // 116: gitaly.RepositoryService.CreateRepositoryFromURL:output_type -> gitaly.CreateRepositoryFromURLResponse
-	38,  // 117: gitaly.RepositoryService.CreateBundle:output_type -> gitaly.CreateBundleResponse
-	40,  // 118: gitaly.RepositoryService.CreateBundleFromRefList:output_type -> gitaly.CreateBundleFromRefListResponse
-	42,  // 119: gitaly.RepositoryService.GenerateBundleURI:output_type -> gitaly.GenerateBundleURIResponse
-	16,  // 120: gitaly.RepositoryService.FetchBundle:output_type -> gitaly.FetchBundleResponse
-	54,  // 121: gitaly.RepositoryService.CreateRepositoryFromBundle:output_type -> gitaly.CreateRepositoryFromBundleResponse
-	44,  // 122: gitaly.RepositoryService.GetConfig:output_type -> gitaly.GetConfigResponse
-	56,  // 123: gitaly.RepositoryService.FindLicense:output_type -> gitaly.FindLicenseResponse
-	58,  // 124: gitaly.RepositoryService.GetInfoAttributes:output_type -> gitaly.GetInfoAttributesResponse
-	60,  // 125: gitaly.RepositoryService.CalculateChecksum:output_type -> gitaly.CalculateChecksumResponse
-	62,  // 126: gitaly.RepositoryService.GetSnapshot:output_type -> gitaly.GetSnapshotResponse
-	64,  // 127: gitaly.RepositoryService.CreateRepositoryFromSnapshot:output_type -> gitaly.CreateRepositoryFromSnapshotResponse
-	66,  // 128: gitaly.RepositoryService.GetRawChanges:output_type -> gitaly.GetRawChangesResponse
-	70,  // 129: gitaly.RepositoryService.SearchFilesByContent:output_type -> gitaly.SearchFilesByContentResponse
-	68,  // 130: gitaly.RepositoryService.SearchFilesByName:output_type -> gitaly.SearchFilesByNameResponse
-	47,  // 131: gitaly.RepositoryService.RestoreCustomHooks:output_type -> gitaly.RestoreCustomHooksResponse
-	48,  // 132: gitaly.RepositoryService.SetCustomHooks:output_type -> gitaly.SetCustomHooksResponse
-	51,  // 133: gitaly.RepositoryService.BackupCustomHooks:output_type -> gitaly.BackupCustomHooksResponse
-	52,  // 134: gitaly.RepositoryService.GetCustomHooks:output_type -> gitaly.GetCustomHooksResponse
-	73,  // 135: gitaly.RepositoryService.GetObjectDirectorySize:output_type -> gitaly.GetObjectDirectorySizeResponse
-	75,  // 136: gitaly.RepositoryService.RemoveRepository:output_type -> gitaly.RemoveRepositoryResponse
-	77,  // 137: gitaly.RepositoryService.ReplicateRepository:output_type -> gitaly.ReplicateRepositoryResponse
-	79,  // 138: gitaly.RepositoryService.OptimizeRepository:output_type -> gitaly.OptimizeRepositoryResponse
-	81,  // 139: gitaly.RepositoryService.PruneUnreachableObjects:output_type -> gitaly.PruneUnreachableObjectsResponse
-	83,  // 140: gitaly.RepositoryService.BackupRepository:output_type -> gitaly.BackupRepositoryResponse
-	85,  // 141: gitaly.RepositoryService.RestoreRepository:output_type -> gitaly.RestoreRepositoryResponse
-	87,  // 142: gitaly.RepositoryService.GetFileAttributes:output_type -> gitaly.GetFileAttributesResponse
-	89,  // 143: gitaly.RepositoryService.FastExport:output_type -> gitaly.FastExportResponse
-	101, // [101:144] is the sub-list for method output_type
-	58,  // [58:101] is the sub-list for method input_type
-	58,  // [58:58] is the sub-list for extension type_name
-	58,  // [58:58] is the sub-list for extension extendee
-	0,   // [0:58] is the sub-list for field type_name
+	97,  // 16: gitaly.HasLocalBranchesRequest.repository:type_name -> gitaly.Repository
+	97,  // 17: gitaly.FetchSourceBranchRequest.repository:type_name -> gitaly.Repository
+	97,  // 18: gitaly.FetchSourceBranchRequest.source_repository:type_name -> gitaly.Repository
+	97,  // 19: gitaly.FsckRequest.repository:type_name -> gitaly.Repository
+	97,  // 20: gitaly.WriteRefRequest.repository:type_name -> gitaly.Repository
+	97,  // 21: gitaly.FindMergeBaseRequest.repository:type_name -> gitaly.Repository
+	97,  // 22: gitaly.CreateForkRequest.repository:type_name -> gitaly.Repository
+	97,  // 23: gitaly.CreateForkRequest.source_repository:type_name -> gitaly.Repository
+	97,  // 24: gitaly.CreateRepositoryFromURLRequest.repository:type_name -> gitaly.Repository
+	99,  // 25: gitaly.CreateRepositoryFromURLError.remote_not_found:type_name -> gitaly.RemoteNotFoundError
+	97,  // 26: gitaly.CreateBundleRequest.repository:type_name -> gitaly.Repository
+	97,  // 27: gitaly.CreateBundleFromRefListRequest.repository:type_name -> gitaly.Repository
+	97,  // 28: gitaly.GenerateBundleURIRequest.repository:type_name -> gitaly.Repository
+	97,  // 29: gitaly.GetConfigRequest.repository:type_name -> gitaly.Repository
+	97,  // 30: gitaly.RestoreCustomHooksRequest.repository:type_name -> gitaly.Repository
+	97,  // 31: gitaly.SetCustomHooksRequest.repository:type_name -> gitaly.Repository
+	97,  // 32: gitaly.BackupCustomHooksRequest.repository:type_name -> gitaly.Repository
+	97,  // 33: gitaly.GetCustomHooksRequest.repository:type_name -> gitaly.Repository
+	97,  // 34: gitaly.CreateRepositoryFromBundleRequest.repository:type_name -> gitaly.Repository
+	97,  // 35: gitaly.FindLicenseRequest.repository:type_name -> gitaly.Repository
+	97,  // 36: gitaly.GetInfoAttributesRequest.repository:type_name -> gitaly.Repository
+	97,  // 37: gitaly.CalculateChecksumRequest.repository:type_name -> gitaly.Repository
+	97,  // 38: gitaly.GetSnapshotRequest.repository:type_name -> gitaly.Repository
+	97,  // 39: gitaly.CreateRepositoryFromSnapshotRequest.repository:type_name -> gitaly.Repository
+	97,  // 40: gitaly.GetRawChangesRequest.repository:type_name -> gitaly.Repository
+	93,  // 41: gitaly.GetRawChangesResponse.raw_changes:type_name -> gitaly.GetRawChangesResponse.RawChange
+	97,  // 42: gitaly.SearchFilesByNameRequest.repository:type_name -> gitaly.Repository
+	97,  // 43: gitaly.SearchFilesByContentRequest.repository:type_name -> gitaly.Repository
+	97,  // 44: gitaly.GetObjectDirectorySizeRequest.repository:type_name -> gitaly.Repository
+	97,  // 45: gitaly.RemoveRepositoryRequest.repository:type_name -> gitaly.Repository
+	97,  // 46: gitaly.ReplicateRepositoryRequest.repository:type_name -> gitaly.Repository
+	97,  // 47: gitaly.ReplicateRepositoryRequest.source:type_name -> gitaly.Repository
+	97,  // 48: gitaly.OptimizeRepositoryRequest.repository:type_name -> gitaly.Repository
+	2,   // 49: gitaly.OptimizeRepositoryRequest.strategy:type_name -> gitaly.OptimizeRepositoryRequest.Strategy
+	97,  // 50: gitaly.PruneUnreachableObjectsRequest.repository:type_name -> gitaly.Repository
+	97,  // 51: gitaly.BackupRepositoryRequest.repository:type_name -> gitaly.Repository
+	97,  // 52: gitaly.BackupRepositoryRequest.vanity_repository:type_name -> gitaly.Repository
+	97,  // 53: gitaly.RestoreRepositoryRequest.repository:type_name -> gitaly.Repository
+	97,  // 54: gitaly.RestoreRepositoryRequest.vanity_repository:type_name -> gitaly.Repository
+	97,  // 55: gitaly.GetFileAttributesRequest.repository:type_name -> gitaly.Repository
+	96,  // 56: gitaly.GetFileAttributesResponse.attribute_infos:type_name -> gitaly.GetFileAttributesResponse.AttributeInfo
+	97,  // 57: gitaly.FastExportRequest.repository:type_name -> gitaly.Repository
+	1,   // 58: gitaly.GetRawChangesResponse.RawChange.operation:type_name -> gitaly.GetRawChangesResponse.RawChange.Operation
+	3,   // 59: gitaly.RepositoryService.RepositoryExists:input_type -> gitaly.RepositoryExistsRequest
+	5,   // 60: gitaly.RepositoryService.RepositorySize:input_type -> gitaly.RepositorySizeRequest
+	7,   // 61: gitaly.RepositoryService.RepositoryInfo:input_type -> gitaly.RepositoryInfoRequest
+	9,   // 62: gitaly.RepositoryService.ObjectsSize:input_type -> gitaly.ObjectsSizeRequest
+	11,  // 63: gitaly.RepositoryService.ObjectFormat:input_type -> gitaly.ObjectFormatRequest
+	13,  // 64: gitaly.RepositoryService.ApplyGitattributes:input_type -> gitaly.ApplyGitattributesRequest
+	17,  // 65: gitaly.RepositoryService.FetchRemote:input_type -> gitaly.FetchRemoteRequest
+	19,  // 66: gitaly.RepositoryService.CreateRepository:input_type -> gitaly.CreateRepositoryRequest
+	21,  // 67: gitaly.RepositoryService.GetArchive:input_type -> gitaly.GetArchiveRequest
+	23,  // 68: gitaly.RepositoryService.HasLocalBranches:input_type -> gitaly.HasLocalBranchesRequest
+	25,  // 69: gitaly.RepositoryService.FetchSourceBranch:input_type -> gitaly.FetchSourceBranchRequest
+	27,  // 70: gitaly.RepositoryService.Fsck:input_type -> gitaly.FsckRequest
+	29,  // 71: gitaly.RepositoryService.WriteRef:input_type -> gitaly.WriteRefRequest
+	31,  // 72: gitaly.RepositoryService.FindMergeBase:input_type -> gitaly.FindMergeBaseRequest
+	33,  // 73: gitaly.RepositoryService.CreateFork:input_type -> gitaly.CreateForkRequest
+	35,  // 74: gitaly.RepositoryService.CreateRepositoryFromURL:input_type -> gitaly.CreateRepositoryFromURLRequest
+	38,  // 75: gitaly.RepositoryService.CreateBundle:input_type -> gitaly.CreateBundleRequest
+	40,  // 76: gitaly.RepositoryService.CreateBundleFromRefList:input_type -> gitaly.CreateBundleFromRefListRequest
+	42,  // 77: gitaly.RepositoryService.GenerateBundleURI:input_type -> gitaly.GenerateBundleURIRequest
+	15,  // 78: gitaly.RepositoryService.FetchBundle:input_type -> gitaly.FetchBundleRequest
+	54,  // 79: gitaly.RepositoryService.CreateRepositoryFromBundle:input_type -> gitaly.CreateRepositoryFromBundleRequest
+	44,  // 80: gitaly.RepositoryService.GetConfig:input_type -> gitaly.GetConfigRequest
+	56,  // 81: gitaly.RepositoryService.FindLicense:input_type -> gitaly.FindLicenseRequest
+	58,  // 82: gitaly.RepositoryService.GetInfoAttributes:input_type -> gitaly.GetInfoAttributesRequest
+	60,  // 83: gitaly.RepositoryService.CalculateChecksum:input_type -> gitaly.CalculateChecksumRequest
+	62,  // 84: gitaly.RepositoryService.GetSnapshot:input_type -> gitaly.GetSnapshotRequest
+	64,  // 85: gitaly.RepositoryService.CreateRepositoryFromSnapshot:input_type -> gitaly.CreateRepositoryFromSnapshotRequest
+	66,  // 86: gitaly.RepositoryService.GetRawChanges:input_type -> gitaly.GetRawChangesRequest
+	70,  // 87: gitaly.RepositoryService.SearchFilesByContent:input_type -> gitaly.SearchFilesByContentRequest
+	68,  // 88: gitaly.RepositoryService.SearchFilesByName:input_type -> gitaly.SearchFilesByNameRequest
+	46,  // 89: gitaly.RepositoryService.RestoreCustomHooks:input_type -> gitaly.RestoreCustomHooksRequest
+	47,  // 90: gitaly.RepositoryService.SetCustomHooks:input_type -> gitaly.SetCustomHooksRequest
+	50,  // 91: gitaly.RepositoryService.BackupCustomHooks:input_type -> gitaly.BackupCustomHooksRequest
+	51,  // 92: gitaly.RepositoryService.GetCustomHooks:input_type -> gitaly.GetCustomHooksRequest
+	73,  // 93: gitaly.RepositoryService.GetObjectDirectorySize:input_type -> gitaly.GetObjectDirectorySizeRequest
+	75,  // 94: gitaly.RepositoryService.RemoveRepository:input_type -> gitaly.RemoveRepositoryRequest
+	77,  // 95: gitaly.RepositoryService.ReplicateRepository:input_type -> gitaly.ReplicateRepositoryRequest
+	79,  // 96: gitaly.RepositoryService.OptimizeRepository:input_type -> gitaly.OptimizeRepositoryRequest
+	81,  // 97: gitaly.RepositoryService.PruneUnreachableObjects:input_type -> gitaly.PruneUnreachableObjectsRequest
+	83,  // 98: gitaly.RepositoryService.BackupRepository:input_type -> gitaly.BackupRepositoryRequest
+	85,  // 99: gitaly.RepositoryService.RestoreRepository:input_type -> gitaly.RestoreRepositoryRequest
+	87,  // 100: gitaly.RepositoryService.GetFileAttributes:input_type -> gitaly.GetFileAttributesRequest
+	89,  // 101: gitaly.RepositoryService.FastExport:input_type -> gitaly.FastExportRequest
+	4,   // 102: gitaly.RepositoryService.RepositoryExists:output_type -> gitaly.RepositoryExistsResponse
+	6,   // 103: gitaly.RepositoryService.RepositorySize:output_type -> gitaly.RepositorySizeResponse
+	8,   // 104: gitaly.RepositoryService.RepositoryInfo:output_type -> gitaly.RepositoryInfoResponse
+	10,  // 105: gitaly.RepositoryService.ObjectsSize:output_type -> gitaly.ObjectsSizeResponse
+	12,  // 106: gitaly.RepositoryService.ObjectFormat:output_type -> gitaly.ObjectFormatResponse
+	14,  // 107: gitaly.RepositoryService.ApplyGitattributes:output_type -> gitaly.ApplyGitattributesResponse
+	18,  // 108: gitaly.RepositoryService.FetchRemote:output_type -> gitaly.FetchRemoteResponse
+	20,  // 109: gitaly.RepositoryService.CreateRepository:output_type -> gitaly.CreateRepositoryResponse
+	22,  // 110: gitaly.RepositoryService.GetArchive:output_type -> gitaly.GetArchiveResponse
+	24,  // 111: gitaly.RepositoryService.HasLocalBranches:output_type -> gitaly.HasLocalBranchesResponse
+	26,  // 112: gitaly.RepositoryService.FetchSourceBranch:output_type -> gitaly.FetchSourceBranchResponse
+	28,  // 113: gitaly.RepositoryService.Fsck:output_type -> gitaly.FsckResponse
+	30,  // 114: gitaly.RepositoryService.WriteRef:output_type -> gitaly.WriteRefResponse
+	32,  // 115: gitaly.RepositoryService.FindMergeBase:output_type -> gitaly.FindMergeBaseResponse
+	34,  // 116: gitaly.RepositoryService.CreateFork:output_type -> gitaly.CreateForkResponse
+	36,  // 117: gitaly.RepositoryService.CreateRepositoryFromURL:output_type -> gitaly.CreateRepositoryFromURLResponse
+	39,  // 118: gitaly.RepositoryService.CreateBundle:output_type -> gitaly.CreateBundleResponse
+	41,  // 119: gitaly.RepositoryService.CreateBundleFromRefList:output_type -> gitaly.CreateBundleFromRefListResponse
+	43,  // 120: gitaly.RepositoryService.GenerateBundleURI:output_type -> gitaly.GenerateBundleURIResponse
+	16,  // 121: gitaly.RepositoryService.FetchBundle:output_type -> gitaly.FetchBundleResponse
+	55,  // 122: gitaly.RepositoryService.CreateRepositoryFromBundle:output_type -> gitaly.CreateRepositoryFromBundleResponse
+	45,  // 123: gitaly.RepositoryService.GetConfig:output_type -> gitaly.GetConfigResponse
+	57,  // 124: gitaly.RepositoryService.FindLicense:output_type -> gitaly.FindLicenseResponse
+	59,  // 125: gitaly.RepositoryService.GetInfoAttributes:output_type -> gitaly.GetInfoAttributesResponse
+	61,  // 126: gitaly.RepositoryService.CalculateChecksum:output_type -> gitaly.CalculateChecksumResponse
+	63,  // 127: gitaly.RepositoryService.GetSnapshot:output_type -> gitaly.GetSnapshotResponse
+	65,  // 128: gitaly.RepositoryService.CreateRepositoryFromSnapshot:output_type -> gitaly.CreateRepositoryFromSnapshotResponse
+	67,  // 129: gitaly.RepositoryService.GetRawChanges:output_type -> gitaly.GetRawChangesResponse
+	71,  // 130: gitaly.RepositoryService.SearchFilesByContent:output_type -> gitaly.SearchFilesByContentResponse
+	69,  // 131: gitaly.RepositoryService.SearchFilesByName:output_type -> gitaly.SearchFilesByNameResponse
+	48,  // 132: gitaly.RepositoryService.RestoreCustomHooks:output_type -> gitaly.RestoreCustomHooksResponse
+	49,  // 133: gitaly.RepositoryService.SetCustomHooks:output_type -> gitaly.SetCustomHooksResponse
+	52,  // 134: gitaly.RepositoryService.BackupCustomHooks:output_type -> gitaly.BackupCustomHooksResponse
+	53,  // 135: gitaly.RepositoryService.GetCustomHooks:output_type -> gitaly.GetCustomHooksResponse
+	74,  // 136: gitaly.RepositoryService.GetObjectDirectorySize:output_type -> gitaly.GetObjectDirectorySizeResponse
+	76,  // 137: gitaly.RepositoryService.RemoveRepository:output_type -> gitaly.RemoveRepositoryResponse
+	78,  // 138: gitaly.RepositoryService.ReplicateRepository:output_type -> gitaly.ReplicateRepositoryResponse
+	80,  // 139: gitaly.RepositoryService.OptimizeRepository:output_type -> gitaly.OptimizeRepositoryResponse
+	82,  // 140: gitaly.RepositoryService.PruneUnreachableObjects:output_type -> gitaly.PruneUnreachableObjectsResponse
+	84,  // 141: gitaly.RepositoryService.BackupRepository:output_type -> gitaly.BackupRepositoryResponse
+	86,  // 142: gitaly.RepositoryService.RestoreRepository:output_type -> gitaly.RestoreRepositoryResponse
+	88,  // 143: gitaly.RepositoryService.GetFileAttributes:output_type -> gitaly.GetFileAttributesResponse
+	90,  // 144: gitaly.RepositoryService.FastExport:output_type -> gitaly.FastExportResponse
+	102, // [102:145] is the sub-list for method output_type
+	59,  // [59:102] is the sub-list for method input_type
+	59,  // [59:59] is the sub-list for extension type_name
+	59,  // [59:59] is the sub-list for extension extendee
+	0,   // [0:59] is the sub-list for field type_name
 }
 
 func init() { file_repository_proto_init() }
@@ -6588,6 +6669,7 @@ func file_repository_proto_init() {
 	if File_repository_proto != nil {
 		return
 	}
+	file_errors_proto_init()
 	file_lint_proto_init()
 	file_shared_proto_init()
 	if !protoimpl.UnsafeEnabled {
@@ -7000,7 +7082,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[34].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateBundleRequest); i {
+			switch v := v.(*CreateRepositoryFromURLError); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7012,7 +7094,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[35].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateBundleResponse); i {
+			switch v := v.(*CreateBundleRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7024,7 +7106,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[36].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateBundleFromRefListRequest); i {
+			switch v := v.(*CreateBundleResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7036,7 +7118,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[37].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateBundleFromRefListResponse); i {
+			switch v := v.(*CreateBundleFromRefListRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7048,7 +7130,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[38].Exporter = func(v any, i int) any {
-			switch v := v.(*GenerateBundleURIRequest); i {
+			switch v := v.(*CreateBundleFromRefListResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7060,7 +7142,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[39].Exporter = func(v any, i int) any {
-			switch v := v.(*GenerateBundleURIResponse); i {
+			switch v := v.(*GenerateBundleURIRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7072,7 +7154,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[40].Exporter = func(v any, i int) any {
-			switch v := v.(*GetConfigRequest); i {
+			switch v := v.(*GenerateBundleURIResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7084,7 +7166,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[41].Exporter = func(v any, i int) any {
-			switch v := v.(*GetConfigResponse); i {
+			switch v := v.(*GetConfigRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7096,7 +7178,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[42].Exporter = func(v any, i int) any {
-			switch v := v.(*RestoreCustomHooksRequest); i {
+			switch v := v.(*GetConfigResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7108,7 +7190,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[43].Exporter = func(v any, i int) any {
-			switch v := v.(*SetCustomHooksRequest); i {
+			switch v := v.(*RestoreCustomHooksRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7120,7 +7202,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[44].Exporter = func(v any, i int) any {
-			switch v := v.(*RestoreCustomHooksResponse); i {
+			switch v := v.(*SetCustomHooksRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7132,7 +7214,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[45].Exporter = func(v any, i int) any {
-			switch v := v.(*SetCustomHooksResponse); i {
+			switch v := v.(*RestoreCustomHooksResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7144,7 +7226,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[46].Exporter = func(v any, i int) any {
-			switch v := v.(*BackupCustomHooksRequest); i {
+			switch v := v.(*SetCustomHooksResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7156,7 +7238,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[47].Exporter = func(v any, i int) any {
-			switch v := v.(*GetCustomHooksRequest); i {
+			switch v := v.(*BackupCustomHooksRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7168,7 +7250,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[48].Exporter = func(v any, i int) any {
-			switch v := v.(*BackupCustomHooksResponse); i {
+			switch v := v.(*GetCustomHooksRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7180,7 +7262,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[49].Exporter = func(v any, i int) any {
-			switch v := v.(*GetCustomHooksResponse); i {
+			switch v := v.(*BackupCustomHooksResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7192,7 +7274,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[50].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateRepositoryFromBundleRequest); i {
+			switch v := v.(*GetCustomHooksResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7204,7 +7286,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[51].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateRepositoryFromBundleResponse); i {
+			switch v := v.(*CreateRepositoryFromBundleRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7216,7 +7298,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[52].Exporter = func(v any, i int) any {
-			switch v := v.(*FindLicenseRequest); i {
+			switch v := v.(*CreateRepositoryFromBundleResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7228,7 +7310,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[53].Exporter = func(v any, i int) any {
-			switch v := v.(*FindLicenseResponse); i {
+			switch v := v.(*FindLicenseRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7240,7 +7322,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[54].Exporter = func(v any, i int) any {
-			switch v := v.(*GetInfoAttributesRequest); i {
+			switch v := v.(*FindLicenseResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7252,7 +7334,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[55].Exporter = func(v any, i int) any {
-			switch v := v.(*GetInfoAttributesResponse); i {
+			switch v := v.(*GetInfoAttributesRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7264,7 +7346,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[56].Exporter = func(v any, i int) any {
-			switch v := v.(*CalculateChecksumRequest); i {
+			switch v := v.(*GetInfoAttributesResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7276,7 +7358,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[57].Exporter = func(v any, i int) any {
-			switch v := v.(*CalculateChecksumResponse); i {
+			switch v := v.(*CalculateChecksumRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7288,7 +7370,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[58].Exporter = func(v any, i int) any {
-			switch v := v.(*GetSnapshotRequest); i {
+			switch v := v.(*CalculateChecksumResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7300,7 +7382,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[59].Exporter = func(v any, i int) any {
-			switch v := v.(*GetSnapshotResponse); i {
+			switch v := v.(*GetSnapshotRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7312,7 +7394,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[60].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateRepositoryFromSnapshotRequest); i {
+			switch v := v.(*GetSnapshotResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7324,7 +7406,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[61].Exporter = func(v any, i int) any {
-			switch v := v.(*CreateRepositoryFromSnapshotResponse); i {
+			switch v := v.(*CreateRepositoryFromSnapshotRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7336,7 +7418,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[62].Exporter = func(v any, i int) any {
-			switch v := v.(*GetRawChangesRequest); i {
+			switch v := v.(*CreateRepositoryFromSnapshotResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7348,7 +7430,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[63].Exporter = func(v any, i int) any {
-			switch v := v.(*GetRawChangesResponse); i {
+			switch v := v.(*GetRawChangesRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7360,7 +7442,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[64].Exporter = func(v any, i int) any {
-			switch v := v.(*SearchFilesByNameRequest); i {
+			switch v := v.(*GetRawChangesResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7372,7 +7454,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[65].Exporter = func(v any, i int) any {
-			switch v := v.(*SearchFilesByNameResponse); i {
+			switch v := v.(*SearchFilesByNameRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7384,7 +7466,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[66].Exporter = func(v any, i int) any {
-			switch v := v.(*SearchFilesByContentRequest); i {
+			switch v := v.(*SearchFilesByNameResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7396,7 +7478,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[67].Exporter = func(v any, i int) any {
-			switch v := v.(*SearchFilesByContentResponse); i {
+			switch v := v.(*SearchFilesByContentRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7408,7 +7490,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[68].Exporter = func(v any, i int) any {
-			switch v := v.(*Remote); i {
+			switch v := v.(*SearchFilesByContentResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7420,7 +7502,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[69].Exporter = func(v any, i int) any {
-			switch v := v.(*GetObjectDirectorySizeRequest); i {
+			switch v := v.(*Remote); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7432,7 +7514,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[70].Exporter = func(v any, i int) any {
-			switch v := v.(*GetObjectDirectorySizeResponse); i {
+			switch v := v.(*GetObjectDirectorySizeRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7444,7 +7526,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[71].Exporter = func(v any, i int) any {
-			switch v := v.(*RemoveRepositoryRequest); i {
+			switch v := v.(*GetObjectDirectorySizeResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7456,7 +7538,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[72].Exporter = func(v any, i int) any {
-			switch v := v.(*RemoveRepositoryResponse); i {
+			switch v := v.(*RemoveRepositoryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7468,7 +7550,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[73].Exporter = func(v any, i int) any {
-			switch v := v.(*ReplicateRepositoryRequest); i {
+			switch v := v.(*RemoveRepositoryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7480,7 +7562,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[74].Exporter = func(v any, i int) any {
-			switch v := v.(*ReplicateRepositoryResponse); i {
+			switch v := v.(*ReplicateRepositoryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7492,7 +7574,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[75].Exporter = func(v any, i int) any {
-			switch v := v.(*OptimizeRepositoryRequest); i {
+			switch v := v.(*ReplicateRepositoryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7504,7 +7586,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[76].Exporter = func(v any, i int) any {
-			switch v := v.(*OptimizeRepositoryResponse); i {
+			switch v := v.(*OptimizeRepositoryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7516,7 +7598,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[77].Exporter = func(v any, i int) any {
-			switch v := v.(*PruneUnreachableObjectsRequest); i {
+			switch v := v.(*OptimizeRepositoryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7528,7 +7610,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[78].Exporter = func(v any, i int) any {
-			switch v := v.(*PruneUnreachableObjectsResponse); i {
+			switch v := v.(*PruneUnreachableObjectsRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7540,7 +7622,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[79].Exporter = func(v any, i int) any {
-			switch v := v.(*BackupRepositoryRequest); i {
+			switch v := v.(*PruneUnreachableObjectsResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7552,7 +7634,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[80].Exporter = func(v any, i int) any {
-			switch v := v.(*BackupRepositoryResponse); i {
+			switch v := v.(*BackupRepositoryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7564,7 +7646,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[81].Exporter = func(v any, i int) any {
-			switch v := v.(*RestoreRepositoryRequest); i {
+			switch v := v.(*BackupRepositoryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7576,7 +7658,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[82].Exporter = func(v any, i int) any {
-			switch v := v.(*RestoreRepositoryResponse); i {
+			switch v := v.(*RestoreRepositoryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7588,7 +7670,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[83].Exporter = func(v any, i int) any {
-			switch v := v.(*GetFileAttributesRequest); i {
+			switch v := v.(*RestoreRepositoryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7600,7 +7682,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[84].Exporter = func(v any, i int) any {
-			switch v := v.(*GetFileAttributesResponse); i {
+			switch v := v.(*GetFileAttributesRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7612,7 +7694,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[85].Exporter = func(v any, i int) any {
-			switch v := v.(*FastExportRequest); i {
+			switch v := v.(*GetFileAttributesResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7624,7 +7706,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[86].Exporter = func(v any, i int) any {
-			switch v := v.(*FastExportResponse); i {
+			switch v := v.(*FastExportRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7636,7 +7718,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[87].Exporter = func(v any, i int) any {
-			switch v := v.(*RepositoryInfoResponse_ReferencesInfo); i {
+			switch v := v.(*FastExportResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7648,7 +7730,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[88].Exporter = func(v any, i int) any {
-			switch v := v.(*RepositoryInfoResponse_ObjectsInfo); i {
+			switch v := v.(*RepositoryInfoResponse_ReferencesInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7660,7 +7742,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[89].Exporter = func(v any, i int) any {
-			switch v := v.(*GetRawChangesResponse_RawChange); i {
+			switch v := v.(*RepositoryInfoResponse_ObjectsInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7672,7 +7754,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[90].Exporter = func(v any, i int) any {
-			switch v := v.(*BackupRepositoryResponse_SkippedError); i {
+			switch v := v.(*GetRawChangesResponse_RawChange); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7684,7 +7766,7 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[91].Exporter = func(v any, i int) any {
-			switch v := v.(*RestoreRepositoryResponse_SkippedError); i {
+			switch v := v.(*BackupRepositoryResponse_SkippedError); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -7696,6 +7778,18 @@ func file_repository_proto_init() {
 			}
 		}
 		file_repository_proto_msgTypes[92].Exporter = func(v any, i int) any {
+			switch v := v.(*RestoreRepositoryResponse_SkippedError); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_repository_proto_msgTypes[93].Exporter = func(v any, i int) any {
 			switch v := v.(*GetFileAttributesResponse_AttributeInfo); i {
 			case 0:
 				return &v.state
@@ -7708,13 +7802,16 @@ func file_repository_proto_init() {
 			}
 		}
 	}
+	file_repository_proto_msgTypes[34].OneofWrappers = []any{
+		(*CreateRepositoryFromURLError_RemoteNotFound)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_repository_proto_rawDesc,
 			NumEnums:      3,
-			NumMessages:   93,
+			NumMessages:   94,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
