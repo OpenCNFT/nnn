@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"regexp"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
@@ -16,6 +17,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
+
+var remoteNotFoundRegex = regexp.MustCompile(`fatal: repository '.*' not found`)
 
 func (s *server) cloneFromURLCommand(
 	ctx context.Context,
@@ -110,8 +113,16 @@ func (s *server) CreateRepositoryFromURL(ctx context.Context, req *gitalypb.Crea
 		}
 
 		if err := cmd.Wait(); err != nil {
+			stderrStr := stderr.String()
+			if remoteNotFoundRegex.MatchString(stderrStr) {
+				return structerr.NewNotFound("cloning repository: repository at given URL not found").
+					WithDetail(&gitalypb.CreateRepositoryFromURLError{
+						Error: &gitalypb.CreateRepositoryFromURLError_RemoteNotFound{},
+					})
+			}
+
 			return structerr.NewInternal("cloning repository: %w", err).WithMetadataItems(
-				structerr.MetadataItem{Key: "stderr", Value: stderr.String()},
+				structerr.MetadataItem{Key: "stderr", Value: stderrStr},
 				structerr.MetadataItem{Key: "resolved_address", Value: req.GetResolvedAddress()},
 			)
 		}
