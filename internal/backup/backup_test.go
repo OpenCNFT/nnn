@@ -157,6 +157,7 @@ func TestManager_Create(t *testing.T) {
 						expectedBackup: &backup.Backup{
 							ID:            backupID,
 							Repository:    vanityRepo,
+							Empty:         true,
 							ObjectFormat:  gittest.DefaultObjectHash.Format,
 							HeadReference: git.DefaultRef.String(),
 							Steps: []backup.Step{
@@ -183,12 +184,24 @@ func TestManager_Create(t *testing.T) {
 					return setupData{
 						repo:     nonexistentRepo,
 						repoPath: repoPath,
+						expectedBackup: &backup.Backup{
+							ID:          backupID,
+							Repository:  vanityRepo,
+							NonExistent: true,
+							Empty:       true,
+							Steps: []backup.Step{
+								{
+									BundlePath:      joinBackupPath(t, "", vanityRepo, backupID, "001.bundle"),
+									RefPath:         joinBackupPath(t, "", vanityRepo, backupID, "001.refs"),
+									CustomHooksPath: joinBackupPath(t, "", vanityRepo, backupID, "001.custom_hooks.tar"),
+								},
+							},
+						},
 					}
 				},
 				createsRefList:     false,
 				createsBundle:      false,
 				createsCustomHooks: false,
-				err:                fmt.Errorf("manager: repository not found: %w", backup.ErrSkipped),
 			},
 		} {
 			t.Run(tc.desc, func(t *testing.T) {
@@ -225,6 +238,8 @@ func TestManager_Create(t *testing.T) {
 					require.Equal(t, tc.err, err)
 				}
 
+				require.FileExists(t, manifestPath)
+
 				if tc.createsBundle {
 					require.FileExists(t, refsPath)
 					require.FileExists(t, bundlePath)
@@ -243,12 +258,6 @@ func TestManager_Create(t *testing.T) {
 					require.FileExists(t, refsPath)
 				} else {
 					require.NoFileExists(t, refsPath)
-				}
-
-				if tc.createsBundle || tc.createsRefList {
-					require.FileExists(t, manifestPath)
-				} else {
-					require.NoFileExists(t, manifestPath)
 				}
 
 				if tc.createsCustomHooks {
@@ -577,15 +586,6 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 					expectedErrAs: backup.ErrSkipped,
 				},
 				{
-					desc: "missing backup, always create",
-					setup: func(tb testing.TB) (*gitalypb.Repository, *git.Checksum) {
-						repo, _ := gittest.CreateRepository(t, ctx, cfg)
-						return repo, new(git.Checksum)
-					},
-					alwaysCreate: true,
-					expectExists: true,
-				},
-				{
 					desc: "empty backup",
 					setup: func(tb testing.TB) (*gitalypb.Repository, *git.Checksum) {
 						repo, _ := gittest.CreateRepository(t, ctx, cfg)
@@ -594,6 +594,8 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 						testhelper.WriteFiles(tb, backupRoot, map[string]any{
 							filepath.Join("manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"): fmt.Sprintf(`
 object_format = '%[1]s'
+empty = true
+non_existent= false
 head_reference = '%[3]s'
 
 [[steps]]
@@ -608,57 +610,38 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 					expectExists: true,
 				},
 				{
-					desc: "empty backup, always create",
+					desc: "empty repository with custom hooks",
 					setup: func(tb testing.TB) (*gitalypb.Repository, *git.Checksum) {
-						repo, _ := gittest.CreateRepository(t, ctx, cfg)
+						repo, _ := gittest.CreateRepository(tb, ctx, cfg)
+						const backupID = "abc123"
+
+						customHooksArchive := mustCreateCustomHooksArchive(t, ctx)
 
 						relativePath := stripRelativePath(tb, repo)
 						testhelper.WriteFiles(tb, backupRoot, map[string]any{
 							filepath.Join("manifests", repo.GetStorageName(), repo.GetRelativePath(), "+latest.toml"): fmt.Sprintf(`
-object_format = '%[1]s'
-head_reference = '%[3]s'
-
-[[steps]]
-ref_path = '%[2]s.refs'
-custom_hooks_path = '%[2]s/custom_hooks.tar'
-							`, gittest.DefaultObjectHash.Format, relativePath, git.DefaultRef.String()),
-							relativePath + ".refs": "",
+				empty = true
+				non_existent = false
+				object_format = %q
+				head_reference = 'refs/heads/main'
+				
+				[[steps]]
+				bundle_path = '%s/%s/001.bundle'
+				ref_path = '%s/%s/001.refs'
+				custom_hooks_path = '%s/%s/001.custom_hooks.tar'
+							`, gittest.DefaultObjectHash.Format, relativePath, backupID, relativePath, backupID, relativePath, backupID),
+							filepath.Join(relativePath, backupID, "001.refs"):             "",
+							filepath.Join(relativePath, backupID, "001.custom_hooks.tar"): testhelper.MustReadFile(tb, customHooksArchive),
 						})
 
 						return repo, new(git.Checksum)
 					},
-					alwaysCreate: true,
 					expectExists: true,
-				},
-				{
-					desc: "nonexistent repo",
-					setup: func(tb testing.TB) (*gitalypb.Repository, *git.Checksum) {
-						_, repoPath, _ := createAndSeedRepository(t, ctx, cfg)
-						repoChecksum, repoBundle, repoRefs := createBackupArtifacts(t, cfg, repoPath)
-
-						nonexistentRepo := &gitalypb.Repository{
-							StorageName:  "default",
-							RelativePath: gittest.NewRepositoryName(tb),
-						}
-
-						relativePath := stripRelativePath(tb, nonexistentRepo)
-						testhelper.WriteFiles(tb, backupRoot, map[string]any{
-							filepath.Join("manifests", nonexistentRepo.GetStorageName(), nonexistentRepo.GetRelativePath(), "+latest.toml"): fmt.Sprintf(`
-object_format = '%[1]s'
-head_reference = '%[3]s'
-
-[[steps]]
-bundle_path = '%[2]s.bundle'
-ref_path = '%[2]s.refs'
-custom_hooks_path = '%[2]s/custom_hooks.tar'
-							`, gittest.DefaultObjectHash.Format, relativePath, git.DefaultRef.String()),
-							relativePath + ".bundle": repoBundle,
-							relativePath + ".refs":   repoRefs,
-						})
-
-						return nonexistentRepo, repoChecksum
+					expectedPaths: []string{
+						"custom_hooks/pre-commit.sample",
+						"custom_hooks/prepare-commit-msg.sample",
+						"custom_hooks/pre-push.sample",
 					},
-					expectExists: true,
 				},
 				{
 					desc: "many incrementals",
@@ -766,7 +749,6 @@ custom_hooks_path = '%[2]s/%[3]s/002.custom_hooks.tar'
 						Server:           storage.ServerInfo{Address: cfg.SocketPath, Token: cfg.Auth.Token},
 						Repository:       repo,
 						VanityRepository: repo,
-						AlwaysCreate:     tc.alwaysCreate,
 						BackupID:         "",
 					})
 					if tc.expectedErrAs != nil {
@@ -997,7 +979,10 @@ custom_hooks_path = '%[2]s/%[3]s/002.custom_hooks.tar'
 
 						testhelper.WriteFiles(tb, backupRoot, map[string]any{
 							filepath.Join("manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"): fmt.Sprintf(
-								`object_format = %q
+								`
+empty = true
+non_existent = false
+object_format = %q
 head_reference = 'refs/heads/banana'
 
 [[steps]]
@@ -1021,7 +1006,9 @@ custom_hooks_path = 'custom_hooks.tar'
 
 						testhelper.WriteFiles(tb, backupRoot, map[string]any{
 							filepath.Join("manifests", repo.GetStorageName(), repo.GetRelativePath(), backupID+".toml"): fmt.Sprintf(
-								`object_format = %q
+								`empty = false
+non_existent = false
+object_format = %q
 head_reference = 'refs/heads/banana'
 
 [[steps]]

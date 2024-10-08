@@ -207,7 +207,7 @@ func TestServerSideAdapter_Restore(t *testing.T) {
 					backupID: "",
 				}
 			},
-			expectedErr: fmt.Errorf("server-side restore: %w: rpc error: code = FailedPrecondition desc = restore repository: manager: restore from bundle: repository skipped: read refs: storage service sink: new reader for \"@test/restore/latest/missing.refs\": doesn't exist", backup.ErrSkipped),
+			expectedErr: structerr.NewInternal("server-side restore: restore repository: manifest: find latest: read manifest: storage service sink: new reader for \"manifests/default/@test/restore/latest/missing.git/+latest.toml\": doesn't exist"),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -217,7 +217,7 @@ func TestServerSideAdapter_Restore(t *testing.T) {
 			backupSink, err := backup.ResolveSink(ctx, backupRoot)
 			require.NoError(t, err)
 
-			backupLocator, err := backup.ResolveLocator("pointer", backupSink)
+			backupLocator, err := backup.ResolveLocator("manifest", backupSink)
 			require.NoError(t, err)
 
 			cfg := testcfg.Build(t)
