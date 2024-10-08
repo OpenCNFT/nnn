@@ -1,7 +1,7 @@
 package config
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,7 +76,7 @@ func TestPruneOldGitalyProcessDirectories(t *testing.T) {
 			dirPath := filepath.Join(baseDir, dirName)
 			require.NoError(t, os.Mkdir(dirPath, mode.Directory))
 			expectedLogs[dirPath] = "could not prune entry"
-			expectedErrs[dirPath] = errors.New("gitaly process directory contains an unexpected directory")
+			expectedErrs[dirPath] = fmt.Errorf("gitaly process directory contains an unexpected directory: %q", dirName)
 			nonPrunableDirs = append(nonPrunableDirs, dirPath)
 		}
 
