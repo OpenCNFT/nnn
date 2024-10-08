@@ -2531,7 +2531,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionWG.Wait()
 			b.StopTimer()
 
-			b.ReportMetric(float64(b.N*tc.transactionSize)/time.Since(began).Seconds(), "reference_updates/s")
+			b.ReportMetric(float64(b.N)/time.Since(began).Seconds(), "tx/s")
 
 			for _, manager := range managers {
 				manager.Close()
