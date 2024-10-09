@@ -34,14 +34,14 @@ func PruneOldGitalyProcessDirectories(log log.Logger, directory string) error {
 			if len(components) != 2 || components[0] != "gitaly" {
 				// This directory does not match the gitaly process directory naming format
 				// of `gitaly-<process id>.
-				return errors.New("gitaly process directory contains an unexpected directory")
+				return fmt.Errorf("gitaly process directory contains an unexpected directory: %q", entry.Name())
 			}
 
 			processID, err := strconv.ParseInt(components[1], 10, 64)
 			if err != nil {
 				// This is not a temporary gitaly process directory as the section
 				// after the hyphen is not a process id.
-				return errors.New("gitaly process directory contains an unexpected directory")
+				return fmt.Errorf("gitaly process directory contains an unexpected directory: %q", entry.Name())
 			}
 
 			// When the pid is 0 it might be from a previous failed run, so

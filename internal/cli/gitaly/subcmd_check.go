@@ -2,7 +2,9 @@ package gitaly
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/urfave/cli/v2"
 	"gitlab.com/gitlab-org/gitaly/v16"
@@ -29,7 +31,7 @@ Example: gitaly check gitaly.config.toml`,
 	}
 }
 
-func checkAction(ctx *cli.Context) error {
+func checkAction(ctx *cli.Context) (returnedErr error) {
 	logger := log.ConfigureCommand()
 
 	if ctx.NArg() != 1 || ctx.Args().First() == "" {
@@ -45,6 +47,24 @@ func checkAction(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("loading configuration %q: %w", configPath, err)
 	}
+
+	if cfg.RuntimeDir != "" {
+		if err := config.PruneOldGitalyProcessDirectories(logger, cfg.RuntimeDir); err != nil {
+			return fmt.Errorf("prune runtime directories: %w", err)
+		}
+	}
+
+	runtimeDir, err := config.SetupRuntimeDirectory(cfg, os.Getpid())
+	if err != nil {
+		return fmt.Errorf("setup runtime directory: %w", err)
+	}
+	cfg.RuntimeDir = runtimeDir
+
+	defer func() {
+		if rmErr := os.RemoveAll(cfg.RuntimeDir); rmErr != nil {
+			returnedErr = errors.Join(err, rmErr)
+		}
+	}()
 
 	// Since this subcommand invokes a Git command, we need to unpack the bundled Git binaries
 	// from the Gitaly binary.
@@ -68,7 +88,7 @@ func checkAction(ctx *cli.Context) error {
 	fmt.Fprintf(ctx.App.Writer, "Redis reachable for GitLab: %t\n", info.RedisReachable)
 	fmt.Fprintln(ctx.App.Writer, "OK")
 
-	return nil
+	return returnedErr
 }
 
 func checkAPI(cfg config.Cfg, logger log.Logger) (*gitlab.CheckInfo, error) {
