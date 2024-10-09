@@ -44,7 +44,8 @@ This request template is part of [Gitaly Team's intake process](https://about.gi
 
 <!-- Please be as realistic as possible here. We are sensitive to the fact that customers are frustrated when things aren't working, but realistically we cannot treat everything as a Severity 1 emergency.
 
-For a good rule of thumb, please refer to the bug prioritization framework located in the handbook here: https://about.gitlab.com/handbook/engineering/quality/issue-triage/#severity
+For a good rule of thumb, please refer to the bug prioritization framework located in the handbook here: 
+<https://about.gitlab.com/handbook/engineering/infrastructure/engineering-productivity/issue-triage/#severity>
 
 For S1 or S2 issues, please follow https://about.gitlab.com/handbook/engineering/development/enablement/systems/gitaly/#urgent-issues-and-outages .
 -->
