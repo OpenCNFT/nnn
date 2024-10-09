@@ -1,5 +1,9 @@
 # Gitaly changelog
 
+## 17.4.2 (2024-10-09)
+
+No changes.
+
 ## 17.4.1 (2024-09-24)
 
 No changes.
@@ -18,6 +22,10 @@ No changes.
 ### Other (1 change)
 
 - [featureflag: Remove use_empty_tree_in_attr_tree_config](gitlab-org/gitaly@676b701f4adce5fb35d4b56689e7e261d3113e88) ([merge request](gitlab-org/gitaly!7199))
+
+## 17.3.5 (2024-10-09)
+
+No changes.
 
 ## 17.3.4 (2024-09-24)
 
@@ -48,6 +56,10 @@ No changes.
 - [gitalybackup: Do not consider pool repos dangling on restore](gitlab-org/gitaly@37552827044b27980372977c078d36ed5b6cbb33) ([merge request](gitlab-org/gitaly!7146))
 - [Ensure page token is for the same tree](gitlab-org/gitaly@dc09bfc081125d97059358376a9960cea42f1dbb) ([merge request](gitlab-org/gitaly!7121))
 - [objectpool: Return already exists gRPC code from CreateObjectPool](gitlab-org/gitaly@cc8e1ca1f419dc3d976ee63917c6a518ff54df65) ([merge request](gitlab-org/gitaly!7104))
+
+## 17.2.9 (2024-10-09)
+
+No changes.
 
 ## 17.2.8 (2024-09-24)
 
