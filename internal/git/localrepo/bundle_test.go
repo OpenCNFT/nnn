@@ -321,6 +321,29 @@ func TestRepo_FetchBundle(t *testing.T) {
 			expectedErrAs:       FetchFailedError{},
 			expectedErrContains: "fetch bundle: exit status 128",
 		},
+		{
+			desc: "bundle contains fsck error",
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, targetRepoPath string) testSetup {
+				_, sourceRepoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+					SkipCreationViaService: true,
+				})
+
+				// Write a tree object that has the same path twice. When git-fetch(1) executes with
+				// `transfer.fsckObjects=true`, it is expected that this objects causes the fetch to fail.
+				treeID := gittest.WriteTree(t, cfg, sourceRepoPath, []gittest.TreeEntry{
+					{Path: "duplicate", Mode: "100644", Content: "foo"},
+					{Path: "duplicate", Mode: "100644", Content: "bar"},
+				})
+
+				gittest.WriteCommit(t, cfg, sourceRepoPath, gittest.WithBranch(git.DefaultBranch), gittest.WithTree(treeID))
+
+				return testSetup{
+					reader: createBundle(t, cfg, sourceRepoPath),
+				}
+			},
+			expectedErrAs:       FetchFailedError{},
+			expectedErrContains: "duplicateEntries: contains duplicate file entries",
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
