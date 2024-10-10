@@ -223,3 +223,6 @@ message InvalidRevisionRange {
   bytes range = 1;
 }
 
+// RemoteNotFoundError is an error returned when a repository is not found at given remote URL.
+message RemoteNotFoundError {
+}

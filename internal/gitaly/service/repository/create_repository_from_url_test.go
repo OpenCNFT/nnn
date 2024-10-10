@@ -230,6 +230,39 @@ func TestCreateRepositoryFromURL_fsck(t *testing.T) {
 	)
 }
 
+func TestCreateRepositoryFromURL_remoteNotFound(t *testing.T) {
+	t.Parallel()
+	ctx := testhelper.Context(t)
+	cfg, client := setupRepositoryService(t)
+	gitCmdFactory := gittest.NewCommandFactory(t, cfg)
+
+	_, repoPath := gittest.CreateRepository(t, ctx, cfg)
+	gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(git.DefaultBranch))
+
+	user := "username123"
+	password := "password321localhost"
+	port := gitServerWithBasicAuth(t, ctx, gitCmdFactory, user, password, repoPath)
+
+	req := &gitalypb.CreateRepositoryFromURLRequest{
+		Repository: &gitalypb.Repository{
+			RelativePath: "imports/test-repo-imported.git",
+			StorageName:  cfg.Storages[0].Name,
+		},
+		Url: fmt.Sprintf("http://%s:%s@localhost:%d/%s", user, password, port, "invalid-path.git"),
+	}
+
+	_, err := client.CreateRepositoryFromURL(ctx, req)
+
+	testhelper.RequireGrpcError(
+		t,
+		structerr.NewNotFound("creating repository: cloning repository: repository at given URL not found").
+			WithDetail(&gitalypb.CreateRepositoryFromURLError{
+				Error: &gitalypb.CreateRepositoryFromURLError_RemoteNotFound{},
+			}),
+		err,
+	)
+}
+
 func TestServer_CloneFromURLCommand(t *testing.T) {
 	t.Parallel()
 
