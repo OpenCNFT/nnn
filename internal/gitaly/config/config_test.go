@@ -2967,3 +2967,71 @@ initial_members = {1 = "localhost:4001", 2 = "localhost:4002", 3 = "localhost:40
 	require.NoError(t, expectedCfg.Sanitize())
 	require.Equal(t, expectedCfg.Raft, cfg.Raft)
 }
+
+func TestGoCloudURL(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name        string
+		cfg         Cfg
+		expectedURL string
+		expectedErr error
+	}{
+		{
+			name: "invalid url provided",
+			cfg: Cfg{
+				Backup: BackupConfig{
+					GoCloudURL: "s3://my bucket",
+				},
+			},
+			expectedErr: fmt.Errorf(""),
+		},
+		{
+			name: "url is not s3",
+			cfg: Cfg{
+				Backup: BackupConfig{
+					GoCloudURL: "gs://my-bucket",
+				},
+			},
+			expectedURL: "gs://my-bucket",
+		},
+		{
+			name: "no query parameter provided",
+			cfg: Cfg{
+				Backup: BackupConfig{
+					GoCloudURL: "s3://my-bucket",
+				},
+			},
+			expectedURL: "s3://my-bucket?awssdk=v1",
+		},
+		{
+			name: "query parameter other than awssdk provided",
+			cfg: Cfg{
+				Backup: BackupConfig{
+					GoCloudURL: "s3://my-bucket?foo=bar",
+				},
+			},
+			expectedURL: "s3://my-bucket?awssdk=v1&foo=bar",
+		},
+		{
+			name: "awssdk query parameter provided",
+			cfg: Cfg{
+				Backup: BackupConfig{
+					GoCloudURL: "s3://my-bucket?awssdk=v2",
+				},
+			},
+			expectedURL: "s3://my-bucket?awssdk=v2",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.cfg.Sanitize()
+
+			if tc.expectedErr == nil {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedURL, tc.cfg.Backup.GoCloudURL)
+			} else {
+				require.Error(t, err, "parse GoCloudURL: parse \"s3://my bucket\": invalid character")
+			}
+		})
+	}
+}

@@ -918,6 +918,26 @@ func (cfg *Cfg) Sanitize() error {
 		cfg.Logging.Config.Level = "info"
 	}
 
+	// Go Cloud Development Kit (CDK) v0.39.0 introduced a default to AWS SDK v2,
+	// which includes a new token bucket rate limiting mechanism. This can cause
+	// unexpected behavior in some scenarios. To mitigate this, we use the 'awssdk=v1'
+	// query parameter to revert to v1 behavior. This workaround is temporary;
+	// Go CDK v0.40.0 will default to no rate limiting unless explicitly defined.
+	if cfg.Backup.GoCloudURL != "" {
+		parsedURL, err := url.Parse(cfg.Backup.GoCloudURL)
+		if err != nil {
+			return fmt.Errorf("parse GoCloudURL: %w", err)
+		}
+		if parsedURL.Scheme == "s3" {
+			query := parsedURL.Query()
+			if query.Get("awssdk") == "" {
+				query.Set("awssdk", "v1")
+				parsedURL.RawQuery = query.Encode()
+				cfg.Backup.GoCloudURL = parsedURL.String()
+			}
+		}
+	}
+
 	return nil
 }
 
