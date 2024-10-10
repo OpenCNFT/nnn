@@ -627,6 +627,13 @@ func RequireDatabase(tb testing.TB, ctx context.Context, database keyvalue.Trans
 	if expectedState == nil {
 		expectedState = DatabaseState{}
 	}
+	// Most of the time, persisted committedLSN is equal to appliedLSN except for some intentional tests. Thus, if
+	// appliedLSN is asserted, the test should backfill committedLSN if it's not there.
+	if appliedLSN, appliedExist := expectedState[string(keyAppliedLSN)]; appliedExist {
+		if _, committedExist := expectedState[string(keyCommittedLSN)]; !committedExist {
+			expectedState[string(keyCommittedLSN)] = appliedLSN
+		}
+	}
 
 	actualState := DatabaseState{}
 	unexpectedKeys := []string{}
@@ -705,6 +712,8 @@ type testTransactionHooks struct {
 	BeforeApplyLogEntry hookFunc
 	// BeforeAppendLogEntry is called before a log entry is appended to the log.
 	BeforeAppendLogEntry hookFunc
+	// BeforeAppendLogEntry is called before a log entry is marked as committed.
+	BeforeCommitLogEntry hookFunc
 	// AfterDeleteLogEntry is called after a log entry is deleted.
 	AfterDeleteLogEntry hookFunc
 	// BeforeReadAppliedLSN is invoked before the applied LSN is read.

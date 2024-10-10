@@ -346,6 +346,7 @@ func TestTransactionManager(t *testing.T) {
 	subTests := map[string][]transactionTestCase{
 		"Common":                           generateCommonTests(t, ctx, setup),
 		"CommittedEntries":                 generateCommittedEntriesTests(t, setup),
+		"AppendedEntries":                  generateAppendedEntriesTests(t, setup),
 		"ModifyReferences":                 generateModifyReferencesTests(t, setup),
 		"CreateRepository":                 generateCreateRepositoryTests(t, setup),
 		"DeleteRepository":                 generateDeleteRepositoryTests(t, setup),
@@ -531,6 +532,11 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 			},
 			expectedState: StateAssertion{
+				Database: DatabaseState{
+					// The process crashes before apply but after it's committed. So, only
+					// committedLSN is persisted.
+					string(keyCommittedLSN): storage.LSN(1).ToProto(),
+				},
 				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                  {Mode: mode.Directory},
 					"/wal":               {Mode: mode.Directory},
@@ -1751,6 +1757,8 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			}
 			i++
 		}
+
+		require.Empty(t, manager.appendedEntries)
 	}
 
 	return []transactionTestCase{
@@ -2142,6 +2150,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(3))
 					require.Equal(t, tm.committedLSN, storage.LSN(3))
+					require.Equal(t, tm.appendedLSN, storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2268,10 +2277,13 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					require.NoError(t, tm.commitLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
+					require.NoError(t, tm.proposeLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
+						// Because this is an out-of-band insertion, the committedLSN is updated
+						// but new log entry is not applied until waken up.
+						string(keyCommittedLSN): storage.LSN(4).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
 					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", testhelper.DirectoryState{
@@ -2298,11 +2310,13 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(4))
 					require.Equal(t, tm.committedLSN, storage.LSN(4))
+					require.Equal(t, tm.appendedLSN, storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(4).ToProto(),
+					string(keyAppliedLSN):   storage.LSN(4).ToProto(),
+					string(keyCommittedLSN): storage.LSN(4).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2317,6 +2331,305 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 								},
 							},
 						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func generateAppendedEntriesTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
+	assertAppendedEntries := func(t *testing.T, manager *TransactionManager, expectedList []storage.LSN) {
+		actual := manager.appendedEntries
+		assert.Equalf(t, len(expectedList), len(actual), "appended entries not matched")
+
+		for _, lsn := range expectedList {
+			expectedEntry, err := manager.readLogEntry(lsn)
+			assert.NoError(t, err)
+			testhelper.ProtoEqualAssert(t, expectedEntry, actual[lsn])
+		}
+	}
+
+	return []transactionTestCase{
+		{
+			desc: "manager has just initialized",
+			steps: steps{
+				StartManager{Hooks: testTransactionHooks{
+					BeforeCommitLogEntry: func(c hookContext) {
+						assert.Fail(t, "there shouldn't be any committed entry")
+					},
+				}},
+				AssertManager{},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					require.Equal(t, storage.LSN(0), tm.appendedLSN)
+					assertAppendedEntries(t, tm, nil)
+				}),
+				CloseManager{},
+			},
+		},
+		{
+			desc: "appended entries are removed after committed",
+			steps: steps{
+				StartManager{Hooks: testTransactionHooks{
+					BeforeCommitLogEntry: func(c hookContext) {
+						// It is not the best solution. But as we intercept to assert an
+						// intermediate state, there is no cleaner way than using hooks.
+						lsn := c.lsn
+						manager := c.manager
+						switch lsn {
+						case storage.LSN(1):
+							assert.Equal(t, storage.LSN(1), manager.appendedLSN)
+							assert.Equal(t, storage.LSN(0), manager.committedLSN)
+							assertAppendedEntries(t, manager, []storage.LSN{1})
+						case storage.LSN(2):
+							assert.Equal(t, storage.LSN(2), manager.appendedLSN)
+							assert.Equal(t, storage.LSN(1), manager.committedLSN)
+							assertAppendedEntries(t, manager, []storage.LSN{2})
+						default:
+							assert.Fail(t, "there shouldn't be another committed entry")
+						}
+					},
+				}},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					require.Equal(t, storage.LSN(1), tm.appendedLSN)
+					require.Equal(t, storage.LSN(1), tm.committedLSN)
+					assertAppendedEntries(t, tm, nil)
+				}),
+				Begin{
+					TransactionID:       2,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					require.Equal(t, storage.LSN(1), tm.appendedLSN)
+					require.Equal(t, storage.LSN(1), tm.committedLSN)
+					assertAppendedEntries(t, tm, nil)
+				}),
+				Commit{
+					TransactionID: 2,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+				},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					require.Equal(t, storage.LSN(2), tm.appendedLSN)
+					require.Equal(t, storage.LSN(2), tm.committedLSN)
+					assertAppendedEntries(t, tm, nil)
+				}),
+				CloseManager{},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+				},
+				// The appended-but-not-committed log entry from transaction 1 is also removed.
+				Directory: testhelper.DirectoryState{
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/main":     setup.Commits.First.OID,
+										"refs/heads/branch-1": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+										{
+											MinIndex: 3,
+											MaxIndex: 3,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						),
+					},
+				},
+			},
+		},
+		{
+			desc: "transaction manager crashes after appending",
+			steps: steps{
+				StartManager{
+					Hooks: testTransactionHooks{
+						BeforeCommitLogEntry: func(c hookContext) {
+							assert.Equal(t, storage.LSN(1), c.manager.appendedLSN)
+							assertAppendedEntries(t, c.manager, []storage.LSN{1})
+							simulateCrashHook()(c)
+						},
+						WaitForTransactionsWhenClosing: true,
+					},
+					ExpectedError: errSimulatedCrash,
+				},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					require.Equal(t, storage.LSN(0), tm.appendedLSN)
+					require.Equal(t, storage.LSN(0), tm.committedLSN)
+					assertAppendedEntries(t, tm, nil)
+				}),
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
+					ExpectedError: storage.ErrTransactionProcessingStopped,
+				},
+				AssertManager{
+					ExpectedError: errSimulatedCrash,
+				},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					// Appended entries are persisted.
+					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", gittest.FilesOrReftables(testhelper.DirectoryState{
+						"/":                  {Mode: mode.Directory},
+						"/wal":               {Mode: mode.Directory},
+						"/wal/0000000000001": {Mode: mode.Directory},
+						"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(&gitalypb.LogEntry{
+							RelativePath: setup.RelativePath,
+							ReferenceTransactions: []*gitalypb.LogEntry_ReferenceTransaction{
+								{
+									Changes: []*gitalypb.LogEntry_ReferenceTransaction_Change{
+										{
+											ReferenceName: []byte("refs/heads/branch-1"),
+											NewOid:        []byte(setup.Commits.First.OID),
+										},
+									},
+								},
+							},
+							Operations: []*gitalypb.LogEntry_Operation{
+								{
+									Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
+										CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
+											SourcePath:      []byte("1"),
+											DestinationPath: []byte(filepath.Join(setup.RelativePath, "refs/heads/branch-1")),
+										},
+									},
+								},
+							},
+						}),
+						"/wal/0000000000001/1": {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+					}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+						1: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+					})))
+				}),
+				StartManager{},
+				AssertManager{},
+				// No-op, just to ensure the manager is initialized.
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					// Both of them are set to 0 now.
+					require.Equal(t, storage.LSN(0), tm.appendedLSN)
+					require.Equal(t, storage.LSN(0), tm.committedLSN)
+					// Appended entries are removed now.
+					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", testhelper.DirectoryState{
+						"/":    {Mode: mode.Directory},
+						"/wal": {Mode: mode.Directory},
+					})
+					assertAppendedEntries(t, tm, nil)
+				}),
+				Begin{
+					TransactionID: 2,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 2,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
+					},
+				},
+				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
+					// Apply new commit only. The prior commit was rejected.
+					require.Equal(t, storage.LSN(1), tm.appendedLSN)
+					require.Equal(t, storage.LSN(1), tm.committedLSN)
+					assertAppendedEntries(t, tm, nil)
+				}),
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/main",
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch-1": setup.Commits.Second.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch-1",
+													Target: setup.Commits.Second.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						),
 					},
 				},
 			},
