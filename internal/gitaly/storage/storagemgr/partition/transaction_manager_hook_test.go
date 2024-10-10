@@ -47,6 +47,7 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 	for destination, source := range map[*func(storage.LSN)]hookFunc{
 		&mgr.testHooks.beforeApplyLogEntry:       hooks.BeforeApplyLogEntry,
 		&mgr.testHooks.beforeAppendLogEntry:      hooks.BeforeAppendLogEntry,
+		&mgr.testHooks.beforeCommitLogEntry:      hooks.BeforeCommitLogEntry,
 		&mgr.testHooks.beforeStoreAppliedLSN:     hooks.BeforeStoreAppliedLSN,
 		&mgr.testHooks.beforeDeleteLogEntryFiles: hooks.AfterDeleteLogEntry,
 	} {
