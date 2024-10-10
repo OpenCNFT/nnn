@@ -66,6 +66,7 @@ var commandDescriptions = map[string]commandDescription{
 				ConfigPair{Key: "init.templateDir", Value: ""},
 				// See "fetch" for why we disable following redirects.
 				ConfigPair{Key: "http.followRedirects", Value: "false"},
+				ConfigPair{Key: "transfer.bundleURI", Value: "true"},
 			}, packConfiguration(ctx)...), fetchFsckConfiguration(ctx)...)
 		},
 	},
