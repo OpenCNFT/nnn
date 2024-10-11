@@ -31,7 +31,7 @@ Please edit this section like a workbook, adding not just the answer but also ho
 - [ ] What was Gitaly's SLO availability last month?
 - [ ] Which repository had the most errors in `gprd` last week?
 - [ ] What was the top error they had? If it's a real bug, please file an issue. :slight_smile:
-- [ ] What was the p95 latency of the `SSHUploadPack` RPC in `gstg` last week?
+- [ ] What was the p95 latency of the `SSHUploadPackWithSidechannel` RPC in `gstg` last week?
 - [ ] Which Gitaly node had the most performance issues last week?
 - [ ] Which RPC handlers spent the most CPU time in the last week? Is there an overarching theme amongst them? Hint: we export profiling metrics to GCP.
 
