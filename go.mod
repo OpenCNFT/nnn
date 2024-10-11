@@ -8,7 +8,7 @@ toolchain go1.22.0
 replace github.com/go-enry/go-license-detector/v4 => github.com/gl-gitaly/go-license-detector/v4 v4.0.0-20230524080836-4cc9a3796917
 
 require (
-	cloud.google.com/go/storage v1.43.0
+	cloud.google.com/go/storage v1.44.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
 	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.63.1
@@ -58,14 +58,15 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.115.0 // indirect
-	cloud.google.com/go/auth v0.8.1 // indirect
+	cel.dev/expr v0.16.1 // indirect
+	cloud.google.com/go v0.115.1 // indirect
+	cloud.google.com/go/auth v0.9.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
-	cloud.google.com/go/compute/metadata v0.5.0 // indirect
-	cloud.google.com/go/iam v1.1.13 // indirect
-	cloud.google.com/go/monitoring v1.20.4 // indirect
+	cloud.google.com/go/compute/metadata v0.5.1 // indirect
+	cloud.google.com/go/iam v1.2.1 // indirect
+	cloud.google.com/go/monitoring v1.21.0 // indirect
 	cloud.google.com/go/profiler v0.1.0 // indirect
-	cloud.google.com/go/trace v1.10.12 // indirect
+	cloud.google.com/go/trace v1.11.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.14 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.14.0 // indirect
@@ -76,6 +77,9 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
 	github.com/DataDog/datadog-go v4.4.0+incompatible // indirect
 	github.com/DataDog/sketches-go v1.0.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.1 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
@@ -105,6 +109,7 @@ require (
 	github.com/cilium/ebpf v0.11.0 // indirect
 	github.com/client9/reopen v1.0.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
+	github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
@@ -116,6 +121,8 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/ekzhu/minhash-lsh v0.0.0-20190924033628-faac2c6342f8 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/envoyproxy/go-control-plane v0.13.0 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.1.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/git-lfs/gitobj/v2 v2.1.1 // indirect
 	github.com/git-lfs/go-netrc v0.0.0-20210914205454-f0c862dd687a // indirect
@@ -139,7 +146,7 @@ require (
 	github.com/google/pprof v0.0.0-20240711041743-f6c9dda6c6da // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
 	github.com/google/wire v0.6.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hhatto/gorst v0.0.0-20181029133204-ca9f730cac5b // indirect
@@ -173,6 +180,7 @@ require (
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
@@ -194,21 +202,25 @@ require (
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
-	go.opentelemetry.io/otel v1.28.0 // indirect
-	go.opentelemetry.io/otel/metric v1.28.0 // indirect
-	go.opentelemetry.io/otel/trace v1.28.0 // indirect
+	go.opentelemetry.io/contrib/detectors/gcp v1.29.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 // indirect
+	go.opentelemetry.io/otel v1.29.0 // indirect
+	go.opentelemetry.io/otel/metric v1.29.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.29.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.29.0 // indirect
+	go.opentelemetry.io/otel/trace v1.29.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/oauth2 v0.22.0 // indirect
+	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
-	google.golang.org/api v0.191.0 // indirect
-	google.golang.org/genproto v0.0.0-20240812133136-8ffd90a71988 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
+	google.golang.org/api v0.197.0 // indirect
+	google.golang.org/genproto v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b2c93a // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.32.0 // indirect
 	gopkg.in/neurosnap/sentences.v1 v1.0.7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
