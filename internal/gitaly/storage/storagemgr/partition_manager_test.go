@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1250,7 +1251,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 		defer wg.Done()
 
 		ptn, err := mgr.GetPartition(ctx, 1)
-		assert.EqualError(t, err, "start partition: sync state directory hierarchy: syncing error")
+		assert.EqualError(t, err, "start partition: create state directory hierarchy: sync hierarchy: syncing error")
 		assert.Nil(t, ptn)
 	}()
 
@@ -1263,7 +1264,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 		defer wg.Done()
 
 		ptn, err := mgr.GetPartition(ctx, 1)
-		assert.EqualError(t, err, "initialize partition: sync state directory hierarchy: syncing error")
+		assert.EqualError(t, err, "initialize partition: create state directory hierarchy: sync hierarchy: syncing error")
 		assert.Nil(t, ptn)
 	}()
 
@@ -1346,10 +1347,11 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 		case 3:
 			return nil
 		default:
-			t.Errorf("unexpected call")
 			return fmt.Errorf("unexpected call")
 		}
 	})
+
+	defer func() { require.Equal(t, 3, call) }()
 
 	ctx := testhelper.Context(t)
 
@@ -1360,7 +1362,7 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 		defer wg.Done()
 
 		ptn, err := mgr.GetPartition(ctx, 1)
-		assert.EqualError(t, err, "start partition: sync state directory hierarchy: syncing error")
+		assert.EqualError(t, err, "start partition: create state directory hierarchy: sync hierarchy: syncing error")
 		assert.Nil(t, ptn)
 	}()
 
@@ -1436,4 +1438,53 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
 
 	wg.Wait()
+}
+
+func TestMkdirAllSync(t *testing.T) {
+	failingSyncer := SyncerFunc(func(rootPath, relativePath string) error {
+		t.Fatalf("unexpected call")
+		return nil
+	})
+
+	tmpDir := t.TempDir()
+
+	filePath := filepath.Join(tmpDir, "file")
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file"), nil, mode.File))
+
+	t.Run("target is a file", func(t *testing.T) {
+		require.Equal(t, mkdirAllSync(failingSyncer, filePath, mode.Directory), errors.New("not a directory"))
+	})
+
+	t.Run("parent is a file", func(t *testing.T) {
+		targetPath := filepath.Join(filePath, "target-dir")
+		require.Equal(t,
+			mkdirAllSync(failingSyncer, targetPath, mode.File),
+			fmt.Errorf("stat: %w", &os.PathError{Op: "stat", Path: targetPath, Err: syscall.ENOTDIR}),
+		)
+	})
+
+	t.Run("target exists", func(t *testing.T) {
+		require.NoError(t, mkdirAllSync(failingSyncer, tmpDir, mode.Directory))
+	})
+
+	t.Run("creates missing directories", func(t *testing.T) {
+		type SyncCall struct {
+			RootPath     string
+			RelativePath string
+		}
+
+		var syncCall *SyncCall
+		require.NoError(t, mkdirAllSync(SyncerFunc(func(rootPath, relativePath string) error {
+			syncCall = &SyncCall{
+				RootPath:     rootPath,
+				RelativePath: relativePath,
+			}
+			return nil
+		}), filepath.Join(tmpDir, "child-1", "child-2"), mode.Directory))
+
+		require.Equal(t, &SyncCall{
+			RootPath:     tmpDir,
+			RelativePath: "child-1/child-2",
+		}, syncCall)
+	})
 }

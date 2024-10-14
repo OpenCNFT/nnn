@@ -359,6 +359,54 @@ func (sm *StorageManager) GetPartition(ctx context.Context, partitionID storage.
 	return sm.startPartition(ctx, partitionID)
 }
 
+// mkdirAllSync creates all missing directories in path. It fsyncs the first existing directory in the path and
+// the created directories.
+func mkdirAllSync(syncer interface{ SyncHierarchy(string, string) error }, path string, mode fs.FileMode) error {
+	// Traverse the hierarchy towards the root to find the first directory that exists.
+	currentPath := path
+	for {
+		info, err := os.Stat(currentPath)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				// This directory did not exist. Check if its parent exists.
+				currentPath = filepath.Dir(currentPath)
+				continue
+			}
+
+			return fmt.Errorf("stat: %w", err)
+		}
+
+		if !info.IsDir() {
+			return errors.New("not a directory")
+		}
+
+		// This directory existed.
+		break
+	}
+
+	if currentPath == path {
+		// All directories existed, no changes done.
+		return nil
+	}
+
+	// Create the missing directories.
+	if err := os.MkdirAll(path, mode); err != nil {
+		return fmt.Errorf("mkdir all: %w", err)
+	}
+
+	// Sync the created directories and the first parent directory that existed.
+	dirtyHierarchy, err := filepath.Rel(currentPath, path)
+	if err != nil {
+		return fmt.Errorf("rel: %w", err)
+	}
+
+	if err := syncer.SyncHierarchy(currentPath, dirtyHierarchy); err != nil {
+		return fmt.Errorf("sync hierarchy: %w", err)
+	}
+
+	return nil
+}
+
 // startPartition starts a partition.
 func (sm *StorageManager) startPartition(ctx context.Context, partitionID storage.PartitionID) (*partitionHandle, error) {
 	for {
@@ -408,12 +456,8 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 				relativeStateDir := deriveStateDirectory(partitionID)
 				absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
-				if err := os.MkdirAll(filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
+				if err := mkdirAllSync(sm.syncer, filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 					return fmt.Errorf("create state directory hierarchy: %w", err)
-				}
-
-				if err := sm.syncer.SyncHierarchy(sm.path, filepath.Dir(relativeStateDir)); err != nil {
-					return fmt.Errorf("sync state directory hierarchy: %w", err)
 				}
 
 				stagingDir, err := os.MkdirTemp(sm.stagingDirectory, "")
