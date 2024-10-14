@@ -85,7 +85,8 @@ func (b *syncBuffer) String() string {
 }
 
 type loggerOptions struct {
-	name string
+	name  string
+	level logrus.Level
 }
 
 // LoggerOption configures a logger.
@@ -99,15 +100,23 @@ func WithLoggerName(name string) LoggerOption {
 	}
 }
 
+// WithLevel sets the level of the logger. It's useful when we would like
+// to capture debug logs.
+func WithLevel(level logrus.Level) LoggerOption {
+	return func(opts *loggerOptions) {
+		opts.level = level
+	}
+}
+
 // NewLogger returns a logger that records the log output and
 // prints it out only if the test fails.
 func NewLogger(tb testing.TB, options ...LoggerOption) log.LogrusLogger {
-	logger, logOutput := NewCapturedLogger()
-
 	var opts loggerOptions
 	for _, apply := range options {
 		apply(&opts)
 	}
+
+	logger, logOutput := NewCapturedLogger(opts)
 
 	tb.Cleanup(func() {
 		if !tb.Failed() || logOutput.Len() == 0 {
@@ -126,10 +135,13 @@ func NewLogger(tb testing.TB, options ...LoggerOption) log.LogrusLogger {
 
 // NewCapturedLogger returns a logger that records the log outputs in a buffer. The caller
 // decides how and when the logs are dumped out.
-func NewCapturedLogger() (log.LogrusLogger, *syncBuffer) {
+func NewCapturedLogger(opts loggerOptions) (log.LogrusLogger, *syncBuffer) {
 	logOutput := &syncBuffer{}
 	logger := logrus.New() //nolint:forbidigo
 	logger.Out = logOutput
+	if opts.level != 0 {
+		logger.SetLevel(opts.level)
+	}
 
 	return log.FromLogrusEntry(logrus.NewEntry(logger)), logOutput
 }
