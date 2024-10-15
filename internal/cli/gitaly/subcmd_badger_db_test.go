@@ -22,15 +22,18 @@ func TestBadgerDBCLI(t *testing.T) {
 	db, dbPath, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	storage := &gitalypb.Storage{Name: "default"}
-	storageBytes, err := proto.Marshal(storage)
+	repository := &gitalypb.Repository{StorageName: "default", RelativePath: "foo/bar.git"}
+	repositoryBytes, err := proto.Marshal(repository)
 	require.NoError(t, err)
 
 	require.NoError(t, db.Update(func(txn keyvalue.ReadWriter) error {
 		if err := txn.Set([]byte("partition_id_seq"), []byte("1")); err != nil {
 			return err
 		}
-		return txn.Set([]byte("p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/self/storage"), storageBytes)
+		if err := txn.Set([]byte("p/\x00\x00\x00\x00\x00\x00\x00\x09/applied_lsn"), []byte("1")); err != nil {
+			return err
+		}
+		return txn.Set([]byte("p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/storage"), repositoryBytes)
 	}))
 
 	require.NoError(t, db.Close())
@@ -40,7 +43,7 @@ func TestBadgerDBCLI(t *testing.T) {
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err)
 
-		expectedRawKey := "p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/self/storage"
+		expectedRawKey := "p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/storage"
 		expectedOutput := fmt.Sprintf("%q", expectedRawKey)
 		require.Contains(t, string(output), expectedOutput)
 		require.Contains(t, string(output), "partition_id_seq")
@@ -50,7 +53,7 @@ func TestBadgerDBCLI(t *testing.T) {
 		cmd := exec.Command(cfg.BinaryPath("gitaly"), "db", "list", "--db-path", dbPath, "--prefix", `p/\x00\x00\x00\x00\x00\x00\x00\x01/`)
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err)
-		expectedRawKey := "p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/self/storage"
+		expectedRawKey := "p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/storage"
 		expectedOutput := fmt.Sprintf("%q", expectedRawKey)
 		require.Contains(t, string(output), expectedOutput)
 	})
@@ -59,19 +62,19 @@ func TestBadgerDBCLI(t *testing.T) {
 		cmd := exec.Command(cfg.BinaryPath("gitaly"), "db", "list", "--db-path", dbPath, "--format-keys")
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err)
-		require.Contains(t, string(output), "p/1/kv/raft/self/storage")
+		require.Contains(t, string(output), "p/9/applied_lsn")
 	})
 	t.Run("get command - existing key", func(t *testing.T) {
-		key := `p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/raft/self/storage`
+		key := `p/\x00\x00\x00\x00\x00\x00\x00\x01/kv/storage`
 		cmd := exec.Command(cfg.BinaryPath("gitaly"), "db", "get", "--db-path", dbPath, key)
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err)
 
-		require.Contains(t, string(output), "\"default\"")
+		require.Contains(t, string(output), "default")
 	})
 
 	t.Run("get command - non-existing key", func(t *testing.T) {
-		key := `p/\x00\x00\x00\x00\x00\x00\x00\x02/kv/raft-1`
+		key := `p/\x00\x00\x00\x00\x00\x00\x00\x02/kv/hello-1`
 		cmd := exec.Command(cfg.BinaryPath("gitaly"), "db", "get", "--db-path", dbPath, key)
 		output, err := cmd.CombinedOutput()
 		require.Error(t, err)
