@@ -2534,6 +2534,7 @@ func (mgr *TransactionManager) doesRepositoryExist(ctx context.Context, relative
 }
 
 func (mgr *TransactionManager) createStateDirectory() error {
+	needsFsync := false
 	for _, path := range []string{
 		mgr.stateDirectory,
 		filepath.Join(mgr.stateDirectory, "wal"),
@@ -2542,7 +2543,17 @@ func (mgr *TransactionManager) createStateDirectory() error {
 			if !errors.Is(err, fs.ErrExist) {
 				return fmt.Errorf("mkdir: %w", err)
 			}
+
+			continue
 		}
+
+		// The directory was created so we need to fsync.
+		needsFsync = true
+	}
+
+	// If the directories already existed and we didn't create them, don't fsync.
+	if !needsFsync {
+		return nil
 	}
 
 	syncer := safe.NewSyncer()
