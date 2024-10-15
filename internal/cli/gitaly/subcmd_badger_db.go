@@ -17,12 +17,9 @@ import (
 )
 
 const (
-	keyPartitionIDSeq        = `^partition_id_seq$`
-	keyPartitionAssignment   = `^partition_assignment/.+$`
-	keyRaftClusterAppliedLSN = `^(p/)(.{8})(/kv/raft/cluster/applied_lsn)$`
-	keyStorage               = `^(p/)(.{8})(/kv/raft/self/storage)$`
-	keyAppliedLSN            = `^(p/)(.{8})(/applied_lsn)$`
-	keyRaftClusterInfo       = `^(p/)(.{8})(/kv/raft/cluster/cluster)$`
+	keyPartitionIDSeq      = `^partition_id_seq$`
+	keyPartitionAssignment = `^partition_assignment/.+$`
+	keyAppliedLSN          = `^(p/)(.{8})(/applied_lsn)$`
 )
 
 type decoder func([]byte) (string, error)
@@ -34,21 +31,15 @@ type keyRegexFormatter interface {
 
 // decoders are used to decode the value of a key into a human-readable string.
 var decoders = map[string]decoder{
-	keyPartitionIDSeq:        decodeUint64("partition_id_seq"),
-	keyRaftClusterAppliedLSN: decodeUint64("applied_lsn"),
-	keyPartitionAssignment:   decodeUint64("partition_assignment"),
-	keyStorage:               decodeProtoMessage(&gitalypb.Storage{}),
-	keyAppliedLSN:            decodeProtoMessage(&gitalypb.LSN{}),
-	keyRaftClusterInfo:       decodeProtoMessage(&gitalypb.Cluster{}),
+	keyPartitionIDSeq:      decodeUint64("partition_id_seq"),
+	keyPartitionAssignment: decodeUint64("partition_assignment"),
+	keyAppliedLSN:          decodeProtoMessage(&gitalypb.LSN{}),
 }
 
 var formatters = map[string]keyRegexFormatter{
-	keyRaftClusterAppliedLSN: bigEndianUint64Formatter{},
-	keyStorage:               bigEndianUint64Formatter{},
-	keyAppliedLSN:            bigEndianUint64Formatter{},
-	keyRaftClusterInfo:       bigEndianUint64Formatter{},
-	keyPartitionAssignment:   stringFormatter{},
-	keyPartitionIDSeq:        stringFormatter{},
+	keyAppliedLSN:          bigEndianUint64Formatter{},
+	keyPartitionAssignment: stringFormatter{},
+	keyPartitionIDSeq:      stringFormatter{},
 }
 
 type stringFormatter struct{}
