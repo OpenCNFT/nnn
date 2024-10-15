@@ -15,6 +15,7 @@ import (
 	"runtime/trace"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"gitlab.com/gitlab-org/labkit/correlation"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 )
@@ -309,6 +311,14 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	defer trace.StartRegion(ctx, "begin").End()
 	defer prometheus.NewTimer(mgr.metrics.beginDuration(opts.Write)).ObserveDuration()
 	transactionDurationTimer := prometheus.NewTimer(mgr.metrics.transactionDuration(opts.Write))
+
+	trace.Log(ctx, "correlation_id", correlation.ExtractFromContext(ctx))
+	trace.Log(ctx, "storage_name", mgr.storageName)
+	trace.Log(ctx, "partition_id", mgr.partitionID.String())
+	trace.Log(ctx, "write", strconv.FormatBool(opts.Write))
+	trace.Log(ctx, "relative_path_filter_set", strconv.FormatBool(opts.RelativePaths != nil))
+	trace.Log(ctx, "relative_path_filter", strings.Join(opts.RelativePaths, ";"))
+	trace.Log(ctx, "force_exclusive_snapshot", strconv.FormatBool(opts.ForceExclusiveSnapshot))
 
 	// Wait until the manager has been initialized so the notification channels
 	// and the LSNs are loaded.
