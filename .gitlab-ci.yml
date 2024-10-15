@@ -665,6 +665,23 @@ build-package-and-qa:
     - when: manual
       allow_failure: true
 
+build-cng-image:
+  needs: []
+  stage: qa
+  trigger:
+    project: gitlab-org/build/CNG-mirror
+    strategy: depend
+  inherit:
+    variables: false
+  variables:
+    GITALY_SERVER_VERSION: $CI_COMMIT_SHA
+    GITLAB_NAMESPACE: $CI_PROJECT_NAMESPACE
+    ee: "true"
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+      when: manual
+      allow_failure: true
+
 qa:nightly-praefect-migration-test:
   needs: []
   stage: qa
