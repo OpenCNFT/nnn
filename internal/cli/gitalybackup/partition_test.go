@@ -95,6 +95,7 @@ func TestPartitionSubcommand_Create(t *testing.T) {
 			cmd.Writer = io.Discard
 
 			args := append([]string{progname, "partition"}, "create")
+			args = append(args, "--parallel", "2")
 			err := cmd.RunContext(ctx, args)
 
 			// The test relies on the interceptor being configured in the test server. If WAL is not enabled, the interceptor won't be configured,
