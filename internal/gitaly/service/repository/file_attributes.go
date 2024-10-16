@@ -3,8 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitattributes"
@@ -25,14 +23,14 @@ func (s *server) GetFileAttributes(ctx context.Context, in *gitalypb.GetFileAttr
 	// we delete it if it exists when reading from HEAD:.gitattributes is called.
 	// This logic can be removed when ApplyGitattributes and GetInfoAttributes RPC are totally removed from
 	// the code base.
-	repoPath, err := s.locator.GetRepoPath(ctx, repo)
-	if err != nil {
-		return nil, structerr.NewInternal("get repo path: %w", err)
-	}
+	//repoPath, err := s.locator.GetRepoPath(ctx, repo)
+	//if err != nil {
+	//	return nil, structerr.NewInternal("get repo path: %w", err)
+	//}
 
-	if deletionErr := deleteInfoAttributesFile(repoPath); deletionErr != nil {
-		return nil, structerr.NewInternal("delete info/gitattributes file: %w", err).WithMetadata("path", repoPath)
-	}
+	//if deletionErr := deleteInfoAttributesFile(repoPath); deletionErr != nil {
+	//	return nil, structerr.NewInternal("delete info/gitattributes file: %w", err).WithMetadata("path", repoPath)
+	//}
 
 	checkAttrCmd, finishAttr, err := gitattributes.CheckAttr(ctx, repo, git.Revision(in.GetRevision()), in.GetAttributes())
 	if err != nil {
@@ -74,16 +72,5 @@ func validateGetFileAttributesRequest(ctx context.Context, locator storage.Locat
 		return errors.New("attributes are required")
 	}
 
-	return nil
-}
-
-// deleteInfoAttributesFile delete the info/attributes files in the repoPath
-func deleteInfoAttributesFile(repoPath string) error {
-	attrFile := filepath.Join(repoPath, "info", "attributes")
-	err := os.Remove(attrFile)
-
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
 	return nil
 }
