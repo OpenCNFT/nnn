@@ -481,19 +481,12 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 										},
 										{
 											MinIndex: 3,
-											MaxIndex: 3,
+											MaxIndex: 4,
 											References: []git.Reference{
 												{
 													Name:   "refs/heads/parent",
 													Target: setup.ObjectHash.ZeroOID.String(),
 												},
-											},
-										},
-
-										{
-											MinIndex: 4,
-											MaxIndex: 4,
-											References: []git.Reference{
 												{
 													Name:   "refs/heads/parent/child",
 													Target: setup.Commits.First.OID.String(),
@@ -2084,16 +2077,6 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 										},
 										{
 											MinIndex: 2,
-											MaxIndex: 2,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.First.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 3,
 											MaxIndex: 3,
 											References: []git.Reference{
 												{

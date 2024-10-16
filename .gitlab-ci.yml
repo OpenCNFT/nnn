@@ -14,7 +14,7 @@ default:
 .versions:
   debian: "bookworm"
   git_default: "default"
-  git_minimum: "v2.46.0"
+  git_minimum: "v2.47.0"
   go_default: "1.22"
   go_supported: ["1.22", "1.23"]
   macos: "macos-14-xcode-15"
@@ -302,7 +302,6 @@ test:reftable:
   variables:
     <<: *test_variables
     GITALY_TEST_ENABLE_SYMREF_UPDATE: "true"
-    GIT_VERSION: "v2.46.0"
     TEST_TARGET: test-with-reftable
 
 test:nightly:

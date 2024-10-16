@@ -148,7 +148,7 @@ OVERRIDE_GIT_VERSION ?= ${GIT_VERSION}
 ifeq (${GIT_VERSION:default=},)
 	# GIT_VERSION should be overridden to the default version of bundled Git. This is only
 	# necessary until https://gitlab.com/gitlab-org/gitaly/-/issues/6195 is complete.
-    override GIT_VERSION := ${GIT_VERSION_2_46}
+    override GIT_VERSION := ${GIT_VERSION_2_47}
     # When GIT_VERSION is not explicitly set, we default to bundled Git.
 	export WITH_BUNDLED_GIT = YesPlease
 else
