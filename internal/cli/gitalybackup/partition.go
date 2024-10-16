@@ -80,7 +80,7 @@ func run(ctx context.Context, logger log.Logger) (returnErr error) {
 		returnErr = errors.Join(returnErr, pool.Close())
 	}()
 
-	manager := backup.NewPartititonBackupManager(pool)
+	manager := backup.NewPartitionBackupManager(pool)
 
 	gitalyServers, err := storage.ExtractGitalyServers(ctx)
 	if err != nil {
