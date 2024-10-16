@@ -1,5 +1,19 @@
 # Gitaly changelog
 
+## 17.5.0 (2024-10-16)
+
+### Added (1 change)
+
+- [Add --skip git-rev-list(1) in list_commits.go](gitlab-org/gitaly@a4604bf3b21bf987c825199f0630785b8bc2d6d5) ([merge request](gitlab-org/gitaly!7277))
+
+### Fixed (1 change)
+
+- [Update gocloud.dev to v0.40.0](gitlab-org/gitaly@764744c6629ccc93af2ed90f3c7a33418eb8811e) ([merge request](gitlab-org/gitaly!7349))
+
+### Deprecated (1 change)
+
+- [protobuf: Mark SSHUploadPack RPC as deprecated](gitlab-org/gitaly@b4e224d975fb33e1fa91efe3e61d92b426a37560) ([merge request](gitlab-org/gitaly!7324))
+
 ## 17.4.2 (2024-10-09)
 
 No changes.
