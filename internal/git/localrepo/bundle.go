@@ -161,7 +161,16 @@ func (repo *Repo) FetchBundle(ctx context.Context, txManager transaction.Manager
 		{Key: "remote.inmemory.fetch", Value: git.MirrorRefSpec},
 	}
 	fetchOpts := FetchOpts{
-		CommandOptions: []gitcmd.CmdOpt{gitcmd.WithConfigEnv(fetchConfig...)},
+		CommandOptions: []gitcmd.CmdOpt{
+			gitcmd.WithConfigEnv(fetchConfig...),
+			// Starting in Git version 2.46.0, executing git-fetch(1) on a bundle performs fsck
+			// checks when `transfer.fsckObjects` is enabled. Prior to this, this configuration was
+			// always ignored and fsck checks were not run. Unfortunately, fsck message severity
+			// configuration is ignored by Git only for bundle fetches. Until this is supported by
+			// Git, disable `transfer.fsckObjects` so bundles containing fsck errors can continue to
+			// be fetched. This matches behavior prior to Git version 2.46.0.
+			gitcmd.WithConfig(gitcmd.ConfigPair{Key: "transfer.fsckObjects", Value: "false"}),
+		},
 	}
 	if err := repo.FetchRemote(ctx, "inmemory", fetchOpts); err != nil {
 		return fmt.Errorf("fetch bundle: %w", err)
