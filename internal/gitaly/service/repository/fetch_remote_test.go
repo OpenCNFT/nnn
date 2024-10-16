@@ -41,6 +41,28 @@ func gitRequestValidation(w http.ResponseWriter, r *http.Request, next http.Hand
 	next.ServeHTTP(w, r)
 }
 
+func TestChangeTypes_Coverage(t *testing.T) {
+	for updateType := range gitcmd.ValidRefUpdateTypes {
+		t.Run(string(updateType), func(t *testing.T) {
+			_, shouldIndicateChange := changeTypes[updateType]
+
+			switch updateType {
+			case gitcmd.RefUpdateTypeFastForwardUpdate,
+				gitcmd.RefUpdateTypeForcedUpdate,
+				gitcmd.RefUpdateTypeTagUpdate,
+				gitcmd.RefUpdateTypeFetched:
+				require.True(t, shouldIndicateChange, "expected %s to indicate a change", updateType)
+			case gitcmd.RefUpdateTypePruned,
+				gitcmd.RefUpdateTypeUpdateFailed,
+				gitcmd.RefUpdateTypeUnchanged:
+				require.False(t, shouldIndicateChange, "expected %s to not indicate a change", updateType)
+			default:
+				t.Fatalf("update type %s is not covered by this test", string(updateType))
+			}
+		})
+	}
+}
+
 func TestFetchRemote(t *testing.T) {
 	t.Parallel()
 
@@ -86,7 +108,7 @@ func TestFetchRemote(t *testing.T) {
 							expectedRefs: map[string]git.ObjectID{
 								"refs/heads/main": commitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: false, RepoChanged: true},
 						},
 					},
 				}
@@ -116,7 +138,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/main":   commitID,
 								"refs/tags/testtag": tagID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -146,7 +168,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/main":   commitID,
 								"refs/tags/testtag": tagID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 						{
 							expectedRefs: map[string]git.ObjectID{
@@ -154,7 +176,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/tags/testtag": tagID,
 							},
 							// second time around it shouldn't have changed tags
-							expectedResponse: &gitalypb.FetchRemoteResponse{},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: false, RepoChanged: false},
 						},
 					},
 				}
@@ -176,7 +198,6 @@ func TestFetchRemote(t *testing.T) {
 						RemoteParams: &gitalypb.Remote{
 							Url: remoteRepoPath,
 						},
-						CheckTagsChanged: false,
 					},
 					runs: []run{
 						{
@@ -184,9 +205,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/main":   commitID,
 								"refs/tags/testtag": tagID,
 							},
-							// TagsChanged is set to true as we have requested to not check for tags changed
-							// in the request so it defaults to true.
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 						// Run a second time to ensure it is consistent
 						{
@@ -194,7 +213,8 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/main":   commitID,
 								"refs/tags/testtag": tagID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							// The second time there are no changes in repo
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: false},
 						},
 					},
 				}
@@ -222,7 +242,7 @@ func TestFetchRemote(t *testing.T) {
 							expectedRefs: map[string]git.ObjectID{
 								"refs/heads/branch": commitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 							expectedErr:      nil,
 						},
 					},
@@ -284,7 +304,7 @@ func TestFetchRemote(t *testing.T) {
 							expectedRefs: map[string]git.ObjectID{
 								"refs/heads/branch/conflict": commitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 							expectedErr:      nil,
 						},
 					},
@@ -353,7 +373,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/feature": featureCommitID,
 								"refs/heads/master":  masterCommitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -383,7 +403,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/unrelated": unrelatedCommitID,
 								"refs/heads/master":    masterCommitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -412,7 +432,7 @@ func TestFetchRemote(t *testing.T) {
 							expectedRefs: map[string]git.ObjectID{
 								"refs/heads/master": commitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -443,7 +463,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/remotes/my-remote/master": commitID,
 								"refs/heads/unrelated":          unrelatedID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -471,8 +491,257 @@ func TestFetchRemote(t *testing.T) {
 					runs: []run{
 						{
 							expectedRefs:     map[string]git.ObjectID{"refs/heads/master": commitID},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: false},
 							expectedErr:      nil,
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypeFastForwardUpdate",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				_, remoteRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				initialCommit := gittest.WriteCommit(t, cfg, remoteRepoPath, gittest.WithBranch("master"))
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("master"))
+
+				gittest.WriteRef(t, cfg, repoPath, "refs/heads/master", initialCommit)
+
+				// Create a new commit in the remote repo
+				newCommit := gittest.WriteCommit(t, cfg, remoteRepoPath,
+					gittest.WithParents(initialCommit), gittest.WithBranch("master"))
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url: remoteRepoPath,
+						},
+					},
+					runs: []run{
+						{
+							expectedRefs: map[string]git.ObjectID{
+								"refs/heads/master": newCommit,
+							},
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								RepoChanged: true,
+								TagsChanged: true,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypeForcedUpdate",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				_, remoteRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				gittest.WriteCommit(t, cfg, remoteRepoPath, gittest.WithBranch("main"))
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"))
+
+				// Create a new commit in the remote repo with a different history
+				newCommit := gittest.WriteCommit(t, cfg, remoteRepoPath,
+					gittest.WithBranch("main"), gittest.WithMessage("force update"))
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url: remoteRepoPath,
+						},
+						Force: true,
+					},
+					runs: []run{
+						{
+							expectedRefs: map[string]git.ObjectID{
+								"refs/heads/main": newCommit,
+							},
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								RepoChanged: true,
+								TagsChanged: true,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypePruned",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				_, remoteRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				remoteCommit := gittest.WriteCommit(t, cfg, remoteRepoPath, gittest.WithBranch("to-be-pruned"))
+
+				gittest.Exec(t, cfg, "-C", repoPath, "fetch", remoteRepoPath, "to-be-pruned")
+				gittest.Exec(t, cfg, "-C", repoPath, "branch", "to-be-pruned", remoteCommit.String())
+
+				// Delete the branch in the remote repo
+				gittest.Exec(t, cfg, "-C", remoteRepoPath, "branch", "-D", "to-be-pruned")
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url: remoteRepoPath,
+						},
+						NoPrune: false,
+					},
+					runs: []run{
+						{
+							expectedRefs: nil, // The "to-be-pruned" branch should not be present
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								RepoChanged: false,
+								TagsChanged: true,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypeTagUpdate",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				_, remoteRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				initialCommit := gittest.WriteCommit(t, cfg, remoteRepoPath)
+				gittest.Exec(t, cfg, "-C", remoteRepoPath, "tag", "v1.0", initialCommit.String())
+
+				// Fetch the initial state to local repo
+				gittest.Exec(t, cfg, "-C", repoPath, "fetch", remoteRepoPath, "refs/tags/*:refs/tags/*")
+
+				// Create a new commit and update the tag to an annotated tag in remote repo
+				newCommit := gittest.WriteCommit(t, cfg, remoteRepoPath)
+				gittest.Exec(t, cfg, "-C", remoteRepoPath, "tag", "-f", "-a", "v1.0", "-m", "Annotated tag", newCommit.String())
+
+				// Get the actual ObjectID of the updated tag
+				tagID := gittest.Exec(t, cfg, "-C", remoteRepoPath, "rev-parse", "refs/tags/v1.0")
+				tagID = bytes.TrimSpace(tagID)
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url:           remoteRepoPath,
+							MirrorRefmaps: []string{"refs/tags/*:refs/tags/*"},
+						},
+						Force: true,
+					},
+					runs: []run{
+						{
+							expectedRefs: map[string]git.ObjectID{
+								"refs/tags/v1.0": git.ObjectID(tagID),
+							},
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								TagsChanged: true,
+								RepoChanged: true,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypeFetched",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				_, remoteRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				// Create initial commit and tag in remote repo
+				initialCommit := gittest.WriteCommit(t, cfg, remoteRepoPath)
+				gittest.WriteTag(t, cfg, remoteRepoPath, "v1.0", initialCommit.Revision())
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url: remoteRepoPath,
+						},
+					},
+					runs: []run{
+						{
+							expectedRefs: map[string]git.ObjectID{
+								"refs/tags/v1.0": initialCommit,
+							},
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								TagsChanged: true,
+								RepoChanged: true,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypeUnchanged",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+				masterCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("master"))
+
+				// Simulate the remote by creating a remote tracking branch
+				gittest.WriteRef(t, cfg, repoPath, "refs/remotes/origin/master", masterCommitID)
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url: repoPath,
+						},
+					},
+					runs: []run{
+						{
+							expectedRefs: map[string]git.ObjectID{
+								"refs/heads/master":          masterCommitID,
+								"refs/remotes/origin/master": masterCommitID,
+							},
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								TagsChanged: true,
+								RepoChanged: false,
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "fetch with RefUpdateTypeUpdateFailed",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				_, remoteRepoPath := gittest.CreateRepository(t, ctx, cfg)
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				// Create conflicting commits in remote and local repos
+				gittest.WriteCommit(t, cfg, remoteRepoPath, gittest.WithBranch("main"))
+				localCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"))
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.FetchRemoteRequest{
+						Repository: repoProto,
+						RemoteParams: &gitalypb.Remote{
+							Url: remoteRepoPath,
+						},
+						Force: false,
+					},
+					runs: []run{
+						{
+							expectedRefs: map[string]git.ObjectID{
+								"refs/heads/main": localCommitID,
+							},
+							expectedResponse: &gitalypb.FetchRemoteResponse{
+								TagsChanged: true,
+								RepoChanged: false,
+							},
 						},
 					},
 				}
@@ -501,7 +770,7 @@ func TestFetchRemote(t *testing.T) {
 					runs: []run{
 						{
 							expectedRefs:     map[string]git.ObjectID{"refs/heads/master": commitID},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -535,7 +804,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/master": remoteCommitID,
 								"refs/tags/v1":      commitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 							expectedErr:      nil,
 						},
 					},
@@ -571,7 +840,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/master": remoteCommitID,
 								"refs/tags/v1":      remoteCommitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -606,7 +875,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/master": remoteCommitID,
 								"refs/tags/v1":      commitID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 						},
 					},
 				}
@@ -648,7 +917,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/main":   localDivergingID,
 								"refs/heads/branch": remoteUpdatedID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 							expectedErr:      nil,
 						},
 					},
@@ -686,7 +955,7 @@ func TestFetchRemote(t *testing.T) {
 								"refs/heads/main":  localDivergingID,
 								"refs/tags/v1.0.0": remoteTagID,
 							},
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 							expectedErr:      nil,
 						},
 					},
@@ -821,7 +1090,7 @@ func TestFetchRemote(t *testing.T) {
 					},
 					runs: []run{
 						{
-							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true},
+							expectedResponse: &gitalypb.FetchRemoteResponse{TagsChanged: true, RepoChanged: true},
 							expectedRefs:     map[string]git.ObjectID{"refs/heads/master": masterCommitID},
 						},
 					},

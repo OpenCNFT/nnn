@@ -17,7 +17,7 @@ type RefUpdateType byte
 
 // Valid checks whether the RefUpdateType is one of the seven valid types of update
 func (t RefUpdateType) Valid() bool {
-	_, ok := validRefUpdateTypes[t]
+	_, ok := ValidRefUpdateTypes[t]
 
 	return ok
 }
@@ -63,7 +63,8 @@ const (
 	RefUpdateTypeUnchanged RefUpdateType = '='
 )
 
-var validRefUpdateTypes = map[RefUpdateType]struct{}{
+// ValidRefUpdateTypes returns a list of struct of the seven valid types of update
+var ValidRefUpdateTypes = map[RefUpdateType]struct{}{
 	RefUpdateTypeFastForwardUpdate: {},
 	RefUpdateTypeForcedUpdate:      {},
 	RefUpdateTypePruned:            {},
