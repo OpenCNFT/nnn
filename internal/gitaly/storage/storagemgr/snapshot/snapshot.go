@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -19,6 +20,16 @@ import (
 // It gives the owner read and execute permissions on directories.
 const ModeReadOnlyDirectory fs.FileMode = fs.ModeDir | permission.OwnerRead | permission.OwnerExecute
 
+// snapshotStatistics contains statistics related to the snapshot.
+type snapshotStatistics struct {
+	// creationDuration is the time taken to create the snapshot.
+	creationDuration time.Duration
+	// directoryCount is the total number of directories created in the snapshot.
+	directoryCount int
+	// fileCount is the total number of files linked in the snapshot.
+	fileCount int
+}
+
 // snapshot is a snapshot of a file system's state.
 type snapshot struct {
 	// root is the absolute path of the snapshot.
@@ -27,6 +38,8 @@ type snapshot struct {
 	prefix string
 	// readOnly indicates whether the snapshot is a read-only snapshot.
 	readOnly bool
+	// stats contains statistics related to the snapshot.
+	stats snapshotStatistics
 }
 
 // Root returns the root of the snapshot's file system.
@@ -74,6 +87,8 @@ func (s *snapshot) setDirectoryMode(mode fs.FileMode) error {
 // destinationPath must be a subdirectory within roothPath. The prefix of the snapshot within the root file system
 // can be retrieved by calling Prefix.
 func newSnapshot(ctx context.Context, rootPath, destinationPath string, relativePaths []string, readOnly bool) (_ *snapshot, returnedErr error) {
+	began := time.Now()
+
 	snapshotPrefix, err := filepath.Rel(rootPath, destinationPath)
 	if err != nil {
 		return nil, fmt.Errorf("rel snapshot prefix: %w", err)
@@ -89,7 +104,7 @@ func newSnapshot(ctx context.Context, rootPath, destinationPath string, relative
 		}
 	}()
 
-	if err := createRepositorySnapshots(ctx, rootPath, snapshotPrefix, relativePaths); err != nil {
+	if err := createRepositorySnapshots(ctx, rootPath, snapshotPrefix, relativePaths, &s.stats); err != nil {
 		return nil, fmt.Errorf("create repository snapshots: %w", err)
 	}
 
@@ -101,13 +116,15 @@ func newSnapshot(ctx context.Context, rootPath, destinationPath string, relative
 		}
 	}
 
+	s.stats.creationDuration = time.Since(began)
 	return s, nil
 }
 
 // createRepositorySnapshots creates a snapshot of the partition containing all repositories at the given relative paths
 // and their alternates.
-func createRepositorySnapshots(ctx context.Context, storagePath, snapshotPrefix string, relativePaths []string) error {
+func createRepositorySnapshots(ctx context.Context, storagePath, snapshotPrefix string, relativePaths []string, stats *snapshotStatistics) error {
 	// Create the root directory always to as the storage would also exist always.
+	stats.directoryCount++
 	if err := os.Mkdir(filepath.Join(storagePath, snapshotPrefix), mode.Directory); err != nil {
 		return fmt.Errorf("mkdir snapshot root: %w", err)
 	}
@@ -134,7 +151,7 @@ func createRepositorySnapshots(ctx context.Context, storagePath, snapshotPrefix 
 		}
 
 		targetPath := filepath.Join(storagePath, snapshotPrefix, relativePath)
-		if err := createRepositorySnapshot(ctx, sourcePath, targetPath); err != nil {
+		if err := createRepositorySnapshot(ctx, sourcePath, targetPath, stats); err != nil {
 			return fmt.Errorf("create snapshot: %w", err)
 		}
 
@@ -157,6 +174,7 @@ func createRepositorySnapshots(ctx context.Context, storagePath, snapshotPrefix 
 			if err := createRepositorySnapshot(ctx,
 				filepath.Join(storagePath, alternateRelativePath),
 				filepath.Join(storagePath, snapshotPrefix, alternateRelativePath),
+				stats,
 			); err != nil {
 				return fmt.Errorf("create alternate snapshot: %w", err)
 			}
@@ -173,14 +191,30 @@ func createRepositorySnapshots(ctx context.Context, storagePath, snapshotPrefix 
 // correct locations there. This effectively does a copy-free clone of the repository. Since the files
 // are shared between the snapshot and the repository, they must not be modified. Git doesn't modify
 // existing files but writes new ones so this property is upheld.
-func createRepositorySnapshot(ctx context.Context, repositoryPath, snapshotPath string) error {
+func createRepositorySnapshot(ctx context.Context, repositoryPath, snapshotPath string, stats *snapshotStatistics) error {
+	repositoryParentDir := filepath.Dir(snapshotPath)
+	// Measure how many directories we're about to create as part of the MkdirAll call below.
+	for currentPath := repositoryParentDir; ; {
+		if _, err := os.Lstat(currentPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				stats.directoryCount++
+				currentPath = filepath.Dir(currentPath)
+				continue
+			}
+
+			return fmt.Errorf("lstat: %w", err)
+		}
+
+		break
+	}
+
 	// This creates the parent directory hierarchy regardless of whether the repository exists or not. It also
 	// doesn't consider the permissions in the storage. While not 100% correct, we have no logic that cares about
 	// the storage hierarchy above repositories.
 	//
 	// The repository's directory itself is not yet created as whether it should be created depends on whether the
 	// repository exists or not.
-	if err := os.MkdirAll(filepath.Dir(snapshotPath), mode.Directory); err != nil {
+	if err := os.MkdirAll(repositoryParentDir, mode.Directory); err != nil {
 		return fmt.Errorf("create parent directory hierarchy: %w", err)
 	}
 
@@ -190,7 +224,7 @@ func createRepositorySnapshot(ctx context.Context, repositoryPath, snapshotPath 
 		// worktrees in the snapshot.
 		housekeeping.WorktreesPrefix:      {},
 		housekeeping.GitlabWorktreePrefix: {},
-	}); err != nil {
+	}, stats); err != nil {
 		return fmt.Errorf("create directory snapshot: %w", err)
 	}
 
@@ -201,7 +235,7 @@ func createRepositorySnapshot(ctx context.Context, repositoryPath, snapshotPath 
 // snapshotDirectory and hard links files into the same locations in snapshotDirectory.
 //
 // skipRelativePaths can be provided to skip certain entries from being included in the snapshot.
-func createDirectorySnapshot(ctx context.Context, originalDirectory, snapshotDirectory string, skipRelativePaths map[string]struct{}) error {
+func createDirectorySnapshot(ctx context.Context, originalDirectory, snapshotDirectory string, skipRelativePaths map[string]struct{}, stats *snapshotStatistics) error {
 	if err := filepath.Walk(originalDirectory, func(oldPath string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && oldPath == originalDirectory {
@@ -224,10 +258,12 @@ func createDirectorySnapshot(ctx context.Context, originalDirectory, snapshotDir
 
 		newPath := filepath.Join(snapshotDirectory, relativePath)
 		if info.IsDir() {
+			stats.directoryCount++
 			if err := os.Mkdir(newPath, info.Mode().Perm()); err != nil {
 				return fmt.Errorf("create dir: %w", err)
 			}
 		} else if info.Mode().IsRegular() {
+			stats.fileCount++
 			if err := os.Link(oldPath, newPath); err != nil {
 				return fmt.Errorf("link file: %w", err)
 			}

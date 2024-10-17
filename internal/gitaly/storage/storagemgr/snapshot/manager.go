@@ -11,8 +11,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
 // closeWrapper wraps the snapshot to run custom logic on Close.
@@ -48,6 +50,8 @@ type Manager struct {
 	// for snaphots that are about to be created.
 	nextDirectory atomic.Uint64
 
+	// logger is used for logging.
+	logger log.Logger
 	// storageDir is an absolute path to the root of the storage.
 	storageDir string
 	// workingDir is an absolute path to where the snapshots should
@@ -71,8 +75,9 @@ type Manager struct {
 }
 
 // NewManager returns a new Manager that creates snapshots from storageDir into workingDir.
-func NewManager(storageDir, workingDir string, metrics ManagerMetrics) *Manager {
+func NewManager(logger log.Logger, storageDir, workingDir string, metrics ManagerMetrics) *Manager {
 	return &Manager{
+		logger:          logger.WithField("component", "snapshot_manager"),
 		storageDir:      storageDir,
 		workingDir:      workingDir,
 		sharedSnapshots: make(map[storage.LSN]map[string]*sharedSnapshot),
@@ -101,6 +106,8 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		if err != nil {
 			return nil, fmt.Errorf("new exclusive snapshot: %w", err)
 		}
+
+		mgr.logSnapshotCreation(ctx, exclusive, snapshot.stats)
 
 		return closeWrapper{
 			snapshot: snapshot,
@@ -195,6 +202,10 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		// Other goroutines are waiting on the ready channel for us to finish the snapshotting
 		// so close it to signal the process is finished.
 		close(wrapper.ready)
+
+		if wrapper.snapshotErr == nil {
+			mgr.logSnapshotCreation(ctx, exclusive, wrapper.snapshot.stats)
+		}
 	} else {
 		mgr.metrics.reusedSharedSnapshotTotal.Inc()
 	}
@@ -212,6 +223,17 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		snapshot: wrapper.snapshot,
 		close:    cleanup,
 	}, nil
+}
+
+func (mgr *Manager) logSnapshotCreation(ctx context.Context, exclusive bool, stats snapshotStatistics) {
+	mgr.logger.WithFields(log.Fields{
+		"snapshot": map[string]any{
+			"exclusive":       exclusive,
+			"duration_ms":     float64(stats.creationDuration) / float64(time.Millisecond),
+			"directory_count": stats.directoryCount,
+			"file_count":      stats.fileCount,
+		},
+	}).InfoContext(ctx, "created transaction snapshot")
 }
 
 func (mgr *Manager) newSnapshot(ctx context.Context, relativePaths []string, readOnly bool) (*snapshot, error) {
