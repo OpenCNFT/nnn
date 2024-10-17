@@ -649,9 +649,8 @@ func TestFetchInternalRemote_successful(t *testing.T) {
 		},
 	)
 
-	// When using 'symref-updates' we use the reference-transaction
-	// hook for the default branch updates.
-	require.Equal(t, gittest.IfSymrefUpdateSupported(t, ctx, remoteCfg, 4, 2), referenceTransactionHookCalled)
+	// We use the reference-transaction hook for the default branch updates.
+	require.Equal(t, 4, referenceTransactionHookCalled)
 }
 
 func TestFetchInternalRemote_failure(t *testing.T) {

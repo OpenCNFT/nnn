@@ -301,7 +301,6 @@ test:reftable:
   <<: *test_definition
   variables:
     <<: *test_variables
-    GITALY_TEST_ENABLE_SYMREF_UPDATE: "true"
     TEST_TARGET: test-with-reftable
 
 test:nightly:
