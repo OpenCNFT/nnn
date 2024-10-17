@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/env"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
@@ -529,11 +530,19 @@ func templateFsckConfiguration(_ context.Context, prefix string) []GlobalOption 
 }
 
 func packConfiguration(context.Context) []GlobalOption {
-	return []GlobalOption{
+	opts := []GlobalOption{
 		ConfigPair{Key: "pack.windowMemory", Value: "100m"},
 		ConfigPair{Key: "pack.writeReverseIndex", Value: "true"},
 		ConfigPair{Key: "pack.threads", Value: threadsConfigValue(runtime.NumCPU())},
 	}
+
+	// Experimental configuration for https://gitlab.com/gitlab-org/charts/gitlab/-/issues/5795
+	// To documented properly at a later stage.
+	if packedGitLimit := env.GetString("GITALY_PACKED_GIT_LIMIT", ""); packedGitLimit != "" {
+		opts = append(opts, ConfigPair{Key: "core.packedGitLimit", Value: packedGitLimit})
+	}
+
+	return opts
 }
 
 // threadsConfigValue returns the log-2 number of threads based on the number of provided CPUs. This

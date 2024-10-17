@@ -2,6 +2,7 @@ package gitcmd
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -145,6 +146,46 @@ func TestFsckConfiguration_prefix(t *testing.T) {
 			for _, config := range tc.expected {
 				require.Containsf(t, opts, config, fmt.Sprintf("missing %s", config.Key))
 			}
+		})
+	}
+}
+
+func TestPackConfiguration(t *testing.T) {
+	ctx := testhelper.Context(t)
+
+	for _, tc := range []struct {
+		name     string
+		env      map[string]string
+		expected []ConfigPair
+	}{
+		{
+			name: "with GITALY_PACKED_GIT_LIMIT",
+			env: map[string]string{
+				"GITALY_PACKED_GIT_LIMIT": "1g",
+			},
+			expected: []ConfigPair{
+				{Key: "pack.windowMemory", Value: "100m"},
+				{Key: "pack.writeReverseIndex", Value: "true"},
+				{Key: "pack.threads", Value: threadsConfigValue(runtime.NumCPU())},
+				{Key: "core.packedGitLimit", Value: "1g"},
+			},
+		},
+		{
+			name: "without GITALY_PACKED_GIT_LIMIT",
+			expected: []ConfigPair{
+				{Key: "pack.windowMemory", Value: "100m"},
+				{Key: "pack.writeReverseIndex", Value: "true"},
+				{Key: "pack.threads", Value: threadsConfigValue(runtime.NumCPU())},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+
+			opts := packConfiguration(ctx)
+			require.ElementsMatch(t, tc.expected, opts)
 		})
 	}
 }
