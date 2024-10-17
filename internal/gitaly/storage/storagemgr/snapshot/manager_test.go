@@ -363,7 +363,7 @@ func TestManager(t *testing.T) {
 
 			metrics := NewMetrics()
 
-			mgr := NewManager(storageDir, workingDir, metrics.Scope("storage-name"))
+			mgr := NewManager(testhelper.SharedLogger(t), storageDir, workingDir, metrics.Scope("storage-name"))
 
 			tc.run(t, mgr)
 
