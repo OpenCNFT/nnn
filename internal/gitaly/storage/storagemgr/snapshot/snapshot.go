@@ -73,7 +73,7 @@ func (s *snapshot) setDirectoryMode(mode fs.FileMode) error {
 //
 // destinationPath must be a subdirectory within roothPath. The prefix of the snapshot within the root file system
 // can be retrieved by calling Prefix.
-func newSnapshot(ctx context.Context, rootPath, destinationPath string, relativePaths []string, readOnly bool) (_ FileSystem, returnedErr error) {
+func newSnapshot(ctx context.Context, rootPath, destinationPath string, relativePaths []string, readOnly bool) (_ *snapshot, returnedErr error) {
 	snapshotPrefix, err := filepath.Rel(rootPath, destinationPath)
 	if err != nil {
 		return nil, fmt.Errorf("rel snapshot prefix: %w", err)

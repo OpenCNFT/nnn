@@ -15,9 +15,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
 
-// closeWrapper wraps the FileSystem to run custom logic on Close.
+// closeWrapper wraps the snapshot to run custom logic on Close.
 type closeWrapper struct {
-	FileSystem
+	*snapshot
 	close func() error
 }
 
@@ -33,13 +33,13 @@ type sharedSnapshot struct {
 	// will be cleaned up.
 	referenceCount int
 	// ready is closed when the goroutine performing the snapshotting
-	// has finished and has populated snapshotErr and filesystem fields.
+	// has finished and has populated snapshotErr and snapshot fields.
 	ready chan struct{}
 	// snapshotErr describes the possible error that has occurred while
 	// creating the snapshot.
 	snapshotErr error
-	// filesystem is the filesystem snapshot to access.
-	filesystem FileSystem
+	// snapshot is the snapshot to access.
+	snapshot *snapshot
 }
 
 // Manager creates file system snapshots from a given directory hierarchy.
@@ -97,20 +97,20 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 	defer trace.StartRegion(ctx, "GetSnapshot").End()
 	if exclusive {
 		mgr.metrics.createdExclusiveSnapshotTotal.Inc()
-		filesystem, err := mgr.newSnapshot(ctx, relativePaths, false)
+		snapshot, err := mgr.newSnapshot(ctx, relativePaths, false)
 		if err != nil {
 			return nil, fmt.Errorf("new exclusive snapshot: %w", err)
 		}
 
 		return closeWrapper{
-			FileSystem: filesystem,
+			snapshot: snapshot,
 			close: func() error {
 				defer trace.StartRegion(ctx, "close exclusive snapshot").End()
 
 				mgr.metrics.destroyedExclusiveSnapshotTotal.Inc()
 				// Exclusive snapshots are not shared, so it can be removed as soon
 				// as the user finishes with it.
-				if err := filesystem.Close(); err != nil {
+				if err := snapshot.Close(); err != nil {
 					return fmt.Errorf("close exclusive snapshot: %w", err)
 				}
 
@@ -166,13 +166,13 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 
 			// We need to remove the file system state of the snapshot
 			// only if it was successfully created.
-			removeSnapshot = wrapper.filesystem != nil
+			removeSnapshot = wrapper.snapshot != nil
 		}
 		mgr.mutex.Unlock()
 
 		if removeSnapshot {
 			mgr.metrics.destroyedSharedSnapshotTotal.Inc()
-			if err := wrapper.filesystem.Close(); err != nil {
+			if err := wrapper.snapshot.Close(); err != nil {
 				return fmt.Errorf("close shared snapshot: %w", err)
 			}
 		}
@@ -191,7 +191,7 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 	if !ok {
 		mgr.metrics.createdSharedSnapshotTotal.Inc()
 		// If there was no existing snapshot, we need to create it.
-		wrapper.filesystem, wrapper.snapshotErr = mgr.newSnapshot(ctx, relativePaths, true)
+		wrapper.snapshot, wrapper.snapshotErr = mgr.newSnapshot(ctx, relativePaths, true)
 		// Other goroutines are waiting on the ready channel for us to finish the snapshotting
 		// so close it to signal the process is finished.
 		close(wrapper.ready)
@@ -209,12 +209,12 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 	}
 
 	return closeWrapper{
-		FileSystem: wrapper.filesystem,
-		close:      cleanup,
+		snapshot: wrapper.snapshot,
+		close:    cleanup,
 	}, nil
 }
 
-func (mgr *Manager) newSnapshot(ctx context.Context, relativePaths []string, readOnly bool) (FileSystem, error) {
+func (mgr *Manager) newSnapshot(ctx context.Context, relativePaths []string, readOnly bool) (*snapshot, error) {
 	return newSnapshot(ctx,
 		mgr.storageDir,
 		filepath.Join(mgr.workingDir, strconv.FormatUint(mgr.nextDirectory.Add(1), 36)),
