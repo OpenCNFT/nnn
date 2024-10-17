@@ -226,6 +226,8 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 }
 
 func (mgr *Manager) logSnapshotCreation(ctx context.Context, exclusive bool, stats snapshotStatistics) {
+	mgr.metrics.snapshotCreationDuration.Observe(stats.creationDuration.Seconds())
+	mgr.metrics.snapshotDirectoryEntries.Observe(float64(stats.directoryCount + stats.fileCount))
 	mgr.logger.WithFields(log.Fields{
 		"snapshot": map[string]any{
 			"exclusive":       exclusive,

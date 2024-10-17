@@ -12,6 +12,8 @@ type Metrics struct {
 	createdSharedSnapshotTotal      *prometheus.CounterVec
 	reusedSharedSnapshotTotal       *prometheus.CounterVec
 	destroyedSharedSnapshotTotal    *prometheus.CounterVec
+	snapshotCreationDuration        *prometheus.HistogramVec
+	snapshotDirectoryEntries        *prometheus.HistogramVec
 }
 
 // Describe implements prometheus.Collector.
@@ -26,6 +28,8 @@ func (m Metrics) Collect(metrics chan<- prometheus.Metric) {
 	m.createdSharedSnapshotTotal.Collect(metrics)
 	m.reusedSharedSnapshotTotal.Collect(metrics)
 	m.destroyedSharedSnapshotTotal.Collect(metrics)
+	m.snapshotCreationDuration.Collect(metrics)
+	m.snapshotDirectoryEntries.Collect(metrics)
 }
 
 // NewMetrics returns a new Metrics instance.
@@ -52,6 +56,16 @@ func NewMetrics() Metrics {
 			Name: "gitaly_shared_snapshots_destroyed_total",
 			Help: "Number of destroyed shared snapshots.",
 		}, labels),
+		snapshotCreationDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "gitaly_snapshot_creation_duration_seconds",
+			Help:    "Time spent creating snapshots.",
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 12),
+		}, labels),
+		snapshotDirectoryEntries: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name:    "gitaly_snapshot_directory_entries",
+			Help:    "Number directories and files in snapshots.",
+			Buckets: prometheus.ExponentialBuckets(1, 2, 12),
+		}, labels),
 	}
 }
 
@@ -62,6 +76,8 @@ type ManagerMetrics struct {
 	createdSharedSnapshotTotal      prometheus.Counter
 	reusedSharedSnapshotTotal       prometheus.Counter
 	destroyedSharedSnapshotTotal    prometheus.Counter
+	snapshotCreationDuration        prometheus.Observer
+	snapshotDirectoryEntries        prometheus.Observer
 }
 
 // Scope returns the metrics scoped for a given Manager.
@@ -73,5 +89,7 @@ func (m Metrics) Scope(storageName string) ManagerMetrics {
 		createdSharedSnapshotTotal:      m.createdSharedSnapshotTotal.With(labels),
 		reusedSharedSnapshotTotal:       m.reusedSharedSnapshotTotal.With(labels),
 		destroyedSharedSnapshotTotal:    m.destroyedSharedSnapshotTotal.With(labels),
+		snapshotCreationDuration:        m.snapshotCreationDuration.With(labels),
+		snapshotDirectoryEntries:        m.snapshotDirectoryEntries.With(labels),
 	}
 }
