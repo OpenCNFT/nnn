@@ -97,21 +97,6 @@ func (s *server) replicateRepository(ctx context.Context, source, target *gitaly
 		return fmt.Errorf("synchronizing gitconfig: %w", err)
 	}
 
-	// In git 2.43.0+, gitattributes supports reading from HEAD:.gitattributes,
-	// so info/attributes is no longer needed. To make sure info/attributes file is cleaned up,
-	// we delete it if it exists when reading from HEAD:.gitattributes is called.
-	// This logic can be removed when ApplyGitattributes and GetInfoAttributes RPC are totally removed from
-	// the code base.
-	if target != nil {
-		repoPath, err := s.locator.GetRepoPath(ctx, target)
-		if err != nil {
-			return structerr.NewInternal("get repo path: %w", err)
-		}
-		if deletionErr := deleteInfoAttributesFile(repoPath); deletionErr != nil {
-			return structerr.NewInternal("delete info/gitattributes file: %w", deletionErr).WithMetadata("path", repoPath)
-		}
-	}
-
 	if err := s.syncReferences(ctx, source, target); err != nil {
 		return fmt.Errorf("synchronizing references: %w", err)
 	}

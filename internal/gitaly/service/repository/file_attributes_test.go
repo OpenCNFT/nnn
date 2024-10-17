@@ -1,11 +1,8 @@
 package repository
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -185,12 +182,6 @@ func TestDeletingInfoAttributes(t *testing.T) {
 			gittest.TreeEntry{Path: "README.md", Mode: "100644", Content: "some text"},
 			gittest.TreeEntry{Path: "pic.jpg", Mode: "100644", Content: "blob"},
 		))
-	path := filepath.Join(repoPath, "info")
-	require.NoError(t, os.Mkdir(path, os.ModePerm))
-	path = filepath.Join(path, "attributes")
-	file, err := os.Create(path)
-	require.NoError(t, err)
-	require.NoError(t, file.Close())
 
 	request := &gitalypb.GetFileAttributesRequest{
 		Repository: repoProto,
@@ -199,8 +190,4 @@ func TestDeletingInfoAttributes(t *testing.T) {
 		Paths:      []string{"example.go"},
 	}
 	_, _ = client.GetFileAttributes(ctx, request)
-
-	// when gitattributesSupportReadingFromHead is true, the info/attributes file should be deleted
-	// otherwise it should not be deleted
-	require.NoFileExists(t, path)
 }
