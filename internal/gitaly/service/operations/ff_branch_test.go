@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
@@ -16,13 +15,9 @@ import (
 )
 
 func TestUserFFBranch(t *testing.T) {
-	testhelper.NewFeatureSets(featureflag.UserFFBranchStructuredErrors).Run(t, testUserFFBranch)
-}
-
-func testUserFFBranch(t *testing.T, ctx context.Context) {
 	t.Parallel()
 
-	ctx, cfg, client := setupOperationsService(t, ctx)
+	ctx, cfg, client := setupOperationsService(t, testhelper.Context(t))
 
 	type setupData struct {
 		repoPath         string
@@ -285,12 +280,16 @@ func testUserFFBranch(t *testing.T, ctx context.Context) {
 					gittest.TreeEntry{Path: "goo", Mode: "100644", Content: "something"},
 				))
 
-				expectedResponse := &gitalypb.UserFFBranchResponse{}
-				var expectedErr error
-
-				if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
-					expectedResponse = nil
-					expectedErr = structerr.NewFailedPrecondition("update reference with hooks: reference update: reference does not point to expected object").
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.UserFFBranchRequest{
+						Repository:     repoProto,
+						CommitId:       commitToMerge.String(),
+						User:           gittest.TestUser,
+						Branch:         []byte("master"),
+						ExpectedOldOid: firstCommit.String(),
+					},
+					expectedErr: structerr.NewFailedPrecondition("update reference with hooks: reference update: reference does not point to expected object").
 						WithDetail(&testproto.ErrorMetadata{
 							Key:   []byte("actual_object_id"),
 							Value: []byte(secondCommit),
@@ -310,22 +309,7 @@ func testUserFFBranch(t *testing.T, ctx context.Context) {
 									NewOid: commitToMerge.String(),
 								},
 							},
-						})
-				}
-
-				return setupData{
-					repoPath: repoPath,
-					request: &gitalypb.UserFFBranchRequest{
-						Repository:     repoProto,
-						CommitId:       commitToMerge.String(),
-						User:           gittest.TestUser,
-						Branch:         []byte("master"),
-						ExpectedOldOid: firstCommit.String(),
-					},
-					// empty response is the expected (legacy) behavior when we fail to
-					// update the ref.
-					expectedResponse: expectedResponse,
-					expectedErr:      expectedErr,
+						}),
 				}
 			},
 		},
@@ -349,14 +333,10 @@ func testUserFFBranch(t *testing.T, ctx context.Context) {
 	}
 }
 
-func TestUserFFBranch_failingHooks(t *testing.T) {
-	testhelper.NewFeatureSets(featureflag.UserFFBranchStructuredErrors).Run(t, testUserFFBranchFailingHooks)
-}
-
-func testUserFFBranchFailingHooks(t *testing.T, ctx context.Context) {
+func TestUserFFBranchFailingHooks(t *testing.T) {
 	t.Parallel()
 
-	ctx, cfg, client := setupOperationsService(t, ctx)
+	ctx, cfg, client := setupOperationsService(t, testhelper.Context(t))
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
 	parentID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("branch"))
@@ -381,8 +361,8 @@ func testUserFFBranchFailingHooks(t *testing.T, ctx context.Context) {
 			gittest.WriteCustomHook(t, repoPath, hookName, hookContent)
 
 			resp, err := client.UserFFBranch(ctx, request)
-			if featureflag.UserFFBranchStructuredErrors.IsEnabled(ctx) {
-				testhelper.RequireGrpcError(t, structerr.NewPermissionDenied("failure\n").
+			testhelper.RequireGrpcError(t,
+				structerr.NewPermissionDenied("failure\n").
 					WithDetail(&gitalypb.UserFFBranchError{
 						Error: &gitalypb.UserFFBranchError_CustomHook{
 							CustomHook: &gitalypb.CustomHookError{
@@ -390,13 +370,10 @@ func testUserFFBranchFailingHooks(t *testing.T, ctx context.Context) {
 								Stdout:   []byte("failure\n"),
 							},
 						},
-					}), err)
-				require.Nil(t, resp)
-				return
-			}
-
-			require.Nil(t, err)
-			require.Contains(t, resp.GetPreReceiveError(), "failure")
+					}),
+				err,
+			)
+			require.Nil(t, resp)
 		})
 	}
 }
