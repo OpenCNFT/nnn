@@ -77,8 +77,10 @@ type StorageManager struct {
 	partitions map[storage.PartitionID]*partition
 	// initializingPartitions keeps track of partitions currently being initialized.
 	initializingPartitions sync.WaitGroup
-	// activePartitions keeps track of active partitions.
-	activePartitions sync.WaitGroup
+	// runningPartitionGoroutines keeps track of how many partition running goroutines are still alive.
+	// This is different from the active partitions as the goroutines perform clean up after the partition
+	// is no longer active itself.
+	runningPartitionGoroutines sync.WaitGroup
 	// partitionFactory is a factory to create Partitions.
 	partitionFactory PartitionFactory
 
@@ -160,7 +162,7 @@ func (sm *StorageManager) Close() {
 	sm.mu.Unlock()
 
 	// Wait for all partitions to finish.
-	sm.activePartitions.Wait()
+	sm.runningPartitionGoroutines.Wait()
 
 	if err := sm.partitionAssigner.Close(); err != nil {
 		sm.logger.WithError(err).Error("failed closing partition assigner")
@@ -480,7 +482,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				ptn.Partition = mgr
 
 				sm.metrics.partitionsStarted.Inc()
-				sm.activePartitions.Add(1)
+				sm.runningPartitionGoroutines.Add(1)
 				go func() {
 					if err := mgr.Run(); err != nil {
 						logger.WithError(err).WithField("partition_state_directory", relativeStateDir).Error("partition failed")
@@ -508,7 +510,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 					sm.metrics.partitionsStopped.Inc()
 					close(ptn.closed)
-					sm.activePartitions.Done()
+					sm.runningPartitionGoroutines.Done()
 				}()
 
 				return nil
