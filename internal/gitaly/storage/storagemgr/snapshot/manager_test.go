@@ -395,7 +395,7 @@ gitaly_shared_snapshots_destroyed_total{storage="storage-name"} %d
 			testhelper.RequireDirectoryState(t, workingDir, "", testhelper.DirectoryState{
 				"/": {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 			})
-			require.Empty(t, mgr.sharedSnapshots)
+			require.Empty(t, mgr.activeSharedSnapshots)
 		})
 	}
 }

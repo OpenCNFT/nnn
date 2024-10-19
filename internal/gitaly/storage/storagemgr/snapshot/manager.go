@@ -64,24 +64,25 @@ type Manager struct {
 
 	// mutex covers access to sharedSnapshots.
 	mutex sync.Mutex
-	// sharedSnapshots tracks all of the open shared snapshots.
+	// activeSharedSnapshots tracks all of the open shared snapshots
+	// that are actively used by a transaction.
 	// - The first level key is the LSN when the snapshot was taken.
 	//   Snapshots are only shared if the currentLSN matches the LSN
 	//   when the snapshot was taken.
 	// - The second level key is an ordered list of relative paths
 	//   that are being snapshotted. Snapshots are only shared if they
 	//   are accessing the same set of relative paths.
-	sharedSnapshots map[storage.LSN]map[string]*sharedSnapshot
+	activeSharedSnapshots map[storage.LSN]map[string]*sharedSnapshot
 }
 
 // NewManager returns a new Manager that creates snapshots from storageDir into workingDir.
 func NewManager(logger log.Logger, storageDir, workingDir string, metrics ManagerMetrics) *Manager {
 	return &Manager{
-		logger:          logger.WithField("component", "snapshot_manager"),
-		storageDir:      storageDir,
-		workingDir:      workingDir,
-		sharedSnapshots: make(map[storage.LSN]map[string]*sharedSnapshot),
-		metrics:         metrics,
+		logger:                logger.WithField("component", "snapshot_manager"),
+		storageDir:            storageDir,
+		workingDir:            workingDir,
+		activeSharedSnapshots: make(map[storage.LSN]map[string]*sharedSnapshot),
+		metrics:               metrics,
 	}
 }
 
@@ -131,11 +132,11 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 
 	mgr.mutex.Lock()
 	lsn := mgr.currentLSN
-	if mgr.sharedSnapshots[lsn] == nil {
-		mgr.sharedSnapshots[lsn] = make(map[string]*sharedSnapshot)
+	if mgr.activeSharedSnapshots[lsn] == nil {
+		mgr.activeSharedSnapshots[lsn] = make(map[string]*sharedSnapshot)
 	}
 
-	wrapper, ok := mgr.sharedSnapshots[lsn][key]
+	wrapper, ok := mgr.activeSharedSnapshots[lsn][key]
 	if !ok {
 		// If there isn't a snapshot yet, create the synchronization
 		// state to ensure other goroutines won't concurrently create
@@ -147,7 +148,7 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		// snapshotted. The goroutines waiting for this snapshot
 		// wait on the `ready` channel.
 		wrapper = &sharedSnapshot{ready: make(chan struct{})}
-		mgr.sharedSnapshots[lsn][key] = wrapper
+		mgr.activeSharedSnapshots[lsn][key] = wrapper
 	}
 	// Increment the reference counter to record that we are using
 	// the snapshot.
@@ -163,12 +164,12 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		wrapper.referenceCount--
 		if wrapper.referenceCount == 0 {
 			// If we were the last user of the snapshot, remove it.
-			delete(mgr.sharedSnapshots[lsn], key)
+			delete(mgr.activeSharedSnapshots[lsn], key)
 
 			// If this was the last snapshot on the given LSN, also
 			// clear the LSNs entry.
-			if len(mgr.sharedSnapshots[lsn]) == 0 {
-				delete(mgr.sharedSnapshots, lsn)
+			if len(mgr.activeSharedSnapshots[lsn]) == 0 {
+				delete(mgr.activeSharedSnapshots, lsn)
 			}
 
 			// We need to remove the file system state of the snapshot
