@@ -73,8 +73,9 @@ type StorageManager struct {
 	database keyvalue.Store
 	// partitionAssigner manages partition assignments of repositories.
 	partitionAssigner *partitionAssigner
-	// partitions contains all the active partitions. Each repository can have up to one partition.
-	partitions map[storage.PartitionID]*partition
+	// activePartitions contains all the active partitions. Active partitions are partitions that have
+	// one or more open handles to them.
+	activePartitions map[storage.PartitionID]*partition
 	// initializingPartitions keeps track of partitions currently being initialized.
 	initializingPartitions sync.WaitGroup
 	// runningPartitionGoroutines keeps track of how many partition running goroutines are still alive.
@@ -133,7 +134,7 @@ func NewStorageManager(
 		stagingDirectory:  stagingDir,
 		database:          db,
 		partitionAssigner: pa,
-		partitions:        map[storage.PartitionID]*partition{},
+		activePartitions:  map[storage.PartitionID]*partition{},
 		partitionFactory:  partitionFactory,
 		metrics:           metrics.storageManagerMetrics(name),
 		syncer:            safe.NewSyncer(),
@@ -156,7 +157,7 @@ func (sm *StorageManager) Close() {
 	// Close all currently active partitions. No more partitions can be added to the list
 	// as we set closed in the earlier lock block.
 	sm.mu.Lock()
-	for _, ptn := range sm.partitions {
+	for _, ptn := range sm.activePartitions {
 		ptn.close()
 	}
 	sm.mu.Unlock()
@@ -418,7 +419,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			return nil, ErrPartitionManagerClosed
 		}
 
-		ptn, ok := sm.partitions[partitionID]
+		ptn, ok := sm.activePartitions[partitionID]
 		if !ok {
 			sm.initializingPartitions.Add(1)
 			// The partition isn't running yet so we're responsible for setting it up.
@@ -433,12 +434,12 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					managerFinished: make(chan struct{}),
 					referenceCount:  1,
 				}
-				sm.partitions[partitionID] = ptn
+				sm.activePartitions[partitionID] = ptn
 				sm.mu.Unlock()
 
 				removePartition := func() {
 					sm.mu.Lock()
-					delete(sm.partitions, partitionID)
+					delete(sm.activePartitions, partitionID)
 					sm.mu.Unlock()
 				}
 

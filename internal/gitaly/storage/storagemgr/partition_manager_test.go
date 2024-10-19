@@ -154,7 +154,7 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 
 	var waitFor []chan struct{}
 	mgr.mu.Lock()
-	for _, ptn := range mgr.partitions {
+	for _, ptn := range mgr.activePartitions {
 		// The closePartition step closes the transaction manager directly without calling close
 		// on the partition, so we check the manager directly here as well.
 		if ptn.isClosing() || ptn.Partition.(*mockPartition).closeCalled.Load() {
@@ -179,7 +179,7 @@ func checkExpectedState(t *testing.T, mgr *StorageManager, expectedState map[sto
 	t.Helper()
 
 	actualState := map[storage.PartitionID]uint{}
-	for ptnID, partition := range mgr.partitions {
+	for ptnID, partition := range mgr.activePartitions {
 		actualState[ptnID] = partition.referenceCount
 	}
 
@@ -920,7 +920,7 @@ func TestStorageManager(t *testing.T) {
 					ptnID, err := storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, "", false)
 					require.NoError(t, err)
 
-					ptn := storageMgr.partitions[ptnID]
+					ptn := storageMgr.activePartitions[ptnID]
 					storageMgr.mu.Unlock()
 
 					openTransactionData[step.transactionID] = &transactionData{
@@ -1082,7 +1082,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	}()
 
 	// The Partition may return if it errors out.
-	txMgr := storageMgr.partitions[2].Partition
+	txMgr := storageMgr.activePartitions[2].Partition
 	go func() {
 		defer wg.Done()
 		<-start
@@ -1272,7 +1272,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 	// on the partition to reflect the other pending partition handle retrieval.
 	for {
 		mgr.mu.Lock()
-		refCount := mgr.partitions[1].referenceCount
+		refCount := mgr.activePartitions[1].referenceCount
 		mgr.mu.Unlock()
 
 		if refCount == 2 {
@@ -1419,9 +1419,9 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 		3: 1,
 	})
 
-	require.Nil(t, mgr.partitions[1].Partition)
-	require.Nil(t, mgr.partitions[2].Partition)
-	require.NotNil(t, mgr.partitions[3].Partition)
+	require.Nil(t, mgr.activePartitions[1].Partition)
+	require.Nil(t, mgr.activePartitions[2].Partition)
+	require.NotNil(t, mgr.activePartitions[3].Partition)
 
 	// The Close() is still waiting for the ongoing initializations to finish.
 	select {
