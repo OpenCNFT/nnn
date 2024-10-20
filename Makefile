@@ -108,7 +108,7 @@ ifeq ($(origin PROTOC_BUILD_OPTIONS),undefined)
 endif
 
 # Git target
-GIT_REPO_URL       ?= https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/gitlab-org/security/git.git
+GIT_REPO_URL       ?= https://gitlab.com/gitlab-org/git.git
 GIT_QUIET          :=
 ifeq (${Q},@)
     GIT_QUIET = --quiet
@@ -137,7 +137,7 @@ GIT_VERSION ?=
 # major version is added, be sure to update GIT_PACKED_EXECUTABLES, the *-bundled-git targets,
 # and add new targets under the "# These targets build specific releases of Git." section.
 GIT_VERSION_2_46 ?= v2.46.2
-GIT_VERSION_2_47 ?= v2.47.0-rc1
+GIT_VERSION_2_47 ?= v2.47.0
 #
 # OVERRIDE_GIT_VERSION allows you to specify a custom semver value to be reported by the
 # `git --version` command. This affects bundled and non-bundled Git, and can be used whenever
