@@ -7,7 +7,7 @@ toolchain go1.22.6
 require (
 	github.com/golangci/golangci-lint v1.61.0
 	github.com/mitchellh/mapstructure v1.5.0
-	golang.org/x/tools v0.24.0
+	golang.org/x/tools v0.25.0
 )
 
 require (
