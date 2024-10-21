@@ -1134,8 +1134,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.Commit", nil)
 	defer span.Finish()
 
-	transaction.result = make(resultChannel, 1)
-
 	if transaction.repositoryTarget() && !transaction.repositoryExists {
 		// Determine if the repository was created in this transaction and stage its state
 		// for committing if so.
@@ -1148,6 +1146,43 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("stage repository creation: %w", err)
 		}
 	}
+
+	if err := mgr.prepareCommit(ctx, transaction); err != nil {
+		return err
+	}
+
+	if err := func() error {
+		defer trace.StartRegion(ctx, "commit queue").End()
+		transaction.metrics.commitQueueDepth.Inc()
+		defer transaction.metrics.commitQueueDepth.Dec()
+		defer prometheus.NewTimer(mgr.metrics.commitQueueWaitSeconds).ObserveDuration()
+
+		select {
+		case mgr.admissionQueue <- transaction:
+			transaction.admitted = true
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-mgr.closing:
+			return storage.ErrTransactionProcessingStopped
+		}
+	}(); err != nil {
+		return err
+	}
+
+	defer trace.StartRegion(ctx, "result wait").End()
+	select {
+	case err := <-transaction.result:
+		return unwrapExpectedError(err)
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-mgr.closed:
+		return storage.ErrTransactionProcessingStopped
+	}
+}
+
+func (mgr *TransactionManager) prepareCommit(ctx context.Context, transaction *Transaction) error {
+	transaction.result = make(resultChannel, 1)
 
 	// Create a directory to store all staging files.
 	if err := os.Mkdir(transaction.walFilesPath(), mode.Directory); err != nil {
@@ -1270,34 +1305,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 	}
 
-	if err := func() error {
-		defer trace.StartRegion(ctx, "commit queue").End()
-		transaction.metrics.commitQueueDepth.Inc()
-		defer transaction.metrics.commitQueueDepth.Dec()
-		defer prometheus.NewTimer(mgr.metrics.commitQueueWaitSeconds).ObserveDuration()
-
-		select {
-		case mgr.admissionQueue <- transaction:
-			transaction.admitted = true
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-mgr.closing:
-			return storage.ErrTransactionProcessingStopped
-		}
-	}(); err != nil {
-		return err
-	}
-
-	defer trace.StartRegion(ctx, "result wait").End()
-	select {
-	case err := <-transaction.result:
-		return unwrapExpectedError(err)
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-mgr.closed:
-		return storage.ErrTransactionProcessingStopped
-	}
+	return nil
 }
 
 // replaceObjectDirectory replaces the snapshot repository's object directory
@@ -2247,87 +2255,13 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.processTransaction", nil)
 	defer span.Finish()
 
-	if err := func() (commitErr error) {
-		repositoryExists, err := mgr.doesRepositoryExist(ctx, transaction.relativePath)
+	if err := func() error {
+		logEntry, logEntryPath, err := mgr.packageLogEntry(ctx, transaction)
 		if err != nil {
-			return fmt.Errorf("does repository exist: %w", err)
+			return err
 		}
 
-		logEntry := &gitalypb.LogEntry{
-			RelativePath: transaction.relativePath,
-		}
-
-		if transaction.repositoryCreation != nil && repositoryExists {
-			return ErrRepositoryAlreadyExists
-		} else if transaction.repositoryCreation == nil && !repositoryExists {
-			return storage.ErrRepositoryNotFound
-		}
-
-		alternateRelativePath, err := mgr.verifyAlternateUpdate(ctx, transaction)
-		if err != nil {
-			return fmt.Errorf("verify alternate update: %w", err)
-		}
-
-		if err := mgr.setupStagingRepository(ctx, transaction, alternateRelativePath); err != nil {
-			return fmt.Errorf("setup staging snapshot: %w", err)
-		}
-
-		// Verify that all objects this transaction depends on are present in the repository. The dependency
-		// objects are the reference tips set in the transaction and the objects the transaction's packfile
-		// is based on. If an object dependency is missing, the transaction is aborted as applying it would
-		// result in repository corruption.
-		if err := mgr.verifyObjectsExist(ctx, transaction.stagingRepository, transaction.objectDependencies); err != nil {
-			return fmt.Errorf("verify object dependencies: %w", err)
-		}
-
-		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
-			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
-			if err != nil {
-				return fmt.Errorf("verify references: %w", err)
-			}
-		}
-
-		if transaction.customHooksUpdated {
-			// Log a deletion of the existing custom hooks so they are removed before the
-			// new ones are put in place.
-			if err := transaction.walEntry.RecordDirectoryRemoval(
-				mgr.storagePath,
-				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record custom hook removal: %w", err)
-			}
-		}
-
-		if transaction.deleteRepository {
-			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
-
-			if err := transaction.walEntry.RecordDirectoryRemoval(
-				mgr.storagePath,
-				transaction.relativePath,
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record repository removal: %w", err)
-			}
-
-			if err := transaction.KV().Delete(relativePathKey(transaction.relativePath)); err != nil {
-				return fmt.Errorf("delete relative path: %w", err)
-			}
-		}
-
-		if transaction.runHousekeeping != nil {
-			housekeepingEntry, err := mgr.verifyHousekeeping(ctx, transaction)
-			if err != nil {
-				return fmt.Errorf("verifying pack refs: %w", err)
-			}
-			logEntry.Housekeeping = housekeepingEntry
-		}
-
-		if err := mgr.verifyKeyValueOperations(ctx, transaction); err != nil {
-			return fmt.Errorf("verify key-value operations: %w", err)
-		}
-
-		logEntry.Operations = transaction.walEntry.Operations()
-
-		return mgr.proposeLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath())
+		return mgr.proposeLogEntry(ctx, transaction.objectDependencies, logEntry, logEntryPath)
 	}(); err != nil {
 		transaction.result <- err
 		return nil
@@ -2336,6 +2270,89 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 	mgr.awaitingTransactions[mgr.committedLSN] = transaction.result
 
 	return nil
+}
+
+// packageLogEntry verifies the transaction and packaged its content to respective log entry.
+func (mgr *TransactionManager) packageLogEntry(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry, string, error) {
+	repositoryExists, err := mgr.doesRepositoryExist(ctx, transaction.relativePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("does repository exist: %w", err)
+	}
+
+	logEntry := &gitalypb.LogEntry{
+		RelativePath: transaction.relativePath,
+	}
+
+	if transaction.repositoryCreation != nil && repositoryExists {
+		return nil, "", ErrRepositoryAlreadyExists
+	} else if transaction.repositoryCreation == nil && !repositoryExists {
+		return nil, "", storage.ErrRepositoryNotFound
+	}
+
+	alternateRelativePath, err := mgr.verifyAlternateUpdate(ctx, transaction)
+	if err != nil {
+		return nil, "", fmt.Errorf("verify alternate update: %w", err)
+	}
+
+	if err := mgr.setupStagingRepository(ctx, transaction, alternateRelativePath); err != nil {
+		return nil, "", fmt.Errorf("setup staging snapshot: %w", err)
+	}
+
+	// Verify that all objects this transaction depends on are present in the repository. The dependency
+	// objects are the reference tips set in the transaction and the objects the transaction's packfile
+	// is based on. If an object dependency is missing, the transaction is aborted as applying it would
+	// result in repository corruption.
+	if err := mgr.verifyObjectsExist(ctx, transaction.stagingRepository, transaction.objectDependencies); err != nil {
+		return nil, "", fmt.Errorf("verify object dependencies: %w", err)
+	}
+
+	if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
+		logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
+		if err != nil {
+			return nil, "", fmt.Errorf("verify references: %w", err)
+		}
+	}
+
+	if transaction.customHooksUpdated {
+		// Log a deletion of the existing custom hooks so they are removed before the
+		// new ones are put in place.
+		if err := transaction.walEntry.RecordDirectoryRemoval(
+			mgr.storagePath,
+			filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
+		); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, "", fmt.Errorf("record custom hook removal: %w", err)
+		}
+	}
+
+	if transaction.deleteRepository {
+		logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
+
+		if err := transaction.walEntry.RecordDirectoryRemoval(
+			mgr.storagePath,
+			transaction.relativePath,
+		); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, "", fmt.Errorf("record repository removal: %w", err)
+		}
+
+		if err := transaction.KV().Delete(relativePathKey(transaction.relativePath)); err != nil {
+			return nil, "", fmt.Errorf("delete relative path: %w", err)
+		}
+	}
+
+	if transaction.runHousekeeping != nil {
+		housekeepingEntry, err := mgr.verifyHousekeeping(ctx, transaction)
+		if err != nil {
+			return nil, "", fmt.Errorf("verifying pack refs: %w", err)
+		}
+		logEntry.Housekeeping = housekeepingEntry
+	}
+
+	if err := mgr.verifyKeyValueOperations(ctx, transaction); err != nil {
+		return nil, "", fmt.Errorf("verify key-value operations: %w", err)
+	}
+
+	logEntry.Operations = transaction.walEntry.Operations()
+	return logEntry, transaction.walFilesPath(), nil
 }
 
 // verifyKeyValueOperations checks the key-value operations of the transaction for conflicts and includes
