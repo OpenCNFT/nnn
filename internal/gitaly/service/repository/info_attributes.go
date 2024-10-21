@@ -19,19 +19,6 @@ func (s *server) GetInfoAttributes(in *gitalypb.GetInfoAttributesRequest, stream
 	if err := s.locator.ValidateRepository(ctx, repository); err != nil {
 		return structerr.NewInvalidArgument("%w", err)
 	}
-	repoPath, err := s.locator.GetRepoPath(ctx, repository)
-	if err != nil {
-		return err
-	}
-
-	// In git 2.43.0+, gitattributes supports reading from HEAD:.gitattributes,
-	// so info/attributes is no longer needed. To make sure info/attributes file is cleaned up,
-	// we delete it if it exists when reading from HEAD:.gitattributes is called.
-	// This logic can be removed when ApplyGitattributes and GetInfoAttributes PRC are totally removed from
-	// the code base.
-	if deletionErr := deleteInfoAttributesFile(repoPath); deletionErr != nil {
-		return structerr.NewInternal("delete info/gitattributes file: %w", deletionErr).WithMetadata("path", repoPath)
-	}
 
 	repo := s.localrepo(in.GetRepository())
 	var stderr strings.Builder

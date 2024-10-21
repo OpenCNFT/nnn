@@ -62,10 +62,6 @@ var repositoryCreatingRPCs = map[string]struct{}{
 // forceExclusiveSnapshot forces the RPCs to use an exclusive snapshot. This is a temporary
 // workaround for some RPCs that do not work well with shared read-only snapshots yet.
 var forceExclusiveSnapshot = map[string]bool{
-	// GetInfoAttributes is a read-only RPC that is performing a write if there
-	// is an 'info/attributes' file in the repository. This is related to
-	// migrating old state.
-	gitalypb.RepositoryService_GetInfoAttributes_FullMethodName: true,
 	// CommitLanguages is a read-only RPC that is performing write if the cache
 	// containing the language statistics is outdated.
 	gitalypb.CommitService_CommitLanguages_FullMethodName: true,
