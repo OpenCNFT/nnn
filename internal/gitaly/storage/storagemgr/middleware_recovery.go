@@ -171,8 +171,9 @@ func (mw *TransactionRecoveryMiddleware) applyPendingWAL(ctx context.Context, me
 	// Start a transaction against the repository. The partition's WAL is applied before beginning
 	// transactions which ensures the WAL is fully applied.
 	tx, err := storageHandle.Begin(ctx, storage.TransactionOptions{
-		ReadOnly:     true,
-		RelativePath: targetRepo.GetRelativePath(),
+		ReadOnly:               true,
+		RelativePath:           targetRepo.GetRelativePath(),
+		ForceExclusiveSnapshot: true,
 	})
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
