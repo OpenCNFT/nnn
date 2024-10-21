@@ -1215,6 +1215,11 @@ func TestStorageManager(t *testing.T) {
 				partitionFactory = newStubPartitionFactory()
 			}
 
+			maxInactivePartitions := DefaultMaxInactivePartitions
+			if tc.maxInactivePartitions > 0 {
+				maxInactivePartitions = tc.maxInactivePartitions
+			}
+
 			metrics := NewMetrics(cfg.Prometheus)
 			storageMgr, err := NewStorageManager(
 				logger,
@@ -1222,6 +1227,7 @@ func TestStorageManager(t *testing.T) {
 				cfg.Storages[0].Path,
 				dbMgr,
 				partitionFactory,
+				maxInactivePartitions,
 				metrics,
 			)
 			require.NoError(t, err)
@@ -1362,7 +1368,7 @@ func TestStorageManager_getPartition(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
+	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), DefaultMaxInactivePartitions, NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer mgr.Close()
 
@@ -1430,7 +1436,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), DefaultMaxInactivePartitions, NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
@@ -1488,6 +1494,7 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
+		DefaultMaxInactivePartitions,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)
@@ -1600,6 +1607,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
+		DefaultMaxInactivePartitions,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)
@@ -1713,6 +1721,7 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
+		DefaultMaxInactivePartitions,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)

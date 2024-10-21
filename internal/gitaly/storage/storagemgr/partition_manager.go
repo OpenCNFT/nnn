@@ -26,6 +26,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
+// DefaultMaxInactivePartitions is the default number of inactive partitions to keep on standby.
+var DefaultMaxInactivePartitions = 100
+
 // ErrPartitionManagerClosed is returned when the PartitionManager stops processing transactions.
 var ErrPartitionManagerClosed = errors.New("partition manager closed")
 
@@ -113,6 +116,7 @@ func NewStorageManager(
 	path string,
 	dbMgr *databasemgr.DBManager,
 	partitionFactory PartitionFactory,
+	maxInactivePartitions int,
 	metrics *Metrics,
 ) (*StorageManager, error) {
 	internalDir := internalDirectoryPath(path)
@@ -138,7 +142,6 @@ func NewStorageManager(
 		return nil, fmt.Errorf("new partition assigner: %w", err)
 	}
 
-	const maxInactivePartitions = 100
 	cache, err := lru.New[storage.PartitionID, *partition](maxInactivePartitions)
 	if err != nil {
 		return nil, fmt.Errorf("new lru: %w", err)

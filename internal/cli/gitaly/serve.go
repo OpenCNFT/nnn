@@ -413,6 +413,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 					partitionMetrics,
 					logConsumer,
 				),
+				2,
 				storageMetrics,
 			),
 		)
@@ -457,6 +458,9 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 						partitionMetrics,
 						nil,
 					),
+					// In recovery mode we don't want to keep inactive partitions active. The cache
+					// however can't be disabled so simply set it to one.
+					1,
 					storageMetrics,
 				),
 			)

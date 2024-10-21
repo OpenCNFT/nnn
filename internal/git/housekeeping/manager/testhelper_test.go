@@ -112,6 +112,7 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 						),
 						nil,
 					),
+					storagemgr.DefaultMaxInactivePartitions,
 					storagemgr.NewMetrics(cfg.Prometheus),
 				),
 			)

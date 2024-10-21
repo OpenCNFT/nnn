@@ -432,6 +432,7 @@ func testWithAndWithoutTransaction(t *testing.T, testFunc func(*testing.T, confi
 					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
 					nil,
 				),
+				storagemgr.DefaultMaxInactivePartitions,
 				storagemgr.NewMetrics(cfg.Prometheus),
 			),
 		)
