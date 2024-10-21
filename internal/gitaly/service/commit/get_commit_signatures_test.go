@@ -56,29 +56,25 @@ func TestGetCommitSignatures(t *testing.T) {
 }
 
 func testGetCommitSignatures(t *testing.T, ctx context.Context) {
-	cfg := testcfg.Build(t)
-	testcfg.BuildGitalyGPG(t, cfg)
-
-	cfg.Git.SigningKey = filepath.Join(testhelper.TestdataAbsolutePath(t), "signing_ssh_key_ed25519")
-	cfg.Git.RotatedSigningKeys = []string{filepath.Join(testhelper.TestdataAbsolutePath(t), "signing_ssh_key_rsa")}
-	cfg.SocketPath = startTestServices(t, cfg)
-	client := newCommitServiceClient(t, cfg.SocketPath)
-
-	repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
-
 	type setupData struct {
 		request           *gitalypb.GetCommitSignaturesRequest
 		expectedErr       error
 		expectedResponses []*gitalypb.GetCommitSignaturesResponse
 	}
 
+	type TestData struct {
+		cfg       config.Cfg
+		repoProto *gitalypb.Repository
+		repoPath  string
+	}
+
 	for _, tc := range []struct {
 		desc  string
-		setup func(t *testing.T) setupData
+		setup func(t *testing.T, data TestData) setupData
 	}{
 		{
 			desc: "unset repository",
-			setup: func(t *testing.T) setupData {
+			setup: func(t *testing.T, data TestData) setupData {
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
 						Repository: nil,
@@ -90,10 +86,10 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "unset commit IDs",
-			setup: func(t *testing.T) setupData {
+			setup: func(t *testing.T, data TestData) setupData {
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds:  []string{},
 					},
 					expectedErr: status.Error(codes.InvalidArgument, "empty CommitIds"),
@@ -102,10 +98,10 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "abbreviated commit ID",
-			setup: func(t *testing.T) setupData {
+			setup: func(t *testing.T, data TestData) setupData {
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							gittest.DefaultObjectHash.HashData([]byte("pseudo commit")).String(),
 							"a17a9f6",
@@ -117,10 +113,10 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "nonexistent commit",
-			setup: func(t *testing.T) setupData {
+			setup: func(t *testing.T, data TestData) setupData {
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							gittest.DefaultObjectHash.HashData([]byte("nonexistent commit")).String(),
 						},
@@ -130,12 +126,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "unsigned commit",
-			setup: func(t *testing.T) setupData {
-				commitID := gittest.WriteCommit(t, cfg, repoPath)
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID := gittest.WriteCommit(t, data.cfg, data.repoPath)
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -145,12 +141,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "PGP-signed commit",
-			setup: func(t *testing.T) setupData {
-				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig", pgpSignature, "Signed commit message\n")
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, commitData := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig", pgpSignature, "Signed commit message\n")
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -171,12 +167,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "PGP-signed commit with message lacking newline",
-			setup: func(t *testing.T) setupData {
-				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig", pgpSignature, "Signed commit message")
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, commitData := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig", pgpSignature, "Signed commit message")
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -197,12 +193,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "PGP-signed commit with huge commit message",
-			setup: func(t *testing.T) setupData {
-				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig", pgpSignature, strings.Repeat("a", 5*1024*1024))
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, commitData := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig", pgpSignature, strings.Repeat("a", 5*1024*1024))
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -223,12 +219,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "SSH-signed commit",
-			setup: func(t *testing.T) setupData {
-				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig", sshSignature, "SSH-signed commit message\n")
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, commitData := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig", sshSignature, "SSH-signed commit message\n")
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -249,12 +245,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "garbage-signed commit",
-			setup: func(t *testing.T) setupData {
-				commitID, _ := createCommitWithSignature(t, cfg, repoPath, "gpgsig-garbage", sshSignature, "garbage-signed commit message")
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, _ := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig-garbage", sshSignature, "garbage-signed commit message")
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -264,12 +260,12 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "SHA256-signed commit",
-			setup: func(t *testing.T) setupData {
-				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig-sha256", sshSignature, "sha256-signed commit message")
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, commitData := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig-sha256", sshSignature, "sha256-signed commit message")
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -290,10 +286,10 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "signed by Gitaly",
-			setup: func(t *testing.T) setupData {
-				repo := localrepo.NewTestRepo(t, cfg, repoProto)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo := localrepo.NewTestRepo(t, data.cfg, data.repoProto)
 
-				blobID := gittest.WriteBlob(t, cfg, repoPath, []byte("updated"))
+				blobID := gittest.WriteBlob(t, data.cfg, data.repoPath, []byte("updated"))
 
 				tree := &localrepo.TreeEntry{
 					Type: localrepo.Tree,
@@ -313,7 +309,7 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 					AuthorDate:     gittest.DefaultCommitTime,
 					CommitterDate:  gittest.DefaultCommitTime,
 					Message:        "message",
-					GitConfig:      cfg.Git,
+					GitConfig:      data.cfg.Git,
 					Sign:           featureflag.GPGSigning.IsEnabled(ctx),
 				})
 				require.NoError(t, err)
@@ -328,7 +324,7 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 					CommitterDate:  gittest.DefaultCommitTime,
 					Message:        "rotated key commit message",
 					GitConfig: config.Git{
-						SigningKey: cfg.Git.RotatedSigningKeys[0],
+						SigningKey: data.cfg.Git.RotatedSigningKeys[0],
 					},
 					Sign: featureflag.GPGSigning.IsEnabled(ctx),
 				})
@@ -341,7 +337,7 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 							rotatedKeyCommitID.String(),
@@ -391,17 +387,17 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "commit signed before mailmap entry",
-			setup: func(t *testing.T) setupData {
-				commitID, commitData := createCommitWithSignature(t, cfg, repoPath, "gpgsig", pgpSignature, "Signed commit message\n")
+			setup: func(t *testing.T, data TestData) setupData {
+				commitID, commitData := createCommitWithSignature(t, data.cfg, data.repoPath, "gpgsig", pgpSignature, "Signed commit message\n")
 
 				mailmapContents := "A U Thor <author@example.com> Bug Fixer <bugfixer@email.com>"
-				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				gittest.WriteCommit(t, data.cfg, data.repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{Path: ".mailmap", Mode: "100644", Content: mailmapContents},
 				), gittest.WithBranch("main"))
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -422,10 +418,10 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "commit signed by gitaly before mailmap entry",
-			setup: func(t *testing.T) setupData {
-				repo := localrepo.NewTestRepo(t, cfg, repoProto)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo := localrepo.NewTestRepo(t, data.cfg, data.repoProto)
 
-				blobID := gittest.WriteBlob(t, cfg, repoPath, []byte("updated"))
+				blobID := gittest.WriteBlob(t, data.cfg, data.repoPath, []byte("updated"))
 
 				tree := &localrepo.TreeEntry{
 					Type: localrepo.Tree,
@@ -445,13 +441,13 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 					AuthorDate:     gittest.DefaultCommitTime,
 					CommitterDate:  gittest.DefaultCommitTime,
 					Message:        "message",
-					GitConfig:      cfg.Git,
+					GitConfig:      data.cfg.Git,
 					Sign:           featureflag.GPGSigning.IsEnabled(ctx),
 				})
 				require.NoError(t, err)
 
 				mailmapContents := "A U Thor <author@example.com> Scrooge McDuck <scrooge@mcduck.com>"
-				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				gittest.WriteCommit(t, data.cfg, data.repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{Path: ".mailmap", Mode: "100644", Content: mailmapContents},
 				), gittest.WithBranch("main"))
 
@@ -460,7 +456,7 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 
 				return setupData{
 					request: &gitalypb.GetCommitSignaturesRequest{
-						Repository: repoProto,
+						Repository: data.repoProto,
 						CommitIds: []string{
 							commitID.String(),
 						},
@@ -492,7 +488,23 @@ func testGetCommitSignatures(t *testing.T, ctx context.Context) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			setup := tc.setup(t)
+			t.Parallel()
+
+			cfg := testcfg.Build(t)
+			testcfg.BuildGitalyGPG(t, cfg)
+
+			cfg.Git.SigningKey = filepath.Join(testhelper.TestdataAbsolutePath(t), "signing_ssh_key_ed25519")
+			cfg.Git.RotatedSigningKeys = []string{filepath.Join(testhelper.TestdataAbsolutePath(t), "signing_ssh_key_rsa")}
+			cfg.SocketPath = startTestServices(t, cfg)
+			client := newCommitServiceClient(t, cfg.SocketPath)
+
+			repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+			setup := tc.setup(t, TestData{
+				cfg:       cfg,
+				repoProto: repoProto,
+				repoPath:  repoPath,
+			})
 
 			stream, err := client.GetCommitSignatures(ctx, setup.request)
 			require.NoError(t, err)

@@ -491,6 +491,8 @@ func TestConfirmReplication(t *testing.T) {
 		SkipCreationViaService: true,
 	})
 
+	differentCommitID := gittest.WriteCommit(t, cfg, testRepoAPath)
+
 	srvSocketPath := testserver.RunGitalyServer(t, cfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
 	testRepoB, _ := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -509,7 +511,15 @@ func TestConfirmReplication(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, equal)
 
-	gittest.WriteCommit(t, cfg, testRepoAPath, gittest.WithBranch("master"))
+	// gitaly-hooks is required for the reference update to be committed with transactions.
+	testcfg.BuildGitalyHooks(t, cfg)
+	resp, err := gitalypb.NewRepositoryServiceClient(conn).WriteRef(ctx, &gitalypb.WriteRefRequest{
+		Repository: testRepoA,
+		Ref:        []byte("refs/heads/master"),
+		Revision:   []byte(differentCommitID),
+	})
+	require.NoError(t, err)
+	testhelper.ProtoEqual(t, &gitalypb.WriteRefResponse{}, resp)
 
 	equal, err = confirmChecksums(ctx, testhelper.SharedLogger(t), gitalypb.NewRepositoryServiceClient(conn), gitalypb.NewRepositoryServiceClient(conn), testRepoA, testRepoB)
 	require.NoError(t, err)

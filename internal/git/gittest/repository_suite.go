@@ -7,20 +7,30 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
+// RepositorySuiteState is the state used by TestRepository.
+type RepositorySuiteState struct {
+	Repository         gitcmd.Repository
+	SetReference       SetReferenceFunc
+	FirstParentCommit  git.ObjectID
+	SecondParentCommit git.ObjectID
+	ChildCommit        git.ObjectID
+}
+
 // GetRepositoryFunc is used to get a clean test repository for the different implementations of the
 // Repository interface in the common test suite TestRepository.
-type GetRepositoryFunc func(t testing.TB, ctx context.Context) (gitcmd.Repository, string)
+type GetRepositoryFunc func(t testing.TB, ctx context.Context) RepositorySuiteState
+
+// SetReferenceFunc sets the given reference to the given value.
+type SetReferenceFunc func(t testing.TB, ctx context.Context, name git.ReferenceName, oid git.ObjectID)
 
 // TestRepository tests an implementation of Repository.
-func TestRepository(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFunc) {
+func TestRepository(t *testing.T, getRepository GetRepositoryFunc) {
 	for _, tc := range []struct {
 		desc string
-		test func(*testing.T, config.Cfg, GetRepositoryFunc)
+		test func(*testing.T, GetRepositoryFunc)
 	}{
 		{
 			desc: "ResolveRevision",
@@ -40,19 +50,16 @@ func TestRepository(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFun
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			tc.test(t, cfg, getRepository)
+			tc.test(t, getRepository)
 		})
 	}
 }
 
-func testRepositoryResolveRevision(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFunc) {
+func testRepositoryResolveRevision(t *testing.T, getRepository GetRepositoryFunc) {
 	ctx := testhelper.Context(t)
 
-	repo, repoPath := getRepository(t, ctx)
-
-	firstParentCommitID := WriteCommit(t, cfg, repoPath, WithMessage("first parent"))
-	secondParentCommitID := WriteCommit(t, cfg, repoPath, WithMessage("second parent"))
-	masterCommitID := WriteCommit(t, cfg, repoPath, WithBranch("master"), WithParents(firstParentCommitID, secondParentCommitID))
+	state := getRepository(t, ctx)
+	state.SetReference(t, ctx, "refs/heads/master", state.ChildCommit)
 
 	for _, tc := range []struct {
 		desc     string
@@ -62,22 +69,22 @@ func testRepositoryResolveRevision(t *testing.T, cfg config.Cfg, getRepository G
 		{
 			desc:     "unqualified master branch",
 			revision: "master",
-			expected: masterCommitID,
+			expected: state.ChildCommit,
 		},
 		{
 			desc:     "fully qualified master branch",
 			revision: "refs/heads/master",
-			expected: masterCommitID,
+			expected: state.ChildCommit,
 		},
 		{
 			desc:     "typed commit",
 			revision: "refs/heads/master^{commit}",
-			expected: masterCommitID,
+			expected: state.ChildCommit,
 		},
 		{
 			desc:     "extended SHA notation",
 			revision: "refs/heads/master^2",
-			expected: secondParentCommitID,
+			expected: state.SecondParentCommit,
 		},
 		{
 			desc:     "nonexistent branch",
@@ -89,7 +96,7 @@ func testRepositoryResolveRevision(t *testing.T, cfg config.Cfg, getRepository G
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			oid, err := repo.ResolveRevision(ctx, git.Revision(tc.revision))
+			oid, err := state.Repository.ResolveRevision(ctx, git.Revision(tc.revision))
 			if tc.expected == "" {
 				require.Equal(t, err, git.ErrReferenceNotFound)
 				return
@@ -101,27 +108,25 @@ func testRepositoryResolveRevision(t *testing.T, cfg config.Cfg, getRepository G
 	}
 }
 
-func testRepositoryHasBranches(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFunc) {
+func testRepositoryHasBranches(t *testing.T, getRepository GetRepositoryFunc) {
 	ctx := testhelper.Context(t)
 
-	repo, repoPath := getRepository(t, ctx)
+	state := getRepository(t, ctx)
 
-	emptyCommit := text.ChompBytes(Exec(t, cfg, "-C", repoPath, "commit-tree", DefaultObjectHash.EmptyTreeOID.String()))
+	state.SetReference(t, ctx, "refs/headsbranch", state.ChildCommit)
 
-	Exec(t, cfg, "-C", repoPath, "update-ref", "refs/headsbranch", emptyCommit)
-
-	hasBranches, err := repo.HasBranches(ctx)
+	hasBranches, err := state.Repository.HasBranches(ctx)
 	require.NoError(t, err)
 	require.False(t, hasBranches)
 
-	Exec(t, cfg, "-C", repoPath, "update-ref", "refs/heads/branch", emptyCommit)
+	state.SetReference(t, ctx, "refs/heads/branch", state.ChildCommit)
 
-	hasBranches, err = repo.HasBranches(ctx)
+	hasBranches, err = state.Repository.HasBranches(ctx)
 	require.NoError(t, err)
 	require.True(t, hasBranches)
 }
 
-func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFunc) {
+func testRepositoryGetDefaultBranch(t *testing.T, getRepository GetRepositoryFunc) {
 	ctx := testhelper.Context(t)
 
 	for _, tc := range []struct {
@@ -132,58 +137,53 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 		{
 			desc: "default ref",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				oid := WriteCommit(t, cfg, repoPath, WithBranch("apple"))
-				WriteCommit(t, cfg, repoPath, WithParents(oid), WithBranch("main"))
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "refs/heads/main", state.ChildCommit)
+				return state.Repository
 			},
 			expectedName: git.DefaultRef,
 		},
 		{
 			desc: "legacy default ref",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				oid := WriteCommit(t, cfg, repoPath, WithBranch("apple"))
-				WriteCommit(t, cfg, repoPath, WithParents(oid), WithBranch("master"))
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "refs/heads/master", state.ChildCommit)
+				return state.Repository
 			},
 			expectedName: git.LegacyDefaultRef,
 		},
 		{
 			desc: "no branches",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, _ := getRepository(t, ctx)
-				return repo
+				return getRepository(t, ctx).Repository
 			},
 		},
 		{
 			desc: "one branch",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				WriteCommit(t, cfg, repoPath, WithBranch("apple"))
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "refs/heads/apple", state.ChildCommit)
+				return state.Repository
 			},
 			expectedName: git.NewReferenceNameFromBranchName("apple"),
 		},
 		{
 			desc: "no default branches",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				oid := WriteCommit(t, cfg, repoPath, WithBranch("apple"))
-				WriteCommit(t, cfg, repoPath, WithParents(oid), WithBranch("banana"))
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "refs/heads/apple", state.FirstParentCommit)
+				state.SetReference(t, ctx, "refs/heads/banana", state.SecondParentCommit)
+				return state.Repository
 			},
 			expectedName: git.NewReferenceNameFromBranchName("apple"),
 		},
 		{
 			desc: "test repo HEAD set",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-
-				WriteCommit(t, cfg, repoPath, WithBranch("feature"))
-				Exec(t, cfg, "-C", repoPath, "symbolic-ref", "HEAD", "refs/heads/feature")
-
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "refs/heads/feature", state.ChildCommit)
+				state.SetReference(t, ctx, "HEAD", "refs/heads/feature")
+				return state.Repository
 			},
 			expectedName: git.NewReferenceNameFromBranchName("feature"),
 		},
@@ -196,7 +196,7 @@ func testRepositoryGetDefaultBranch(t *testing.T, cfg config.Cfg, getRepository 
 	}
 }
 
-func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository GetRepositoryFunc) {
+func testRepositoryHeadReference(t *testing.T, getRepository GetRepositoryFunc) {
 	t.Parallel()
 	ctx := testhelper.Context(t)
 
@@ -208,36 +208,35 @@ func testRepositoryHeadReference(t *testing.T, cfg config.Cfg, getRepository Get
 		{
 			desc: "default unborn",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, _ := getRepository(t, ctx)
-				return repo
+				return getRepository(t, ctx).Repository
 			},
 			expectedName: git.DefaultRef,
 		},
 		{
 			desc: "default exists",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				WriteCommit(t, cfg, repoPath, WithBranch(git.DefaultBranch))
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, git.DefaultRef, state.ChildCommit)
+				return state.Repository
 			},
 			expectedName: git.DefaultRef,
 		},
 		{
 			desc: "HEAD set nonexistent",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				Exec(t, cfg, "-C", repoPath, "symbolic-ref", "HEAD", "refs/heads/feature")
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "HEAD", "refs/heads/feature")
+				return state.Repository
 			},
 			expectedName: git.NewReferenceNameFromBranchName("feature"),
 		},
 		{
 			desc: "HEAD set exists",
 			repo: func(t *testing.T) gitcmd.Repository {
-				repo, repoPath := getRepository(t, ctx)
-				WriteCommit(t, cfg, repoPath, WithBranch("feature"))
-				Exec(t, cfg, "-C", repoPath, "symbolic-ref", "HEAD", "refs/heads/feature")
-				return repo
+				state := getRepository(t, ctx)
+				state.SetReference(t, ctx, "refs/heads/feature", state.ChildCommit)
+				state.SetReference(t, ctx, "HEAD", "refs/heads/feature")
+				return state.Repository
 			},
 			expectedName: git.NewReferenceNameFromBranchName("feature"),
 		},
