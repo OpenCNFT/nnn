@@ -33,6 +33,7 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 type Partition interface {
 	storage.Partition
 	Run() error
+	CloseSnapshots() error
 }
 
 // PartitionFactory is factory type that can create new partitions.
@@ -184,17 +185,14 @@ func (sm *StorageManager) Close() {
 		ptn.close()
 	}
 
-	// StorageManager is only closed when the server is exiting. The partition goroutines wait
-	// for the users to be done before cleaning up to avoid cleaning up the snapshots from
-	// below transactions that are still running. If the server is closing, the graceful period
-	// has already finished and we should exit now. Release the partitions waiting on the
-	// remaining handles to be released.
+	// We shouldn't need to explicitly release closing partitions here. StorageManager is only
+	// closed when the server is exiting, and by that point the server's shutdown grace period
+	// would've elapsed, thus we expect all Git commands running within the partition to have
+	// exited.
 	//
-	// We shouldn't need this part as we should be able to expect the transactions/RPCs to finish
-	// fast if we are closing the server. This is not the case as we don't SIGKILL commands and
-	// some Git processes may get stuck. Once we fix this, we can remove this part.
-	//
-	// Issue: https://gitlab.com/gitlab-org/gitaly/-/issues/5595
+	// Unfortunately, because we don't SIGKILL commands, we have no guarantee that this will
+	// be the case. Once https://gitlab.com/gitlab-org/gitaly/-/issues/5595 is implemented, we
+	// can remove this loop.
 	for ptn := range sm.closingPartitions {
 		ptn.close()
 	}
@@ -577,6 +575,13 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					sm.mu.Lock()
 					sm.closingPartitions[ptn] = struct{}{}
 					sm.mu.Unlock()
+
+					// Now that all handles to the partition have been closed, there can be no more transactions
+					// using the snapshots, nor can there be new snapshots starting. Close the snapshots that
+					// may have been cached.
+					if err := mgr.CloseSnapshots(); err != nil {
+						logger.WithError(err).Error("failed closing snapshots")
+					}
 
 					if err := os.RemoveAll(stagingDir); err != nil {
 						logger.WithError(err).Error("failed removing partition's staging directory")

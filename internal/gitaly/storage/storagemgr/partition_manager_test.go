@@ -134,6 +134,14 @@ func (m *mockPartition) Close() {
 	m.close()
 }
 
+func (m *mockPartition) CloseSnapshots() error {
+	if !m.closeCalled.Load() {
+		return fmt.Errorf("close snaphots called before close")
+	}
+
+	return nil
+}
+
 type mockTransaction struct {
 	storage.Transaction
 	commit   func(context.Context) error

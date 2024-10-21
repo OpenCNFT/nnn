@@ -41,6 +41,8 @@ func TestManager(t *testing.T) {
 		{
 			desc: "exclusive snapshots are not shared",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, true)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
@@ -84,6 +86,8 @@ func TestManager(t *testing.T) {
 		{
 			desc: "shared snapshots are shared",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
@@ -118,6 +122,8 @@ func TestManager(t *testing.T) {
 		{
 			desc: "multiple relative paths are snapshotted",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a", "repositories/b"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
@@ -154,6 +160,8 @@ func TestManager(t *testing.T) {
 		{
 			desc: "alternate is included in snapshot",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/c"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
@@ -181,6 +189,8 @@ func TestManager(t *testing.T) {
 		{
 			desc: "shared snaphots against the relative paths with the same LSN are shared",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
@@ -213,6 +223,8 @@ func TestManager(t *testing.T) {
 		{
 			desc: "shared snaphots against different relative paths are not shared",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
@@ -235,8 +247,12 @@ func TestManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "unused shared snapshots are removed",
+			desc: "unused shared snapshots are cached up to a limit",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				mgr.maxInactiveSharedSnapshots = 2
+
 				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
 				require.NoError(t, err)
 
@@ -262,21 +278,129 @@ func TestManager(t *testing.T) {
 
 				fs4, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
 				require.NoError(t, err)
-				defer testhelper.MustClose(t, fs4)
 
-				// New snapshot was created as the previous snapshot was cleaned up due to
-				// the last user being done with it.
-				require.NotEqual(t, fs1.Root(), fs4.Root())
+				// Unused snapshot was recovered from the cache.
+				require.Equal(t, fs1.Root(), fs4.Root())
+				// Release the snapshot back to the cache.
+				testhelper.MustClose(t, fs4)
+
+				// Open two snapshots. Both are against different data, so both lead to
+				// creating new snapshots.
+				fsB, err := mgr.GetSnapshot(ctx, []string{"repositories/b"}, false)
+				require.NoError(t, err)
+				require.NotEqual(t, fsB.Root(), fs4.Root())
+
+				fsC, err := mgr.GetSnapshot(ctx, []string{"repositories/c"}, false)
+				require.NoError(t, err)
+				require.NotEqual(t, fsC.Root(), fsB.Root())
+
+				// We now have two more unused shared snapshots which along with the original
+				// one would lead to exceeding cache size.
+				testhelper.MustClose(t, fsB)
+				testhelper.MustClose(t, fsC)
+
+				// As the cache size was exceeded, the shared snapshot of A should have been
+				// evicted, and a new one returned.
+				fs5, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+				require.NotEqual(t, fs5.Root(), fs1.Root())
+				require.NotEqual(t, fs5.Root(), fsC.Root())
+				testhelper.MustClose(t, fs5)
+			},
+			expectedMetrics: metricValues{
+				createdSharedSnapshotCounter:   4,
+				reusedSharedSnapshotCounter:    3,
+				destroyedSharedSnapshotCounter: 4,
+			},
+		},
+		{
+			desc: "exclusive snapshots don't affect caching",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				mgr.maxInactiveSharedSnapshots = 2
+
+				// Open shared snapshot and close it to cache it.
+				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+				testhelper.MustClose(t, fs1)
+
+				// Open two exclusive snapshots. They are not cached, and should not evict the
+				// snapshot of A in cache.
+				for i := 0; i < 2; i++ {
+					fsExclusive, err := mgr.GetSnapshot(ctx, []string{"repositories/b"}, true)
+					require.NoError(t, err)
+					require.NotEqual(t, fsExclusive.Root(), fs1.Root())
+					testhelper.MustClose(t, fsExclusive)
+				}
+
+				// The shared snapshot should still be retrieved from the cache.
+				fs2, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+				require.Equal(t, fs1.Root(), fs2.Root())
+				testhelper.MustClose(t, fs2)
+			},
+			expectedMetrics: metricValues{
+				createdSharedSnapshotCounter:      1,
+				reusedSharedSnapshotCounter:       1,
+				destroyedSharedSnapshotCounter:    1,
+				createdExclusiveSnapshotCounter:   2,
+				destroyedExclusiveSnapshotCounter: 2,
+			},
+		},
+		{
+			desc: "LSN changing invalidates cache",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				// Open shared snapshot and close it to cache it.
+				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+				testhelper.MustClose(t, fs1)
+
+				mgr.SetLSN(1)
+
+				// The shared snapshot should still be retrieved from the cache.
+				fs2, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+				require.NotEqual(t, fs1.Root(), fs2.Root())
+				testhelper.MustClose(t, fs2)
 			},
 			expectedMetrics: metricValues{
 				createdSharedSnapshotCounter:   2,
-				reusedSharedSnapshotCounter:    2,
 				destroyedSharedSnapshotCounter: 2,
 			},
 		},
 		{
+			desc: "LSN changing while shared snapshot is open prevents caching",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				// Open shared snapshot and close it to cache it.
+				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+
+				mgr.SetLSN(1)
+
+				testhelper.MustClose(t, fs1)
+
+				// The shared snapshot should still be retrieved from the cache.
+				fs2, err := mgr.GetSnapshot(ctx, []string{"repositories/a"}, false)
+				require.NoError(t, err)
+				require.NotEqual(t, fs1.Root(), fs2.Root())
+				testhelper.MustClose(t, fs2)
+			},
+			expectedMetrics: metricValues{
+				createdSharedSnapshotCounter:   2,
+				destroyedSharedSnapshotCounter: 2,
+			},
+		},
+
+		{
 			desc: "concurrently taking multiple shared snapshots",
 			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
 				// Defer the clean snapshot clean ups at the end of the test.
 				var cleanGroup errgroup.Group
 				defer func() { require.NoError(t, cleanGroup.Wait()) }()
@@ -363,7 +487,8 @@ func TestManager(t *testing.T) {
 
 			metrics := NewMetrics()
 
-			mgr := NewManager(testhelper.SharedLogger(t), storageDir, workingDir, metrics.Scope("storage-name"))
+			mgr, err := NewManager(testhelper.SharedLogger(t), storageDir, workingDir, metrics.Scope("storage-name"))
+			require.NoError(t, err)
 
 			tc.run(t, mgr)
 

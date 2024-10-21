@@ -13,8 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
+	"golang.org/x/sync/errgroup"
 )
 
 // closeWrapper wraps the snapshot to run custom logic on Close.
@@ -73,17 +75,42 @@ type Manager struct {
 	//   that are being snapshotted. Snapshots are only shared if they
 	//   are accessing the same set of relative paths.
 	activeSharedSnapshots map[storage.LSN]map[string]*sharedSnapshot
+	// maxInactiveSharedSnapshots limits the number of inactive shared
+	// snapshots kept on standby.
+	maxInactiveSharedSnapshots int
+	// inactiveSharedSnapshots contains up to date snapshots that are
+	// not currently used by a transaction. We keep inactive snapshots
+	// around so they are ready to be used by further reads operations.
+	// This reduces thrashing with sequential read workloads where
+	// snapshots are repeatedly created and destroyed.
+	inactiveSharedSnapshots *lru.Cache[string, *sharedSnapshot]
+	// deletionWorkers is a pool of workers that delete shared snapshots
+	// invalidated by LSN updates. This allows TransactionManager to proceed
+	// faster without blocking on deleting the invalidated snapshots.
+	deletionWorkers *errgroup.Group
 }
 
 // NewManager returns a new Manager that creates snapshots from storageDir into workingDir.
-func NewManager(logger log.Logger, storageDir, workingDir string, metrics ManagerMetrics) *Manager {
-	return &Manager{
-		logger:                logger.WithField("component", "snapshot_manager"),
-		storageDir:            storageDir,
-		workingDir:            workingDir,
-		activeSharedSnapshots: make(map[storage.LSN]map[string]*sharedSnapshot),
-		metrics:               metrics,
+func NewManager(logger log.Logger, storageDir, workingDir string, metrics ManagerMetrics) (*Manager, error) {
+	const maxInactiveSharedSnapshots = 25
+	cache, err := lru.New[string, *sharedSnapshot](maxInactiveSharedSnapshots)
+	if err != nil {
+		return nil, fmt.Errorf("new lru: %w", err)
 	}
+
+	deletionWorkers := &errgroup.Group{}
+	deletionWorkers.SetLimit(maxInactiveSharedSnapshots)
+
+	return &Manager{
+		logger:                     logger.WithField("component", "snapshot_manager"),
+		storageDir:                 storageDir,
+		workingDir:                 workingDir,
+		activeSharedSnapshots:      make(map[storage.LSN]map[string]*sharedSnapshot),
+		maxInactiveSharedSnapshots: maxInactiveSharedSnapshots,
+		inactiveSharedSnapshots:    cache,
+		metrics:                    metrics,
+		deletionWorkers:            deletionWorkers,
+	}, nil
 }
 
 // SetLSN sets the current LSN. Snaphots returned by GetSnapshot always cover the latest LSN
@@ -91,7 +118,30 @@ func NewManager(logger log.Logger, storageDir, workingDir string, metrics Manage
 //
 // SetLSN must not be called concurrently with GetSnapshot.
 func (mgr *Manager) SetLSN(currentLSN storage.LSN) {
+	mgr.mutex.Lock()
 	mgr.currentLSN = currentLSN
+	outdatedSnapshots := mgr.inactiveSharedSnapshots.Values()
+	mgr.inactiveSharedSnapshots.Purge()
+	mgr.mutex.Unlock()
+
+	mgr.closeSnapshots(outdatedSnapshots)
+}
+
+func (mgr *Manager) closeSnapshots(snapshots []*sharedSnapshot) {
+	for _, wrapper := range snapshots {
+		snapshot := wrapper.snapshot
+		mgr.deletionWorkers.Go(func() error {
+			defer mgr.metrics.destroyedSharedSnapshotTotal.Inc()
+			if err := snapshot.Close(); err != nil {
+				mgr.logger.WithError(err).Error("failed closing shared snapshot")
+				// We don't stop work even if we return the error. Return it anyway so
+				// it's more visible if failures happen in tests.
+				return fmt.Errorf("close: %w", err)
+			}
+
+			return nil
+		})
+	}
 }
 
 // GetSnapshot returns a file system snapshot. If exclusive is set, the snapshot is a new one and not shared with
@@ -136,19 +186,30 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		mgr.activeSharedSnapshots[lsn] = make(map[string]*sharedSnapshot)
 	}
 
+	// Check the active snapshots whether there's already a snapshot we could
+	// reuse.
 	wrapper, ok := mgr.activeSharedSnapshots[lsn][key]
 	if !ok {
-		// If there isn't a snapshot yet, create the synchronization
-		// state to ensure other goroutines won't concurrently create
-		// another snapshot, and instead wait for us to take the
-		// snapshot.
-		//
-		// Once the synchronization state is in place, we'll release
-		// the lock to allow other repositories to be concurrently
-		// snapshotted. The goroutines waiting for this snapshot
-		// wait on the `ready` channel.
-		wrapper = &sharedSnapshot{ready: make(chan struct{})}
-		mgr.activeSharedSnapshots[lsn][key] = wrapper
+		// If no one is actively using a similar snapshot, check whether the
+		// snapshot cache contains snapshot of the data we're looking to access.
+		if wrapper, ok = mgr.inactiveSharedSnapshots.Get(key); ok {
+			// There was a suitable snapshot in the cache. Remove it from the cache
+			// and place it in active snapshots.
+			mgr.activeSharedSnapshots[lsn][key] = wrapper
+			mgr.inactiveSharedSnapshots.Remove(key)
+		} else {
+			// If there isn't a snapshot yet, create the synchronization
+			// state to ensure other goroutines won't concurrently create
+			// another snapshot, and instead wait for us to take the
+			// snapshot.
+			//
+			// Once the synchronization state is in place, we'll release
+			// the lock to allow other repositories to be concurrently
+			// snapshotted. The goroutines waiting for this snapshot
+			// wait on the `ready` channel.
+			wrapper = &sharedSnapshot{ready: make(chan struct{})}
+			mgr.activeSharedSnapshots[lsn][key] = wrapper
+		}
 	}
 	// Increment the reference counter to record that we are using
 	// the snapshot.
@@ -158,7 +219,7 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 	cleanup := func() error {
 		defer trace.StartRegion(ctx, "close shared snapshot").End()
 
-		removeSnapshot := false
+		var snapshotToRemove *sharedSnapshot
 
 		mgr.mutex.Lock()
 		wrapper.referenceCount--
@@ -174,13 +235,27 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 
 			// We need to remove the file system state of the snapshot
 			// only if it was successfully created.
-			removeSnapshot = wrapper.snapshot != nil
+			if wrapper.snapshot != nil {
+				snapshotToRemove = wrapper
+
+				// If this snapshot is up to date, cache it instead of removing it.
+				if lsn == mgr.currentLSN {
+					// Since we're caching the snapshot, we don't want to remove it anymore.
+					snapshotToRemove = nil
+					// Evict the oldest snapshot from the cache if we're at the limit.
+					if mgr.inactiveSharedSnapshots.Len() == mgr.maxInactiveSharedSnapshots {
+						_, snapshotToRemove, _ = mgr.inactiveSharedSnapshots.RemoveOldest()
+					}
+
+					mgr.inactiveSharedSnapshots.Add(key, wrapper)
+				}
+			}
 		}
 		mgr.mutex.Unlock()
 
-		if removeSnapshot {
+		if snapshotToRemove != nil {
 			mgr.metrics.destroyedSharedSnapshotTotal.Inc()
-			if err := wrapper.snapshot.Close(); err != nil {
+			if err := snapshotToRemove.snapshot.Close(); err != nil {
 				return fmt.Errorf("close shared snapshot: %w", err)
 			}
 		}
@@ -224,6 +299,13 @@ func (mgr *Manager) GetSnapshot(ctx context.Context, relativePaths []string, exc
 		snapshot: wrapper.snapshot,
 		close:    cleanup,
 	}, nil
+}
+
+// Close closes the Manager. It closes all inactive shared snapshots. It's not safe for concurrency
+// and should be called only after there are no more new snapshots taken or being closed.
+func (mgr *Manager) Close() error {
+	mgr.closeSnapshots(mgr.inactiveSharedSnapshots.Values())
+	return mgr.deletionWorkers.Wait()
 }
 
 func (mgr *Manager) logSnapshotCreation(ctx context.Context, exclusive bool, stats snapshotStatistics) {
