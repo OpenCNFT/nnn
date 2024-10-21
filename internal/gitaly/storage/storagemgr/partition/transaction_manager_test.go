@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
@@ -2393,13 +2392,6 @@ func BenchmarkTransactionManager(b *testing.B) {
 			tc.transactionSize,
 		)
 		b.Run(desc, func(b *testing.B) {
-			traceFile, err := os.OpenFile("trace.bin", os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
-			require.NoError(b, err)
-			defer traceFile.Close()
-
-			require.NoError(b, trace.Start(traceFile))
-			defer trace.Stop()
-
 			ctx := testhelper.Context(b)
 
 			cfg := testcfg.Build(b)
