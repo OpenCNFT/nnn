@@ -286,7 +286,6 @@ type Transaction struct {
 	skipVerificationFailures bool
 	initialReferenceValues   map[git.ReferenceName]git.Reference
 	referenceUpdates         []git.ReferenceUpdates
-	defaultBranchUpdated     bool
 	customHooksUpdated       bool
 	repositoryCreation       *repositoryCreation
 	deleteRepository         bool
@@ -602,7 +601,6 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 	}
 
 	if txn.runHousekeeping != nil && (txn.referenceUpdates != nil ||
-		txn.defaultBranchUpdated ||
 		txn.customHooksUpdated ||
 		txn.deleteRepository ||
 		txn.includedObjects != nil) {
@@ -786,12 +784,6 @@ func (txn *Transaction) flattenReferenceTransactions() git.ReferenceUpdates {
 // DeleteRepository deletes the repository when the transaction is committed.
 func (txn *Transaction) DeleteRepository() {
 	txn.deleteRepository = true
-}
-
-// MarkDefaultBranchUpdated sets a hint for the transaction manager that the default branch has been updated
-// as a part of the transaction. This leads to the manager identifying changes and staging them for commit.
-func (txn *Transaction) MarkDefaultBranchUpdated() {
-	txn.defaultBranchUpdated = true
 }
 
 // MarkCustomHooksUpdated sets a hint to the transaction manager that custom hooks have been updated as part
@@ -1224,25 +1216,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 					filepath.Join(packDir, transaction.packPrefix+fileExtension),
 				); err != nil {
 					return fmt.Errorf("record file creation: %w", err)
-				}
-			}
-		}
-
-		if transaction.defaultBranchUpdated {
-			refBackend, err := transaction.snapshotRepository.ReferenceBackend(ctx)
-			if err != nil {
-				return fmt.Errorf("detecting reference backend: %w", err)
-			}
-
-			// We only want to track the HEAD ref manually for the files backend.
-			// For the reftable backend, we would track the HEAD ref as a regular
-			// reference update.
-			if refBackend == git.ReferenceBackendFiles {
-				if err := transaction.walEntry.RecordFileUpdate(
-					transaction.snapshot.Root(),
-					filepath.Join(transaction.relativePath, "HEAD"),
-				); err != nil {
-					return fmt.Errorf("record HEAD update: %w", err)
 				}
 			}
 		}
@@ -3302,8 +3275,8 @@ func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transact
 	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
 		for _, refTransaction := range entry.GetReferenceTransactions() {
 			for _, change := range refTransaction.GetChanges() {
-				// Dealing of HEAD ref is only applicable to reftable backend and
-				// can be ignored here.
+				// We handle HEAD updates through the git-update-ref, but since
+				// it is not part of the packed-refs file, we don't need to worry about it.
 				if bytes.Equal(change.GetReferenceName(), []byte("HEAD")) {
 					continue
 				}

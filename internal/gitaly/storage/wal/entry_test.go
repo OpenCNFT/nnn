@@ -352,14 +352,15 @@ func TestRecordReferenceUpdates(t *testing.T) {
 
 	t.Parallel()
 
-	type referenceTransaction map[git.ReferenceName]git.ObjectID
+	type referenceTransaction map[git.ReferenceName]git.ReferenceUpdate
 
 	referenceTransactionToProto := func(refTX referenceTransaction) *gitalypb.LogEntry_ReferenceTransaction {
 		var protoRefTX gitalypb.LogEntry_ReferenceTransaction
-		for reference, newOID := range refTX {
+		for reference, update := range refTX {
 			protoRefTX.Changes = append(protoRefTX.Changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
 				ReferenceName: []byte(reference),
-				NewOid:        []byte(newOID),
+				NewOid:        []byte(update.NewOID),
+				NewTarget:     []byte(update.NewTarget),
 			})
 		}
 		return &protoRefTX
@@ -411,11 +412,11 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
 					referenceTransactions: []referenceTransaction{
-						{"refs/heads/branch-1": oids[0]},
-						{"refs/heads/branch-2": oids[1]},
-						{"refs/heads/subdir/branch-3": oids[2]},
-						{"refs/heads/subdir/branch-4": oids[3]},
-						{"refs/heads/subdir/no-refs/branch-5": oids[4]},
+						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]}},
+						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[1]}},
+						{"refs/heads/subdir/branch-3": git.ReferenceUpdate{NewOID: oids[2]}},
+						{"refs/heads/subdir/branch-4": git.ReferenceUpdate{NewOID: oids[3]}},
+						{"refs/heads/subdir/no-refs/branch-5": git.ReferenceUpdate{NewOID: oids[4]}},
 					},
 					expectedOperations: func() operations {
 						var ops operations
@@ -444,13 +445,13 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
 					existingReferences: referenceTransaction{
-						"refs/heads/branch-1": oids[0],
-						"refs/tags/tag-1":     oids[1],
+						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/tags/tag-1":     git.ReferenceUpdate{NewOID: oids[1]},
 					},
 					referenceTransactions: []referenceTransaction{
 						{
-							"refs/heads/branch-1": gittest.DefaultObjectHash.ZeroOID,
-							"refs/tags/tag-1":     gittest.DefaultObjectHash.ZeroOID,
+							"refs/heads/branch-1": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
+							"refs/tags/tag-1":     git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 						},
 					},
 					expectedOperations: func() operations {
@@ -472,22 +473,22 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
 					existingReferences: referenceTransaction{
-						"refs/heads/branch-1":                    oids[0],
-						"refs/heads/branch-2":                    oids[0],
-						"refs/heads/subdir/branch-3":             oids[0],
-						"refs/heads/subdir/branch-4":             oids[0],
-						"refs/heads/subdir/secondlevel/branch-5": oids[0],
+						"refs/heads/branch-1":                    git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/heads/branch-2":                    git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/heads/subdir/branch-3":             git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/heads/subdir/branch-4":             git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/heads/subdir/secondlevel/branch-5": git.ReferenceUpdate{NewOID: oids[0]},
 					},
 					referenceTransactions: []referenceTransaction{
 						{
-							"refs/heads/branch-1":                    gittest.DefaultObjectHash.ZeroOID,
-							"refs/heads/branch-2":                    oids[1],
-							"refs/heads/branch-6":                    oids[2],
-							"refs/heads/subdir/branch-3":             oids[1],
-							"refs/heads/subdir/branch-4":             gittest.DefaultObjectHash.ZeroOID,
-							"refs/heads/subdir/branch-7":             oids[2],
-							"refs/heads/subdir/secondlevel/branch-5": gittest.DefaultObjectHash.ZeroOID,
-							"refs/heads/subdir/secondlevel/branch-8": oids[3],
+							"refs/heads/branch-1":                    git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
+							"refs/heads/branch-2":                    git.ReferenceUpdate{NewOID: oids[1]},
+							"refs/heads/branch-6":                    git.ReferenceUpdate{NewOID: oids[2]},
+							"refs/heads/subdir/branch-3":             git.ReferenceUpdate{NewOID: oids[1]},
+							"refs/heads/subdir/branch-4":             git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
+							"refs/heads/subdir/branch-7":             git.ReferenceUpdate{NewOID: oids[2]},
+							"refs/heads/subdir/secondlevel/branch-5": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
+							"refs/heads/subdir/secondlevel/branch-8": git.ReferenceUpdate{NewOID: oids[3]},
 						},
 					},
 					expectedOperations: func() operations {
@@ -520,20 +521,20 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
 					existingReferences: referenceTransaction{
-						"refs/heads/branch-1":                oids[0],
-						"refs/heads/branch-2":                oids[1],
-						"refs/heads/subdir/branch-3":         oids[2],
-						"refs/heads/subdir/branch-4":         oids[3],
-						"refs/heads/subdir/no-refs/branch-5": oids[4],
+						"refs/heads/branch-1":                git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/heads/branch-2":                git.ReferenceUpdate{NewOID: oids[1]},
+						"refs/heads/subdir/branch-3":         git.ReferenceUpdate{NewOID: oids[2]},
+						"refs/heads/subdir/branch-4":         git.ReferenceUpdate{NewOID: oids[3]},
+						"refs/heads/subdir/no-refs/branch-5": git.ReferenceUpdate{NewOID: oids[4]},
 					},
 					referenceTransactions: []referenceTransaction{
 						{
-							"refs/heads/branch-1":        gittest.DefaultObjectHash.ZeroOID,
-							"refs/heads/branch-2":        gittest.DefaultObjectHash.ZeroOID,
-							"refs/heads/subdir/branch-3": gittest.DefaultObjectHash.ZeroOID,
+							"refs/heads/branch-1":        git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
+							"refs/heads/branch-2":        git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
+							"refs/heads/subdir/branch-3": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 							// "refs/heads/subdir/branch-4" is not deleted so we expect the directory
 							// to not be deleted.
-							"refs/heads/subdir/no-refs/branch-5": gittest.DefaultObjectHash.ZeroOID,
+							"refs/heads/subdir/no-refs/branch-5": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 						},
 					},
 					expectedOperations: func() operations {
@@ -556,16 +557,16 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
 					existingReferences: referenceTransaction{
-						"refs/heads/parent": oids[0],
+						"refs/heads/parent": git.ReferenceUpdate{NewOID: oids[0]},
 					},
 					referenceTransactions: []referenceTransaction{
 						{
-							"refs/heads/parent": gittest.DefaultObjectHash.ZeroOID,
+							"refs/heads/parent": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 						},
 						{
-							"refs/heads/branch-1":               oids[0],
-							"refs/heads/parent/branch-2":        oids[1],
-							"refs/heads/parent/subdir/branch-3": oids[2],
+							"refs/heads/branch-1":               git.ReferenceUpdate{NewOID: oids[0]},
+							"refs/heads/parent/branch-2":        git.ReferenceUpdate{NewOID: oids[1]},
+							"refs/heads/parent/subdir/branch-3": git.ReferenceUpdate{NewOID: oids[2]},
 						},
 					},
 					expectedOperations: func() operations {
@@ -592,11 +593,11 @@ func TestRecordReferenceUpdates(t *testing.T) {
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
 					existingReferences: referenceTransaction{
-						"refs/heads/parent": oids[0],
+						"refs/heads/parent": git.ReferenceUpdate{NewOID: oids[0]},
 					},
 					referenceTransactions: []referenceTransaction{
 						{
-							"refs/heads/parent/branch-1": oids[0],
+							"refs/heads/parent/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
 						},
 					},
 					expectedError: updateref.FileDirectoryConflictError{
@@ -612,10 +613,10 @@ func TestRecordReferenceUpdates(t *testing.T) {
 				return setupData{
 					referenceTransactions: []referenceTransaction{
 						{
-							"refs/remotes/upstream/deleted-branch": gittest.DefaultObjectHash.ZeroOID,
+							"refs/remotes/upstream/deleted-branch": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 						},
 						{
-							"refs/remotes/upstream/created-branch": oids[0],
+							"refs/remotes/upstream/created-branch": git.ReferenceUpdate{NewOID: oids[0]},
 						},
 					},
 					expectedOperations: func() operations {
@@ -634,6 +635,33 @@ func TestRecordReferenceUpdates(t *testing.T) {
 					expectedDirectory: testhelper.DirectoryState{
 						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 						"/1": {Mode: mode.File, Content: []byte(oids[0] + "\n")},
+					},
+				}
+			},
+		},
+		{
+			desc: "HEAD ref changes",
+			setup: func(t *testing.T, oids []git.ObjectID) setupData {
+				return setupData{
+					existingReferences: referenceTransaction{
+						"HEAD": git.ReferenceUpdate{NewTarget: "refs/heads/main"},
+					},
+					referenceTransactions: []referenceTransaction{
+						{
+							"HEAD": git.ReferenceUpdate{NewTarget: "refs/heads/branch-2"},
+						},
+					},
+					expectedOperations: func() operations {
+						var ops operations
+						ops.removeDirectoryEntry("relative-path/HEAD")
+						ops.createHardLink("1", "relative-path/HEAD", false)
+						ops.createDirectory("relative-path/refs")
+						ops.createDirectory("relative-path/refs")
+						return ops
+					}(),
+					expectedDirectory: testhelper.DirectoryState{
+						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+						"/1": {Mode: mode.File, Content: []byte("ref: refs/heads/main\n")},
 					},
 				}
 			},

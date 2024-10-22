@@ -319,10 +319,11 @@ func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapsho
 
 	creations := newReferenceTree()
 	deletions := newReferenceTree()
+	defaultBranchUpdated := false
 	preImagePaths := map[string]struct{}{}
 	for _, change := range refTX.GetChanges() {
-		// For the files backend, we track default branch updates manually
 		if bytes.Equal(change.GetReferenceName(), []byte("HEAD")) {
+			defaultBranchUpdated = true
 			continue
 		}
 
@@ -365,6 +366,19 @@ func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapsho
 
 	if err := performReferenceUpdates(refTX.GetChanges()); err != nil {
 		return fmt.Errorf("perform reference updates: %w", err)
+	}
+
+	// Record default branch updates
+	if defaultBranchUpdated {
+		targetRelativePath := filepath.Join(relativePath, "HEAD")
+
+		e.operations.removeDirectoryEntry(targetRelativePath)
+		fileID, err := e.stageFile(filepath.Join(storageRoot, snapshotPrefix, targetRelativePath))
+		if err != nil {
+			return fmt.Errorf("stage file: %w", err)
+		}
+
+		e.operations.createHardLink(fileID, targetRelativePath, false)
 	}
 
 	// Record creations
