@@ -7,17 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 )
 
 // ErrMismatchingState is similar to updateref.MismatchingStateError. It's declared separately to avoid
@@ -162,14 +158,7 @@ func (repo *Repo) SetDefaultBranch(ctx context.Context, txManager transaction.Ma
 		return fmt.Errorf("%q is a malformed refname", reference)
 	}
 
-	// To ensure we stay backward compatible, we should only use the new mechanism
-	// once all nodes have been updated to contain the code for symref updates.
-	// This is the reason we use a feature flag to propagate this change.
-	if featureflag.SymrefUpdate.IsEnabled(ctx) {
-		return repo.setDefaultBranchWithUpdateRef(ctx, reference, version)
-	}
-
-	return repo.setDefaultBranchManually(ctx, txManager, reference)
+	return repo.setDefaultBranchWithUpdateRef(ctx, reference, version)
 }
 
 // setDefaultBranchWithUpdateRef uses 'symref-update' command to update HEAD.
@@ -199,43 +188,6 @@ func (repo *Repo) setDefaultBranchWithUpdateRef(
 
 	if err := updater.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
-}
-
-// setDefaultBranchWithTransaction sets the repository's HEAD to point to the given reference
-// using a safe locking file writer and commits the transaction if one exists in the context
-func (repo *Repo) setDefaultBranchManually(ctx context.Context, txManager transaction.Manager, reference git.ReferenceName) error {
-	newHeadContent := []byte(fmt.Sprintf("ref: %s\n", reference.String()))
-
-	repoPath, err := repo.Path(ctx)
-	if err != nil {
-		return fmt.Errorf("getting repository path: %w", err)
-	}
-
-	headPath := filepath.Join(repoPath, "HEAD")
-
-	lockingFileWriter, err := safe.NewLockingFileWriter(headPath)
-	if err != nil {
-		return fmt.Errorf("getting file writer: %w", err)
-	}
-	defer func() {
-		if err := lockingFileWriter.Close(); err != nil {
-			repo.logger.WithError(err).ErrorContext(ctx, "closing locked HEAD failed")
-		}
-	}()
-
-	if _, err := lockingFileWriter.Write(newHeadContent); err != nil {
-		return fmt.Errorf("writing temporary HEAD: %w", err)
-	}
-
-	if err := transaction.CommitLockedFile(ctx, txManager, lockingFileWriter); err != nil {
-		return fmt.Errorf("committing temporary HEAD: %w", err)
-	}
-
-	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		tx.MarkDefaultBranchUpdated()
 	}
 
 	return nil

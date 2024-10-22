@@ -4650,16 +4650,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 										},
 										{
 											MinIndex: 3,
-											MaxIndex: 3,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/branch-2",
-													Target: setup.Commits.Diverging.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 4,
 											MaxIndex: 4,
 											References: []git.Reference{
 												{

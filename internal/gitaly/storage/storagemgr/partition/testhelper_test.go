@@ -18,7 +18,6 @@ import (
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
@@ -1239,11 +1238,9 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				if step.DefaultBranchUpdate != nil {
 					transaction.MarkDefaultBranchUpdated()
 
-					if featureflag.SymrefUpdate.IsEnabled(ctx) {
-						transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
-							"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
-						})
-					}
+					transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
+						"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
+					})
 
 					require.NoError(t, rewrittenRepo.SetDefaultBranch(storage.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
 				}
