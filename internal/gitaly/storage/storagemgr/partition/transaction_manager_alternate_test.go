@@ -1124,9 +1124,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				CloseManager{},
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeStoreAppliedLSN: func(hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeStoreAppliedLSN: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
@@ -1203,9 +1201,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				CloseManager{},
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeStoreAppliedLSN: func(hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeStoreAppliedLSN: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
