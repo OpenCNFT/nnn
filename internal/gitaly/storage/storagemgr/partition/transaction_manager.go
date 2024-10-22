@@ -1001,10 +1001,10 @@ type TransactionManager struct {
 
 type testHooks struct {
 	beforeInitialization      func()
-	beforeAppendLogEntry      func()
-	beforeApplyLogEntry       func()
-	beforeStoreAppliedLSN     func()
-	beforeDeleteLogEntryFiles func()
+	beforeAppendLogEntry      func(storage.LSN)
+	beforeApplyLogEntry       func(storage.LSN)
+	beforeStoreAppliedLSN     func(storage.LSN)
+	beforeDeleteLogEntryFiles func(storage.LSN)
 	beforeRunExiting          func()
 }
 
@@ -1054,10 +1054,10 @@ func NewTransactionManager(
 
 		testHooks: testHooks{
 			beforeInitialization:      func() {},
-			beforeAppendLogEntry:      func() {},
-			beforeApplyLogEntry:       func() {},
-			beforeStoreAppliedLSN:     func() {},
-			beforeDeleteLogEntryFiles: func() {},
+			beforeAppendLogEntry:      func(storage.LSN) {},
+			beforeApplyLogEntry:       func(storage.LSN) {},
+			beforeStoreAppliedLSN:     func(storage.LSN) {},
+			beforeDeleteLogEntryFiles: func(storage.LSN) {},
 			beforeRunExiting:          func() {},
 		},
 	}
@@ -3512,9 +3512,9 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	mgr.testHooks.beforeAppendLogEntry()
-
 	nextLSN := mgr.appendedLSN + 1
+	mgr.testHooks.beforeAppendLogEntry(nextLSN)
+
 	// Move the log entry from the staging directory into its place in the log.
 	destinationPath := walFilesPathForLSN(mgr.stateDirectory, nextLSN)
 	if err := os.Rename(logEntryPath, destinationPath); err != nil {
@@ -3574,7 +3574,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 	delete(mgr.snapshotLocks, previousLSN)
 	mgr.mutex.Unlock()
 
-	mgr.testHooks.beforeApplyLogEntry()
+	mgr.testHooks.beforeApplyLogEntry(lsn)
 
 	if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry, mgr.db); err != nil {
 		return fmt.Errorf("apply operations: %w", err)
@@ -3589,7 +3589,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 		}
 	}
 
-	mgr.testHooks.beforeStoreAppliedLSN()
+	mgr.testHooks.beforeStoreAppliedLSN(lsn)
 	if err := mgr.storeAppliedLSN(lsn); err != nil {
 		return fmt.Errorf("set applied LSN: %w", err)
 	}
