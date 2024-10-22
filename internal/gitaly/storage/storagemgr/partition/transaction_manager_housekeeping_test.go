@@ -1336,9 +1336,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				CloseManager{},
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeStoreAppliedLSN: func(hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeStoreAppliedLSN: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
