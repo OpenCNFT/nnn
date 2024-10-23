@@ -15,6 +15,24 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
 
+type partitionCreateSubcommand struct {
+	parallel int
+}
+
+func (cmd *partitionCreateSubcommand) flags(ctx *cli.Context) {
+	cmd.parallel = ctx.Int("parallel")
+}
+
+func partitionCreateFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.IntFlag{
+			Name:  "parallel",
+			Usage: "maximum number of parallel backups per storage",
+			Value: 2,
+		},
+	}
+}
+
 func newPartitionCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "partition",
@@ -30,6 +48,7 @@ func newPartitionCreateCommand() *cli.Command {
 		Name:   "create",
 		Usage:  "Create partition backups",
 		Action: partitionCreateAction,
+		Flags:  partitionCreateFlags(),
 	}
 }
 
@@ -67,20 +86,23 @@ func partitionCreateAction(cctx *cli.Context) error {
 		return err
 	}
 
-	if err := run(ctx, logger); err != nil {
+	subcmd := partitionCreateSubcommand{}
+	subcmd.flags(cctx)
+
+	if err := subcmd.run(ctx, logger); err != nil {
 		logger.Error(err.Error())
 		return err
 	}
 	return nil
 }
 
-func run(ctx context.Context, logger log.Logger) (returnErr error) {
+func (cmd *partitionCreateSubcommand) run(ctx context.Context, logger log.Logger) (returnErr error) {
 	pool := client.NewPool(client.WithDialOptions(client.UnaryInterceptor(), client.StreamInterceptor()))
 	defer func() {
 		returnErr = errors.Join(returnErr, pool.Close())
 	}()
 
-	manager := backup.NewPartititonBackupManager(pool)
+	manager := backup.NewPartitionBackupManager(pool, backup.WithPartitionConcurrencyLimit(cmd.parallel))
 
 	gitalyServers, err := storage.ExtractGitalyServers(ctx)
 	if err != nil {
