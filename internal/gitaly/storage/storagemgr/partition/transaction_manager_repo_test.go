@@ -1155,16 +1155,6 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 											},
 											{
 												MinIndex: 2,
-												MaxIndex: 2,
-												References: []git.Reference{
-													{
-														Name:   "refs/heads/main",
-														Target: setup.Commits.First.OID.String(),
-													},
-												},
-											},
-											{
-												MinIndex: 3,
 												MaxIndex: 3,
 												References: []git.Reference{
 													{
@@ -1172,6 +1162,11 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 														Target:     "refs/heads/new-head",
 														IsSymbolic: true,
 													},
+													{
+														Name:   "refs/heads/main",
+														Target: setup.Commits.First.OID.String(),
+													},
+
 												},
 											},
 										},
