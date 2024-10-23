@@ -1235,8 +1235,6 @@ type Raft struct {
 	Enabled bool `json:"enabled" toml:"enabled"`
 	// ClusterID is the unique ID of the cluster. It ensures the current node joins the right cluster.
 	ClusterID string `json:"cluster_id" toml:"cluster_id"`
-	// NodeID is the unique ID of the node.
-	NodeID uint64 `json:"node_id" toml:"node_id"`
 	// RTTMilliseconds is the maximum round trip between two nodes in the cluster. It's used to
 	// calculate multiple types of timeouts of Raft protocol.
 	RTTMilliseconds uint64 `json:"rtt_milliseconds" toml:"rtt_milliseconds"`
@@ -1257,6 +1255,12 @@ const (
 	// timeout is DefaultRTT * DefaultHeartbeatTicks.
 	RaftDefaultHeartbeatTicks = 2
 )
+
+// DefaultRaftConfig returns a Raft configuration filled with default values.
+func DefaultRaftConfig(clusterID string) Raft {
+	r := Raft{Enabled: true, ClusterID: clusterID}
+	return r.fulfillDefaults()
+}
 
 func (r Raft) fulfillDefaults() Raft {
 	if r.RTTMilliseconds == 0 {
@@ -1287,7 +1291,6 @@ func (r Raft) Validate(transactions Transactions) error {
 
 	cfgErr = cfgErr.
 		Append(cfgerror.NotEmpty(r.ClusterID), "cluster_id").
-		Append(cfgerror.Comparable(r.NodeID).GreaterThan(0), "node_id").
 		Append(cfgerror.Comparable(r.RTTMilliseconds).GreaterThan(0), "rtt_millisecond").
 		Append(cfgerror.Comparable(r.ElectionTicks).GreaterThan(0), "election_rtt").
 		Append(cfgerror.Comparable(r.HeartbeatTicks).GreaterThan(0), "heartbeat_rtt")
