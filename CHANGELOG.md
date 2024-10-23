@@ -1,5 +1,11 @@
 # Gitaly changelog
 
+## 17.4.3 (2024-10-22)
+
+### Fixed (1 change)
+
+- [Update gocloud.dev to v0.40.0](gitlab-org/security/gitaly@ae5ab8beee87a2cc0a72991697f013ed4264eeeb)
+
 ## 17.4.2 (2024-10-09)
 
 No changes.
