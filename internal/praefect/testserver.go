@@ -219,7 +219,7 @@ func RunPraefectServer(
 		opt.WithRouter = NewNodeManagerRouter(opt.WithNodeMgr, opt.WithRepoStore)
 	}
 	if opt.WithChecks == nil {
-		opt.WithChecks = service.AllChecks()
+		opt.WithChecks = service.ReadinessChecks()
 	}
 
 	coordinator := NewCoordinator(
