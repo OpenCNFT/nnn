@@ -24,7 +24,6 @@ const (
 	RepositoryService_RepositoryInfo_FullMethodName               = "/gitaly.RepositoryService/RepositoryInfo"
 	RepositoryService_ObjectsSize_FullMethodName                  = "/gitaly.RepositoryService/ObjectsSize"
 	RepositoryService_ObjectFormat_FullMethodName                 = "/gitaly.RepositoryService/ObjectFormat"
-	RepositoryService_ApplyGitattributes_FullMethodName           = "/gitaly.RepositoryService/ApplyGitattributes"
 	RepositoryService_FetchRemote_FullMethodName                  = "/gitaly.RepositoryService/FetchRemote"
 	RepositoryService_CreateRepository_FullMethodName             = "/gitaly.RepositoryService/CreateRepository"
 	RepositoryService_GetArchive_FullMethodName                   = "/gitaly.RepositoryService/GetArchive"
@@ -103,10 +102,6 @@ type RepositoryServiceClient interface {
 	ObjectsSize(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ObjectsSizeRequest, ObjectsSizeResponse], error)
 	// ObjectFormat determines the object format that is being used by the repository.
 	ObjectFormat(ctx context.Context, in *ObjectFormatRequest, opts ...grpc.CallOption) (*ObjectFormatResponse, error)
-	// Deprecated: Do not use.
-	// ApplyGitattributes writes the attributes from the given revision to info/attributes.
-	// This RPC will be removed in 17.0.
-	ApplyGitattributes(ctx context.Context, in *ApplyGitattributesRequest, opts ...grpc.CallOption) (*ApplyGitattributesResponse, error)
 	// FetchRemote fetches references from a remote repository into the local
 	// repository. The remote can be fetched via HTTP or SSH depending on the
 	// request options provided.
@@ -307,17 +302,6 @@ func (c *repositoryServiceClient) ObjectFormat(ctx context.Context, in *ObjectFo
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ObjectFormatResponse)
 	err := c.cc.Invoke(ctx, RepositoryService_ObjectFormat_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// Deprecated: Do not use.
-func (c *repositoryServiceClient) ApplyGitattributes(ctx context.Context, in *ApplyGitattributesRequest, opts ...grpc.CallOption) (*ApplyGitattributesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ApplyGitattributesResponse)
-	err := c.cc.Invoke(ctx, RepositoryService_ApplyGitattributes_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -850,10 +834,6 @@ type RepositoryServiceServer interface {
 	ObjectsSize(grpc.ClientStreamingServer[ObjectsSizeRequest, ObjectsSizeResponse]) error
 	// ObjectFormat determines the object format that is being used by the repository.
 	ObjectFormat(context.Context, *ObjectFormatRequest) (*ObjectFormatResponse, error)
-	// Deprecated: Do not use.
-	// ApplyGitattributes writes the attributes from the given revision to info/attributes.
-	// This RPC will be removed in 17.0.
-	ApplyGitattributes(context.Context, *ApplyGitattributesRequest) (*ApplyGitattributesResponse, error)
 	// FetchRemote fetches references from a remote repository into the local
 	// repository. The remote can be fetched via HTTP or SSH depending on the
 	// request options provided.
@@ -1021,9 +1001,6 @@ func (UnimplementedRepositoryServiceServer) ObjectsSize(grpc.ClientStreamingServ
 }
 func (UnimplementedRepositoryServiceServer) ObjectFormat(context.Context, *ObjectFormatRequest) (*ObjectFormatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ObjectFormat not implemented")
-}
-func (UnimplementedRepositoryServiceServer) ApplyGitattributes(context.Context, *ApplyGitattributesRequest) (*ApplyGitattributesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ApplyGitattributes not implemented")
 }
 func (UnimplementedRepositoryServiceServer) FetchRemote(context.Context, *FetchRemoteRequest) (*FetchRemoteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchRemote not implemented")
@@ -1232,24 +1209,6 @@ func _RepositoryService_ObjectFormat_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RepositoryServiceServer).ObjectFormat(ctx, req.(*ObjectFormatRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RepositoryService_ApplyGitattributes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ApplyGitattributesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RepositoryServiceServer).ApplyGitattributes(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RepositoryService_ApplyGitattributes_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RepositoryServiceServer).ApplyGitattributes(ctx, req.(*ApplyGitattributesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1810,10 +1769,6 @@ var RepositoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ObjectFormat",
 			Handler:    _RepositoryService_ObjectFormat_Handler,
-		},
-		{
-			MethodName: "ApplyGitattributes",
-			Handler:    _RepositoryService_ApplyGitattributes_Handler,
 		},
 		{
 			MethodName: "FetchRemote",
