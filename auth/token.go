@@ -26,7 +26,6 @@ var (
 	tokenValidityDuration = 30 * time.Second
 
 	errUnauthenticated = status.Errorf(codes.Unauthenticated, "authentication required")
-	errDenied          = status.Errorf(codes.PermissionDenied, "permission denied")
 
 	authErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -36,6 +35,10 @@ var (
 		[]string{"version", "error"},
 	)
 )
+
+func newPermissionDeniedError(reason string) error {
+	return status.Errorf(codes.PermissionDenied, "permission denied: %s", reason)
+}
 
 // TokenValidityDuration returns the duration for which any token will be
 // valid. This is currently only used by our testing infrastructure.
@@ -69,13 +72,11 @@ func CheckToken(ctx context.Context, secret string, targetTime time.Time) error 
 		return errUnauthenticated
 	}
 
-	if authInfo.Version == "v2" {
-		if v2HmacInfoValid(authInfo.Message, authInfo.SignedMessage, []byte(secret), targetTime, tokenValidityDuration) {
-			return nil
-		}
+	if authInfo.Version != "v2" {
+		return newPermissionDeniedError("invalid token version")
 	}
 
-	return errDenied
+	return v2HmacInfoValid(authInfo.Message, authInfo.SignedMessage, []byte(secret), targetTime, tokenValidityDuration)
 }
 
 // ExtractAuthInfo returns an `AuthInfo` with the data extracted from `ctx`
@@ -102,17 +103,19 @@ func ExtractAuthInfo(ctx context.Context) (*AuthInfo, error) {
 
 func countV2Error(message string) { authErrors.WithLabelValues("v2", message).Inc() }
 
-func v2HmacInfoValid(message string, signedMessage, secret []byte, targetTime time.Time, tokenValidity time.Duration) bool {
+func v2HmacInfoValid(message string, signedMessage, secret []byte, targetTime time.Time, tokenValidity time.Duration) error {
 	expectedHMAC := hmacSign(secret, message)
 	if !hmac.Equal(signedMessage, expectedHMAC) {
-		countV2Error("wrong hmac signature")
-		return false
+		const reason = "wrong hmac signature"
+		countV2Error(reason)
+		return newPermissionDeniedError(reason)
 	}
 
 	timestamp, err := strconv.ParseInt(message, 10, 64)
 	if err != nil {
-		countV2Error("cannot parse timestamp")
-		return false
+		const reason = "cannot parse timestamp"
+		countV2Error(reason)
+		return newPermissionDeniedError(fmt.Sprintf("%s: %s", reason, err))
 	}
 
 	issuedAt := time.Unix(timestamp, 0)
@@ -120,16 +123,18 @@ func v2HmacInfoValid(message string, signedMessage, secret []byte, targetTime ti
 	upperBound := targetTime.Add(tokenValidity)
 
 	if issuedAt.Before(lowerBound) {
-		countV2Error("timestamp too old")
-		return false
+		const reason = "timestamp too old"
+		countV2Error(reason)
+		return newPermissionDeniedError(reason)
 	}
 
 	if issuedAt.After(upperBound) {
-		countV2Error("timestamp too new")
-		return false
+		const reason = "timestamp too new"
+		countV2Error(reason)
+		return newPermissionDeniedError(reason)
 	}
 
-	return true
+	return nil
 }
 
 func hmacSign(secret []byte, message string) []byte {

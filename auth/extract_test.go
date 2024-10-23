@@ -41,27 +41,27 @@ func TestCheckTokenV2(t *testing.T) {
 		{
 			desc:   "Invalid secret, time within threshold",
 			token:  "v2.52a3b9016f46853c225c72b87617ac27109bba8a3068002069ab90e28253a911.1535671585",
-			result: errDenied,
+			result: newPermissionDeniedError("wrong hmac signature"),
 		},
 		{
 			desc:   "Valid secret, time too much in the future",
 			token:  "v2.ab9e7315aeecf6815fc0df585370157814131acab376f41797ad4ebc4d9a823c.1535671631",
-			result: errDenied,
+			result: newPermissionDeniedError("timestamp too new"),
 		},
 		{
 			desc:   "Valid secret, time too much in the past",
 			token:  "v2.f805bc69ca3aedd99e814b3fb1fc1e6a1094191691480b168a20fad7c2d24557.1535671569",
-			result: errDenied,
+			result: newPermissionDeniedError("timestamp too old"),
 		},
 		{
 			desc:   "Mismatching signed and clear message",
 			token:  "v2.319b96a3194c1cb2a2e6f1386161aca1c4cda13257fa9df8a328ab6769649bb0.1535671599",
-			result: errDenied,
+			result: newPermissionDeniedError("wrong hmac signature"),
 		},
 		{
 			desc:   "Invalid version",
 			token:  "v3.6fec98e8fe494284ce545c4b421799f02b9718b0eadfc3772d027e1ac5d6d569.1535671601",
-			result: errDenied,
+			result: newPermissionDeniedError("invalid token version"),
 		},
 		{
 			desc:   "Invalid token format",
