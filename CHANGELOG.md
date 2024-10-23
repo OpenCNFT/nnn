@@ -1,5 +1,9 @@
 # Gitaly changelog
 
+## 17.5.1 (2024-10-22)
+
+No changes.
+
 ## 17.5.0 (2024-10-16)
 
 ### Added (1 change)
@@ -13,6 +17,12 @@
 ### Deprecated (1 change)
 
 - [protobuf: Mark SSHUploadPack RPC as deprecated](gitlab-org/gitaly@b4e224d975fb33e1fa91efe3e61d92b426a37560) ([merge request](gitlab-org/gitaly!7324))
+
+## 17.4.3 (2024-10-22)
+
+### Fixed (1 change)
+
+- [Update gocloud.dev to v0.40.0](gitlab-org/security/gitaly@ae5ab8beee87a2cc0a72991697f013ed4264eeeb)
 
 ## 17.4.2 (2024-10-09)
 
@@ -36,6 +46,10 @@ No changes.
 ### Other (1 change)
 
 - [featureflag: Remove use_empty_tree_in_attr_tree_config](gitlab-org/gitaly@676b701f4adce5fb35d4b56689e7e261d3113e88) ([merge request](gitlab-org/gitaly!7199))
+
+## 17.3.6 (2024-10-22)
+
+No changes.
 
 ## 17.3.5 (2024-10-09)
 
