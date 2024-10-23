@@ -6,5 +6,5 @@ var RemoveCatfileCacheSessionID = NewFeatureFlag(
 	"remove_catfile_cache_session_id",
 	"v17.6.0",
 	"https://gitlab.com/gitlab-org/gitaly/-/issues/6404",
-	false,
+	true,
 )
