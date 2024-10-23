@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v4"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -25,6 +26,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
+// DefaultMaxInactivePartitions is the default number of inactive partitions to keep on standby.
+var DefaultMaxInactivePartitions = 100
+
 // ErrPartitionManagerClosed is returned when the PartitionManager stops processing transactions.
 var ErrPartitionManagerClosed = errors.New("partition manager closed")
 
@@ -32,6 +36,7 @@ var ErrPartitionManagerClosed = errors.New("partition manager closed")
 type Partition interface {
 	storage.Partition
 	Run() error
+	CloseSnapshots() error
 }
 
 // PartitionFactory is factory type that can create new partitions.
@@ -73,12 +78,24 @@ type StorageManager struct {
 	database keyvalue.Store
 	// partitionAssigner manages partition assignments of repositories.
 	partitionAssigner *partitionAssigner
-	// partitions contains all the active partitions. Each repository can have up to one partition.
-	partitions map[storage.PartitionID]*partition
+	// activePartitions contains all the active partitions. Active partitions are partitions that have
+	// one or more open handles to them.
+	activePartitions map[storage.PartitionID]*partition
+	// maxInactivePartitions is the maximum number of partitions to keep on standby in inactivePartitions.
+	maxInactivePartitions int
+	// inactivePartitions contains partitions that are not actively accessed. They're kept open and ready
+	// to immediately serve new requests without the initialization overhead.
+	inactivePartitions *lru.Cache[storage.PartitionID, *partition]
+	// closingPartitions is a map of partitions that are in the process of closing down and should
+	// not be used anymore. They are kept in the map so they can be cleaned up if the StorageManager
+	// is closing.
+	closingPartitions map[*partition]struct{}
 	// initializingPartitions keeps track of partitions currently being initialized.
 	initializingPartitions sync.WaitGroup
-	// activePartitions keeps track of active partitions.
-	activePartitions sync.WaitGroup
+	// runningPartitionGoroutines keeps track of how many partition running goroutines are still alive.
+	// This is different from the active partitions as the goroutines perform clean up after the partition
+	// is no longer active itself.
+	runningPartitionGoroutines sync.WaitGroup
 	// partitionFactory is a factory to create Partitions.
 	partitionFactory PartitionFactory
 
@@ -99,6 +116,7 @@ func NewStorageManager(
 	path string,
 	dbMgr *databasemgr.DBManager,
 	partitionFactory PartitionFactory,
+	maxInactivePartitions int,
 	metrics *Metrics,
 ) (*StorageManager, error) {
 	internalDir := internalDirectoryPath(path)
@@ -124,17 +142,25 @@ func NewStorageManager(
 		return nil, fmt.Errorf("new partition assigner: %w", err)
 	}
 
+	cache, err := lru.New[storage.PartitionID, *partition](maxInactivePartitions)
+	if err != nil {
+		return nil, fmt.Errorf("new lru: %w", err)
+	}
+
 	return &StorageManager{
-		logger:            storageLogger,
-		name:              name,
-		path:              path,
-		stagingDirectory:  stagingDir,
-		database:          db,
-		partitionAssigner: pa,
-		partitions:        map[storage.PartitionID]*partition{},
-		partitionFactory:  partitionFactory,
-		metrics:           metrics.storageManagerMetrics(name),
-		syncer:            safe.NewSyncer(),
+		logger:                storageLogger,
+		name:                  name,
+		path:                  path,
+		stagingDirectory:      stagingDir,
+		database:              db,
+		partitionAssigner:     pa,
+		activePartitions:      map[storage.PartitionID]*partition{},
+		maxInactivePartitions: maxInactivePartitions,
+		inactivePartitions:    cache,
+		closingPartitions:     map[*partition]struct{}{},
+		partitionFactory:      partitionFactory,
+		metrics:               metrics.storageManagerMetrics(name),
+		syncer:                safe.NewSyncer(),
 	}, nil
 }
 
@@ -151,16 +177,32 @@ func (sm *StorageManager) Close() {
 	// some partitions are initializing.
 	sm.initializingPartitions.Wait()
 
-	// Close all currently active partitions. No more partitions can be added to the list
+	// Close all currently running partitions. No more partitions can be added to the list
 	// as we set closed in the earlier lock block.
 	sm.mu.Lock()
-	for _, ptn := range sm.partitions {
+	for _, ptn := range sm.activePartitions {
+		ptn.close()
+	}
+
+	for _, ptn := range sm.inactivePartitions.Values() {
+		ptn.close()
+	}
+
+	// We shouldn't need to explicitly release closing partitions here. StorageManager is only
+	// closed when the server is exiting, and by that point the server's shutdown grace period
+	// would've elapsed, thus we expect all Git commands running within the partition to have
+	// exited.
+	//
+	// Unfortunately, because we don't SIGKILL commands, we have no guarantee that this will
+	// be the case. Once https://gitlab.com/gitlab-org/gitaly/-/issues/5595 is implemented, we
+	// can remove this loop.
+	for ptn := range sm.closingPartitions {
 		ptn.close()
 	}
 	sm.mu.Unlock()
 
 	// Wait for all partitions to finish.
-	sm.activePartitions.Wait()
+	sm.runningPartitionGoroutines.Wait()
 
 	if err := sm.partitionAssigner.Close(); err != nil {
 		sm.logger.WithError(err).Error("failed closing partition assigner")
@@ -198,6 +240,8 @@ func newFinalizableTransaction(tx storage.Transaction, finalize func()) *finaliz
 
 // partition contains the transaction manager and tracks the number of in-flight transactions for the partition.
 type partition struct {
+	// id is the ID of the partition.
+	id storage.PartitionID
 	// initialized is closed when the partition has been setup and is ready for
 	// access.
 	initialized chan struct{}
@@ -348,9 +392,30 @@ func (p *partitionHandle) Close() {
 		defer p.sm.mu.Unlock()
 
 		p.partition.referenceCount--
-		if p.partition.referenceCount == 0 {
-			p.partition.close()
+		if p.partition.referenceCount > 0 {
+			// This partition still has active handles. Keep it active.
+			return
 		}
+
+		// If there's an active partition with this handle's ID, it could mean that
+		// p has stopped running due to an error and was replaced by another partition
+		// instance. If so, p has already exited, so we call close directly to complete
+		// the cleanup of the partition.
+		if p.sm.activePartitions[p.id] != p.partition {
+			p.partition.close()
+			return
+		}
+
+		// The partition no longer has active users. Move it to the inactive partition
+		// list to stay on standby and evict other standbys as necessary to make space.
+		if p.sm.inactivePartitions.Len() == p.sm.maxInactivePartitions {
+			_, evictedPartition, _ := p.sm.inactivePartitions.RemoveOldest()
+			evictedPartition.close()
+			p.sm.closingPartitions[evictedPartition] = struct{}{}
+		}
+
+		delete(p.sm.activePartitions, p.partition.id)
+		p.sm.inactivePartitions.Add(p.partition.id, p.partition)
 	})
 }
 
@@ -416,7 +481,15 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 			return nil, ErrPartitionManagerClosed
 		}
 
-		ptn, ok := sm.partitions[partitionID]
+		var isInactive bool
+		// Check whether the partition is currently already open as it is being accessed.
+		ptn, ok := sm.activePartitions[partitionID]
+		if !ok {
+			// If not, check whether we've kept the partitions still open ready for access.
+			if ptn, ok = sm.inactivePartitions.Get(partitionID); ok {
+				isInactive = true
+			}
+		}
 		if !ok {
 			sm.initializingPartitions.Add(1)
 			// The partition isn't running yet so we're responsible for setting it up.
@@ -425,20 +498,15 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				// lock so we don't block retrieval of other partitions
 				// while setting up this one.
 				ptn = &partition{
+					id:              partitionID,
 					initialized:     make(chan struct{}),
 					closing:         make(chan struct{}),
 					closed:          make(chan struct{}),
 					managerFinished: make(chan struct{}),
 					referenceCount:  1,
 				}
-				sm.partitions[partitionID] = ptn
+				sm.activePartitions[partitionID] = ptn
 				sm.mu.Unlock()
-
-				removePartition := func() {
-					sm.mu.Lock()
-					delete(sm.partitions, partitionID)
-					sm.mu.Unlock()
-				}
 
 				defer func() {
 					if returnedErr != nil {
@@ -447,7 +515,9 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 						ptn.errInitialization = returnedErr
 						// Remove the partition immediately from the map. Since the setup failed,
 						// there's no goroutine running for the partition.
-						removePartition()
+						sm.mu.Lock()
+						delete(sm.activePartitions, partitionID)
+						sm.mu.Unlock()
 					}
 
 					sm.initializingPartitions.Done()
@@ -480,7 +550,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 				ptn.Partition = mgr
 
 				sm.metrics.partitionsStarted.Inc()
-				sm.activePartitions.Add(1)
+				sm.runningPartitionGoroutines.Add(1)
 				go func() {
 					if err := mgr.Run(); err != nil {
 						logger.WithError(err).WithField("partition_state_directory", relativeStateDir).Error("partition failed")
@@ -490,7 +560,11 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					// need to be started in order to continue processing transactions. The partition instance
 					// is deleted allowing the next transaction for the repository to create a new partition
 					// instance.
-					removePartition()
+					sm.mu.Lock()
+					delete(sm.activePartitions, partitionID)
+					sm.inactivePartitions.Remove(partitionID)
+					sm.closingPartitions[ptn] = struct{}{}
+					sm.mu.Unlock()
 
 					close(ptn.managerFinished)
 
@@ -501,14 +575,23 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 					//
 					// All transactions must eventually finish, so we don't wait on a context cancellation here.
 					<-ptn.closing
+					sm.mu.Lock()
+					sm.closingPartitions[ptn] = struct{}{}
+					sm.mu.Unlock()
+
+					// Now that all handles to the partition have been closed, there can be no more transactions
+					// using the snapshots, nor can there be new snapshots starting. Close the snapshots that
+					// may have been cached.
+					if err := mgr.CloseSnapshots(); err != nil {
+						logger.WithError(err).Error("failed closing snapshots")
+					}
 
 					if err := os.RemoveAll(stagingDir); err != nil {
 						logger.WithError(err).Error("failed removing partition's staging directory")
 					}
-
 					sm.metrics.partitionsStopped.Inc()
 					close(ptn.closed)
-					sm.activePartitions.Done()
+					sm.runningPartitionGoroutines.Done()
 				}()
 
 				return nil
@@ -539,6 +622,12 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 		// Increment the reference count and release the lock. We don't want to hold the lock while waiting
 		// for the initialization so other partition retrievals can proceed.
 		ptn.referenceCount++
+		if isInactive {
+			// If so, move the partition to the list of active partitions and remove
+			// it from the inactive list as it now has a user again.
+			sm.activePartitions[partitionID] = ptn
+			sm.inactivePartitions.Remove(partitionID)
+		}
 		sm.mu.Unlock()
 
 		// Wait for the goroutine setting up the partition to finish initializing it. The initialization

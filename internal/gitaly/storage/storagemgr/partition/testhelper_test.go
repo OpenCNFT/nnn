@@ -1544,6 +1544,9 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		expectedRepositories[relativePath] = state
 	}
 
+	// Close snapshots before asserting the repositories in the storage. Otherwise the repositories in the shared snapshots
+	// will be considered to be repositories in the storage.
+	require.NoError(t, transactionManager.CloseSnapshots())
 	RequireRepositories(t, ctx, setup.Config, setup.Config.Storages[0].Path, storageScopedFactory.Build, expectedRepositories)
 
 	expectedDirectory := tc.expectedState.Directory

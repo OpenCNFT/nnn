@@ -62,16 +62,36 @@ func TestRepositorySize_normalRepository(t *testing.T) {
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
 	requireRepositorySize(t, ctx, client, repo, 0)
 
+	// Gitaly may cache read snapshots until they are invalidated by further writes. As this test is performing writes
+	// directly in the repository and not going through the API, the read snaphot is not invalidated by the direct writes
+	// to the repository done here. This causes all of the RepositorySize calls below to read the snapshot which does
+	// not contain the direct writes done by this test leading to the assertions failing.
+	//
+	// Invalidate the cached snapshot by performing a no-op write until this test is fixed to correctly access the
+	// repository thhrough the API.
+	invalidateSnapshot := func() {
+		resp, err := client.WriteRef(ctx, &gitalypb.WriteRefRequest{
+			Repository: repo,
+			Ref:        []byte("HEAD"),
+			Revision:   []byte(git.DefaultRef),
+		})
+		require.NoError(t, err)
+		testhelper.ProtoEqual(t, &gitalypb.WriteRefResponse{}, resp)
+	}
+
 	// When writing a largish blob into the repository it's expected to grow.
 	gittest.WriteBlob(t, cfg, repoPath, incompressibleData(16*1024))
+	invalidateSnapshot()
 	requireRepositorySize(t, ctx, client, repo, 16)
 
 	// Also, updating any other files should cause a size increase.
 	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "packed-refs"), incompressibleData(7*1024), mode.File))
+	invalidateSnapshot()
 	requireRepositorySize(t, ctx, client, repo, 23)
 
 	// Even garbage should increase the size.
 	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "garbage"), incompressibleData(5*1024), mode.File))
+	invalidateSnapshot()
 	requireRepositorySize(t, ctx, client, repo, 28)
 }
 

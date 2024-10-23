@@ -20,6 +20,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testserver"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 func removeHeadReference(refs []git.Reference) []git.Reference {
@@ -40,6 +41,16 @@ func TestRemoteRepository_ResetRefs(t *testing.T) {
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
 
+	// Create some commits
+	c0 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"))
+	c1 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c0), gittest.WithBranch("main"))
+	c2 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c1), gittest.WithBranch("branch-1"))
+
+	// Create some more commits
+	updatedCommit1 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c1))
+	updatedCommit2 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c2))
+	updatedCommit3 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c2))
+
 	pool := client.NewPool()
 	defer testhelper.MustClose(t, pool)
 
@@ -48,20 +59,35 @@ func TestRemoteRepository_ResetRefs(t *testing.T) {
 
 	rr := backup.NewRemoteRepository(repo, conn)
 
-	// Create some commits
-	c0 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"))
-	c1 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c0), gittest.WithBranch("main"))
-	c2 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c1), gittest.WithBranch("branch-1"))
-
 	// "Snapshot" the refs to pretend this is our backup.
 	backupRefState, err := rr.ListRefs(ctx)
 	require.NoError(t, err)
 	backupRefState = removeHeadReference(backupRefState)
 
-	// Create some more commits
-	gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c1), gittest.WithBranch("main"))
-	gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c2), gittest.WithBranch("branch-1"))
-	gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c2), gittest.WithBranch("branch-2"))
+	stream, err := gitalypb.NewRefServiceClient(conn).UpdateReferences(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, stream.Send(&gitalypb.UpdateReferencesRequest{
+		Repository: repo,
+		Updates: []*gitalypb.UpdateReferencesRequest_Update{
+			{
+				Reference:   []byte("refs/heads/main"),
+				NewObjectId: []byte(updatedCommit1),
+			},
+			{
+				Reference:   []byte("refs/heads/branch-1"),
+				NewObjectId: []byte(updatedCommit2),
+			},
+			{
+				Reference:   []byte("refs/heads/branch-2"),
+				NewObjectId: []byte(updatedCommit3),
+			},
+		},
+	}))
+
+	resp, err := stream.CloseAndRecv()
+	require.NoError(t, err)
+	testhelper.ProtoEqual(t, &gitalypb.UpdateReferencesResponse{}, resp)
 
 	intermediateRefState, err := rr.ListRefs(ctx)
 	require.NoError(t, err)
@@ -149,11 +175,25 @@ func TestRemoteRepository_SetHeadReference(t *testing.T) {
 	rr := backup.NewRemoteRepository(repo, conn)
 
 	c0 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(git.DefaultBranch))
+	c1 := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c0))
 	expectedHead, err := rr.HeadReference(ctx)
 	require.NoError(t, err)
 
-	gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(c0), gittest.WithBranch("branch-1"))
-	gittest.Exec(t, cfg, "-C", repoPath, "symbolic-ref", "HEAD", "refs/heads/branch-1")
+	for _, update := range []struct {
+		Ref      string
+		Revision string
+	}{
+		{Ref: "refs/heads/branch-1", Revision: c1.String()},
+		{Ref: "HEAD", Revision: "refs/heads/branch-1"},
+	} {
+		resp, err := gitalypb.NewRepositoryServiceClient(conn).WriteRef(ctx, &gitalypb.WriteRefRequest{
+			Repository: repo,
+			Ref:        []byte(update.Ref),
+			Revision:   []byte(update.Revision),
+		})
+		require.NoError(t, err)
+		testhelper.ProtoEqual(t, &gitalypb.WriteRefResponse{}, resp)
+	}
 
 	newHead, err := rr.HeadReference(ctx)
 	require.NoError(t, err)

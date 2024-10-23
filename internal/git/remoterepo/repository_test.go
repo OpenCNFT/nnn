@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/remoterepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -17,6 +17,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 func TestRepository(t *testing.T) {
@@ -27,18 +28,42 @@ func TestRepository(t *testing.T) {
 	pool := client.NewPool()
 	t.Cleanup(func() { testhelper.MustClose(t, pool) })
 
-	gittest.TestRepository(t, cfg, func(tb testing.TB, ctx context.Context) (gitcmd.Repository, string) {
+	gittest.TestRepository(t, func(tb testing.TB, ctx context.Context) gittest.RepositorySuiteState {
 		tb.Helper()
 
 		ctx, err := storage.InjectGitalyServers(ctx, "default", cfg.SocketPath, cfg.Auth.Token)
 		require.NoError(tb, err)
 
+		var repoPath string
 		repoProto, repoPath := gittest.CreateRepository(tb, ctx, cfg)
+
+		firstParentCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("first parent"))
+		secondParentCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("second parent"))
+		childCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(firstParentCommit, secondParentCommit))
 
 		repo, err := remoterepo.New(metadata.OutgoingToIncoming(ctx), repoProto, pool)
 		require.NoError(tb, err)
-		return repo, repoPath
-	})
+
+		return gittest.RepositorySuiteState{
+			Repository: repo,
+			SetReference: func(tb testing.TB, ctx context.Context, name git.ReferenceName, oid git.ObjectID) {
+				conn, err := pool.Dial(ctx, cfg.SocketPath, cfg.Auth.Token)
+				require.NoError(t, err)
+
+				resp, err := gitalypb.NewRepositoryServiceClient(conn).WriteRef(ctx, &gitalypb.WriteRefRequest{
+					Repository: repoProto,
+					Ref:        []byte(name),
+					Revision:   []byte(oid),
+				})
+				require.NoError(tb, err)
+				testhelper.ProtoEqual(tb, &gitalypb.WriteRefResponse{}, resp)
+			},
+			FirstParentCommit:  firstParentCommit,
+			SecondParentCommit: secondParentCommit,
+			ChildCommit:        childCommit,
+		}
+	},
+	)
 }
 
 func TestRepository_ObjectHash(t *testing.T) {

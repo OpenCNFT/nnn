@@ -134,6 +134,14 @@ func (m *mockPartition) Close() {
 	m.close()
 }
 
+func (m *mockPartition) CloseSnapshots() error {
+	if !m.closeCalled.Load() {
+		return fmt.Errorf("close snaphots called before close")
+	}
+
+	return nil
+}
+
 type mockTransaction struct {
 	storage.Transaction
 	commit   func(context.Context) error
@@ -154,7 +162,18 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 
 	var waitFor []chan struct{}
 	mgr.mu.Lock()
-	for _, ptn := range mgr.partitions {
+	var partitions []*partition
+	for _, ptn := range mgr.activePartitions {
+		partitions = append(partitions, ptn)
+	}
+
+	partitions = append(partitions, mgr.inactivePartitions.Values()...)
+
+	for ptn := range mgr.closingPartitions {
+		partitions = append(partitions, ptn)
+	}
+
+	for _, ptn := range partitions {
 		// The closePartition step closes the transaction manager directly without calling close
 		// on the partition, so we check the manager directly here as well.
 		if ptn.isClosing() || ptn.Partition.(*mockPartition).closeCalled.Load() {
@@ -173,18 +192,38 @@ func blockOnPartitionClosing(t *testing.T, mgr *StorageManager, waitForFullClose
 	}
 }
 
+// partitionState contains state used to assert the state of partition in a StorageManager.
+type partitionState struct {
+	// active contains the active partitions with their reference counts.
+	active map[storage.PartitionID]uint
+	// inactive contains the inactive partitions with their reference counts.
+	inactive map[storage.PartitionID]uint
+}
+
 // checkExpectedState validates that the storage manager contains the correct partitions and
 // associated reference counts at the point of execution.
-func checkExpectedState(t *testing.T, mgr *StorageManager, expectedState map[storage.PartitionID]uint) {
+func checkExpectedState(t *testing.T, mgr *StorageManager, expectedState partitionState) {
 	t.Helper()
 
-	actualState := map[storage.PartitionID]uint{}
-	for ptnID, partition := range mgr.partitions {
-		actualState[ptnID] = partition.referenceCount
+	actualState := partitionState{
+		active:   map[storage.PartitionID]uint{},
+		inactive: map[storage.PartitionID]uint{},
 	}
 
-	if expectedState == nil {
-		expectedState = map[storage.PartitionID]uint{}
+	for ptnID, partition := range mgr.activePartitions {
+		actualState.active[ptnID] = partition.referenceCount
+	}
+
+	for _, partition := range mgr.inactivePartitions.Values() {
+		actualState.inactive[partition.id] = partition.referenceCount
+	}
+
+	if expectedState.active == nil {
+		expectedState.active = map[storage.PartitionID]uint{}
+	}
+
+	if expectedState.inactive == nil {
+		expectedState.inactive = map[storage.PartitionID]uint{}
 	}
 
 	require.Equal(t, expectedState, actualState)
@@ -214,7 +253,7 @@ func TestStorageManager(t *testing.T) {
 		readOnly bool
 		// expectedState contains the partitions and their pending transaction count at
 		// the end of the step.
-		expectedState map[storage.PartitionID]uint
+		expectedState partitionState
 		// expectedError is the error expected to be returned when beginning the transaction.
 		expectedError error
 	}
@@ -227,7 +266,7 @@ func TestStorageManager(t *testing.T) {
 		ctx context.Context
 		// expectedState contains the partitions and their pending transaction count at
 		// the end of the step.
-		expectedState map[storage.PartitionID]uint
+		expectedState partitionState
 		// expectedError is the error that is expected to be returned when committing the transaction.
 		expectedError error
 	}
@@ -238,7 +277,7 @@ func TestStorageManager(t *testing.T) {
 		transactionID int
 		// expectedState contains the partitions and their pending transaction count at
 		// the end of the step.
-		expectedState map[storage.PartitionID]uint
+		expectedState partitionState
 		// expectedError is the error that is expected to be returned when rolling back the transaction.
 		expectedError error
 	}
@@ -284,8 +323,9 @@ func TestStorageManager(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		desc  string
-		setup func(t *testing.T, cfg config.Cfg) setupData
+		desc                  string
+		maxInactivePartitions int
+		setup                 func(t *testing.T, cfg config.Cfg) setupData
 	}{
 		{
 			desc: "transaction committed for single repository",
@@ -296,11 +336,19 @@ func TestStorageManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
-						commit{},
+						commit{
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
 					},
 				}
 			},
@@ -315,22 +363,36 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						commit{
 							transactionID: 1,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						commit{
 							transactionID: 2,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 					},
 				}
@@ -346,25 +408,36 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
 							},
 						},
 						commit{
 							transactionID: 1,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						commit{
 							transactionID: 2,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 					},
 				}
@@ -382,42 +455,66 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repoA,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repoB,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-								3: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+									3: 1,
+								},
 							},
 						},
 						begin{
 							transactionID: 3,
 							repo:          repoC,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-								3: 1,
-								4: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+									3: 1,
+									4: 1,
+								},
 							},
 						},
 						commit{
 							transactionID: 1,
-							expectedState: map[storage.PartitionID]uint{
-								3: 1,
-								4: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									3: 1,
+									4: 1,
+								},
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
 							},
 						},
 						commit{
 							transactionID: 2,
-							expectedState: map[storage.PartitionID]uint{
-								4: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									4: 1,
+								},
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+									3: 0,
+								},
 							},
 						},
 						commit{
 							transactionID: 3,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+									3: 0,
+									4: 0,
+								},
+							},
 						},
 					},
 				}
@@ -432,11 +529,19 @@ func TestStorageManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
-						rollback{},
+						rollback{
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
 					},
 				}
 			},
@@ -455,6 +560,11 @@ func TestStorageManager(t *testing.T) {
 							ctx:           stepCtx,
 							repo:          repo,
 							expectedError: context.Canceled,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 					},
 				}
@@ -472,13 +582,20 @@ func TestStorageManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						commit{
 							ctx:           stepCtx,
 							expectedError: context.Canceled,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 					},
 				}
@@ -493,8 +610,10 @@ func TestStorageManager(t *testing.T) {
 					steps: steps{
 						begin{
 							repo: repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						closePartition{},
@@ -515,8 +634,10 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						closePartition{
@@ -525,18 +646,27 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						rollback{
 							transactionID: 1,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						commit{
 							transactionID: 2,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 					},
 				}
@@ -590,8 +720,10 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						begin{
@@ -600,8 +732,10 @@ func TestStorageManager(t *testing.T) {
 								StorageName:  repo.GetStorageName(),
 								RelativePath: filepath.Join(repo.GetRelativePath(), "child-dir", ".."),
 							},
-							expectedState: map[storage.PartitionID]uint{
-								2: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
 							},
 						},
 					},
@@ -618,8 +752,10 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						begin{
@@ -628,20 +764,26 @@ func TestStorageManager(t *testing.T) {
 								StorageName:  repo.GetStorageName(),
 								RelativePath: repo.GetRelativePath(),
 							},
-							expectedState: map[storage.PartitionID]uint{
-								2: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
 							},
 						},
 						rollback{
 							transactionID: 2,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						rollback{
 							transactionID: 2,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 					},
@@ -660,38 +802,53 @@ func TestStorageManager(t *testing.T) {
 							transactionID:         1,
 							repo:                  repo,
 							alternateRelativePath: alternateRepo.GetRelativePath(),
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
 							},
 						},
 						begin{
 							transactionID: 3,
 							repo:          alternateRepo,
-							expectedState: map[storage.PartitionID]uint{
-								2: 3,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 3,
+								},
 							},
 						},
 						rollback{
 							transactionID: 1,
-							expectedState: map[storage.PartitionID]uint{
-								2: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
 							},
 						},
 						rollback{
 							transactionID: 2,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						rollback{
 							transactionID: 3,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
 						},
 					},
 				}
@@ -708,25 +865,31 @@ func TestStorageManager(t *testing.T) {
 						begin{
 							transactionID: 1,
 							repo:          repo1,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						begin{
 							transactionID: 2,
 							repo:          repo2,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-								3: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+									3: 1,
+								},
 							},
 						},
 						begin{
 							transactionID:         3,
 							repo:                  repo1,
 							alternateRelativePath: repo2.GetRelativePath(),
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
-								3: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+									3: 1,
+								},
 							},
 							expectedError: fmt.Errorf("get partition: %w", ErrRepositoriesAreInDifferentPartitions),
 						},
@@ -769,17 +932,21 @@ func TestStorageManager(t *testing.T) {
 			},
 		},
 		{
-			desc: "records metrics correctly",
+			desc:                  "records metrics correctly",
+			maxInactivePartitions: 1,
 			setup: func(t *testing.T, cfg config.Cfg) setupData {
 				repo1 := setupRepository(t, cfg, cfg.Storages[0])
+				repo2 := setupRepository(t, cfg, cfg.Storages[0])
 				return setupData{
 					steps: steps{
 						begin{
 							transactionID: 1,
 							repo:          repo1,
 							readOnly:      true,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						assertMetrics{
@@ -789,36 +956,231 @@ func TestStorageManager(t *testing.T) {
 							transactionID: 2,
 							repo:          repo1,
 							readOnly:      true,
-							expectedState: map[storage.PartitionID]uint{
-								2: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
 							},
 						},
 						commit{
 							transactionID: 1,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
 						assertMetrics{
 							partitionsStartedTotal: 1,
 						},
-						commit{transactionID: 2},
+						commit{
+							transactionID: 2,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
 						assertMetrics{
 							partitionsStartedTotal: 1,
-							partitionsStoppedTotal: 1,
+							partitionsStoppedTotal: 0,
 						},
 						begin{
 							transactionID: 3,
 							repo:          repo1,
 							readOnly:      true,
-							expectedState: map[storage.PartitionID]uint{
-								2: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
 							},
 						},
-						commit{transactionID: 3},
+						commit{
+							transactionID: 3,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
+						assertMetrics{
+							partitionsStartedTotal: 1,
+							partitionsStoppedTotal: 0,
+						},
+						begin{
+							transactionID: 4,
+							repo:          repo2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									3: 1,
+								},
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
 						assertMetrics{
 							partitionsStartedTotal: 2,
-							partitionsStoppedTotal: 2,
+							partitionsStoppedTotal: 0,
+						},
+						commit{
+							transactionID: 4,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									3: 0,
+								},
+							},
+						},
+						assertMetrics{
+							partitionsStartedTotal: 2,
+							partitionsStoppedTotal: 1,
+						},
+					},
+				}
+			},
+		},
+		{
+			desc: "two transactions committed for single repository sequentially",
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo := setupRepository(t, cfg, cfg.Storages[0])
+
+				return setupData{
+					steps: steps{
+						begin{
+							transactionID: 1,
+							repo:          repo,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
+							},
+						},
+						commit{
+							transactionID: 1,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
+						begin{
+							transactionID: 2,
+							repo:          repo,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
+							},
+						},
+						commit{
+							transactionID: 2,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			desc:                  "number of inactive partitions is limited",
+			maxInactivePartitions: 2,
+			setup: func(t *testing.T, cfg config.Cfg) setupData {
+				repo1 := setupRepository(t, cfg, cfg.Storages[0])
+				repo2 := setupRepository(t, cfg, cfg.Storages[0])
+				repo3 := setupRepository(t, cfg, cfg.Storages[0])
+
+				return setupData{
+					steps: steps{
+						begin{
+							transactionID: 1,
+							repo:          repo1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+								},
+							},
+						},
+						begin{
+							transactionID: 2,
+							repo:          repo1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+								},
+							},
+						},
+						begin{
+							transactionID: 3,
+							repo:          repo2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+									3: 1,
+								},
+							},
+						},
+						// We can have unlimited amount of active partitions.
+						begin{
+							transactionID: 4,
+							repo:          repo3,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 2,
+									3: 1,
+									4: 1,
+								},
+							},
+						},
+						// Committing a transaction does not move the repository to inactive
+						// yet as as the partition has more users.
+						commit{
+							transactionID: 1,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									2: 1,
+									3: 1,
+									4: 1,
+								},
+							},
+						},
+						commit{
+							transactionID: 2,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									3: 1,
+									4: 1,
+								},
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+								},
+							},
+						},
+						// We now have the maximum number of inactive partitions.
+						commit{
+							transactionID: 3,
+							expectedState: partitionState{
+								active: map[storage.PartitionID]uint{
+									4: 1,
+								},
+								inactive: map[storage.PartitionID]uint{
+									2: 0,
+									3: 0,
+								},
+							},
+						},
+						// As we go over the limit, the least recently used partition
+						// is evicted and cleaned up.
+						commit{
+							transactionID: 4,
+							expectedState: partitionState{
+								inactive: map[storage.PartitionID]uint{
+									3: 0,
+									4: 0,
+								},
+							},
 						},
 					},
 				}
@@ -853,6 +1215,11 @@ func TestStorageManager(t *testing.T) {
 				partitionFactory = newStubPartitionFactory()
 			}
 
+			maxInactivePartitions := DefaultMaxInactivePartitions
+			if tc.maxInactivePartitions > 0 {
+				maxInactivePartitions = tc.maxInactivePartitions
+			}
+
 			metrics := NewMetrics(cfg.Prometheus)
 			storageMgr, err := NewStorageManager(
 				logger,
@@ -860,9 +1227,14 @@ func TestStorageManager(t *testing.T) {
 				cfg.Storages[0].Path,
 				dbMgr,
 				partitionFactory,
+				maxInactivePartitions,
 				metrics,
 			)
 			require.NoError(t, err)
+
+			if tc.maxInactivePartitions > 0 {
+				storageMgr.maxInactivePartitions = tc.maxInactivePartitions
+			}
 
 			defer func() {
 				storageMgr.Close()
@@ -908,7 +1280,7 @@ func TestStorageManager(t *testing.T) {
 					})
 					require.Equal(t, step.expectedError, err)
 
-					blockOnPartitionClosing(t, storageMgr, true)
+					blockOnPartitionClosing(t, storageMgr, false)
 					checkExpectedState(t, storageMgr, step.expectedState)
 
 					if err != nil {
@@ -920,7 +1292,7 @@ func TestStorageManager(t *testing.T) {
 					ptnID, err := storageMgr.partitionAssigner.getPartitionID(ctx, relativePath, "", false)
 					require.NoError(t, err)
 
-					ptn := storageMgr.partitions[ptnID]
+					ptn := storageMgr.activePartitions[ptnID]
 					storageMgr.mu.Unlock()
 
 					openTransactionData[step.transactionID] = &transactionData{
@@ -996,7 +1368,7 @@ func TestStorageManager_getPartition(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
+	mgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), DefaultMaxInactivePartitions, NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer mgr.Close()
 
@@ -1012,16 +1384,23 @@ func TestStorageManager_getPartition(t *testing.T) {
 	require.Same(t, ptn2Handle1.(*partitionHandle).Partition, ptn2Handle2.(*partitionHandle).Partition)
 	require.NotSame(t, ptn1.(*partitionHandle).Partition, ptn2Handle1.(*partitionHandle).Partition)
 
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
-		1: 1,
-		2: 2,
+	checkExpectedState(t, mgr, partitionState{
+		active: map[storage.PartitionID]uint{
+			1: 1,
+			2: 2,
+		},
 	})
 
 	// Closing the only handle to a partition should clean it up.
 	ptn1.Close()
 	blockOnPartitionClosing(t, mgr, false)
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
-		2: 2,
+	checkExpectedState(t, mgr, partitionState{
+		active: map[storage.PartitionID]uint{
+			2: 2,
+		},
+		inactive: map[storage.PartitionID]uint{
+			1: 0,
+		},
 	})
 
 	// Closing a handle shouldn't clean up a partition if there are
@@ -1029,14 +1408,19 @@ func TestStorageManager_getPartition(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		ptn2Handle1.Close()
 		blockOnPartitionClosing(t, mgr, false)
-		checkExpectedState(t, mgr, map[storage.PartitionID]uint{
-			2: 1,
+		checkExpectedState(t, mgr, partitionState{
+			active: map[storage.PartitionID]uint{
+				2: 1,
+			},
+			inactive: map[storage.PartitionID]uint{
+				1: 0,
+			},
 		})
 	}
 
 	// Closing cleans up all remaining partitions.
 	mgr.Close()
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
+	checkExpectedState(t, mgr, partitionState{})
 }
 
 func TestStorageManager_concurrentClose(t *testing.T) {
@@ -1052,7 +1436,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	defer dbMgr.Close()
 
 	storageName := cfg.Storages[0].Name
-	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), NewMetrics(cfg.Prometheus))
+	storageMgr, err := NewStorageManager(logger, storageName, cfg.Storages[0].Path, dbMgr, newStubPartitionFactory(), DefaultMaxInactivePartitions, NewMetrics(cfg.Prometheus))
 	require.NoError(t, err)
 	defer storageMgr.Close()
 
@@ -1082,7 +1466,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	}()
 
 	// The Partition may return if it errors out.
-	txMgr := storageMgr.partitions[2].Partition
+	txMgr := storageMgr.activePartitions[2].Partition
 	go func() {
 		defer wg.Done()
 		<-start
@@ -1110,6 +1494,7 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
+		DefaultMaxInactivePartitions,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)
@@ -1222,6 +1607,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
+		DefaultMaxInactivePartitions,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)
@@ -1272,7 +1658,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 	// on the partition to reflect the other pending partition handle retrieval.
 	for {
 		mgr.mu.Lock()
-		refCount := mgr.partitions[1].referenceCount
+		refCount := mgr.activePartitions[1].referenceCount
 		mgr.mu.Unlock()
 
 		if refCount == 2 {
@@ -1287,9 +1673,11 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 	require.NoError(t, err)
 	defer ptn.Close()
 
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
-		1: 2,
-		2: 1,
+	checkExpectedState(t, mgr, partitionState{
+		active: map[storage.PartitionID]uint{
+			1: 2,
+			2: 1,
+		},
 	})
 
 	// Release the blocked partition 1 retrievals and wait for the goroutines
@@ -1298,14 +1686,24 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 	wg.Wait()
 
 	// Only partition 2 should still be active.
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
-		2: 1,
+	checkExpectedState(t, mgr, partitionState{
+		active: map[storage.PartitionID]uint{
+			2: 1,
+		},
 	})
 
 	// Closing the remaining handle to partition 2 should leave us with no active partitions.
 	ptn.Close()
 	blockOnPartitionClosing(t, mgr, true)
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
+	checkExpectedState(t, mgr, partitionState{
+		inactive: map[storage.PartitionID]uint{
+			2: 0,
+		},
+	})
+
+	// Closing the manager cleans up the rest inactive partitions.
+	mgr.Close()
+	checkExpectedState(t, mgr, partitionState{})
 }
 
 func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
@@ -1323,6 +1721,7 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 		cfg.Storages[0].Path,
 		dbMgr,
 		newStubPartitionFactory(),
+		DefaultMaxInactivePartitions,
 		NewMetrics(cfg.Prometheus),
 	)
 	require.NoError(t, err)
@@ -1413,15 +1812,17 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 	require.Nil(t, ptn)
 
 	// First two partitions are still initializing, the third one has initialized.
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{
-		1: 1,
-		2: 1,
-		3: 1,
+	checkExpectedState(t, mgr, partitionState{
+		active: map[storage.PartitionID]uint{
+			1: 1,
+			2: 1,
+			3: 1,
+		},
 	})
 
-	require.Nil(t, mgr.partitions[1].Partition)
-	require.Nil(t, mgr.partitions[2].Partition)
-	require.NotNil(t, mgr.partitions[3].Partition)
+	require.Nil(t, mgr.activePartitions[1].Partition)
+	require.Nil(t, mgr.activePartitions[2].Partition)
+	require.NotNil(t, mgr.activePartitions[3].Partition)
 
 	// The Close() is still waiting for the ongoing initializations to finish.
 	select {
@@ -1435,7 +1836,7 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 	close(unblockInitialization)
 
 	<-closeDone
-	checkExpectedState(t, mgr, map[storage.PartitionID]uint{})
+	checkExpectedState(t, mgr, partitionState{})
 
 	wg.Wait()
 }

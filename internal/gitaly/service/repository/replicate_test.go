@@ -557,7 +557,13 @@ func TestReplicateRepository_transactional(t *testing.T) {
 
 	// We're now changing a reference in the source repository such that we can observe changes
 	// in the target repo.
-	gittest.Exec(t, cfg, "-C", sourceRepoPath, "update-ref", "refs/heads/master", "refs/heads/master~")
+	resp, err := client.WriteRef(ctx, &gitalypb.WriteRefRequest{
+		Repository: sourceRepo,
+		Ref:        []byte("refs/heads/master"),
+		Revision:   []byte(commitID1),
+	})
+	require.NoError(t, err)
+	testhelper.ProtoEqual(t, &gitalypb.WriteRefResponse{}, resp)
 
 	votes = nil
 

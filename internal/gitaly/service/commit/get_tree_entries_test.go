@@ -19,6 +19,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -31,10 +32,11 @@ func TestGetTreeEntries(t *testing.T) {
 
 func testGetTreeEntries(t *testing.T, ctx context.Context) {
 	t.Parallel()
-	cfg := testcfg.Build(t)
 
-	cfg.SocketPath = startTestServices(t, cfg)
-	client := newCommitServiceClient(t, cfg.SocketPath)
+	type TestData struct {
+		cfg    config.Cfg
+		client *grpc.ClientConn
+	}
 
 	type setupData struct {
 		request             *gitalypb.GetTreeEntriesRequest
@@ -45,20 +47,20 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 
 	for _, tc := range []struct {
 		desc  string
-		setup func(t *testing.T) setupData
+		setup func(t *testing.T, data TestData) setupData
 	}{
 		{
 			desc: "path with curly braces exists",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blob := gittest.WriteBlob(t, cfg, repoPath, []byte("test1"))
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
-					Path: "issue-46261", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test1"))
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+					Path: "issue-46261", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+						{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test1.txt", Mode: "100644", OID: blob},
 						})},
-						{Path: "{{curly}}", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+						{Path: "{{curly}}", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test2.txt", Mode: "100644", Content: "test2"},
 						})},
 					}),
@@ -85,16 +87,16 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path with curly braces exists and is requested",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blob := gittest.WriteBlob(t, cfg, repoPath, []byte("test2"))
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
-					Path: "issue-46261", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test2"))
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+					Path: "issue-46261", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+						{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test1.txt", Mode: "100644", Content: "test1"},
 						})},
-						{Path: "{{curly}}", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+						{Path: "{{curly}}", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test2.txt", Mode: "100644", OID: blob},
 						})},
 					}),
@@ -121,7 +123,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "repository does not exist",
-			setup: func(t *testing.T) setupData {
+			setup: func(t *testing.T, data TestData) setupData {
 				return setupData{
 					request: &gitalypb.GetTreeEntriesRequest{
 						Repository: &gitalypb.Repository{StorageName: "fake", RelativePath: "path"},
@@ -136,7 +138,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "repository is nil",
-			setup: func(t *testing.T) setupData {
+			setup: func(t *testing.T, data TestData) setupData {
 				return setupData{
 					request: &gitalypb.GetTreeEntriesRequest{
 						Repository: nil,
@@ -149,8 +151,8 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "revision is empty",
-			setup: func(t *testing.T) setupData {
-				repo, _ := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, _ := gittest.CreateRepository(t, ctx, data.cfg)
 
 				return setupData{
 					request: &gitalypb.GetTreeEntriesRequest{
@@ -164,11 +166,11 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path is empty",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
-					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					}),
 				}))
@@ -190,8 +192,8 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "revision is invalid",
-			setup: func(t *testing.T) setupData {
-				repo, _ := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, _ := gittest.CreateRepository(t, ctx, data.cfg)
 
 				return setupData{
 					request: &gitalypb.GetTreeEntriesRequest{
@@ -205,11 +207,11 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "non existent token",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
-					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					}),
 				}))
@@ -229,10 +231,10 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path points to a file",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath,
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath,
 					gittest.WithTreeEntries(gittest.TreeEntry{
 						Mode:    "100644",
 						Path:    "README.md",
@@ -262,10 +264,10 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path points to a file plus recursive",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath,
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath,
 					gittest.WithTreeEntries(gittest.TreeEntry{
 						Mode:    "100644",
 						Path:    "README.md",
@@ -296,10 +298,10 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path resolves outside the repo",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath,
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath,
 					gittest.WithTreeEntries(gittest.TreeEntry{
 						Mode:    "100644",
 						Path:    "README.md",
@@ -329,11 +331,11 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path contains relative path syntax ..",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
-					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					}),
 				}))
@@ -360,11 +362,11 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path contains relative path syntax ./",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
-					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+					Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					}),
 				}))
@@ -391,15 +393,15 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path with .. in request raises no errors",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				treeID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				treeID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "test.txt", Mode: "100644", OID: blobID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
 					OID:  treeID,
 					Mode: "040000",
 					Path: "a..b",
@@ -425,14 +427,14 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path is .",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				treeID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				treeID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "test.txt", Mode: "100644", Content: "test"},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
 					OID:  treeID,
 					Mode: "040000",
 					Path: "folder",
@@ -460,14 +462,14 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "absolute path is used",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				treeID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				treeID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "test.txt", Mode: "100644", Content: "test"},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(gittest.TreeEntry{
 					OID:  treeID,
 					Mode: "040000",
 					Path: "folder",
@@ -495,8 +497,8 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "deeply nested flat path",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
 				nestingLevel := 12
 				require.Greater(t, nestingLevel, defaultFlatTreeRecursion, "sanity check: construct folder deeper than default recursion value")
@@ -513,10 +515,10 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 						treeEntry = gittest.TreeEntry{Path: strconv.Itoa(i), Mode: "040000", OID: treeIDs[len(treeIDs)-1]}
 					}
 
-					treeID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{treeEntry})
+					treeID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{treeEntry})
 					treeIDs = append(treeIDs, treeID)
 				}
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTree(treeIDs[len(treeIDs)-1]))
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTree(treeIDs[len(treeIDs)-1]))
 
 				return setupData{
 					// We make a non-recursive request which tries to fetch tree entrie for the tree structure
@@ -544,13 +546,13 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with root path but only files in repo",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				fileOID := gittest.WriteBlob(t, cfg, repoPath, []byte("file"))
-				file2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("file2"))
+				fileOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("file"))
+				file2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("file2"))
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: file2OID, Mode: "100644", Path: "bar"},
 					gittest.TreeEntry{OID: fileOID, Mode: "100644", Path: "foo"},
 				))
@@ -584,13 +586,13 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with root path and disabled flat path but only files in repo",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				fileOID := gittest.WriteBlob(t, cfg, repoPath, []byte("file"))
-				file2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("file2"))
+				fileOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("file"))
+				file2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("file2"))
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: file2OID, Mode: "100644", Path: "bar"},
 					gittest.TreeEntry{OID: fileOID, Mode: "100644", Path: "foo"},
 				))
@@ -623,24 +625,24 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with root path and repo with folders",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					})},
 				})
 
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder2", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{Path: "folder3", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder2", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+						{Path: "folder3", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test2.txt", Mode: "100644", Content: "test2"},
 						})},
 					})},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -674,25 +676,25 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with specific folder",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "test.txt", Mode: "100644", Content: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder2", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{Path: "folder3", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder2", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+						{Path: "folder3", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test2.txt", Mode: "100644", Content: "test2"},
 						})},
 					})},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -718,25 +720,25 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with specific folder and disabled flatpath",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "test.txt", Mode: "100644", Content: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder2", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{Path: "folder3", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder2", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+						{Path: "folder3", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{Path: "test2.txt", Mode: "100644", Content: "test2"},
 						})},
 					})},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -762,29 +764,29 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with recursive",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -850,16 +852,16 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with non-existent path",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					})},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
 
@@ -885,16 +887,16 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with non-existent path plus recursive",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					})},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
 
@@ -921,16 +923,16 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with non-existent revision",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					})},
 				})
 
-				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
 
@@ -959,16 +961,16 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "with non-existent revision plus recursive",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+					{Path: "folder", Mode: "040000", OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{Path: "test.txt", Mode: "100644", Content: "test"},
 					})},
 				})
 
-				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
 
@@ -995,29 +997,29 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "sorted by trees first",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -1084,9 +1086,9 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "pagination - read a tree with subdirectories",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
-				subSubDir2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
+				subSubDir2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{
 						Mode:    "100644",
 						Path:    "test3",
@@ -1099,7 +1101,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 					},
 				})
 
-				subSubDir3OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subSubDir3OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{
 						Mode:    "100644",
 						Path:    "test5",
@@ -1107,21 +1109,21 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 					},
 				})
 
-				SubDirBlobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test6-content"))
+				SubDirBlobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test6-content"))
 
-				rootTreeOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				rootTreeOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{
 						Path: "rootDir",
 						Mode: "040000",
-						OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+						OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 							{
 								Path: "subDir",
 								Mode: "040000",
-								OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+								OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 									{
 										Path: "subSubDir",
 										Mode: "040000",
-										OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+										OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 											{
 												Mode:    "100644",
 												Path:    "test",
@@ -1156,7 +1158,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 							{
 								Path: "subDir2",
 								Mode: "040000",
-								OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+								OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 									{
 										Mode:    "100644",
 										Path:    "test5",
@@ -1167,7 +1169,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 							{
 								Path: "subDir3",
 								Mode: "040000",
-								OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+								OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 									{
 										Mode:    "100644",
 										Path:    "test6",
@@ -1183,7 +1185,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 						Content: "file-content",
 					},
 				})
-				gittest.WriteCommit(t, cfg, repoPath, gittest.WithTree(rootTreeOID), gittest.WithBranch("main"))
+				gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTree(rootTreeOID), gittest.WithBranch("main"))
 
 				// First request to get initial page token
 				firstReq := &gitalypb.GetTreeEntriesRequest{
@@ -1196,7 +1198,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 					},
 					Sort: gitalypb.GetTreeEntriesRequest_TREES_FIRST,
 				}
-				stream, err := client.GetTreeEntries(ctx, firstReq)
+				stream, err := gitalypb.NewCommitServiceClient(data.client).GetTreeEntries(ctx, firstReq)
 				require.NoError(t, err)
 
 				var firstResp *gitalypb.GetTreeEntriesResponse
@@ -1253,19 +1255,19 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "pagination continues on same tree after concurrent commit",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
-				file3OID := gittest.WriteBlob(t, cfg, repoPath, []byte("file-3-content"))
-				dir2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
+				file3OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("file-3-content"))
+				dir2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Mode: "100644", Path: "file3", OID: file3OID},
 				})
 				// Initial commit
-				gittest.WriteCommit(t, cfg, repoPath,
-					gittest.WithTree(gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				originalCommitOID := gittest.WriteCommit(t, data.cfg, repoPath,
+					gittest.WithTree(gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 						{
 							Path: "dir1",
 							Mode: "040000",
-							OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+							OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 								{Mode: "100644", Path: "file2", Content: "file2-content"},
 							}),
 						},
@@ -1278,6 +1280,25 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 					gittest.WithBranch("main"),
 				)
 
+				// We need hooks set up to commit the reference update in WriteRef with transactions.
+				testcfg.BuildGitalyHooks(t, data.cfg)
+				// Second commit we'll update the main branch to between the paginated requests.
+				concurrentCommitOID := gittest.WriteCommit(t, data.cfg, repoPath,
+					gittest.WithTree(gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+						{
+							Path: "new_dir",
+							Mode: "040000",
+							OID: gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
+								{
+									Mode:    "100644",
+									Path:    "new_file2",
+									Content: "new_file2-content",
+								},
+							}),
+						},
+					})),
+				)
+
 				// First request to get initial page token
 				firstReq := &gitalypb.GetTreeEntriesRequest{
 					Repository: repo,
@@ -1288,7 +1309,7 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 						Limit: 2,
 					},
 				}
-				stream, err := client.GetTreeEntries(ctx, firstReq)
+				stream, err := gitalypb.NewCommitServiceClient(data.client).GetTreeEntries(ctx, firstReq)
 				require.NoError(t, err)
 
 				var firstResp *gitalypb.GetTreeEntriesResponse
@@ -1302,23 +1323,14 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 				require.Equal(t, []byte("dir1"), firstResp.GetEntries()[0].GetPath())
 				require.Equal(t, []byte("dir1/file2"), firstResp.GetEntries()[1].GetPath())
 
-				// Write a new commit changing the tree
-				gittest.WriteCommit(t, cfg, repoPath,
-					gittest.WithTree(gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-						{
-							Path: "new_dir",
-							Mode: "040000",
-							OID: gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
-								{
-									Mode:    "100644",
-									Path:    "new_file2",
-									Content: "new_file2-content",
-								},
-							}),
-						},
-					})),
-					gittest.WithBranch("main"),
-				)
+				resp, err := gitalypb.NewRepositoryServiceClient(data.client).WriteRef(ctx, &gitalypb.WriteRefRequest{
+					Repository:  repo,
+					Ref:         []byte("refs/heads/main"),
+					Revision:    []byte(concurrentCommitOID),
+					OldRevision: []byte(originalCommitOID),
+				})
+				require.NoError(t, err)
+				testhelper.ProtoEqual(t, resp, &gitalypb.WriteRefResponse{})
 
 				expectedError := status.Error(codes.Internal, fmt.Sprintf("could not find starting OID: %s", "dir1/file2"))
 				var expectedTreeEntries []*gitalypb.TreeEntry
@@ -1362,33 +1374,33 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "sorted by trees first and paginated",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				rootTreeOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				rootTreeOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: folder2OID, Mode: "040000", Path: "bar"},
 					{OID: folderOID, Mode: "040000", Path: "foo"},
 				})
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTree(rootTreeOID))
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTree(rootTreeOID))
 
 				expectedTreeEntries := []*gitalypb.TreeEntry{
 					{
@@ -1437,29 +1449,29 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "sorted by trees first and paginated with token",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -1502,29 +1514,29 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "sorted by trees first with high pagination limit",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -1594,29 +1606,29 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "sorted by trees first with 0 pagination limit",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -1637,29 +1649,29 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "sorted by trees first with -1 pagination limit",
-			setup: func(t *testing.T) setupData {
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
+			setup: func(t *testing.T, data TestData) setupData {
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
 
-				blobOID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blobOID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blobOID, Mode: "100644", Path: "test"},
 				})
-				folderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolderOID},
 				})
 
-				blob2OID := gittest.WriteBlob(t, cfg, repoPath, []byte("test"))
-				subSubFolderOID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				blob2OID := gittest.WriteBlob(t, data.cfg, repoPath, []byte("test"))
+				subSubFolderOID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: blob2OID, Mode: "100644", Path: "test"},
 				})
-				subFolder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				subFolder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{OID: subSubFolderOID, Mode: "040000", Path: "folder2"},
 				})
-				folder2OID := gittest.WriteTree(t, cfg, repoPath, []gittest.TreeEntry{
+				folder2OID := gittest.WriteTree(t, data.cfg, repoPath, []gittest.TreeEntry{
 					{Path: "folder", Mode: "040000", OID: subFolder2OID},
 				})
 
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{OID: folder2OID, Mode: "040000", Path: "bar"},
 					gittest.TreeEntry{OID: folderOID, Mode: "040000", Path: "foo"},
 				))
@@ -1729,12 +1741,12 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path to submodule",
-			setup: func(t *testing.T) setupData {
-				_, submoduleRepoPath := gittest.CreateRepository(t, ctx, cfg)
-				submodule := gittest.WriteCommit(t, cfg, submoduleRepoPath)
+			setup: func(t *testing.T, data TestData) setupData {
+				_, submoduleRepoPath := gittest.CreateRepository(t, ctx, data.cfg)
+				submodule := gittest.WriteCommit(t, data.cfg, submoduleRepoPath)
 
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{Path: "submodule", Mode: "160000", OID: submodule},
 				))
 
@@ -1766,12 +1778,12 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		},
 		{
 			desc: "path inside submodule",
-			setup: func(t *testing.T) setupData {
-				_, submoduleRepoPath := gittest.CreateRepository(t, ctx, cfg)
-				submodule := gittest.WriteCommit(t, cfg, submoduleRepoPath)
+			setup: func(t *testing.T, data TestData) setupData {
+				_, submoduleRepoPath := gittest.CreateRepository(t, ctx, data.cfg)
+				submodule := gittest.WriteCommit(t, data.cfg, submoduleRepoPath)
 
-				repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
-				commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
+				repo, repoPath := gittest.CreateRepository(t, ctx, data.cfg)
+				commitID := gittest.WriteCommit(t, data.cfg, repoPath, gittest.WithTreeEntries(
 					gittest.TreeEntry{Path: "submodule", Mode: "160000", OID: submodule},
 				))
 
@@ -1803,9 +1815,17 @@ func testGetTreeEntries(t *testing.T, ctx context.Context) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
-			data := tc.setup(t)
+			cfg := testcfg.Build(t)
 
-			c, err := client.GetTreeEntries(ctx, data.request)
+			cfg.SocketPath = startTestServices(t, cfg)
+			cc := dial(t, cfg.SocketPath)
+
+			data := tc.setup(t, TestData{
+				cfg:    cfg,
+				client: cc,
+			})
+
+			c, err := gitalypb.NewCommitServiceClient(cc).GetTreeEntries(ctx, data.request)
 			require.NoError(t, err)
 
 			fetchedEntries, cursor := getTreeEntriesFromTreeEntryClient(t, c, data.expectedErr)

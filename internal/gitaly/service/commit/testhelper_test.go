@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/repository"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -43,10 +44,11 @@ func startTestServices(tb testing.TB, cfg config.Cfg, opts ...testserver.GitalyS
 	return testserver.RunGitalyServer(tb, cfg, func(srv *grpc.Server, deps *service.Dependencies) {
 		gitalypb.RegisterCommitServiceServer(srv, NewServer(deps))
 		gitalypb.RegisterRepositoryServiceServer(srv, repository.NewServer(deps))
+		gitalypb.RegisterHookServiceServer(srv, hook.NewServer(deps))
 	}, opts...)
 }
 
-func newCommitServiceClient(tb testing.TB, serviceSocketPath string) gitalypb.CommitServiceClient {
+func dial(tb testing.TB, serviceSocketPath string) *grpc.ClientConn {
 	tb.Helper()
 
 	connOpts := []grpc.DialOption{
@@ -56,7 +58,12 @@ func newCommitServiceClient(tb testing.TB, serviceSocketPath string) gitalypb.Co
 	require.NoError(tb, err)
 	tb.Cleanup(func() { conn.Close() })
 
-	return gitalypb.NewCommitServiceClient(conn)
+	return conn
+}
+
+func newCommitServiceClient(tb testing.TB, serviceSocketPath string) gitalypb.CommitServiceClient {
+	tb.Helper()
+	return gitalypb.NewCommitServiceClient(dial(tb, serviceSocketPath))
 }
 
 type gitCommitsGetter interface {

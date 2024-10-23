@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -22,7 +21,7 @@ import (
 func TestRepo(t *testing.T) {
 	cfg := testcfg.Build(t)
 
-	gittest.TestRepository(t, cfg, func(tb testing.TB, ctx context.Context) (gitcmd.Repository, string) {
+	gittest.TestRepository(t, func(tb testing.TB, ctx context.Context) gittest.RepositorySuiteState {
 		tb.Helper()
 
 		repoProto, repoPath := gittest.CreateRepository(tb, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -32,7 +31,27 @@ func TestRepo(t *testing.T) {
 		gitCmdFactory := gittest.NewCommandFactory(tb, cfg)
 		catfileCache := catfile.NewCache(cfg)
 		tb.Cleanup(catfileCache.Stop)
-		return New(testhelper.NewLogger(t), config.NewLocator(cfg), gitCmdFactory, catfileCache, repoProto), repoPath
+
+		repo := New(testhelper.NewLogger(t), config.NewLocator(cfg), gitCmdFactory, catfileCache, repoProto)
+
+		firstParentCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("first parent"))
+		secondParentCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("second parent"))
+		childCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(firstParentCommit, secondParentCommit))
+
+		return gittest.RepositorySuiteState{
+			Repository: repo,
+			SetReference: func(tb testing.TB, ctx context.Context, name git.ReferenceName, oid git.ObjectID) {
+				if name == "HEAD" {
+					require.NoError(t, repo.SetDefaultBranch(ctx, nil, git.ReferenceName(oid)))
+					return
+				}
+
+				require.NoError(t, repo.UpdateRef(ctx, name, oid, ""))
+			},
+			FirstParentCommit:  firstParentCommit,
+			SecondParentCommit: secondParentCommit,
+			ChildCommit:        childCommit,
+		}
 	})
 }
 

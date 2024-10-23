@@ -2439,6 +2439,18 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 // Close stops the transaction processing causing Run to return.
 func (mgr *TransactionManager) Close() { mgr.close() }
 
+// CloseSnapshots closes any remaining snapshots in the cache. Caller of Run() should
+// call it after there are no more active transactions and no new transactions will be
+// started.
+func (mgr *TransactionManager) CloseSnapshots() error {
+	// snapshotManager may not be set if initializing it fails.
+	if mgr.snapshotManager == nil {
+		return nil
+	}
+
+	return mgr.snapshotManager.Close()
+}
+
 // snapshotsDir returns the directory where the transactions' snapshots are stored.
 func (mgr *TransactionManager) snapshotsDir() string {
 	return filepath.Join(mgr.stagingDirectory, "snapshots")
@@ -2466,7 +2478,10 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("create snapshot manager directory: %w", err)
 	}
 
-	mgr.snapshotManager = snapshot.NewManager(mgr.logger, mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot)
+	var err error
+	if mgr.snapshotManager, err = snapshot.NewManager(mgr.logger, mgr.storagePath, mgr.snapshotsDir(), mgr.metrics.snapshot); err != nil {
+		return fmt.Errorf("new snapshot manager: %w", err)
+	}
 
 	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
 	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there
