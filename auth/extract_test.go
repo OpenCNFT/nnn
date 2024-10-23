@@ -46,12 +46,12 @@ func TestCheckTokenV2(t *testing.T) {
 		{
 			desc:   "Valid secret, time too much in the future",
 			token:  "v2.ab9e7315aeecf6815fc0df585370157814131acab376f41797ad4ebc4d9a823c.1535671631",
-			result: newPermissionDeniedError("timestamp too new"),
+			result: newPermissionDeniedError("token's validity window is in future"),
 		},
 		{
 			desc:   "Valid secret, time too much in the past",
 			token:  "v2.f805bc69ca3aedd99e814b3fb1fc1e6a1094191691480b168a20fad7c2d24557.1535671569",
-			result: newPermissionDeniedError("timestamp too old"),
+			result: newPermissionDeniedError("token has expired"),
 		},
 		{
 			desc:   "Mismatching signed and clear message",

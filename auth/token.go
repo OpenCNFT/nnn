@@ -123,13 +123,13 @@ func v2HmacInfoValid(message string, signedMessage, secret []byte, targetTime ti
 	upperBound := targetTime.Add(tokenValidity)
 
 	if issuedAt.Before(lowerBound) {
-		const reason = "timestamp too old"
+		const reason = "token has expired"
 		countV2Error(reason)
 		return newPermissionDeniedError(reason)
 	}
 
 	if issuedAt.After(upperBound) {
-		const reason = "timestamp too new"
+		const reason = "token's validity window is in future"
 		countV2Error(reason)
 		return newPermissionDeniedError(reason)
 	}
