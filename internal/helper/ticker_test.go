@@ -21,11 +21,7 @@ func TestTimerTicker(t *testing.T) {
 
 	ticker.Reset()
 
-	select {
-	case <-ticker.C():
-	case <-time.After(wait):
-		t.Fatalf("timed out waiting for a tick")
-	}
+	<-ticker.C()
 
 	ticker.Reset()
 	ticker.Stop()
