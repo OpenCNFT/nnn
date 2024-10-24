@@ -134,10 +134,12 @@ func TestBackupPartition(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
+			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{
+				BackupRelativePath: filepath.Join("partition-backups", "default", "2", "0000000000002.tar"),
+			}, resp)
 
 			lsn := storage.LSN(2)
-			tarPath := filepath.Join(backupRoot, data.storageName, data.partitionID, lsn.String()) + ".tar"
+			tarPath := filepath.Join(backupRoot, "partition-backups", data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tar, err := os.Open(tarPath)
 			require.NoError(t, err)
 			defer testhelper.MustClose(t, tar)
@@ -166,7 +168,7 @@ func TestBackupPartition_BackupExists(t *testing.T) {
 		testserver.WithBackupSink(backupSink),
 	)
 
-	_, err = ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+	resp, err := ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 		StorageName: "default",
 		PartitionId: "1",
 	})
@@ -180,11 +182,14 @@ func TestBackupPartition_BackupExists(t *testing.T) {
 		return
 	}
 
-	// Calling the same backup again should fail as it already exists
-	_, err = ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+	backupRelativePath := filepath.Join("partition-backups", "default", "1", "0000000000000.tar")
+	require.Equal(t, backupRelativePath, resp.GetBackupRelativePath())
+
+	// Calling the same backup again should not fail
+	resp, err = ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 		StorageName: "default",
 		PartitionId: "1",
 	})
-
-	testhelper.RequireGrpcError(t, structerr.NewAlreadyExists("there is an up-to-date backup for the given partition"), err)
+	require.NoError(t, err)
+	require.Equal(t, backupRelativePath, resp.GetBackupRelativePath())
 }

@@ -49,6 +49,8 @@ message BackupPartitionRequest {
 
 // BackupPartitionResponse is a response for the BackupPartition RPC.
 message BackupPartitionResponse {
+  // backup_relative_path contains the relative path to the backup.
+  string backup_relative_path = 1;
 }
 
 // ListPartitionsRequest is a request for the ListPartitions RPC.

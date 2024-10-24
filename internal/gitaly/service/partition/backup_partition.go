@@ -27,14 +27,16 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 		return nil, structerr.NewInternal("backup partition: transaction not initialized")
 	}
 
-	backupRelativePath := filepath.Join(in.GetStorageName(), in.GetPartitionId(), lsn+".tar")
+	backupRelativePath := filepath.Join("partition-backups", in.GetStorageName(), in.GetPartitionId(), lsn+".tar")
 
 	exists, err := s.backupSink.Exists(ctx, backupRelativePath)
 	if err != nil {
 		return nil, fmt.Errorf("backup exists: %w", err)
 	}
 	if exists {
-		return nil, structerr.NewAlreadyExists("there is an up-to-date backup for the given partition")
+		return &gitalypb.BackupPartitionResponse{
+			BackupRelativePath: backupRelativePath,
+		}, nil
 	}
 
 	// Create a new context to abort the write on failure.
@@ -60,5 +62,7 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 		return nil, fmt.Errorf("write tarball: %w", err)
 	}
 
-	return &gitalypb.BackupPartitionResponse{}, nil
+	return &gitalypb.BackupPartitionResponse{
+		BackupRelativePath: backupRelativePath,
+	}, nil
 }
