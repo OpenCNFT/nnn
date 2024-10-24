@@ -1,6 +1,7 @@
 package partition
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -17,7 +18,7 @@ import (
 // during an earlier interrupted attempt to apply the log entry. Similarly ErrNotExist is ignored
 // when removing directory entries. We can be stricter once log entry application becomes atomic
 // through https://gitlab.com/gitlab-org/gitaly/-/issues/5765.
-func applyOperations(sync func(string) error, storageRoot, walEntryDirectory string, entry *gitalypb.LogEntry, db keyvalue.Transactioner) error {
+func applyOperations(ctx context.Context, sync func(context.Context, string) error, storageRoot, walEntryDirectory string, entry *gitalypb.LogEntry, db keyvalue.Transactioner) error {
 	wb := db.NewWriteBatch()
 	defer wb.Cancel()
 
@@ -89,7 +90,7 @@ func applyOperations(sync func(string) error, storageRoot, walEntryDirectory str
 
 	// Sync all the dirty directories.
 	for relativePath := range dirtyDirectories {
-		if err := sync(filepath.Join(storageRoot, relativePath)); err != nil {
+		if err := sync(ctx, filepath.Join(storageRoot, relativePath)); err != nil {
 			return fmt.Errorf("sync: %w", err)
 		}
 	}

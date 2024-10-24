@@ -1,6 +1,7 @@
 package partition
 
 import (
+	"context"
 	"io/fs"
 	"path/filepath"
 	"testing"
@@ -55,7 +56,8 @@ func TestApplyOperations(t *testing.T) {
 	var syncedPaths []string
 	require.NoError(t,
 		applyOperations(
-			func(path string) error {
+			ctx,
+			func(ctx context.Context, path string) error {
 				syncedPaths = append(syncedPaths, path)
 				return nil
 			},

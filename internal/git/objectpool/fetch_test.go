@@ -1,6 +1,7 @@
 package objectpool
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -30,9 +31,8 @@ import (
 )
 
 func TestFetchFromOrigin_dangling(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
-
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 		poolPath := gittest.RepositoryPath(t, ctx, pool)
 		repoPath := gittest.RepositoryPath(t, ctx, repo)
@@ -91,8 +91,8 @@ func TestFetchFromOrigin_dangling(t *testing.T) {
 }
 
 func TestFetchFromOrigin_fsck(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 		repoPath, err := repo.Path(ctx)
 		require.NoError(t, err)
@@ -116,8 +116,8 @@ func TestFetchFromOrigin_fsck(t *testing.T) {
 }
 
 func TestFetchFromOrigin_deltaIslands(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 		poolPath := gittest.RepositoryPath(t, ctx, pool)
 		repoPath := gittest.RepositoryPath(t, ctx, repo)
@@ -142,8 +142,8 @@ func TestFetchFromOrigin_deltaIslands(t *testing.T) {
 }
 
 func TestFetchFromOrigin_bitmapHashCache(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 		repoPath, err := repo.Path(ctx)
 		require.NoError(t, err)
@@ -168,8 +168,8 @@ func TestFetchFromOrigin_bitmapHashCache(t *testing.T) {
 }
 
 func TestFetchFromOrigin_refUpdates(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 		repoPath, err := repo.Path(ctx)
 		require.NoError(t, err)
@@ -215,8 +215,8 @@ func TestFetchFromOrigin_refUpdates(t *testing.T) {
 }
 
 func TestFetchFromOrigin_refs(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 		repoPath, err := repo.Path(ctx)
 		require.NoError(t, err)
@@ -254,8 +254,8 @@ func TestFetchFromOrigin_refs(t *testing.T) {
 }
 
 func TestFetchFromOrigin_missingPool(t *testing.T) {
-	testWithAndWithoutTransaction(t, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
-		ctx := testhelper.Context(t)
+	ctx := testhelper.Context(t)
+	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 
 		// Remove the object pool to assert that we raise an error when fetching into a non-existent
@@ -403,7 +403,7 @@ func TestObjectPool_logStats(t *testing.T) {
 	}
 }
 
-func testWithAndWithoutTransaction(t *testing.T, testFunc func(*testing.T, config.Cfg, LocalRepoFactory)) {
+func testWithAndWithoutTransaction(t *testing.T, ctx context.Context, testFunc func(*testing.T, config.Cfg, LocalRepoFactory)) {
 	t.Helper()
 
 	t.Run("with transaction", func(t *testing.T) {
@@ -416,7 +416,7 @@ func testWithAndWithoutTransaction(t *testing.T, testFunc func(*testing.T, confi
 		catfileCache := catfile.NewCache(cfg)
 		t.Cleanup(catfileCache.Stop)
 
-		dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+		dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 		require.NoError(t, err)
 		defer dbMgr.Close()
 

@@ -47,6 +47,7 @@ func TestTransactionRecoveryMiddleware(t *testing.T) {
 	logger := testhelper.SharedLogger(t)
 
 	dbMgr, err := databasemgr.NewDBManager(
+		ctx,
 		cfg.Storages,
 		keyvalue.NewBadgerStore,
 		helper.NewNullTickerFactory(),
