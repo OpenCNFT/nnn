@@ -25,6 +25,8 @@ type migration struct {
 	id uint64
 	// fn is the function executed to modify the WAL entry during transaction commit.
 	fn func(context.Context, storage.Transaction) error
+	// isDisabled defines an optional check to prevent a migration from being executed.
+	isDisabled func(ctx context.Context) bool
 }
 
 // run performs the migration job on the provided transaction.

@@ -80,7 +80,9 @@ func TestMigration_Run(t *testing.T) {
 
 type mockTransaction struct {
 	storage.Transaction
-	kvFn func() keyvalue.ReadWriter
+	kvFn     func() keyvalue.ReadWriter
+	commitFn func(context.Context) error
+	rootFn   func() string
 }
 
 func (m mockTransaction) KV() keyvalue.ReadWriter {
@@ -90,14 +92,50 @@ func (m mockTransaction) KV() keyvalue.ReadWriter {
 	return nil
 }
 
+func (m mockTransaction) Commit(ctx context.Context) error {
+	if m.commitFn != nil {
+		return m.commitFn(ctx)
+	}
+	return nil
+}
+
+func (m mockTransaction) Rollback(context.Context) error { return nil }
+
+func (m mockTransaction) Root() string {
+	if m.rootFn != nil {
+		return m.rootFn()
+	}
+	return ""
+}
+
 type mockReadWriter struct {
 	keyvalue.ReadWriter
+	getFn func(key []byte) (keyvalue.Item, error)
 	setFn func(key, value []byte) error
+}
+
+func (m mockReadWriter) Get(key []byte) (keyvalue.Item, error) {
+	if m.getFn != nil {
+		return m.getFn(key)
+	}
+	return nil, nil
 }
 
 func (m mockReadWriter) Set(key, value []byte) error {
 	if m.setFn != nil {
 		return m.setFn(key, value)
+	}
+	return nil
+}
+
+type mockItem struct {
+	keyvalue.Item
+	valueFn func(fn func(value []byte) error) error
+}
+
+func (m mockItem) Value(fn func(value []byte) error) error {
+	if m.valueFn != nil {
+		return m.valueFn(fn)
 	}
 	return nil
 }
