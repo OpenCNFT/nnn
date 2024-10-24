@@ -3561,7 +3561,10 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	// See https://gitlab.com/gitlab-org/gitaly/-/issues/5892 for more details. Once the issue is
 	// addressed, we could stage the transaction entirely before queuing it for commit, and thus not
 	// need to sync here.
-	if err := safe.NewSyncer().SyncRecursive(ctx, logEntryPath); err != nil {
+	//
+	// Sync the WAL entry itself concurrently to reduce the blocking if we have multiple files to
+	// fsync.
+	if err := safe.NewConcurrentSyncer(25).SyncRecursive(ctx, logEntryPath); err != nil {
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
