@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package gitaly;
 
+import "google/protobuf/timestamp.proto";
 import "lint.proto";
 import "shared.proto";
 
@@ -21,6 +22,14 @@ service PartitionService {
 
   // ListPartitions lists partitions present in the storage.
   rpc ListPartitions(ListPartitionsRequest) returns (ListPartitionsResponse) {
+    option (op_type) = {
+      op:          ACCESSOR
+      scope_level: STORAGE
+    };
+  }
+
+  // CreatePartitionBackupManifest creates the manifest for locating backups.
+  rpc CreatePartitionBackupManifest(CreatePartitionBackupManifestRequest) returns (CreatePartitionBackupManifestResponse) {
     option (op_type) = {
       op:          ACCESSOR
       scope_level: STORAGE
@@ -59,4 +68,28 @@ message ListPartitionsResponse {
   // pagination_cursor contains the page token to fetch the next page of results. Refer to PaginationCursor
   // documentation for further info.
   PaginationCursor pagination_cursor = 2;
+}
+
+// CreatePartitionBackupManifestRequest is a request for the CreatePartitionBackupManifest RPC.
+message CreatePartitionBackupManifestRequest {
+  // storage_name is the name of the storage containing the archived partitions.
+  string storage_name = 1 [(gitaly.storage)=true];
+  // timestamp is the global time of the backup.
+  google.protobuf.Timestamp timestamp = 2;
+  // partitions contains the list of partitions that are archived.
+  repeated PartitionBackupInfo partitions = 3;
+}
+
+// PartitionBackupInfo metadata for the partition that is archived
+message PartitionBackupInfo {
+  // timestamp is the time of the partition backup.
+  google.protobuf.Timestamp timestamp = 1;
+  // partition_id is the identifier of the partition.
+  string partition_id = 2;
+  // backup_relative_path contains the relative path to the backup.
+  string backup_relative_path = 3;
+}
+
+// CreatePartitionBackupManifestResponse is a response for the CreatePartitionBackupManifest RPC.
+message CreatePartitionBackupManifestResponse {
 }

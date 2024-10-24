@@ -283,3 +283,7 @@ func (m *mockPartitionServiceClient) BackupPartition(ctx context.Context, req *g
 
 	return &gitalypb.BackupPartitionResponse{}, nil
 }
+
+func (m *mockPartitionServiceClient) CreatePartitionBackupManifest(ctx context.Context, req *gitalypb.CreatePartitionBackupManifestRequest, opts ...grpc.CallOption) (*gitalypb.CreatePartitionBackupManifestResponse, error) {
+	return &gitalypb.CreatePartitionBackupManifestResponse{}, nil
+}
