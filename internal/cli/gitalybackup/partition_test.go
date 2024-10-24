@@ -110,7 +110,7 @@ func TestPartitionSubcommand_Create(t *testing.T) {
 			require.NoError(t, err)
 
 			lsn := storage.LSN(1)
-			tarPath := filepath.Join(path, cfg.Storages[0].Name, "2", lsn.String()) + ".tar"
+			tarPath := filepath.Join(path, "partition-backups", cfg.Storages[0].Name, "2", lsn.String()) + ".tar"
 			tar, err := os.Open(tarPath)
 			require.NoError(t, err)
 			defer testhelper.MustClose(t, tar)
