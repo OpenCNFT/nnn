@@ -2,15 +2,13 @@ package safe
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-<<<<<<< HEAD
-=======
 	"runtime/trace"
 
 	"golang.org/x/sync/errgroup"
->>>>>>> 0ff3fd337 (Mark fsyncing functions in execution traces)
 )
 
 type file interface {
@@ -96,4 +94,36 @@ func (s Syncer) SyncHierarchy(ctx context.Context, rootPath, relativePath string
 	}
 
 	return nil
+}
+
+// ConcurrentSyncer implements helper methods for fsyncing multiple files and directories
+// concurrently.
+type ConcurrentSyncer struct {
+	syncer  Syncer
+	workers *errgroup.Group
+}
+
+// NewConcurrentSyncer returns a ConcurrentSyncer configured with a maximum number
+// of concurrent workers.
+func NewConcurrentSyncer(maxWorkers int) *ConcurrentSyncer {
+	workers := &errgroup.Group{}
+	workers.SetLimit(maxWorkers)
+	return &ConcurrentSyncer{syncer: NewSyncer(), workers: workers}
+}
+
+// SyncRecursive walks the file tree rooted at path and fsyncing the root and the children.
+func (s *ConcurrentSyncer) SyncRecursive(ctx context.Context, path string) error {
+	if err := filepath.WalkDir(path, func(path string, _ os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		s.workers.Go(func() error { return s.syncer.Sync(ctx, path) })
+
+		return nil
+	}); err != nil {
+		return errors.Join(fmt.Errorf("walk dir: %w", err), s.workers.Wait())
+	}
+
+	return s.workers.Wait()
 }

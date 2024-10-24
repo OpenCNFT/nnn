@@ -4,7 +4,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,6 +21,7 @@ type call struct {
 // recordingOpener opens files normally through the OS package but
 // it records all of the calls for testing.
 type recordingOpener struct {
+	mutex       sync.Mutex
 	wrappedOpen func(string) (file, error)
 	calls       []call
 }
@@ -50,10 +53,12 @@ func (r *recordingOpener) open(path string) (file, error) {
 }
 
 func (r *recordingOpener) record(method, path string) {
+	r.mutex.Lock()
 	r.calls = append(r.calls, call{
 		method: method,
 		path:   path,
 	})
+	r.mutex.Unlock()
 }
 
 type recordingFile struct {
@@ -79,6 +84,16 @@ func recordingSyncer() (Syncer, *recordingOpener) {
 	syncer.open = recorder.open
 
 	return syncer, recorder
+}
+
+// recordingConcurrentSyncer returns a new ConcurrentSyncer and a
+// recordingOpener that records the open calls made by the syncer.
+func recordingConcurrentSyncer() (*ConcurrentSyncer, *recordingOpener) {
+	syncer, recorder := recordingSyncer()
+	concurrentSyncer := NewConcurrentSyncer(100)
+	concurrentSyncer.syncer = syncer
+
+	return concurrentSyncer, recorder
 }
 
 func createTestDirectoryHierarchy(tb testing.TB) (string, string) {
@@ -233,20 +248,30 @@ func TestSyncRecursive(t *testing.T) {
 	ctx := testhelper.Context(t)
 
 	tmpDir, rootDir := createTestDirectoryHierarchy(t)
-	syncer, recorder := recordingSyncer()
-	require.NoError(t, syncer.SyncRecursive(ctx, filepath.Join(rootDir, "a")))
-	require.Equal(t,
-		expectedCalls(
-			"/root/a",
-			"/root/a/c",
-			"/root/a/c/file_7",
-			"/root/a/c/file_8",
-			"/root/a/d",
-			"/root/a/d/file_10",
-			"/root/a/d/file_9",
-			"/root/a/file_3",
-			"/root/a/file_4",
-		),
-		recorder.recordedCalls(tmpDir),
+	expectedCalls := expectedCalls(
+		"/root/a",
+		"/root/a/c",
+		"/root/a/c/file_7",
+		"/root/a/c/file_8",
+		"/root/a/d",
+		"/root/a/d/file_10",
+		"/root/a/d/file_9",
+		"/root/a/file_3",
+		"/root/a/file_4",
 	)
+
+	t.Run("Syncer", func(t *testing.T) {
+		syncer, recorder := recordingSyncer()
+		require.NoError(t, syncer.SyncRecursive(ctx, filepath.Join(rootDir, "a")))
+		require.Equal(t, expectedCalls, recorder.recordedCalls(tmpDir))
+	})
+
+	t.Run("ConcurrentSyncer", func(t *testing.T) {
+		syncer, recorder := recordingConcurrentSyncer()
+		require.NoError(t, syncer.SyncRecursive(ctx, filepath.Join(rootDir, "a")))
+
+		actualCalls := recorder.recordedCalls(tmpDir)
+		sort.SliceStable(actualCalls, func(i, j int) bool { return actualCalls[i].path < actualCalls[j].path })
+		require.Equal(t, expectedCalls, actualCalls)
+	})
 }
