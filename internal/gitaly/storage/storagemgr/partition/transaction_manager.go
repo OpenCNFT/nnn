@@ -3550,7 +3550,6 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	syncer := safe.NewSyncer()
 	// Sync the log entry completely before committing it.
 	//
 	// Ideally the log entry would be completely flushed to the disk before queuing the
@@ -3562,12 +3561,8 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	// See https://gitlab.com/gitlab-org/gitaly/-/issues/5892 for more details. Once the issue is
 	// addressed, we could stage the transaction entirely before queuing it for commit, and thus not
 	// need to sync here.
-	if err := syncer.SyncRecursive(logEntryPath); err != nil {
+	if err := safe.NewSyncer().SyncRecursive(logEntryPath); err != nil {
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
-	}
-
-	if err := syncer.SyncParent(manifestPath); err != nil {
-		return fmt.Errorf("sync manifest directory entry: %w", err)
 	}
 
 	mgr.testHooks.beforeAppendLogEntry()
