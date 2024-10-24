@@ -135,7 +135,7 @@ func (o *ObjectPool) Remove(ctx context.Context) (err error) {
 		return fmt.Errorf("remove all: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncParent(path); err != nil {
+	if err := safe.NewSyncer().SyncParent(ctx, path); err != nil {
 		return fmt.Errorf("sync parent: %w", err)
 	}
 

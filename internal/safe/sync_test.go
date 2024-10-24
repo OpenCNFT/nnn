@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
 type call struct {
@@ -134,6 +135,8 @@ func expectedCalls(paths ...string) []call {
 }
 
 func TestSync(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	for _, tc := range []struct {
 		desc          string
 		path          string
@@ -152,18 +155,20 @@ func TestSync(t *testing.T) {
 			tmpDir, _ := createTestDirectoryHierarchy(t)
 
 			syncer, recorder := recordingSyncer()
-			require.NoError(t, syncer.Sync(filepath.Join(tmpDir, tc.path)))
+			require.NoError(t, syncer.Sync(ctx, filepath.Join(tmpDir, tc.path)))
 			require.Equal(t, expectedCalls(tc.path), recorder.recordedCalls(tmpDir))
 		})
 	}
 }
 
 func TestSyncParent(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	tmpDir, _ := createTestDirectoryHierarchy(t)
 
 	t.Run("parent exists", func(t *testing.T) {
 		syncer, recorder := recordingSyncer()
-		require.NoError(t, syncer.SyncParent(filepath.Join(tmpDir, "root", "file_1")))
+		require.NoError(t, syncer.SyncParent(ctx, filepath.Join(tmpDir, "root", "file_1")))
 		require.Equal(t,
 			expectedCalls("/root"),
 			recorder.recordedCalls(tmpDir),
@@ -172,7 +177,7 @@ func TestSyncParent(t *testing.T) {
 
 	t.Run("trailing slash ignored", func(t *testing.T) {
 		syncer, recorder := recordingSyncer()
-		require.NoError(t, syncer.SyncParent(filepath.Join(tmpDir, "root", "file_1")+string(os.PathSeparator)))
+		require.NoError(t, syncer.SyncParent(ctx, filepath.Join(tmpDir, "root", "file_1")+string(os.PathSeparator)))
 		require.Equal(t,
 			expectedCalls("/root"),
 			recorder.recordedCalls(tmpDir),
@@ -183,7 +188,7 @@ func TestSyncParent(t *testing.T) {
 		// Since we are fsyncing just the parent, we don't really need to verify whether the
 		// child itself exists.
 		syncer, recorder := recordingSyncer()
-		require.NoError(t, syncer.SyncParent(filepath.Join(tmpDir, "root", "non-existent")))
+		require.NoError(t, syncer.SyncParent(ctx, filepath.Join(tmpDir, "root", "non-existent")))
 		require.Equal(t,
 			expectedCalls("/root"),
 			recorder.recordedCalls(tmpDir),
@@ -196,7 +201,7 @@ func TestSyncParent(t *testing.T) {
 		path := filepath.Join(tmpDir, "root", "non-existent-parent", "non-existent-child")
 		require.ErrorIs(
 			t,
-			syncer.SyncParent(path),
+			syncer.SyncParent(ctx, path),
 			fs.ErrNotExist,
 		)
 
@@ -208,9 +213,11 @@ func TestSyncParent(t *testing.T) {
 }
 
 func TestSyncHierarchy(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	tmpDir, rootDir := createTestDirectoryHierarchy(t)
 	syncer, recorder := recordingSyncer()
-	require.NoError(t, syncer.SyncHierarchy(rootDir, "a/c/file_7"))
+	require.NoError(t, syncer.SyncHierarchy(ctx, rootDir, "a/c/file_7"))
 	require.Equal(t,
 		expectedCalls(
 			"/root/a/c/file_7",
@@ -223,9 +230,11 @@ func TestSyncHierarchy(t *testing.T) {
 }
 
 func TestSyncRecursive(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	tmpDir, rootDir := createTestDirectoryHierarchy(t)
 	syncer, recorder := recordingSyncer()
-	require.NoError(t, syncer.SyncRecursive(filepath.Join(rootDir, "a")))
+	require.NoError(t, syncer.SyncRecursive(ctx, filepath.Join(rootDir, "a")))
 	require.Equal(t,
 		expectedCalls(
 			"/root/a",

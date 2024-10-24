@@ -377,6 +377,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		logger.WarnContext(ctx, "Transactions enabled. Transactions are an experimental feature. The feature is not production ready yet and might lead to various issues including data loss.")
 
 		dbMgr, err := databasemgr.NewDBManager(
+			ctx,
 			cfg.Storages,
 			keyvalue.NewBadgerStore,
 			helper.NewTimerTickerFactory(time.Minute),
@@ -437,6 +438,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			return fmt.Errorf("may have pending WAL: %w", err)
 		} else if mayHaveWAL {
 			dbMgr, err := databasemgr.NewDBManager(
+				ctx,
 				cfg.Storages,
 				keyvalue.NewBadgerStore,
 				helper.NewTimerTickerFactory(time.Minute),

@@ -33,10 +33,12 @@ func (db dbWrapper) Close() error {
 func TestNewDBManager(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	logger := testhelper.NewLogger(t)
 
 	t.Run("no configured storages", func(t *testing.T) {
-		dbMgr, err := NewDBManager(nil, nil, helper.NewNullTickerFactory(), logger)
+		dbMgr, err := NewDBManager(ctx, nil, nil, helper.NewNullTickerFactory(), logger)
 		require.NoError(t, err)
 		require.NotNil(t, dbMgr)
 		require.Empty(t, dbMgr.databases)
@@ -49,7 +51,7 @@ func TestNewDBManager(t *testing.T) {
 		}
 
 		cfg := testcfg.Build(t)
-		dbMgr, err := NewDBManager(cfg.Storages, opener, helper.NewNullTickerFactory(), logger)
+		dbMgr, err := NewDBManager(ctx, cfg.Storages, opener, helper.NewNullTickerFactory(), logger)
 		require.Error(t, err)
 		require.Nil(t, dbMgr)
 	})
@@ -57,7 +59,7 @@ func TestNewDBManager(t *testing.T) {
 	t.Run("successful initialization", func(t *testing.T) {
 		cfg := testcfg.Build(t, testcfg.WithStorages("first", "second"))
 
-		dbMgr, err := NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+		dbMgr, err := NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 		require.NoError(t, err)
 		require.NotNil(t, dbMgr)
 
@@ -105,7 +107,7 @@ func TestNewDBManager(t *testing.T) {
 			return nil, errors.New("failed to open second DB")
 		})
 
-		dbMgr, err := NewDBManager(cfg.Storages, opener, helper.NewNullTickerFactory(), logger)
+		dbMgr, err := NewDBManager(ctx, cfg.Storages, opener, helper.NewNullTickerFactory(), logger)
 		require.EqualError(t, err, "create storage's database directory: failed to open second DB")
 		require.Nil(t, dbMgr)
 		require.Equal(t, true, firstDBClosed.Load())
@@ -115,10 +117,12 @@ func TestNewDBManager(t *testing.T) {
 func TestDBManager_GetDB(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	cfg := testcfg.Build(t, testcfg.WithStorages("first", "second"))
 	logger := testhelper.NewLogger(t)
 
-	dbMgr, err := NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	t.Cleanup(dbMgr.Close)
 
@@ -142,6 +146,8 @@ func TestDBManager_GetDB(t *testing.T) {
 func TestDBManager_garbageCollection(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	cfg := testcfg.Build(t)
 
 	logger := testhelper.NewLogger(t)
@@ -152,6 +158,7 @@ func TestDBManager_garbageCollection(t *testing.T) {
 	errExpected := errors.New("some gc failure")
 
 	dbMgr, err := NewDBManager(
+		ctx,
 		cfg.Storages,
 		func(logger log.Logger, path string) (keyvalue.Store, error) {
 			db, err := keyvalue.NewBadgerStore(logger, path)

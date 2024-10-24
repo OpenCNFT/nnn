@@ -113,7 +113,7 @@ func remove(
 		return structerr.NewInternal("staging repository for removal: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncParent(path); err != nil {
+	if err := safe.NewSyncer().SyncParent(ctx, path); err != nil {
 		return fmt.Errorf("sync removal: %w", err)
 	}
 

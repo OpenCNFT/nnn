@@ -184,7 +184,7 @@ func SetCustomHooks(
 	// the repository. This makes the move atomic as there is no state where the
 	// move succeeds, but the hook files themselves are not yet on the disk, or
 	// are partially written.
-	if err := syncer.SyncRecursive(tempHooksPath); err != nil {
+	if err := syncer.SyncRecursive(ctx, tempHooksPath); err != nil {
 		return fmt.Errorf("syncing extracted custom hooks: %w", err)
 	}
 
@@ -195,7 +195,7 @@ func SetCustomHooks(
 
 	// Sync the parent directory after a move to ensure the directory entry of the
 	// hooks directory is flushed to the disk.
-	if err := syncer.SyncParent(repoHooksPath); err != nil {
+	if err := syncer.SyncParent(ctx, repoHooksPath); err != nil {
 		return fmt.Errorf("syncing custom hooks parent directory: %w", err)
 	}
 

@@ -108,10 +108,10 @@ func (d *Dir) Migrate(ctx context.Context) error {
 		objectDir = "objects"
 	}
 
-	return migrate(d.dir.Path(), filepath.Join(repoPath, objectDir))
+	return migrate(ctx, d.dir.Path(), filepath.Join(repoPath, objectDir))
 }
 
-func migrate(sourcePath, targetPath string) error {
+func migrate(ctx context.Context, sourcePath, targetPath string) error {
 	entries, err := os.ReadDir(sourcePath)
 	if err != nil {
 		return fmt.Errorf("reading directory: %w", err)
@@ -134,11 +134,11 @@ func migrate(sourcePath, targetPath string) error {
 				}
 			}
 
-			if err := migrate(nestedSourcePath, nestedTargetPath); err != nil {
+			if err := migrate(ctx, nestedSourcePath, nestedTargetPath); err != nil {
 				return fmt.Errorf("migrating directory %q: %w", nestedSourcePath, err)
 			}
 
-			if err := syncer.Sync(nestedTargetPath); err != nil {
+			if err := syncer.Sync(ctx, nestedTargetPath); err != nil {
 				return fmt.Errorf("sync directory: %w", err)
 			}
 
@@ -149,12 +149,12 @@ func migrate(sourcePath, targetPath string) error {
 			return fmt.Errorf("migrating object file %q: %w", nestedSourcePath, err)
 		}
 
-		if err := syncer.Sync(nestedTargetPath); err != nil {
+		if err := syncer.Sync(ctx, nestedTargetPath); err != nil {
 			return fmt.Errorf("sync object: %w", err)
 		}
 	}
 
-	if err := syncer.Sync(targetPath); err != nil {
+	if err := syncer.Sync(ctx, targetPath); err != nil {
 		return fmt.Errorf("sync object directory: %w", err)
 	}
 

@@ -268,7 +268,7 @@ func Create(
 	}
 
 	syncer := safe.NewSyncer()
-	if err := syncer.SyncRecursive(newRepoDir.Path()); err != nil {
+	if err := syncer.SyncRecursive(ctx, newRepoDir.Path()); err != nil {
 		return fmt.Errorf("sync recursive: %w", err)
 	}
 
@@ -283,7 +283,7 @@ func Create(
 		return fmt.Errorf("get storage by name: %w", err)
 	}
 
-	if err := syncer.SyncHierarchy(storagePath, repository.GetRelativePath()); err != nil {
+	if err := syncer.SyncHierarchy(ctx, storagePath, repository.GetRelativePath()); err != nil {
 		return fmt.Errorf("sync hierarchy: %w", err)
 	}
 
