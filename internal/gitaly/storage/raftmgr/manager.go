@@ -90,6 +90,9 @@ func WithRecordTransport() OptionFunc {
 	}
 }
 
+// RaftManagerFactory defines a function type that creates a new Manager instance for a particular parittion.
+type RaftManagerFactory func(storage.PartitionID, string, keyvalue.Transactioner, log.Logger) (*Manager, error)
+
 // Manager orchestrates the Raft consensus protocol, managing configuration,
 // state synchronization, and communication between distributed nodes.
 type Manager struct {

@@ -37,6 +37,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mdfile"
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -404,6 +405,13 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			logConsumer = walArchiver
 		}
 
+		var raftManagerFactory raftmgr.RaftManagerFactory
+		if cfg.Raft.Enabled {
+			raftManagerFactory = func(ptnID storage.PartitionID, storageName string, db keyvalue.Transactioner, logger log.Logger) (*raftmgr.Manager, error) {
+				return raftmgr.NewManager(ptnID, storageName, cfg.Raft, db, logger)
+			}
+		}
+
 		nodeMgr, err := nodeimpl.NewManager(
 			cfg.Storages,
 			storagemgr.NewFactory(
@@ -414,6 +422,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 					partitionMetrics,
 					logConsumer,
+					raftManagerFactory,
 				),
 				2,
 				storageMetrics,
@@ -459,6 +468,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 						gitCmdFactory,
 						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 						partitionMetrics,
+						nil,
 						nil,
 					),
 					// In recovery mode we don't want to keep inactive partitions active. The cache

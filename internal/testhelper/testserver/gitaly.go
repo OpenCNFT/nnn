@@ -361,6 +361,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, ctx context.Conte
 						snapshot.NewMetrics(),
 					),
 					nil,
+					nil,
 				),
 				storagemgr.DefaultMaxInactivePartitions,
 				storagemgr.NewMetrics(cfg.Prometheus),
