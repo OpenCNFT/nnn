@@ -38,6 +38,16 @@ type migrationManager struct {
 	migrationStates map[string]*migrationState
 }
 
+// NewPartition creates a migration manager that wraps the provided partition.
+func NewPartition(partition storagemgr.Partition, logger log.Logger) storagemgr.Partition {
+	return &migrationManager{
+		Partition:       partition,
+		logger:          logger,
+		migrations:      migrations,
+		migrationStates: map[string]*migrationState{},
+	}
+}
+
 func (m *migrationManager) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
 	if err := m.migrate(ctx, opts.RelativePaths); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
