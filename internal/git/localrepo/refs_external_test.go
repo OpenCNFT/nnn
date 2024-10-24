@@ -5,14 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
@@ -22,9 +19,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/hook"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -123,10 +118,7 @@ func TestRepo_SetDefaultBranch(t *testing.T) {
 
 			require.Len(t, txManager.Votes(), 2)
 			h := voting.NewVoteHash()
-			_, err = fmt.Fprint(h, gittest.IfSymrefUpdateSupported(t, ctx, cfg,
-				fmt.Sprintf("%s ref:%s %s\n", gittest.DefaultObjectHash.ZeroOID, tc.ref.String(), "HEAD"),
-				fmt.Sprintf("ref: %s\n", tc.ref.String()),
-			))
+			_, err = fmt.Fprintf(h, "%s ref:%s %s\n", gittest.DefaultObjectHash.ZeroOID, tc.ref.String(), "HEAD")
 
 			require.NoError(t, err)
 			vote, err := h.Vote()
@@ -162,7 +154,7 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		t.Parallel()
 
 		cfg := testcfg.Build(t)
-		repoPath, repo := setupRepoWithHooksServer(t, ctx, cfg)
+		_, repo := setupRepoWithHooksServer(t, ctx, cfg)
 
 		ref, err := repo.HeadReference(ctx)
 		require.NoError(t, err)
@@ -173,20 +165,16 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 		updater, err := updateref.New(ctx, repo)
 		require.NoError(t, err)
 
-		if featureflag.SymrefUpdate.IsEnabled(ctx) {
-			require.NoError(t, updater.Start())
-			require.NoError(t, updater.UpdateSymbolicReference(version, "HEAD", "refs/heads/temp"))
-			require.NoError(t, updater.Prepare())
-			t.Cleanup(func() { require.NoError(t, updater.Close()) })
-		} else {
-			require.NoError(t, os.WriteFile(filepath.Join(repoPath, "HEAD.lock"), []byte(""), mode.File))
-		}
+		require.NoError(t, updater.Start())
+		require.NoError(t, updater.UpdateSymbolicReference(version, "HEAD", "refs/heads/temp"))
+		require.NoError(t, updater.Prepare())
+		t.Cleanup(func() { require.NoError(t, updater.Close()) })
 
 		err = repo.SetDefaultBranch(ctx, &transaction.MockManager{}, "refs/heads/branch")
-		require.ErrorIs(t, err, gittest.IfSymrefUpdateSupported(t, ctx, cfg, gittest.FilesOrReftables[error](
+		require.ErrorIs(t, err, gittest.FilesOrReftables[error](
 			updateref.AlreadyLockedError{ReferenceName: "HEAD"},
 			updateref.AlreadyLockedError{},
-		), safe.ErrFileAlreadyLocked))
+		))
 
 		refAfter, err := repo.HeadReference(ctx)
 		require.NoError(t, err)
@@ -258,19 +246,14 @@ func TestRepo_SetDefaultBranch_errors(t *testing.T) {
 			},
 		}
 
-		repoPath, repo := setupRepoWithHooksServer(t, ctx, cfg, testserver.WithTransactionManager(failingTxManager))
+		_, repo := setupRepoWithHooksServer(t, ctx, cfg, testserver.WithTransactionManager(failingTxManager))
 
 		err = repo.SetDefaultBranch(ctx, failingTxManager, "refs/heads/branch")
 		require.Error(t, err)
 
-		if featureflag.SymrefUpdate.IsEnabled(ctx) {
-			var sErr structerr.Error
-			require.ErrorAs(t, err, &sErr)
-			require.Equal(t, "error executing git hook\nfatal: ref updates aborted by hook\n", sErr.Metadata()["stderr"])
-		} else {
-			require.Equal(t, "committing temporary HEAD: voting on locked file: preimage vote: injected error", err.Error())
-			require.NoFileExists(t, filepath.Join(repoPath, "HEAD.lock"))
-		}
+		var sErr structerr.Error
+		require.ErrorAs(t, err, &sErr)
+		require.Equal(t, "error executing git hook\nfatal: ref updates aborted by hook\n", sErr.Metadata()["stderr"])
 	})
 }
 

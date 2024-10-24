@@ -20,7 +20,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
@@ -326,15 +325,8 @@ func setupTest(t *testing.T, ctx context.Context, testPartitionID storage.Partit
 
 func TestTransactionManager(t *testing.T) {
 	t.Parallel()
-	testhelper.NewFeatureSets(featureflag.SymrefUpdate).Run(t, testTransactionManager)
-}
 
-func testTransactionManager(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
-	if featureflag.SymrefUpdate.IsDisabled(ctx) {
-		testhelper.SkipWithReftable(t, "reftable tests can only be run with symref-updates feature")
-	}
+	ctx := testhelper.Context(t)
 
 	// testPartitionID is the partition ID used in the tests for the TransactionManager.
 	const testPartitionID storage.PartitionID = 1
@@ -1608,22 +1600,16 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 											},
 											{
 												MinIndex: 2,
-												MaxIndex: 2,
-												References: []git.Reference{
-													{
-														Name:   "refs/heads/main",
-														Target: setup.Commits.First.OID.String(),
-													},
-												},
-											},
-											{
-												MinIndex: 3,
 												MaxIndex: 3,
 												References: []git.Reference{
 													{
 														Name:       "HEAD",
 														Target:     "refs/heads/new-head",
 														IsSymbolic: true,
+													},
+													{
+														Name:   "refs/heads/main",
+														Target: setup.Commits.First.OID.String(),
 													},
 												},
 											},
@@ -1684,22 +1670,16 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 										},
 										{
 											MinIndex: 2,
-											MaxIndex: 2,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.First.OID.String(),
-												},
-											},
-										},
-										{
-											MinIndex: 3,
 											MaxIndex: 3,
 											References: []git.Reference{
 												{
 													Name:       "HEAD",
 													Target:     "refs/heads/new-head",
 													IsSymbolic: true,
+												},
+												{
+													Name:   "refs/heads/main",
+													Target: setup.Commits.First.OID.String(),
 												},
 											},
 										},

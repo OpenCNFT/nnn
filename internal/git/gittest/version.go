@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -39,13 +38,4 @@ func SkipIfGitVersion(tb testing.TB, ctx context.Context, cfg config.Cfg, expect
 	if actual.Equal(expected) {
 		tb.Skipf("Unsupported Git version %q, expected %q: %q", actual, expected, reason)
 	}
-}
-
-// IfSymrefUpdateSupported returns the appropriate value based on if symref updates are enabled.
-func IfSymrefUpdateSupported[T any](tb testing.TB, ctx context.Context, cfg config.Cfg, yes, no T) T {
-	if featureflag.SymrefUpdate.IsEnabled(ctx) {
-		return yes
-	}
-
-	return no
 }

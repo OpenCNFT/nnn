@@ -292,9 +292,6 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.MailmapOptions, rnd.Int()%2 == 0)
 	// Disable LogGitTraces
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.LogGitTraces, false)
-	// Enable SymrefUpdates
-	symrefUpdateEnabled, _ := env.GetBool("GITALY_TEST_ENABLE_SYMREF_UPDATE", false)
-	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.SymrefUpdate, symrefUpdateEnabled)
 	// Enable reftable backend, if env variable set
 	newRepoReftableEnabled := env.GetString("GIT_DEFAULT_REF_FORMAT", "files")
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.NewRepoReftableBackend, newRepoReftableEnabled == "reftable")
