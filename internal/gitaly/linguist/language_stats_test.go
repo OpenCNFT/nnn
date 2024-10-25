@@ -74,7 +74,6 @@ func TestInitLanguageStats(t *testing.T) {
 				w := zlib.NewWriter(file)
 				require.NoError(t, json.NewEncoder(w).Encode(stats))
 				require.NoError(t, w.Close())
-				require.NoError(t, file.Sync())
 				require.NoError(t, file.Close())
 
 				newStats, err := initLanguageStats(ctx, repo)
