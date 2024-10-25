@@ -41,18 +41,8 @@ type Check struct {
 // CheckFunc is a function type that takes a praefect config and returns a Check
 type CheckFunc func(conf config.Config, w io.Writer, quiet bool) *Check
 
-// AllChecks returns slice of all checks that can be executed for praefect.
-func AllChecks() []CheckFunc {
-	return []CheckFunc{
-		NewPraefectMigrationCheck,
-		NewGitalyNodeConnectivityCheck,
-		NewPostgresReadWriteCheck,
-		NewUnavailableReposCheck,
-	}
-}
-
-// ReadinessChecks returns the checks invoked by the Praefect readiness RPC.
-func ReadinessChecks() []CheckFunc {
+// Checks returns slice of all checks that can be executed for praefect.
+func Checks() []CheckFunc {
 	return []CheckFunc{
 		NewPraefectMigrationCheck,
 		NewGitalyNodeConnectivityCheck,

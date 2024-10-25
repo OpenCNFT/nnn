@@ -57,7 +57,7 @@ func NewApp() *cli.App {
 			newServeCommand(),
 			newConfigurationCommand(),
 			newAcceptDatalossCommand(),
-			newCheckCommand(service.AllChecks()),
+			newCheckCommand(service.Checks()),
 			newDatalossCommand(),
 			newDialNodesCommand(),
 			newListStoragesCommand(),

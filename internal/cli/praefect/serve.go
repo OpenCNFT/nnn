@@ -403,7 +403,7 @@ func server(
 			Registry:        protoregistry.GitalyProtoPreregistered,
 			Conns:           nodeSet.Connections(),
 			PrimaryGetter:   primaryGetter,
-			Checks:          service.ReadinessChecks(),
+			Checks:          service.Checks(),
 		}, defaultServerOptions...)
 	)
 	metricsCollectors = append(metricsCollectors, transactionManager, coordinator, repl)
