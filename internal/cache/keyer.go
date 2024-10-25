@@ -90,7 +90,7 @@ func (keyer leaseKeyer) updateLatest(ctx context.Context, repo *gitalypb.Reposit
 		return "", err
 	}
 
-	if err := latest.Commit(); err != nil {
+	if err := latest.Commit(ctx); err != nil {
 		return "", err
 	}
 

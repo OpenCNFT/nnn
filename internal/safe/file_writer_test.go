@@ -16,6 +16,8 @@ import (
 )
 
 func TestFileWriter_successful(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	dir := testhelper.TempDir(t)
 
 	filePath := filepath.Join(dir, "test_file_contents")
@@ -28,7 +30,7 @@ func TestFileWriter_successful(t *testing.T) {
 
 	require.NoFileExists(t, filePath)
 
-	require.NoError(t, file.Commit())
+	require.NoError(t, file.Commit(ctx))
 
 	writtenContents := testhelper.MustReadFile(t, filePath)
 	require.Equal(t, fileContents, string(writtenContents))
@@ -46,6 +48,8 @@ func TestFileWriter_multipleConfigs(t *testing.T) {
 }
 
 func TestFileWriter_mode(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	dir := testhelper.TempDir(t)
 
 	target := filepath.Join(dir, "file")
@@ -55,7 +59,7 @@ func TestFileWriter_mode(t *testing.T) {
 		FileMode: 0o060,
 	})
 	require.NoError(t, err)
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	fi, err := os.Stat(target)
 	require.NoError(t, err)
@@ -63,6 +67,8 @@ func TestFileWriter_mode(t *testing.T) {
 }
 
 func TestFileWriter_race(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	dir := testhelper.TempDir(t)
 
 	filePath := filepath.Join(dir, "test_file_contents")
@@ -76,7 +82,7 @@ func TestFileWriter_race(t *testing.T) {
 			require.NoError(t, err)
 			_, err = w.Write([]byte(fmt.Sprintf("message # %d", i)))
 			require.NoError(t, err)
-			require.NoError(t, w.Commit())
+			require.NoError(t, w.Commit(ctx))
 			wg.Done()
 		}(i)
 	}
@@ -89,6 +95,8 @@ func TestFileWriter_race(t *testing.T) {
 }
 
 func TestFileWriter_closeBeforeCommit(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	dir := testhelper.TempDir(t)
 
 	dstPath := filepath.Join(dir, "safety_meow")
@@ -103,10 +111,12 @@ func TestFileWriter_closeBeforeCommit(t *testing.T) {
 	require.NoError(t, sf.Close())
 	require.True(t, dirEmpty(t, dir), "should be empty")
 
-	require.Equal(t, safe.ErrAlreadyDone, sf.Commit())
+	require.Equal(t, safe.ErrAlreadyDone, sf.Commit(ctx))
 }
 
 func TestFileWriter_commitBeforeClose(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	dir := testhelper.TempDir(t)
 
 	dstPath := filepath.Join(dir, "safety_meow")
@@ -118,7 +128,7 @@ func TestFileWriter_commitBeforeClose(t *testing.T) {
 	_, err = sf.Write([]byte("MEOW MEOW MEOW MEOW"))
 	require.NoError(t, err)
 
-	require.NoError(t, sf.Commit())
+	require.NoError(t, sf.Commit(ctx))
 	require.FileExists(t, dstPath)
 
 	require.Equal(t, safe.ErrAlreadyDone, sf.Close(),

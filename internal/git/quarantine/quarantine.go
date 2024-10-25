@@ -138,8 +138,10 @@ func migrate(ctx context.Context, sourcePath, targetPath string) error {
 				return fmt.Errorf("migrating directory %q: %w", nestedSourcePath, err)
 			}
 
-			if err := syncer.Sync(ctx, nestedTargetPath); err != nil {
-				return fmt.Errorf("sync directory: %w", err)
+			if storage.NeedsSync(ctx) {
+				if err := syncer.Sync(ctx, nestedTargetPath); err != nil {
+					return fmt.Errorf("sync directory: %w", err)
+				}
 			}
 
 			continue
@@ -149,13 +151,17 @@ func migrate(ctx context.Context, sourcePath, targetPath string) error {
 			return fmt.Errorf("migrating object file %q: %w", nestedSourcePath, err)
 		}
 
-		if err := syncer.Sync(ctx, nestedTargetPath); err != nil {
-			return fmt.Errorf("sync object: %w", err)
+		if storage.NeedsSync(ctx) {
+			if err := syncer.Sync(ctx, nestedTargetPath); err != nil {
+				return fmt.Errorf("sync object: %w", err)
+			}
 		}
 	}
 
-	if err := syncer.Sync(ctx, targetPath); err != nil {
-		return fmt.Errorf("sync object directory: %w", err)
+	if storage.NeedsSync(ctx) {
+		if err := syncer.Sync(ctx, targetPath); err != nil {
+			return fmt.Errorf("sync object directory: %w", err)
+		}
 	}
 
 	if err := os.Remove(sourcePath); err != nil {

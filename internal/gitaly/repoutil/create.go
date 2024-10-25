@@ -268,8 +268,10 @@ func Create(
 	}
 
 	syncer := safe.NewSyncer()
-	if err := syncer.SyncRecursive(ctx, newRepoDir.Path()); err != nil {
-		return fmt.Errorf("sync recursive: %w", err)
+	if storage.NeedsSync(ctx) {
+		if err := syncer.SyncRecursive(ctx, newRepoDir.Path()); err != nil {
+			return fmt.Errorf("sync recursive: %w", err)
+		}
 	}
 
 	// Now that we have locked the repository and all Gitalies have agreed that they
@@ -283,8 +285,10 @@ func Create(
 		return fmt.Errorf("get storage by name: %w", err)
 	}
 
-	if err := syncer.SyncHierarchy(ctx, storagePath, repository.GetRelativePath()); err != nil {
-		return fmt.Errorf("sync hierarchy: %w", err)
+	if storage.NeedsSync(ctx) {
+		if err := syncer.SyncHierarchy(ctx, storagePath, repository.GetRelativePath()); err != nil {
+			return fmt.Errorf("sync hierarchy: %w", err)
+		}
 	}
 
 	if err := transaction.VoteOnContext(ctx, txManager, vote, voting.Committed); err != nil {

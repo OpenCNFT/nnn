@@ -23,13 +23,17 @@ func readFilesystemID(t *testing.T, path string) string {
 }
 
 func TestWriteMetadataFile(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	tempDir := testhelper.TempDir(t)
 
-	require.NoError(t, WriteMetadataFile(tempDir))
+	require.NoError(t, WriteMetadataFile(ctx, tempDir))
 	require.NotEmpty(t, readFilesystemID(t, tempDir))
 }
 
 func TestWriteMetadataFile_AlreadyExists(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	tempDir := testhelper.TempDir(t)
 
 	metadataPath := filepath.Join(tempDir, ".gitaly-metadata")
@@ -43,7 +47,7 @@ func TestWriteMetadataFile_AlreadyExists(t *testing.T) {
 	require.NoError(t, json.NewEncoder(metadataFile).Encode(&m))
 	require.NoError(t, metadataFile.Close())
 
-	require.NoError(t, WriteMetadataFile(tempDir))
+	require.NoError(t, WriteMetadataFile(ctx, tempDir))
 
 	require.Equal(t, m.GitalyFilesystemID, readFilesystemID(t, tempDir), "WriteMetadataFile should not clobber the existing file")
 }

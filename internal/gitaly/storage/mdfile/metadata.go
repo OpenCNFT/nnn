@@ -1,6 +1,7 @@
 package mdfile
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -22,7 +23,7 @@ type Metadata struct {
 }
 
 // WriteMetadataFile marshals and writes a metadata file
-func WriteMetadataFile(storagePath string) (returnedErr error) {
+func WriteMetadataFile(ctx context.Context, storagePath string) (returnedErr error) {
 	path := filepath.Join(storagePath, metadataFilename)
 
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -47,7 +48,7 @@ func WriteMetadataFile(storagePath string) (returnedErr error) {
 		return err
 	}
 
-	return fw.Commit()
+	return fw.Commit(ctx)
 }
 
 // ReadMetadataFile reads and decodes the json metadata file

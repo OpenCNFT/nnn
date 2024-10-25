@@ -42,7 +42,7 @@ func TestGitalyServerInfo(t *testing.T) {
 	client := newServerClient(t, addr)
 	ctx := testhelper.Context(t)
 
-	require.NoError(t, mdfile.WriteMetadataFile(cfg.Storages[0].Path))
+	require.NoError(t, mdfile.WriteMetadataFile(ctx, cfg.Storages[0].Path))
 	metadata, err := mdfile.ReadMetadataFile(cfg.Storages[0].Path)
 	require.NoError(t, err)
 

@@ -1,6 +1,7 @@
 package safe
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -165,7 +166,7 @@ func (fw *LockingFileWriter) unlock() error {
 // Commit writes whatever has been written to the Filewriter to the target file if and only if the
 // target file has not been modified meanwhile. The writer must be `Lock()`ed first. The writer
 // will be closed after this call, with all locks and temporary files having been removed.
-func (fw *LockingFileWriter) Commit() (returnedErr error) {
+func (fw *LockingFileWriter) Commit(ctx context.Context) (returnedErr error) {
 	if fw.state != lockingFileWriterStateLocked {
 		return fmt.Errorf("file writer not locked")
 	}
@@ -178,7 +179,7 @@ func (fw *LockingFileWriter) Commit() (returnedErr error) {
 		return err
 	}
 
-	if err := fw.writer.Commit(); err != nil {
+	if err := fw.writer.Commit(ctx); err != nil {
 		return fmt.Errorf("committing file: %w", err)
 	}
 

@@ -621,7 +621,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	}
 
 	for _, shard := range cfg.Storages {
-		if err := mdfile.WriteMetadataFile(shard.Path); err != nil {
+		if err := mdfile.WriteMetadataFile(ctx, shard.Path); err != nil {
 			// TODO should this be a return? https://gitlab.com/gitlab-org/gitaly/issues/1893
 			logger.WithError(err).Error("Unable to write gitaly metadata file")
 		}

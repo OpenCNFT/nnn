@@ -315,7 +315,7 @@ func (c *DiskCache) PutStream(ctx context.Context, repo *gitalypb.Repository, re
 	}
 	c.bytesStoredtotals.Add(float64(n))
 
-	if err := sf.Commit(); err != nil {
+	if err := sf.Commit(ctx); err != nil {
 		c.errTotal.WithLabelValues("ErrSafefileCommit").Inc()
 		return err
 	}

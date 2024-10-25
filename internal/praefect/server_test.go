@@ -127,7 +127,7 @@ func TestGitalyServerInfo(t *testing.T) {
 		secondCfg := testcfg.Build(t, testcfg.WithStorages("praefect-internal-2"))
 		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
-		require.NoError(t, mdfile.WriteMetadataFile(firstCfg.Storages[0].Path))
+		require.NoError(t, mdfile.WriteMetadataFile(ctx, firstCfg.Storages[0].Path))
 		firstMetadata, err := mdfile.ReadMetadataFile(firstCfg.Storages[0].Path)
 		require.NoError(t, err)
 
@@ -509,7 +509,7 @@ func TestGitalyServerSignature(t *testing.T) {
 		secondCfg.Git.SigningKey = pathToPrivateKey
 		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
-		require.NoError(t, mdfile.WriteMetadataFile(firstCfg.Storages[0].Path))
+		require.NoError(t, mdfile.WriteMetadataFile(ctx, firstCfg.Storages[0].Path))
 		_, err := mdfile.ReadMetadataFile(firstCfg.Storages[0].Path)
 		require.NoError(t, err)
 
@@ -560,7 +560,7 @@ func TestGitalyServerSignature(t *testing.T) {
 		secondCfg.Git.SigningKey = pathToPrivateKey
 		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
-		require.NoError(t, mdfile.WriteMetadataFile(firstCfg.Storages[0].Path))
+		require.NoError(t, mdfile.WriteMetadataFile(ctx, firstCfg.Storages[0].Path))
 		_, err := mdfile.ReadMetadataFile(firstCfg.Storages[0].Path)
 		require.NoError(t, err)
 

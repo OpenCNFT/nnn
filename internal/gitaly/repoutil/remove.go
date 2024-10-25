@@ -113,8 +113,10 @@ func remove(
 		return structerr.NewInternal("staging repository for removal: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncParent(ctx, path); err != nil {
-		return fmt.Errorf("sync removal: %w", err)
+	if storage.NeedsSync(ctx) {
+		if err := safe.NewSyncer().SyncParent(ctx, path); err != nil {
+			return fmt.Errorf("sync removal: %w", err)
+		}
 	}
 
 	if err := voteOnAction(ctx, txManager, repository, voting.Committed); err != nil {

@@ -1,11 +1,14 @@
 package safe
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
 
 // ErrAlreadyDone is returned when the safe file has already been closed
@@ -66,13 +69,15 @@ func (fw *FileWriter) Write(p []byte) (n int, err error) {
 // Commit will close the temporary file and rename it to the target file name
 // the first call to Commit() will close and delete the temporary file, so
 // subsequently calls to Commit() are guaranteed to return an error.
-func (fw *FileWriter) Commit() error {
+func (fw *FileWriter) Commit(ctx context.Context) error {
 	err := ErrAlreadyDone
 
 	fw.commitOrClose.Do(func() {
-		if err = fw.tmpFile.Sync(); err != nil {
-			err = fmt.Errorf("syncing temp file: %w", err)
-			return
+		if storage.NeedsSync(ctx) {
+			if err = fw.tmpFile.Sync(); err != nil {
+				err = fmt.Errorf("syncing temp file: %w", err)
+				return
+			}
 		}
 
 		if err = fw.tmpFile.Close(); err != nil {
@@ -85,7 +90,7 @@ func (fw *FileWriter) Commit() error {
 			return
 		}
 
-		if err = fw.syncDir(); err != nil {
+		if err = fw.syncDir(ctx); err != nil {
 			err = fmt.Errorf("syncing dir: %w", err)
 			return
 		}
@@ -100,7 +105,11 @@ func (fw *FileWriter) rename() error {
 }
 
 // syncDir will sync the directory
-func (fw *FileWriter) syncDir() error {
+func (fw *FileWriter) syncDir(ctx context.Context) error {
+	if !storage.NeedsSync(ctx) {
+		return nil
+	}
+
 	f, err := os.Open(filepath.Dir(fw.path))
 	if err != nil {
 		return err

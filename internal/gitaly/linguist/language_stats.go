@@ -11,6 +11,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
 
 const (
@@ -153,9 +154,13 @@ func (c *languageStats) save(ctx context.Context, repo *localrepo.Repo, commitID
 	if err = w.Close(); err != nil {
 		return fmt.Errorf("languageStats zlib write: %w", err)
 	}
-	if err = file.Sync(); err != nil {
-		return fmt.Errorf("languageStats flush: %w", err)
+
+	if storage.NeedsSync(ctx) {
+		if err = file.Sync(); err != nil {
+			return fmt.Errorf("languageStats flush: %w", err)
+		}
 	}
+
 	if err = file.Close(); err != nil {
 		return fmt.Errorf("languageStats close: %w", err)
 	}
