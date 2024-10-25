@@ -10,7 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config/auth"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mdfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testserver"
@@ -42,8 +42,8 @@ func TestGitalyServerInfo(t *testing.T) {
 	client := newServerClient(t, addr)
 	ctx := testhelper.Context(t)
 
-	require.NoError(t, storage.WriteMetadataFile(cfg.Storages[0].Path))
-	metadata, err := storage.ReadMetadataFile(cfg.Storages[0].Path)
+	require.NoError(t, mdfile.WriteMetadataFile(cfg.Storages[0].Path))
+	metadata, err := mdfile.ReadMetadataFile(cfg.Storages[0].Path)
 	require.NoError(t, err)
 
 	c, err := client.ServerInfo(ctx, &gitalypb.ServerInfoRequest{})
