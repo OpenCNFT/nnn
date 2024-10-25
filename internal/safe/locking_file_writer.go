@@ -75,13 +75,6 @@ func NewLockingFileWriter(path string, optionalCfg ...LockingFileWriterConfig) (
 		if err != nil {
 			return nil, fmt.Errorf("seeding file writer: %w", err)
 		}
-
-		// We need to sync the file to disk such that it's possible to modify its contents
-		// via an external process. Otherwise, external processes may only see partially
-		// written files.
-		if err := writer.tmpFile.Sync(); err != nil {
-			return nil, fmt.Errorf("flushing seeded contents: %w", err)
-		}
 	}
 
 	return &LockingFileWriter{
