@@ -105,7 +105,7 @@ type StorageManager struct {
 	// syncer is used to fsync. The interface is defined only for testing purposes. See the actual
 	// implementation for documentation.
 	syncer interface {
-		SyncHierarchy(rootPath, relativePath string) error
+		SyncHierarchy(ctx context.Context, rootPath, relativePath string) error
 	}
 }
 
@@ -426,7 +426,10 @@ func (sm *StorageManager) GetPartition(ctx context.Context, partitionID storage.
 
 // mkdirAllSync creates all missing directories in path. It fsyncs the first existing directory in the path and
 // the created directories.
-func mkdirAllSync(syncer interface{ SyncHierarchy(string, string) error }, path string, mode fs.FileMode) error {
+func mkdirAllSync(ctx context.Context, syncer interface {
+	SyncHierarchy(context.Context, string, string) error
+}, path string, mode fs.FileMode,
+) error {
 	// Traverse the hierarchy towards the root to find the first directory that exists.
 	currentPath := path
 	for {
@@ -465,7 +468,7 @@ func mkdirAllSync(syncer interface{ SyncHierarchy(string, string) error }, path 
 		return fmt.Errorf("rel: %w", err)
 	}
 
-	if err := syncer.SyncHierarchy(currentPath, dirtyHierarchy); err != nil {
+	if err := syncer.SyncHierarchy(ctx, currentPath, dirtyHierarchy); err != nil {
 		return fmt.Errorf("sync hierarchy: %w", err)
 	}
 
@@ -526,7 +529,7 @@ func (sm *StorageManager) startPartition(ctx context.Context, partitionID storag
 
 				relativeStateDir := deriveStateDirectory(partitionID)
 				absoluteStateDir := filepath.Join(sm.path, relativeStateDir)
-				if err := mkdirAllSync(sm.syncer, filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
+				if err := mkdirAllSync(ctx, sm.syncer, filepath.Dir(absoluteStateDir), mode.Directory); err != nil {
 					return fmt.Errorf("create state directory hierarchy: %w", err)
 				}
 

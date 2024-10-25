@@ -1206,7 +1206,7 @@ func TestStorageManager(t *testing.T) {
 				)
 			}
 
-			dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+			dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 			require.NoError(t, err)
 			defer dbMgr.Close()
 
@@ -1363,7 +1363,7 @@ func TestStorageManager_getPartition(t *testing.T) {
 	cfg := testcfg.Build(t)
 	logger := testhelper.SharedLogger(t)
 
-	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
@@ -1431,7 +1431,7 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 	cfg := testcfg.Build(t)
 	logger := testhelper.SharedLogger(t)
 
-	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
@@ -1481,10 +1481,12 @@ func TestStorageManager_concurrentClose(t *testing.T) {
 func TestStorageManager_ListPartitions(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	logger := testhelper.SharedLogger(t)
 	cfg := testcfg.Build(t)
 
-	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	t.Cleanup(dbMgr.Close)
 
@@ -1586,18 +1588,20 @@ func TestStorageManager_ListPartitions(t *testing.T) {
 	})
 }
 
-type SyncerFunc func(rootPath, relativePath string) error
+type SyncerFunc func(ctx context.Context, rootPath, relativePath string) error
 
-func (fn SyncerFunc) SyncHierarchy(rootPath, relativePath string) error {
-	return fn(rootPath, relativePath)
+func (fn SyncerFunc) SyncHierarchy(ctx context.Context, rootPath, relativePath string) error {
+	return fn(ctx, rootPath, relativePath)
 }
 
 func TestStorageManager_partitionInitialization(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	cfg := testcfg.Build(t)
 
 	logger := testhelper.SharedLogger(t)
 
-	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
@@ -1617,7 +1621,7 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 	unblockSync := make(chan struct{})
 
 	firstCall := true
-	mgr.syncer = SyncerFunc(func(rootPath, relativePath string) error {
+	mgr.syncer = SyncerFunc(func(ctx context.Context, rootPath, relativePath string) error {
 		if firstCall {
 			firstCall = false
 			close(blockedInSync)
@@ -1627,8 +1631,6 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 
 		return nil
 	})
-
-	ctx := testhelper.Context(t)
 
 	// Start a partition that blocks while initializing.
 	var wg sync.WaitGroup
@@ -1707,11 +1709,13 @@ func TestStorageManager_partitionInitialization(t *testing.T) {
 }
 
 func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
+	ctx := testhelper.Context(t)
+
 	cfg := testcfg.Build(t)
 
 	logger := testhelper.SharedLogger(t)
 
-	dbMgr, err := databasemgr.NewDBManager(cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
+	dbMgr, err := databasemgr.NewDBManager(ctx, cfg.Storages, keyvalue.NewBadgerStore, helper.NewNullTickerFactory(), logger)
 	require.NoError(t, err)
 	defer dbMgr.Close()
 
@@ -1732,7 +1736,7 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 	unblockInitialization := make(chan struct{})
 
 	call := 0
-	mgr.syncer = SyncerFunc(func(rootPath, relativePath string) error {
+	mgr.syncer = SyncerFunc(func(ctx context.Context, rootPath, relativePath string) error {
 		call++
 		switch call {
 		case 1:
@@ -1751,8 +1755,6 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 	})
 
 	defer func() { require.Equal(t, 3, call) }()
-
-	ctx := testhelper.Context(t)
 
 	// Start a partition that is initializing when close is called, and fails the initialization.
 	var wg sync.WaitGroup
@@ -1842,7 +1844,9 @@ func TestStorageManager_uninitializedPartitionsWhileClosing(t *testing.T) {
 }
 
 func TestMkdirAllSync(t *testing.T) {
-	failingSyncer := SyncerFunc(func(rootPath, relativePath string) error {
+	ctx := testhelper.Context(t)
+
+	failingSyncer := SyncerFunc(func(ctx context.Context, rootPath, relativePath string) error {
 		t.Fatalf("unexpected call")
 		return nil
 	})
@@ -1853,19 +1857,19 @@ func TestMkdirAllSync(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "file"), nil, mode.File))
 
 	t.Run("target is a file", func(t *testing.T) {
-		require.Equal(t, mkdirAllSync(failingSyncer, filePath, mode.Directory), errors.New("not a directory"))
+		require.Equal(t, mkdirAllSync(ctx, failingSyncer, filePath, mode.Directory), errors.New("not a directory"))
 	})
 
 	t.Run("parent is a file", func(t *testing.T) {
 		targetPath := filepath.Join(filePath, "target-dir")
 		require.Equal(t,
-			mkdirAllSync(failingSyncer, targetPath, mode.File),
+			mkdirAllSync(ctx, failingSyncer, targetPath, mode.File),
 			fmt.Errorf("stat: %w", &os.PathError{Op: "stat", Path: targetPath, Err: syscall.ENOTDIR}),
 		)
 	})
 
 	t.Run("target exists", func(t *testing.T) {
-		require.NoError(t, mkdirAllSync(failingSyncer, tmpDir, mode.Directory))
+		require.NoError(t, mkdirAllSync(ctx, failingSyncer, tmpDir, mode.Directory))
 	})
 
 	t.Run("creates missing directories", func(t *testing.T) {
@@ -1875,7 +1879,7 @@ func TestMkdirAllSync(t *testing.T) {
 		}
 
 		var syncCall *SyncCall
-		require.NoError(t, mkdirAllSync(SyncerFunc(func(rootPath, relativePath string) error {
+		require.NoError(t, mkdirAllSync(ctx, SyncerFunc(func(ctx context.Context, rootPath, relativePath string) error {
 			syncCall = &SyncCall{
 				RootPath:     rootPath,
 				RelativePath: relativePath,

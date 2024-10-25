@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -74,7 +75,7 @@ func testRepoAndPool(t *testing.T, desc string, testFunc func(t *testing.T, rela
 	})
 }
 
-func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*testing.T, config.Cfg, storage.Node)) {
+func testWithAndWithoutTransaction(t *testing.T, ctx context.Context, desc string, testFunc func(*testing.T, config.Cfg, storage.Node)) {
 	t.Helper()
 	t.Run(desc, func(t *testing.T) {
 		t.Run("with transaction", func(t *testing.T) {
@@ -90,6 +91,7 @@ func testWithAndWithoutTransaction(t *testing.T, desc string, testFunc func(*tes
 			localRepoFactory := localrepo.NewFactory(logger, config.NewLocator(cfg), cmdFactory, catfileCache)
 
 			dbMgr, err := databasemgr.NewDBManager(
+				ctx,
 				cfg.Storages,
 				keyvalue.NewBadgerStore,
 				helper.NewNullTickerFactory(),

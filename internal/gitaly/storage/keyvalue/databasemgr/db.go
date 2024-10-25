@@ -47,6 +47,7 @@ type DBManager struct {
 // that if one of the databases fails to initialize, the garbage collection goroutines for the other
 // successfully initialized databases are stopped.
 func NewDBManager(
+	ctx context.Context,
 	configuredStorages []config.Storage,
 	dbOpen DatabaseOpenerFunc,
 	gcTickerFactory helper.TickerFactory,
@@ -72,7 +73,7 @@ func NewDBManager(
 			return nil, fmt.Errorf("create storage's database directory: %w", err)
 		}
 
-		if err := safe.NewSyncer().SyncHierarchy(internalDir, "database"); err != nil {
+		if err := safe.NewSyncer().SyncHierarchy(ctx, internalDir, "database"); err != nil {
 			return nil, fmt.Errorf("sync database directory: %w", err)
 		}
 

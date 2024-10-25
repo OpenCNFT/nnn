@@ -358,6 +358,8 @@ func TestMigrate(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := testhelper.Context(t)
+
 			dir := testhelper.TempDir(t)
 
 			source := filepath.Join(dir, "source")
@@ -366,7 +368,7 @@ func TestMigrate(t *testing.T) {
 			target := filepath.Join(dir, "target")
 			tc.target.create(t, target)
 
-			require.NoError(t, migrate(source, target))
+			require.NoError(t, migrate(ctx, source, target))
 			require.Equal(t, tc.expected, listEntries(t, target))
 			require.NoDirExists(t, source)
 		})

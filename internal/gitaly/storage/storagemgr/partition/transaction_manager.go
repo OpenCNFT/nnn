@@ -1248,7 +1248,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 	}
 
-	if err := safe.NewSyncer().SyncRecursive(transaction.walFilesPath()); err != nil {
+	if err := safe.NewSyncer().SyncRecursive(ctx, transaction.walFilesPath()); err != nil {
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
@@ -1273,7 +1273,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	// We check for modifications before syncing so we don't unnecessarily sync the changes to the
 	// metadata of the original file if it hasn't been changed.
 	if preImagePackedRefsInode != postImagePackedRefsInode && postImagePackedRefsInode > 0 {
-		if err := safe.NewSyncer().Sync(postImagePackedRefsPath); err != nil {
+		if err := safe.NewSyncer().Sync(ctx, postImagePackedRefsPath); err != nil {
 			return fmt.Errorf("sync packed-refs: %w", err)
 		}
 	}
@@ -2470,7 +2470,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	mgr.appliedLSN = storage.LSN(appliedLSN.GetValue())
 
-	if err := mgr.createStateDirectory(); err != nil {
+	if err := mgr.createStateDirectory(ctx); err != nil {
 		return fmt.Errorf("create state directory: %w", err)
 	}
 
@@ -2558,7 +2558,7 @@ func (mgr *TransactionManager) doesRepositoryExist(ctx context.Context, relative
 	return true, nil
 }
 
-func (mgr *TransactionManager) createStateDirectory() error {
+func (mgr *TransactionManager) createStateDirectory(ctx context.Context) error {
 	needsFsync := false
 	for _, path := range []string{
 		mgr.stateDirectory,
@@ -2582,11 +2582,11 @@ func (mgr *TransactionManager) createStateDirectory() error {
 	}
 
 	syncer := safe.NewSyncer()
-	if err := syncer.SyncRecursive(mgr.stateDirectory); err != nil {
+	if err := syncer.SyncRecursive(ctx, mgr.stateDirectory); err != nil {
 		return fmt.Errorf("sync: %w", err)
 	}
 
-	if err := syncer.SyncParent(mgr.stateDirectory); err != nil {
+	if err := syncer.SyncParent(ctx, mgr.stateDirectory); err != nil {
 		return fmt.Errorf("sync parent: %w", err)
 	}
 
@@ -2653,7 +2653,7 @@ func (mgr *TransactionManager) removeStaleWALFiles(ctx context.Context, oldestLS
 
 	if needsFsync {
 		// Sync the parent directory to flush the file deletion.
-		if err := safe.NewSyncer().Sync(walFilesPath(mgr.stateDirectory)); err != nil {
+		if err := safe.NewSyncer().Sync(ctx, walFilesPath(mgr.stateDirectory)); err != nil {
 			return fmt.Errorf("sync: %w", err)
 		}
 	}
@@ -3430,14 +3430,14 @@ func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction 
 	}
 
 	// Apply the changes of current transaction.
-	if err := mgr.replacePackfiles(workingRepositoryPath, transaction.walFilesPath(), repack.newFiles, repack.deletedFiles); err != nil {
+	if err := mgr.replacePackfiles(ctx, workingRepositoryPath, transaction.walFilesPath(), repack.newFiles, repack.deletedFiles); err != nil {
 		return nil, fmt.Errorf("applying packfiles for verifying repacking: %w", err)
 	}
 
 	// Apply new commit graph if any. Although commit graph update belongs to another task, a repacking task will
 	// result in rewriting the commit graph. It would be nice to apply the commit graph when setting up working
 	// repository for repacking task.
-	if err := mgr.replaceCommitGraphs(workingRepositoryPath, transaction.walFilesPath()); err != nil {
+	if err := mgr.replaceCommitGraphs(ctx, workingRepositoryPath, transaction.walFilesPath()); err != nil {
 		return nil, fmt.Errorf("applying commit graph for verifying repacking: %w", err)
 	}
 
@@ -3550,7 +3550,6 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	syncer := safe.NewSyncer()
 	// Sync the log entry completely before committing it.
 	//
 	// Ideally the log entry would be completely flushed to the disk before queuing the
@@ -3562,12 +3561,8 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	// See https://gitlab.com/gitlab-org/gitaly/-/issues/5892 for more details. Once the issue is
 	// addressed, we could stage the transaction entirely before queuing it for commit, and thus not
 	// need to sync here.
-	if err := syncer.SyncRecursive(logEntryPath); err != nil {
+	if err := safe.NewSyncer().SyncRecursive(ctx, logEntryPath); err != nil {
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
-	}
-
-	if err := syncer.SyncParent(manifestPath); err != nil {
-		return fmt.Errorf("sync manifest directory entry: %w", err)
 	}
 
 	mgr.testHooks.beforeAppendLogEntry()
@@ -3584,7 +3579,7 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	// directory entry of the new log entry in the WAL directory to finalize the commit.
 	//
 	// After this sync, the log entry has been persisted and will be recovered on failure.
-	if err := safe.NewSyncer().SyncParent(destinationPath); err != nil {
+	if err := safe.NewSyncer().SyncParent(ctx, destinationPath); err != nil {
 		// If this fails, the log entry will be left in the write-ahead log but it is not
 		// properly persisted. If the fsync fails, something is seriously wrong and there's no
 		// point trying to delete the files. The right thing to do is to terminate Gitaly
@@ -3634,7 +3629,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 
 	mgr.testHooks.beforeApplyLogEntry()
 
-	if err := applyOperations(safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry, mgr.db); err != nil {
+	if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry, mgr.db); err != nil {
 		return fmt.Errorf("apply operations: %w", err)
 	}
 
@@ -3801,13 +3796,13 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 		// If there is any empty dir along the way, it's removed and dir pointer moves up until the dir
 		// is not empty or reaching the root dir. That one should be fsynced to flush the dir removal.
 		// If there is no empty dir, it stays at the dir of pruned refs, which also needs a flush.
-		if err := syncer.Sync(dir); err != nil {
+		if err := syncer.Sync(ctx, dir); err != nil {
 			return fmt.Errorf("sync dir: %w", err)
 		}
 	}
 
 	// Sync the root of the repository to flush packed-refs replacement.
-	if err := syncer.SyncParent(packedRefsPath); err != nil {
+	if err := syncer.SyncParent(ctx, packedRefsPath); err != nil {
 		return fmt.Errorf("sync parent: %w", err)
 	}
 	return nil
@@ -3829,7 +3824,7 @@ func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.L
 	repack := logEntry.GetHousekeeping().GetRepack()
 	repoPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
 
-	if err := mgr.replacePackfiles(repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn), repack.GetNewFiles(), repack.GetDeletedFiles()); err != nil {
+	if err := mgr.replacePackfiles(ctx, repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn), repack.GetNewFiles(), repack.GetDeletedFiles()); err != nil {
 		return fmt.Errorf("applying packfiles into destination repository: %w", err)
 	}
 
@@ -3847,7 +3842,7 @@ func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.L
 		}
 	}
 
-	if err := safe.NewSyncer().Sync(filepath.Join(repoPath, "objects")); err != nil {
+	if err := safe.NewSyncer().Sync(ctx, filepath.Join(repoPath, "objects")); err != nil {
 		return fmt.Errorf("sync objects dir: %w", err)
 	}
 	return nil
@@ -3892,7 +3887,7 @@ func (mgr *TransactionManager) applyCommitGraphs(ctx context.Context, lsn storag
 	defer finishTimer()
 
 	repoPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
-	if err := mgr.replaceCommitGraphs(repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn)); err != nil {
+	if err := mgr.replaceCommitGraphs(ctx, repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn)); err != nil {
 		return fmt.Errorf("rewriting commit-graph: %w", err)
 	}
 
@@ -3901,7 +3896,7 @@ func (mgr *TransactionManager) applyCommitGraphs(ctx context.Context, lsn storag
 
 // replacePackfiles replaces the set of packfiles at the destination repository by the new set of packfiles from WAL
 // directory. Any packfile outside the input deleted files are kept intact.
-func (mgr *TransactionManager) replacePackfiles(repoPath string, walPath string, newFiles []string, deletedFiles []string) error {
+func (mgr *TransactionManager) replacePackfiles(ctx context.Context, repoPath string, walPath string, newFiles []string, deletedFiles []string) error {
 	for _, file := range newFiles {
 		if err := os.Link(
 			filepath.Join(walPath, file),
@@ -3925,14 +3920,14 @@ func (mgr *TransactionManager) replacePackfiles(repoPath string, walPath string,
 		}
 	}
 
-	if err := safe.NewSyncer().Sync(filepath.Join(repoPath, "objects", "pack")); err != nil {
+	if err := safe.NewSyncer().Sync(ctx, filepath.Join(repoPath, "objects", "pack")); err != nil {
 		return fmt.Errorf("sync objects/pack dir: %w", err)
 	}
 
 	return nil
 }
 
-func (mgr *TransactionManager) replaceCommitGraphs(repoPath string, walPath string) error {
+func (mgr *TransactionManager) replaceCommitGraphs(ctx context.Context, repoPath string, walPath string) error {
 	// Clean up and apply commit graphs.
 	walGraphsDir := filepath.Join(walPath, "commit-graphs")
 	if graphEntries, err := os.ReadDir(walGraphsDir); err != nil {
@@ -3958,10 +3953,10 @@ func (mgr *TransactionManager) replaceCommitGraphs(repoPath string, walPath stri
 				return fmt.Errorf("linking commit-graph entry: %w", err)
 			}
 		}
-		if err := safe.NewSyncer().Sync(commitGraphsDir); err != nil {
+		if err := safe.NewSyncer().Sync(ctx, commitGraphsDir); err != nil {
 			return fmt.Errorf("sync objects/pack dir: %w", err)
 		}
-		if err := safe.NewSyncer().SyncParent(commitGraphsDir); err != nil {
+		if err := safe.NewSyncer().SyncParent(ctx, commitGraphsDir); err != nil {
 			return fmt.Errorf("sync objects/pack dir: %w", err)
 		}
 	}
@@ -4003,7 +3998,7 @@ func (mgr *TransactionManager) deleteLogEntry(ctx context.Context, lsn storage.L
 		return fmt.Errorf("rename: %w", err)
 	}
 
-	if err := safe.NewSyncer().SyncParent(logEntryPath); err != nil {
+	if err := safe.NewSyncer().SyncParent(ctx, logEntryPath); err != nil {
 		return fmt.Errorf("sync file deletion: %w", err)
 	}
 
