@@ -35,6 +35,7 @@ func NewApp() *cli.App {
 			newBundleURICommand(),
 			newGitCommand(),
 			newBadgerDBCmd(),
+			newRecoveryCommand(),
 		},
 	}
 }
