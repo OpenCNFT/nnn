@@ -128,14 +128,22 @@ func (s *server) refsToRemove(ctx context.Context, repo *localrepo.Repo, req *gi
 		return refs, nil
 	}
 
-	prefixes := make([]string, len(req.GetExceptWithPrefix()))
-	for i, prefix := range req.GetExceptWithPrefix() {
-		prefixes[i] = string(prefix)
-	}
-
 	existingRefs, err := repo.GetReferences(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if req.GetDeleteAll() {
+		refs := make([]git.ReferenceName, len(existingRefs))
+		for i, existingRef := range existingRefs {
+			refs[i] = existingRef.Name
+		}
+		return refs, nil
+	}
+
+	prefixes := make([]string, len(req.GetExceptWithPrefix()))
+	for i, prefix := range req.GetExceptWithPrefix() {
+		prefixes[i] = string(prefix)
 	}
 
 	var refs []git.ReferenceName
@@ -165,12 +173,14 @@ func validateDeleteRefRequest(ctx context.Context, locator storage.Locator, req 
 		return err
 	}
 
-	if len(req.GetExceptWithPrefix()) > 0 && len(req.GetRefs()) > 0 {
-		return errors.New("ExceptWithPrefix and Refs are mutually exclusive")
+	selectedOptionsCount := getSelectedOptionsCount(req)
+
+	if selectedOptionsCount > 1 {
+		return errors.New("ExceptWithPrefix, Refs and DeleteAll are mutually exclusive")
 	}
 
-	if len(req.GetExceptWithPrefix()) == 0 && len(req.GetRefs()) == 0 { // You can't delete all refs
-		return errors.New("empty ExceptWithPrefix and Refs")
+	if selectedOptionsCount == 0 {
+		return errors.New("empty ExceptWithPrefix, Refs and DeleteAll")
 	}
 
 	for _, prefix := range req.GetExceptWithPrefix() {
@@ -186,4 +196,18 @@ func validateDeleteRefRequest(ctx context.Context, locator storage.Locator, req 
 	}
 
 	return nil
+}
+
+func getSelectedOptionsCount(req *gitalypb.DeleteRefsRequest) int {
+	options := 0
+	if req.GetDeleteAll() {
+		options++
+	}
+	if len(req.GetRefs()) > 0 {
+		options++
+	}
+	if len(req.GetExceptWithPrefix()) > 0 {
+		options++
+	}
+	return options
 }

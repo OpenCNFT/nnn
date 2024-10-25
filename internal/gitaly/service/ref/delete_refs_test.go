@@ -32,14 +32,23 @@ func TestDeleteRefs_successful(t *testing.T) {
 	cfg, client := setupRefService(t)
 
 	testCases := []struct {
-		desc    string
-		request *gitalypb.DeleteRefsRequest
+		desc         string
+		request      *gitalypb.DeleteRefsRequest
+		expectedRefs []string
 	}{
+		{
+			desc: "delete all",
+			request: &gitalypb.DeleteRefsRequest{
+				DeleteAll: true,
+			},
+			expectedRefs: []string{},
+		},
 		{
 			desc: "delete all except refs with certain prefixes",
 			request: &gitalypb.DeleteRefsRequest{
 				ExceptWithPrefix: [][]byte{[]byte("refs/keep"), []byte("refs/also-keep"), []byte("refs/heads/")},
 			},
+			expectedRefs: []string{"refs/keep/c", "refs/also-keep/d", "refs/heads/master"},
 		},
 		{
 			desc: "delete certain refs",
@@ -51,6 +60,7 @@ func TestDeleteRefs_successful(t *testing.T) {
 					[]byte("refs/delete/symbolic-c"),
 				},
 			},
+			expectedRefs: []string{"refs/keep/c", "refs/also-keep/d", "refs/heads/master"},
 		},
 	}
 
@@ -83,13 +93,7 @@ func TestDeleteRefs_successful(t *testing.T) {
 				refNames[i] = branch.Name.String()
 			}
 
-			require.NotContains(t, refNames, "refs/delete/a")
-			require.NotContains(t, refNames, "refs/also-delete/b")
-			require.NotContains(t, refNames, "refs/delete/symbolic-a")
-			require.NotContains(t, refNames, "refs/delete/symbolic-c")
-			require.Contains(t, refNames, "refs/keep/c")
-			require.Contains(t, refNames, "refs/also-keep/d")
-			require.Contains(t, refNames, "refs/heads/master")
+			require.ElementsMatch(t, testCase.expectedRefs, refNames)
 		})
 	}
 }
@@ -133,7 +137,7 @@ func TestDeleteRefs_transaction(t *testing.T) {
 		{
 			desc: "delete all refs",
 			request: &gitalypb.DeleteRefsRequest{
-				ExceptWithPrefix: [][]byte{[]byte("nonexisting/prefix/")},
+				DeleteAll: true,
 			},
 			expectedVotes: 2,
 		},
@@ -270,7 +274,15 @@ func TestDeleteRefs_validation(t *testing.T) {
 			request: &gitalypb.DeleteRefsRequest{
 				Repository: repo,
 			},
-			expectedErr: status.Error(codes.InvalidArgument, "empty ExceptWithPrefix and Refs"),
+			expectedErr: status.Error(codes.InvalidArgument, "empty ExceptWithPrefix, Refs and DeleteAll"),
+		},
+		{
+			desc: "No prefixes nor refs but delete all is true",
+			request: &gitalypb.DeleteRefsRequest{
+				Repository: repo,
+				DeleteAll:  true,
+			},
+			expectedErr: nil,
 		},
 		{
 			desc: "prefixes with refs",
@@ -279,7 +291,25 @@ func TestDeleteRefs_validation(t *testing.T) {
 				ExceptWithPrefix: [][]byte{[]byte("exclude-this")},
 				Refs:             [][]byte{[]byte("delete-this")},
 			},
-			expectedErr: status.Error(codes.InvalidArgument, "ExceptWithPrefix and Refs are mutually exclusive"),
+			expectedErr: status.Error(codes.InvalidArgument, "ExceptWithPrefix, Refs and DeleteAll are mutually exclusive"),
+		},
+		{
+			desc: "prefixes with delete all",
+			request: &gitalypb.DeleteRefsRequest{
+				Repository:       repo,
+				ExceptWithPrefix: [][]byte{[]byte("exclude-this")},
+				DeleteAll:        true,
+			},
+			expectedErr: status.Error(codes.InvalidArgument, "ExceptWithPrefix, Refs and DeleteAll are mutually exclusive"),
+		},
+		{
+			desc: "refs with delete all",
+			request: &gitalypb.DeleteRefsRequest{
+				Repository: repo,
+				DeleteAll:  true,
+				Refs:       [][]byte{[]byte("delete-this")},
+			},
+			expectedErr: status.Error(codes.InvalidArgument, "ExceptWithPrefix, Refs and DeleteAll are mutually exclusive"),
 		},
 		{
 			desc: "Empty prefix",
