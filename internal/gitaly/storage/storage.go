@@ -114,6 +114,9 @@ type Transaction interface {
 	RewriteRepository(*gitalypb.Repository) *gitalypb.Repository
 	// OriginalRepository returns the repository as it was before rewriting it to point to the snapshot.
 	OriginalRepository(*gitalypb.Repository) *gitalypb.Repository
+	// PartitionRelativePaths returns all known repository relative paths for
+	// the transactions partition.
+	PartitionRelativePaths() []string
 }
 
 // BeginOptions are used to configure a transaction that is being started.
