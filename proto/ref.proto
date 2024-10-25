@@ -381,6 +381,8 @@ message DeleteRefsRequest{
   // refs is the list of references to be deleted. This field can not be set in combination with except_with_prefix
   // and cannot be empty if except_with_prefix is also empty.
   repeated bytes refs = 3;
+  // delete_all deletes all refs except HEAD
+  bool delete_all = 4;
 }
 
 // DeleteRefsResponse is a response for the DeleteRefs RPC.
