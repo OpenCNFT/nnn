@@ -1236,8 +1236,6 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.DefaultBranchUpdate != nil {
-					transaction.MarkDefaultBranchUpdated()
-
 					transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
 						"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
 					})

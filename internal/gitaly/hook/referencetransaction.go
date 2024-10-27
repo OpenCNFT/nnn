@@ -58,7 +58,7 @@ func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state 
 		phase = voting.Prepared
 
 		if tx != nil {
-			updates, _, err := parseChanges(objectHash, bytes.NewReader(changes))
+			updates, err := parseChanges(objectHash, bytes.NewReader(changes))
 			if err != nil {
 				return fmt.Errorf("parse changes: %w", err)
 			}
@@ -86,16 +86,12 @@ func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state 
 		phase = voting.Committed
 
 		if tx != nil {
-			updates, defaultBranchUpdated, err := parseChanges(objectHash, bytes.NewReader(changes))
+			updates, err := parseChanges(objectHash, bytes.NewReader(changes))
 			if err != nil {
 				return fmt.Errorf("parse changes: %w", err)
 			}
 
 			tx.UpdateReferences(updates)
-
-			if defaultBranchUpdated {
-				tx.MarkDefaultBranchUpdated()
-			}
 		}
 	default:
 		return nil
@@ -138,16 +134,15 @@ func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state 
 // No other refs will be parsed.
 // See the documentation of the reference-transaction hook for details on the format:
 // https://git-scm.com/docs/githooks#_reference_transaction
-func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUpdates, bool, error) {
+func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUpdates, error) {
 	scanner := bufio.NewScanner(changes)
-	defaultBranchUpdated := false
 
 	updates := git.ReferenceUpdates{}
 	for scanner.Scan() {
 		line := scanner.Text()
 		components := strings.Split(line, " ")
 		if len(components) != 3 {
-			return nil, defaultBranchUpdated, fmt.Errorf("unexpected change line: %q", line)
+			return nil, fmt.Errorf("unexpected change line: %q", line)
 		}
 
 		reference := git.ReferenceName(components[2])
@@ -167,7 +162,7 @@ func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUp
 		} else {
 			update.OldOID, err = objectHash.FromHex(components[0])
 			if err != nil {
-				return nil, defaultBranchUpdated, fmt.Errorf("parse old: %w", err)
+				return nil, fmt.Errorf("parse old: %w", err)
 			}
 		}
 
@@ -176,17 +171,8 @@ func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUp
 		} else {
 			update.NewOID, err = objectHash.FromHex(components[1])
 			if err != nil {
-				return nil, defaultBranchUpdated, fmt.Errorf("parse new: %w", err)
+				return nil, fmt.Errorf("parse new: %w", err)
 			}
-		}
-
-		// If the reference that HEAD is pointing to gets updated, reference-transaction will
-		// print an output for HEAD. But we should only care for when HEAD itself is updated.
-		//
-		// TODO: This can be removed once the bug in Git itself is fixed
-		// https://gitlab.com/gitlab-org/git/-/issues/348
-		if reference.String() == "HEAD" && update.NewTarget != "" {
-			defaultBranchUpdated = true
 		}
 
 		// Only capture default branch changes and ignore all other symbolic reference updates.
@@ -195,6 +181,9 @@ func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUp
 		}
 
 		// If the default branch is being deleted, we ignore updating HEAD
+		//
+		// TODO: This can be removed once the bug in Git itself is fixed
+		// https://gitlab.com/gitlab-org/git/-/issues/348
 		if reference.String() == "HEAD" && update.NewTarget == "" {
 			continue
 		}
@@ -202,7 +191,7 @@ func parseChanges(objectHash git.ObjectHash, changes io.Reader) (git.ReferenceUp
 		updates[reference] = update
 	}
 
-	return updates, defaultBranchUpdated, nil
+	return updates, nil
 }
 
 // isForceDeletionsOnly determines whether the given changes only consist of force-deletions.

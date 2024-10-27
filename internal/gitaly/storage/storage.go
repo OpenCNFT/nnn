@@ -90,9 +90,6 @@ type Transaction interface {
 	// IncludeObject includes the given object and its dependencies in the transaction's logged pack file even
 	// if the object is unreachable from the references.
 	IncludeObject(git.ObjectID)
-	// MarkDefaultBranchUpdated marks that the default branch has been updated. This is
-	// necessary for the changes to HEAD to be committed.
-	MarkDefaultBranchUpdated()
 	// DeleteRepository deletes the repository when the transaction is committed.
 	DeleteRepository()
 	// MarkCustomHooksUpdated marks that the custom hooks have been updated. This is
