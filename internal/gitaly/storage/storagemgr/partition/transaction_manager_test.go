@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime/trace"
 	"strconv"
 	"strings"
 	"sync"
@@ -2373,13 +2372,6 @@ func BenchmarkTransactionManager(b *testing.B) {
 			tc.transactionSize,
 		)
 		b.Run(desc, func(b *testing.B) {
-			traceFile, err := os.OpenFile("trace.bin", os.O_CREATE|os.O_TRUNC|os.O_RDWR, os.ModePerm)
-			require.NoError(b, err)
-			defer traceFile.Close()
-
-			require.NoError(b, trace.Start(traceFile))
-			defer trace.Stop()
-
 			ctx := testhelper.Context(b)
 
 			cfg := testcfg.Build(b)
@@ -2397,44 +2389,22 @@ func BenchmarkTransactionManager(b *testing.B) {
 				// managerWG records the running TransactionManager.Run goroutines.
 				managerWG sync.WaitGroup
 				managers  []*TransactionManager
-
-				// The references are updated back and forth between commit1 and commit2.
-				commit1 git.ObjectID
-				commit2 git.ObjectID
 			)
-
-			// getReferenceUpdates builds a git.ReferenceUpdates with unique branches for the updater.
-			getReferenceUpdates := func(updaterID int, old, new git.ObjectID) git.ReferenceUpdates {
-				referenceUpdates := make(git.ReferenceUpdates, tc.transactionSize)
-				for i := 0; i < tc.transactionSize; i++ {
-					referenceUpdates[git.ReferenceName(fmt.Sprintf("refs/heads/updater-%d-branch-%d", updaterID, i))] = git.ReferenceUpdate{
-						OldOID: old,
-						NewOID: new,
-					}
-				}
-
-				return referenceUpdates
-			}
 
 			repositoryFactory, err := localrepo.NewFactory(
 				logger, config.NewLocator(cfg), cmdFactory, cache,
 			).ScopeByStorage(ctx, cfg.Storages[0].Name)
 			require.NoError(b, err)
 
+			// transactionWG tracks the number of on going transaction.
+			var transactionWG sync.WaitGroup
+			transactionChan := make(chan struct{})
+
 			// Set up the repositories and start their TransactionManagers.
-			var relativePaths []string
 			for i := 0; i < tc.numberOfRepositories; i++ {
 				repo, repoPath := gittest.CreateRepository(b, ctx, cfg, gittest.CreateRepositoryConfig{
 					SkipCreationViaService: true,
 				})
-				relativePaths = append(relativePaths, repo.GetRelativePath())
-
-				// Set up two commits that the updaters update their references back and forth.
-				// The commit IDs are the same across all repositories as the parameters used to
-				// create them are the same. We thus simply override the commit IDs here across
-				// repositories.
-				commit1 = gittest.WriteCommit(b, cfg, repoPath, gittest.WithParents())
-				commit2 = gittest.WriteCommit(b, cfg, repoPath, gittest.WithParents(commit1))
 
 				storageName := cfg.Storages[0].Name
 				storagePath := cfg.Storages[0].Path
@@ -2465,37 +2435,42 @@ func BenchmarkTransactionManager(b *testing.B) {
 				objectHash, err := repositoryFactory.Build(repo.GetRelativePath()).ObjectHash(ctx)
 				require.NoError(b, err)
 
-				for j := 0; j < tc.concurrentUpdaters; j++ {
+				for updaterID := 0; updaterID < tc.concurrentUpdaters; updaterID++ {
+					// Build the reference updates that this updater will go back and forth with.
+					initialReferenceUpdates := make(git.ReferenceUpdates, tc.transactionSize)
+					updateA := make(git.ReferenceUpdates, tc.transactionSize)
+					updateB := make(git.ReferenceUpdates, tc.transactionSize)
+
+					// Set up a commit pair for each reference that the updater changes updates back
+					// and forth. The commit IDs are unique for each reference in a repository..
+					for branchID := 0; branchID < tc.transactionSize; branchID++ {
+						commit1 := gittest.WriteCommit(b, cfg, repoPath, gittest.WithParents(), gittest.WithMessage(fmt.Sprintf("updater-%d-reference-%d", updaterID, branchID)))
+						commit2 := gittest.WriteCommit(b, cfg, repoPath, gittest.WithParents(commit1))
+
+						ref := git.ReferenceName(fmt.Sprintf("refs/heads/updater-%d-branch-%d", updaterID, branchID))
+						initialReferenceUpdates[ref] = git.ReferenceUpdate{
+							OldOID: objectHash.ZeroOID,
+							NewOID: commit1,
+						}
+
+						updateA[ref] = git.ReferenceUpdate{
+							OldOID: commit1,
+							NewOID: commit2,
+						}
+
+						updateB[ref] = git.ReferenceUpdate{
+							OldOID: commit2,
+							NewOID: commit1,
+						}
+					}
+
+					// Setup the starting state so the references start at the expected old tip.
 					transaction, err := manager.Begin(ctx, storage.BeginOptions{
 						Write:         true,
 						RelativePaths: []string{repo.GetRelativePath()},
 					})
 					require.NoError(b, err)
-					transaction.UpdateReferences(getReferenceUpdates(j, objectHash.ZeroOID, commit1))
-					require.NoError(b, transaction.Commit(ctx))
-				}
-			}
-
-			// transactionWG tracks the number of on going transaction.
-			var transactionWG sync.WaitGroup
-			transactionChan := make(chan struct{})
-
-			for i, manager := range managers {
-				relativePath := relativePaths[i]
-				for i := 0; i < tc.concurrentUpdaters; i++ {
-
-					// Build the reference updates that this updater will go back and forth with.
-					currentReferences := getReferenceUpdates(i, commit1, commit2)
-					nextReferences := getReferenceUpdates(i, commit2, commit1)
-
-					transaction, err := manager.Begin(ctx, storage.BeginOptions{
-						Write:         true,
-						RelativePaths: []string{relativePath},
-					})
-					require.NoError(b, err)
-					transaction.UpdateReferences(currentReferences)
-
-					// Setup the starting state so the references start at the expected old tip.
+					transaction.UpdateReferences(initialReferenceUpdates)
 					require.NoError(b, transaction.Commit(ctx))
 
 					transactionWG.Add(1)
@@ -2505,12 +2480,12 @@ func BenchmarkTransactionManager(b *testing.B) {
 						for range transactionChan {
 							transaction, err := manager.Begin(ctx, storage.BeginOptions{
 								Write:         true,
-								RelativePaths: []string{relativePath},
+								RelativePaths: []string{repo.GetRelativePath()},
 							})
 							require.NoError(b, err)
-							transaction.UpdateReferences(nextReferences)
+							transaction.UpdateReferences(updateA)
 							assert.NoError(b, transaction.Commit(ctx))
-							currentReferences, nextReferences = nextReferences, currentReferences
+							updateA, updateB = updateB, updateA
 						}
 					}()
 				}
@@ -2528,7 +2503,7 @@ func BenchmarkTransactionManager(b *testing.B) {
 			transactionWG.Wait()
 			b.StopTimer()
 
-			b.ReportMetric(float64(b.N*tc.transactionSize)/time.Since(began).Seconds(), "reference_updates/s")
+			b.ReportMetric(float64(b.N)/time.Since(began).Seconds(), "tx/s")
 
 			for _, manager := range managers {
 				manager.Close()
