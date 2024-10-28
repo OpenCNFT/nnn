@@ -309,6 +309,8 @@ message CommitStatsResponse {
   int32 additions = 2;
   // deletions refers to the number of lines deleted in the commit.
   int32 deletions = 3;
+  // files refers to the number of files changed in the commit.
+  int32 files = 4;
 }
 
 // CommitIsAncestorRequest is the request for the CommitIsAncestor RPC.

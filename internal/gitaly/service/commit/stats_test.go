@@ -124,6 +124,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       multipleChanges.String(),
 				Additions: 1,
 				Deletions: 1,
+				Files:     2,
 			},
 		},
 		{
@@ -136,6 +137,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       multipleChanges.String(),
 				Additions: 1,
 				Deletions: 1,
+				Files:     2,
 			},
 		},
 		{
@@ -148,6 +150,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       merge.String(),
 				Additions: 0,
 				Deletions: 0,
+				Files:     1,
 			},
 		},
 		{
@@ -160,6 +163,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       rogueMerge.String(),
 				Additions: 1,
 				Deletions: 1,
+				Files:     2,
 			},
 		},
 		{
@@ -172,6 +176,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       binaryChange.String(),
 				Additions: 0,
 				Deletions: 0,
+				Files:     1,
 			},
 		},
 		{
@@ -184,6 +189,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       initialCommit.String(),
 				Additions: 10,
 				Deletions: 0,
+				Files:     3,
 			},
 		},
 	} {
