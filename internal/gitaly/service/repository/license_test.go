@@ -229,6 +229,28 @@ func TestFindLicense_successful(t *testing.T) {
 			},
 			expectedLicense: &gitalypb.FindLicenseResponse{},
 		},
+		{
+			// https://gitlab.com/gitlab-org/gitaly/-/issues/6456
+			desc: "LGPL 3.0",
+			setup: func(t *testing.T, repoPath string) {
+				licenseText := testhelper.MustReadFile(t, "testdata/lgpl-3.0_license.txt")
+
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"),
+					gittest.WithTreeEntries(
+						gittest.TreeEntry{
+							Mode:    "100644",
+							Path:    "LICENSE",
+							Content: string(licenseText),
+						}))
+			},
+			expectedLicense: &gitalypb.FindLicenseResponse{
+				LicenseShortName: "lgpl-3.0",
+				LicenseUrl:       "https://www.gnu.org/licenses/lgpl-3.0-standalone.html",
+				LicenseName:      "GNU Lesser General Public License v3.0 only",
+				LicensePath:      "LICENSE",
+				LicenseNickname:  "GNU LGPLv3",
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			repo, repoPath := gittest.CreateRepository(t, ctx, cfg)
