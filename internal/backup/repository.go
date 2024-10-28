@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
@@ -267,21 +268,41 @@ func (rr *remoteRepository) ResetRefs(ctx context.Context, refs []git.Reference)
 		return errors.New("empty refs list")
 	}
 
-	refClient := rr.newRefClient()
-
-	_, err := refClient.DeleteRefs(ctx,
-		&gitalypb.DeleteRefsRequest{
-			Repository: rr.repo,
-			// While the DeleteRefs RPC doesn't delete HEAD, we add it to the exceptions list as a
-			// workaround to instruct the RPC to delete all references in the repository.
-			// https://gitlab.com/gitlab-org/gitaly/-/issues/5795 tracks the enhancement to the RPC to
-			// eliminate this workaround.
-			ExceptWithPrefix: [][]byte{[]byte("HEAD")},
-		})
+	existingRefs, err := rr.ListRefs(ctx)
 	if err != nil {
-		return fmt.Errorf("delete existing refs: %w", err)
+		return fmt.Errorf("list existing refs: %w", err)
 	}
 
+	objectHash, err := rr.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("object hash: %w", err)
+	}
+
+	refsToKeep := make(map[git.ReferenceName]struct{}, len(refs))
+	for _, ref := range refs {
+		refsToKeep[ref.Name] = struct{}{}
+	}
+
+	capacity := int(math.Max(float64(len(refs)), float64(len(existingRefs))))
+	updates := make([]*gitalypb.UpdateReferencesRequest_Update, 0, capacity)
+	// Add updates to delete existing refs not in the new set
+	for _, existingRef := range existingRefs {
+		if shouldRemoveRef(refsToKeep, existingRef.Name) {
+			updates = append(updates, &gitalypb.UpdateReferencesRequest_Update{
+				Reference:   []byte(existingRef.Name),
+				NewObjectId: []byte(objectHash.ZeroOID),
+			})
+		}
+	}
+	// Add updates to create or modify refs in the new set
+	for _, newRef := range refs {
+		updates = append(updates, &gitalypb.UpdateReferencesRequest_Update{
+			Reference:   []byte(newRef.Name),
+			NewObjectId: []byte(newRef.Target),
+		})
+	}
+
+	refClient := rr.newRefClient()
 	stream, err := refClient.UpdateReferences(ctx)
 	if err != nil {
 		return fmt.Errorf("open stream: %w", err)
@@ -293,10 +314,7 @@ func (rr *remoteRepository) ResetRefs(ctx context.Context, refs []git.Reference)
 	if err := stream.Send(&gitalypb.UpdateReferencesRequest{
 		Repository: rr.repo,
 		Updates: []*gitalypb.UpdateReferencesRequest_Update{
-			{
-				Reference:   []byte(refs[0].Name),
-				NewObjectId: []byte(refs[0].Target),
-			},
+			updates[0],
 		},
 	}); err != nil {
 		return fmt.Errorf("send initial request: %w", err)
@@ -304,11 +322,8 @@ func (rr *remoteRepository) ResetRefs(ctx context.Context, refs []git.Reference)
 
 	chunker := chunk.New(&updateRefsSender{stream: stream})
 
-	for _, ref := range refs[1:] {
-		if err := chunker.Send(&gitalypb.UpdateReferencesRequest_Update{
-			Reference:   []byte(ref.Name),
-			NewObjectId: []byte(ref.Target),
-		}); err != nil {
+	for _, update := range updates[1:] {
+		if err := chunker.Send(update); err != nil {
 			return fmt.Errorf("send ref update: %w", err)
 		}
 	}
@@ -625,30 +640,38 @@ func (r *localRepository) ResetRefs(ctx context.Context, refs []git.Reference) (
 		}
 	}()
 
-	if err := u.Start(); err != nil {
-		return fmt.Errorf("start delete existing refs transaction: %w", err)
-	}
-
 	existingRefs, err := r.repo.GetReferences(ctx)
 	if err != nil {
 		return fmt.Errorf("get existing refs: %w", err)
 	}
-	for _, ref := range existingRefs {
-		if err := u.Delete(ref.Name); err != nil {
-			return fmt.Errorf("delete existing ref: %w", err)
-		}
+
+	objectHash, err := r.ObjectHash(ctx)
+	if err != nil {
+		return fmt.Errorf("object hash: %w", err)
 	}
 
-	if err := u.Commit(); err != nil {
-		return fmt.Errorf("commit remove existing refs: %w", err)
+	refsToKeep := make(map[git.ReferenceName]struct{}, len(refs))
+	for _, ref := range refs {
+		refsToKeep[ref.Name] = struct{}{}
 	}
+
+	capacity := int(math.Max(float64(len(refs)), float64(len(existingRefs))))
+	updates := make([]git.Reference, 0, capacity)
+	// Prepare updates to delete existing refs not in the new set
+	for _, existingRef := range existingRefs {
+		if shouldRemoveRef(refsToKeep, existingRef.Name) {
+			updates = append(updates, git.NewReference(existingRef.Name, objectHash.ZeroOID))
+		}
+	}
+	// Prepare updates to create or modify refs in the new set
+	updates = append(updates, refs...)
 
 	if err := u.Start(); err != nil {
 		return fmt.Errorf("start reset refs transaction: %w", err)
 	}
 
-	for _, ref := range refs {
-		if err := u.Update(ref.Name, git.ObjectID(ref.Target), ""); err != nil {
+	for _, update := range updates {
+		if err := u.Update(update.Name, git.ObjectID(update.Target), ""); err != nil {
 			return fmt.Errorf("reset ref: %w", err)
 		}
 	}
@@ -663,4 +686,18 @@ func (r *localRepository) ResetRefs(ctx context.Context, refs []git.Reference) (
 // SetHeadReference sets the symbolic HEAD reference of the repository.
 func (r *localRepository) SetHeadReference(ctx context.Context, target git.ReferenceName) error {
 	return r.repo.SetDefaultBranch(ctx, r.txManager, target)
+}
+
+// shouldRemoveRef checks if a reference should be removed from the repository.
+func shouldRemoveRef(refsToKeep map[git.ReferenceName]struct{}, name git.ReferenceName) bool {
+	// Updating HEAD reference is not allowed in UpdateReferences call.
+	if name == "HEAD" {
+		return false
+	}
+
+	if _, shouldKeep := refsToKeep[name]; shouldKeep {
+		return false
+	}
+
+	return true
 }
