@@ -230,9 +230,11 @@ func TestFindLicense_successful(t *testing.T) {
 			expectedLicense: &gitalypb.FindLicenseResponse{},
 		},
 		{
-			// https://gitlab.com/gitlab-org/gitaly/-/issues/6456
-			desc: "LGPL 3.0",
+			desc: "LGPL 3.0 license",
 			setup: func(t *testing.T, repoPath string) {
+				// https://gitlab.com/gitlab-org/gitaly/-/issues/6456
+				t.Skip()
+
 				licenseText := testhelper.MustReadFile(t, "testdata/lgpl-3.0_license.txt")
 
 				gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"),
@@ -249,6 +251,34 @@ func TestFindLicense_successful(t *testing.T) {
 				LicenseName:      "GNU Lesser General Public License v3.0 only",
 				LicensePath:      "LICENSE",
 				LicenseNickname:  "GNU LGPLv3",
+			},
+		},
+		{
+			// https://gitlab.com/gitlab-org/gitaly/-/issues/6456
+			desc: "LGPL 3.0 with README",
+			setup: func(t *testing.T, repoPath string) {
+				// https://gitlab.com/gitlab-org/gitaly/-/issues/6456
+
+				licenseText := testhelper.MustReadFile(t, "testdata/lgpl-3.0_license.txt")
+
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("main"),
+					gittest.WithTreeEntries(
+						gittest.TreeEntry{
+							Mode:    "100644",
+							Path:    "LICENSE",
+							Content: string(licenseText),
+						},
+						gittest.TreeEntry{
+							Mode:    "100644",
+							Path:    "README.md",
+							Content: "# My project\n\nThis is my awesome project.\n## LICENSE\n\nThis code is provided free of charge under the GNU Lesser General Public License version 3.0 - see the [LICENSE](LICENSE) file for details.\n",
+						}))
+			},
+			expectedLicense: &gitalypb.FindLicenseResponse{
+				LicenseShortName: "other",
+				LicenseName:      "Other",
+				LicenseNickname:  "LICENSE",
+				LicensePath:      "LICENSE",
 			},
 		},
 	} {

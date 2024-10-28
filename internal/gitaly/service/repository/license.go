@@ -178,10 +178,13 @@ func (f *gitFiler) ReadFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("read file: %w", err)
 	}
 
-	// `licensedb.Detect` only opens files that look like licenses. Failing that, it will
-	// also open readme files to try to identify license files. The RPC handler needs the
-	// knowledge of whether any license files were encountered, so we filter out the
-	// readme files as defined in licensedb.Detect:
+	// `licensedb.Detect` starts by looking for files that look like license files.
+	// If it can't detect the license from that, it will
+	// also open README files to see if any mention of a license.
+	// When a license file candidate was found, we'll let the caller know
+	// which file it was, but identify it as "Other" license.
+	// To avoid identifying README files as license files, we filter out the
+	// README files as defined in licensedb.Detect:
 	// https://github.com/go-enry/go-license-detector/blob/4f2ca6af2ab943d9b5fa3a02782eebc06f79a5f4/licensedb/internal/investigation.go#L61
 	//
 	// This doesn't filter out the possible license files identified from the readme files which may in fact not
