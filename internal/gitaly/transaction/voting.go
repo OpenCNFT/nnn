@@ -65,7 +65,7 @@ func CommitLockedFile(ctx context.Context, m Manager, writer *safe.LockingFileWr
 		return fmt.Errorf("voting on locked file: %w", err)
 	}
 
-	if err := writer.Commit(); err != nil {
+	if err := writer.Commit(ctx); err != nil {
 		return fmt.Errorf("committing file: %w", err)
 	}
 

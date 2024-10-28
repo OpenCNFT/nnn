@@ -17,11 +17,13 @@ import (
 func TestLockingFileWriter_lifecycle(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	t.Run("normal lifecycle", func(t *testing.T) {
 		writer, err := safe.NewLockingFileWriter(filepath.Join(testhelper.TempDir(t), "file"))
 		require.NoError(t, err)
 		require.NoError(t, writer.Lock())
-		require.NoError(t, writer.Commit())
+		require.NoError(t, writer.Commit(ctx))
 		require.NoError(t, writer.Close())
 	})
 
@@ -35,15 +37,15 @@ func TestLockingFileWriter_lifecycle(t *testing.T) {
 	t.Run("commit without lock fails", func(t *testing.T) {
 		writer, err := safe.NewLockingFileWriter(filepath.Join(testhelper.TempDir(t), "file"))
 		require.NoError(t, err)
-		require.Equal(t, fmt.Errorf("file writer not locked"), writer.Commit())
+		require.Equal(t, fmt.Errorf("file writer not locked"), writer.Commit(ctx))
 	})
 
 	t.Run("multiple commits fail", func(t *testing.T) {
 		writer, err := safe.NewLockingFileWriter(filepath.Join(testhelper.TempDir(t), "file"))
 		require.NoError(t, err)
 		require.NoError(t, writer.Lock())
-		require.NoError(t, writer.Commit())
-		require.Equal(t, fmt.Errorf("file writer not locked"), writer.Commit())
+		require.NoError(t, writer.Commit(ctx))
+		require.Equal(t, fmt.Errorf("file writer not locked"), writer.Commit(ctx))
 	})
 
 	t.Run("lock after close fails", func(t *testing.T) {
@@ -64,6 +66,8 @@ func TestLockingFileWriter_lifecycle(t *testing.T) {
 func TestLockingFileWriter_stateCleanup(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	t.Run("commit", func(t *testing.T) {
 		file := filepath.Join(testhelper.TempDir(t), "file")
 		lock := file + ".lock"
@@ -77,7 +81,7 @@ func TestLockingFileWriter_stateCleanup(t *testing.T) {
 		require.FileExists(t, writer.Path())
 		require.FileExists(t, lock)
 
-		require.NoError(t, writer.Commit())
+		require.NoError(t, writer.Commit(ctx))
 		require.NoFileExists(t, writer.Path())
 		require.NoFileExists(t, lock)
 	})
@@ -104,6 +108,8 @@ func TestLockingFileWriter_stateCleanup(t *testing.T) {
 func TestLockingFileWriter_createsNewFiles(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	target := filepath.Join(testhelper.TempDir(t), "file")
 
 	writer, err := safe.NewLockingFileWriter(target)
@@ -111,7 +117,7 @@ func TestLockingFileWriter_createsNewFiles(t *testing.T) {
 	_, err = writer.Write([]byte("created"))
 	require.NoError(t, err)
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	require.Equal(t, []byte("created"), testhelper.MustReadFile(t, target))
 }
@@ -119,18 +125,22 @@ func TestLockingFileWriter_createsNewFiles(t *testing.T) {
 func TestLockingFileWriter_createsEmptyFiles(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	target := filepath.Join(testhelper.TempDir(t), "file")
 
 	writer, err := safe.NewLockingFileWriter(target)
 	require.NoError(t, err)
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	require.Equal(t, []byte{}, testhelper.MustReadFile(t, target))
 }
 
 func TestLockingFileWriter_seedingWithNonExistentTarget(t *testing.T) {
 	t.Parallel()
+
+	ctx := testhelper.Context(t)
 
 	target := filepath.Join(testhelper.TempDir(t), "file")
 
@@ -139,13 +149,15 @@ func TestLockingFileWriter_seedingWithNonExistentTarget(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	require.Equal(t, []byte{}, testhelper.MustReadFile(t, target))
 }
 
 func TestLockingFileWriter_seedingWithExistingTarget(t *testing.T) {
 	t.Parallel()
+
+	ctx := testhelper.Context(t)
 
 	target := filepath.Join(testhelper.TempDir(t), "file")
 	require.NoError(t, os.WriteFile(target, []byte("seed"), mode.File))
@@ -157,13 +169,15 @@ func TestLockingFileWriter_seedingWithExistingTarget(t *testing.T) {
 	_, err = writer.Write([]byte("append"))
 	require.NoError(t, err)
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	require.Equal(t, []byte("seedappend"), testhelper.MustReadFile(t, target))
 }
 
 func TestLockingFileWriter_modifiesExistingFiles(t *testing.T) {
 	t.Parallel()
+
+	ctx := testhelper.Context(t)
 
 	target := filepath.Join(testhelper.TempDir(t), "file")
 	require.NoError(t, os.WriteFile(target, []byte("preexisting"), mode.File))
@@ -173,13 +187,15 @@ func TestLockingFileWriter_modifiesExistingFiles(t *testing.T) {
 	_, err = writer.Write([]byte("modified"))
 	require.NoError(t, err)
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	require.Equal(t, []byte("modified"), testhelper.MustReadFile(t, target))
 }
 
 func TestLockingFileWriter_modifiesExistingFilesWithMode(t *testing.T) {
 	t.Parallel()
+
+	ctx := testhelper.Context(t)
 
 	target := filepath.Join(testhelper.TempDir(t), "file")
 	require.NoError(t, os.WriteFile(target, []byte("preexisting"), mode.File))
@@ -189,7 +205,7 @@ func TestLockingFileWriter_modifiesExistingFilesWithMode(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	fi, err := os.Stat(target)
 	require.NoError(t, err)
@@ -250,6 +266,8 @@ func TestLockingFileWriter_concurrentModification(t *testing.T) {
 func TestLockingFileWriter_concurrentLocking(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	file := filepath.Join(testhelper.TempDir(t), "file")
 
 	first, err := safe.NewLockingFileWriter(file)
@@ -264,7 +282,7 @@ func TestLockingFileWriter_concurrentLocking(t *testing.T) {
 
 	require.NoError(t, first.Lock())
 	require.Equal(t, safe.ErrFileAlreadyLocked, second.Lock())
-	require.NoError(t, first.Commit())
+	require.NoError(t, first.Commit(ctx))
 
 	require.Equal(t, []byte("first"), testhelper.MustReadFile(t, file))
 }
@@ -289,6 +307,8 @@ func TestLockingFileWriter_locked(t *testing.T) {
 func TestLockingFileWriter_externalProcess(t *testing.T) {
 	t.Parallel()
 
+	ctx := testhelper.Context(t)
+
 	cfg := testcfg.Build(t)
 
 	target := filepath.Join(testhelper.TempDir(t), "file")
@@ -299,7 +319,7 @@ func TestLockingFileWriter_externalProcess(t *testing.T) {
 
 	gittest.Exec(t, cfg, "config", "-f", writer.Path(), "some.config", "true")
 	require.NoError(t, writer.Lock())
-	require.NoError(t, writer.Commit())
+	require.NoError(t, writer.Commit(ctx))
 
 	require.Equal(t, []byte("[some]\n\tconfig = true\n"), testhelper.MustReadFile(t, target))
 }

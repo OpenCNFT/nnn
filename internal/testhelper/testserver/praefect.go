@@ -57,7 +57,6 @@ func StartPraefect(tb testing.TB, cfg config.Config) PraefectServer {
 	defer testhelper.MustClose(tb, configFile)
 
 	require.NoError(tb, toml.NewEncoder(configFile).Encode(&cfg))
-	require.NoError(tb, configFile.Sync())
 
 	binaryPath := testcfg.BuildPraefect(tb, gitalycfg.Cfg{
 		BinDir: tempDir,

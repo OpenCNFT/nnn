@@ -194,7 +194,7 @@ func PruneEmptyConfigSections(ctx context.Context, repo *localrepo.Repo) (_ int,
 	if err := configWriter.Lock(); err != nil {
 		return 0, fmt.Errorf("failed locking config: %w", err)
 	}
-	if err := configWriter.Commit(); err != nil {
+	if err := configWriter.Commit(ctx); err != nil {
 		return 0, fmt.Errorf("failed committing pruned config: %w", err)
 	}
 

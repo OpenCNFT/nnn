@@ -35,6 +35,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mdfile"
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
@@ -620,7 +621,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 	}
 
 	for _, shard := range cfg.Storages {
-		if err := storage.WriteMetadataFile(shard.Path); err != nil {
+		if err := mdfile.WriteMetadataFile(ctx, shard.Path); err != nil {
 			// TODO should this be a return? https://gitlab.com/gitlab-org/gitaly/issues/1893
 			logger.WithError(err).Error("Unable to write gitaly metadata file")
 		}

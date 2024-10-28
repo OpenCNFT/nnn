@@ -23,6 +23,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/setup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mdfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/listenmux"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
@@ -126,8 +127,8 @@ func TestGitalyServerInfo(t *testing.T) {
 		secondCfg := testcfg.Build(t, testcfg.WithStorages("praefect-internal-2"))
 		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
-		require.NoError(t, storage.WriteMetadataFile(firstCfg.Storages[0].Path))
-		firstMetadata, err := storage.ReadMetadataFile(firstCfg.Storages[0].Path)
+		require.NoError(t, mdfile.WriteMetadataFile(ctx, firstCfg.Storages[0].Path))
+		firstMetadata, err := mdfile.ReadMetadataFile(firstCfg.Storages[0].Path)
 		require.NoError(t, err)
 
 		conf := config.Config{
@@ -508,8 +509,8 @@ func TestGitalyServerSignature(t *testing.T) {
 		secondCfg.Git.SigningKey = pathToPrivateKey
 		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
-		require.NoError(t, storage.WriteMetadataFile(firstCfg.Storages[0].Path))
-		_, err := storage.ReadMetadataFile(firstCfg.Storages[0].Path)
+		require.NoError(t, mdfile.WriteMetadataFile(ctx, firstCfg.Storages[0].Path))
+		_, err := mdfile.ReadMetadataFile(firstCfg.Storages[0].Path)
 		require.NoError(t, err)
 
 		conf := config.Config{
@@ -559,8 +560,8 @@ func TestGitalyServerSignature(t *testing.T) {
 		secondCfg.Git.SigningKey = pathToPrivateKey
 		secondCfg.SocketPath = testserver.RunGitalyServer(t, secondCfg, setup.RegisterAll, testserver.WithDisablePraefect())
 
-		require.NoError(t, storage.WriteMetadataFile(firstCfg.Storages[0].Path))
-		_, err := storage.ReadMetadataFile(firstCfg.Storages[0].Path)
+		require.NoError(t, mdfile.WriteMetadataFile(ctx, firstCfg.Storages[0].Path))
+		_, err := mdfile.ReadMetadataFile(firstCfg.Storages[0].Path)
 		require.NoError(t, err)
 
 		conf := config.Config{

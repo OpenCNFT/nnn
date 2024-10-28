@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mdfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode/permission"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/fstype"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -23,7 +23,7 @@ func (s *server) ServerInfo(ctx context.Context, in *gitalypb.ServerInfoRequest)
 		readable, writeable := shardCheck(shard.Path)
 		fsType := fstype.FileSystem(shard.Path)
 
-		gitalyMetadata, err := storage.ReadMetadataFile(shard.Path)
+		gitalyMetadata, err := mdfile.ReadMetadataFile(shard.Path)
 		if err != nil {
 			s.logger.WithField("storage", shard).WithError(err).ErrorContext(ctx, "reading gitaly metadata file")
 		}
