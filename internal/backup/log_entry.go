@@ -3,7 +3,6 @@ package backup
 import (
 	"container/list"
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -487,19 +486,12 @@ func (la *LogEntryArchiver) backupLogEntry(ctx context.Context, archiveRelPath s
 // checkForExistingBackup checks if a non-zero sized file or blob exists at the archive path
 // of the log entry.
 func (la *LogEntryArchiver) checkForExistingBackup(ctx context.Context, archiveRelPath string) (exists bool, returnErr error) {
-	r, err := la.archiveSink.GetReader(ctx, archiveRelPath)
+	exists, err := la.archiveSink.Exists(ctx, archiveRelPath)
 	if err != nil {
-		if errors.Is(err, ErrDoesntExist) {
-			return false, nil
-		}
 		return false, fmt.Errorf("get log entry backup reader: %w", err)
 	}
 
-	if err := r.Close(); err != nil {
-		return false, fmt.Errorf("close log entry backup reader: %w", err)
-	}
-
-	return true, nil
+	return exists, nil
 }
 
 // popNextNotification removes the next entry from the head of the list.
