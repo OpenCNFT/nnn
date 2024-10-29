@@ -44,7 +44,7 @@ type Dependencies struct {
 	HousekeepingManager housekeepingmgr.Manager
 	TransactionRegistry *storagemgr.TransactionRegistry
 	Node                storage.Node
-	BackupSink          backup.Sink
+	BackupSink          *backup.Sink
 	BackupLocator       backup.Locator
 	BundleURISink       *bundleuri.Sink
 	ProcReceiveRegistry *gitalyhook.ProcReceiveRegistry
@@ -146,7 +146,7 @@ func (dc *Dependencies) GetNode() storage.Node {
 }
 
 // GetBackupSink returns the backup.Sink.
-func (dc *Dependencies) GetBackupSink() backup.Sink {
+func (dc *Dependencies) GetBackupSink() *backup.Sink {
 	return dc.BackupSink
 }
 

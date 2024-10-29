@@ -32,7 +32,7 @@ type server struct {
 	hookManager                hook.Manager
 	updater                    *updateref.UpdaterWithHooks
 	backupLocator              backup.Locator
-	backupSink                 backup.Sink
+	backupSink                 *backup.Sink
 	bundleURISink              *bundleuri.Sink
 }
 

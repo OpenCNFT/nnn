@@ -14,7 +14,7 @@ type server struct {
 	logger     log.Logger
 	txManager  transaction.Manager
 	node       storage.Node
-	backupSink backup.Sink
+	backupSink *backup.Sink
 }
 
 // NewServer creates a new instance of a gRPC repo server

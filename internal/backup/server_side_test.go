@@ -153,12 +153,12 @@ func TestServerSideAdapter_Restore(t *testing.T) {
 
 	for _, tc := range []struct {
 		desc        string
-		setup       func(t *testing.T, ctx context.Context, cfg config.Cfg, backupSink backup.Sink, backupLocator backup.Locator) setupData
+		setup       func(t *testing.T, ctx context.Context, cfg config.Cfg, backupSink *backup.Sink, backupLocator backup.Locator) setupData
 		expectedErr error
 	}{
 		{
 			desc: "success",
-			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, backupSink backup.Sink, backupLocator backup.Locator) setupData {
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, backupSink *backup.Sink, backupLocator backup.Locator) setupData {
 				_, templateRepoPath := gittest.CreateRepository(t, ctx, cfg)
 				oid := gittest.WriteCommit(t, cfg, templateRepoPath, gittest.WithBranch(git.DefaultBranch))
 				gittest.WriteCommit(t, cfg, templateRepoPath, gittest.WithBranch("feature"), gittest.WithParents(oid))
@@ -196,7 +196,7 @@ func TestServerSideAdapter_Restore(t *testing.T) {
 		},
 		{
 			desc: "missing bundle",
-			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, backupSink backup.Sink, backupLocator backup.Locator) setupData {
+			setup: func(t *testing.T, ctx context.Context, cfg config.Cfg, backupSink *backup.Sink, backupLocator backup.Locator) setupData {
 				repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
 					RelativePath: "@test/restore/latest/missing.git",
 				})

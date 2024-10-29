@@ -99,7 +99,7 @@ type LogEntryArchiver struct {
 	// logger is the logger to use to write log messages.
 	logger log.Logger
 	// archiveSink is the Sink used to backup log entries.
-	archiveSink Sink
+	archiveSink *Sink
 	// node is used to access the LogManagers.
 	node *storage.Node
 
@@ -139,12 +139,12 @@ type LogEntryArchiver struct {
 }
 
 // NewLogEntryArchiver constructs a new LogEntryArchiver.
-func NewLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, node *storage.Node) *LogEntryArchiver {
+func NewLogEntryArchiver(logger log.Logger, archiveSink *Sink, workerCount uint, node *storage.Node) *LogEntryArchiver {
 	return newLogEntryArchiver(logger, archiveSink, workerCount, node, helper.NewTimerTicker)
 }
 
 // newLogEntryArchiver constructs a new LogEntryArchiver with a configurable ticker function.
-func newLogEntryArchiver(logger log.Logger, archiveSink Sink, workerCount uint, node *storage.Node, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
+func newLogEntryArchiver(logger log.Logger, archiveSink *Sink, workerCount uint, node *storage.Node, tickerFunc func(time.Duration) helper.Ticker) *LogEntryArchiver {
 	if workerCount < 1 {
 		workerCount = 1
 	}

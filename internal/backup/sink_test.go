@@ -22,12 +22,11 @@ import (
 func TestResolveSink(t *testing.T) {
 	ctx := testhelper.Context(t)
 
-	isStorageServiceSink := func(bucketTy interface{}) func(t *testing.T, sink Sink) {
-		return func(t *testing.T, sink Sink) {
+	isStorageServiceSink := func(bucketTy interface{}) func(t *testing.T, sink *Sink) {
+		return func(t *testing.T, sink *Sink) {
 			t.Helper()
-			sssink, ok := sink.(*StorageServiceSink)
-			require.True(t, ok)
-			require.True(t, sssink.bucket.As(bucketTy))
+
+			require.True(t, sink.bucket.As(bucketTy))
 		}
 	}
 
@@ -59,7 +58,7 @@ func TestResolveSink(t *testing.T) {
 		desc   string
 		envs   map[string]string
 		path   string
-		verify func(t *testing.T, sink Sink)
+		verify func(t *testing.T, sink *Sink)
 		errMsg string
 	}{
 		{

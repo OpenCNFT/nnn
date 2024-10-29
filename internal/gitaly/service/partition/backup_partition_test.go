@@ -35,12 +35,12 @@ func TestBackupPartition(t *testing.T) {
 
 	for _, tc := range []struct {
 		desc        string
-		setup       func(t *testing.T, ctx context.Context, backupSink backup.Sink) setupData
+		setup       func(t *testing.T, ctx context.Context, backupSink *backup.Sink) setupData
 		expectedErr error
 	}{
 		{
 			desc: "success",
-			setup: func(t *testing.T, ctx context.Context, backupSink backup.Sink) setupData {
+			setup: func(t *testing.T, ctx context.Context, backupSink *backup.Sink) setupData {
 				cfg, ptnClient, repoClient := setupServices(t,
 					testserver.WithBackupSink(backupSink),
 				)
@@ -56,7 +56,7 @@ func TestBackupPartition(t *testing.T) {
 		},
 		{
 			desc: "invalid storage",
-			setup: func(t *testing.T, ctx context.Context, backupSink backup.Sink) setupData {
+			setup: func(t *testing.T, ctx context.Context, backupSink *backup.Sink) setupData {
 				cfg, ptnClient, repoClient := setupServices(t,
 					testserver.WithBackupSink(backupSink),
 				)
@@ -75,7 +75,7 @@ func TestBackupPartition(t *testing.T) {
 		},
 		{
 			desc: "no backup sink",
-			setup: func(t *testing.T, ctx context.Context, backupSink backup.Sink) setupData {
+			setup: func(t *testing.T, ctx context.Context, backupSink *backup.Sink) setupData {
 				cfg, ptnClient, repoClient := setupServices(t)
 
 				return setupData{
