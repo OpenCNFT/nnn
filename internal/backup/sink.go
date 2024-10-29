@@ -86,21 +86,16 @@ func newFileblobSink(path string) (*StorageServiceSink, error) {
 }
 
 // Close releases resources associated with the bucket communication.
-func (s *StorageServiceSink) Close() error {
-	if s.bucket != nil {
-		bucket := s.bucket
-		s.bucket = nil
-		if err := bucket.Close(); err != nil {
-			return fmt.Errorf("storage service sink: close bucket: %w", err)
-		}
-		return nil
+func (s StorageServiceSink) Close() error {
+	if err := s.bucket.Close(); err != nil {
+		return fmt.Errorf("storage service sink: close bucket: %w", err)
 	}
 	return nil
 }
 
 // GetWriter stores the written data into a relativePath path on the configured
 // bucket. It is the callers responsibility to Close the reader after usage.
-func (s *StorageServiceSink) GetWriter(ctx context.Context, relativePath string) (io.WriteCloser, error) {
+func (s StorageServiceSink) GetWriter(ctx context.Context, relativePath string) (io.WriteCloser, error) {
 	writer, err := s.bucket.NewWriter(ctx, relativePath, &blob.WriterOptions{
 		// 'no-store' - we don't want the backup to be cached as the content could be changed,
 		// so we always want a fresh and up to date data
@@ -118,7 +113,7 @@ func (s *StorageServiceSink) GetWriter(ctx context.Context, relativePath string)
 
 // GetReader returns a reader to consume the data from the configured bucket.
 // It is the caller's responsibility to Close the reader after usage.
-func (s *StorageServiceSink) GetReader(ctx context.Context, relativePath string) (io.ReadCloser, error) {
+func (s StorageServiceSink) GetReader(ctx context.Context, relativePath string) (io.ReadCloser, error) {
 	reader, err := s.bucket.NewReader(ctx, relativePath, nil)
 	if err != nil {
 		if gcerrors.Code(err) == gcerrors.NotFound {
@@ -131,7 +126,7 @@ func (s *StorageServiceSink) GetReader(ctx context.Context, relativePath string)
 
 // SignedURL returns a URL that can be used to GET the blob for the duration
 // specified in expiry.
-func (s *StorageServiceSink) SignedURL(ctx context.Context, relativePath string, expiry time.Duration) (string, error) {
+func (s StorageServiceSink) SignedURL(ctx context.Context, relativePath string, expiry time.Duration) (string, error) {
 	opt := &blob.SignedURLOptions{
 		Expiry: expiry,
 	}
@@ -149,6 +144,6 @@ func (s *StorageServiceSink) SignedURL(ctx context.Context, relativePath string,
 
 // Exists is a wrapper around the underlying bucket and returns true if a blob exists at key,
 // false if it does not exist, or an error.
-func (s *StorageServiceSink) Exists(ctx context.Context, relativePath string) (bool, error) {
+func (s StorageServiceSink) Exists(ctx context.Context, relativePath string) (bool, error) {
 	return s.bucket.Exists(ctx, relativePath)
 }
