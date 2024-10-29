@@ -56,7 +56,7 @@ type Sink struct {
 func newSink(ctx context.Context, url string) (*Sink, error) {
 	bucket, err := blob.OpenBucket(ctx, url)
 	if err != nil {
-		return nil, fmt.Errorf("storage service sink: open bucket: %w", err)
+		return nil, fmt.Errorf("sink: open bucket: %w", err)
 	}
 
 	return &Sink{bucket: bucket}, nil
@@ -79,7 +79,7 @@ func newFileblobSink(path string) (*Sink, error) {
 
 	bucket, err := fileblob.OpenBucket(path, &fileblob.Options{NoTempDir: true, Metadata: fileblob.MetadataDontWrite})
 	if err != nil {
-		return nil, fmt.Errorf("storage service sink: open bucket: %w", err)
+		return nil, fmt.Errorf("sink: open bucket: %w", err)
 	}
 
 	return &Sink{bucket: bucket}, nil
@@ -88,7 +88,7 @@ func newFileblobSink(path string) (*Sink, error) {
 // Close releases resources associated with the bucket communication.
 func (s Sink) Close() error {
 	if err := s.bucket.Close(); err != nil {
-		return fmt.Errorf("storage service sink: close bucket: %w", err)
+		return fmt.Errorf("sink: close bucket: %w", err)
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (s Sink) GetWriter(ctx context.Context, relativePath string) (io.WriteClose
 		ContentType:  "application/octet-stream",
 	})
 	if err != nil {
-		return nil, fmt.Errorf("storage service sink: new writer for %q: %w", relativePath, err)
+		return nil, fmt.Errorf("sink: new writer for %q: %w", relativePath, err)
 	}
 	return writer, nil
 }
@@ -119,7 +119,7 @@ func (s Sink) GetReader(ctx context.Context, relativePath string) (io.ReadCloser
 		if gcerrors.Code(err) == gcerrors.NotFound {
 			err = ErrDoesntExist
 		}
-		return nil, fmt.Errorf("storage service sink: new reader for %q: %w", relativePath, err)
+		return nil, fmt.Errorf("sink: new reader for %q: %w", relativePath, err)
 	}
 	return reader, nil
 }
@@ -136,10 +136,10 @@ func (s Sink) SignedURL(ctx context.Context, relativePath string, expiry time.Du
 		if gcerrors.Code(err) == gcerrors.NotFound {
 			err = ErrDoesntExist
 		}
-		return "", fmt.Errorf("storage service sink: signed URL for %q: %w", relativePath, err)
+		return "", fmt.Errorf("sink: signed URL for %q: %w", relativePath, err)
 	}
 
-	return signed, err
+	return signed, nil
 }
 
 // Exists is a wrapper around the underlying bucket and returns true if a blob exists at key,

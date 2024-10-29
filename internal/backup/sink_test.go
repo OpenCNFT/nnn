@@ -182,7 +182,7 @@ func TestStorageServiceSink(t *testing.T) {
 
 	t.Run("not existing path", func(t *testing.T) {
 		reader, err := sss.GetReader(ctx, "not-existing")
-		require.Equal(t, fmt.Errorf(`storage service sink: new reader for "not-existing": %w`, ErrDoesntExist), err)
+		require.Equal(t, fmt.Errorf(`sink: new reader for "not-existing": %w`, ErrDoesntExist), err)
 		require.Nil(t, reader)
 	})
 }

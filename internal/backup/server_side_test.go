@@ -207,7 +207,7 @@ func TestServerSideAdapter_Restore(t *testing.T) {
 					backupID: "",
 				}
 			},
-			expectedErr: structerr.NewInternal("server-side restore: restore repository: manifest: find latest: read manifest: storage service sink: new reader for \"manifests/default/@test/restore/latest/missing.git/+latest.toml\": doesn't exist"),
+			expectedErr: structerr.NewInternal("server-side restore: restore repository: manifest: find latest: read manifest: sink: new reader for \"manifests/default/@test/restore/latest/missing.git/+latest.toml\": doesn't exist"),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {

@@ -27,7 +27,7 @@ func TestManifestLoader_ReadManifest(t *testing.T) {
 				StorageName:  "default",
 				RelativePath: "my/cool/repo.git",
 			},
-			expectedErr: fmt.Errorf("read manifest: storage service sink: new reader for \"manifests/default/my/cool/repo.git/abc123.toml\": %w", ErrDoesntExist),
+			expectedErr: fmt.Errorf("read manifest: sink: new reader for \"manifests/default/my/cool/repo.git/abc123.toml\": %w", ErrDoesntExist),
 		},
 		{
 			desc: "bad toml",
