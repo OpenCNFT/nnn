@@ -34,11 +34,13 @@ func TestCommitStatsSuccess(t *testing.T) {
 		),
 	)
 
-	binaryChange := gittest.WriteCommit(t, cfg, repoPath, gittest.WithTreeEntries(
-		gittest.TreeEntry{Path: "a", Content: "1\n2\n3\n4\n5\n", Mode: "100644"},
-		gittest.TreeEntry{Path: "b", Content: "1\n2\n3\n4\n5\n", Mode: "100644"},
-		gittest.TreeEntry{Path: "binary", Content: "a\n2\n\000\n4\nd\n", Mode: "100644"},
-	))
+	binaryChange := gittest.WriteCommit(t, cfg, repoPath,
+		gittest.WithParents(initialCommit),
+		gittest.WithTreeEntries(
+			gittest.TreeEntry{Path: "a", Content: "1\n2\n3\n4\n5\n", Mode: "100644"},
+			gittest.TreeEntry{Path: "b", Content: "1\n2\n3\n4\n5\n", Mode: "100644"},
+			gittest.TreeEntry{Path: "binary", Content: "a\n2\n\000\n4\nd\n", Mode: "100644"},
+		))
 
 	merge := gittest.WriteCommit(t, cfg, repoPath,
 		gittest.WithParents(multipleChanges, binaryChange),
@@ -122,6 +124,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       multipleChanges.String(),
 				Additions: 1,
 				Deletions: 1,
+				Files:     2,
 			},
 		},
 		{
@@ -134,6 +137,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       multipleChanges.String(),
 				Additions: 1,
 				Deletions: 1,
+				Files:     2,
 			},
 		},
 		{
@@ -146,6 +150,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       merge.String(),
 				Additions: 0,
 				Deletions: 0,
+				Files:     1,
 			},
 		},
 		{
@@ -158,18 +163,20 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       rogueMerge.String(),
 				Additions: 1,
 				Deletions: 1,
+				Files:     2,
 			},
 		},
 		{
-			desc: "binary file",
+			desc: "binary file modified",
 			request: &gitalypb.CommitStatsRequest{
 				Repository: repo,
 				Revision:   []byte(binaryChange),
 			},
 			expectedResponse: &gitalypb.CommitStatsResponse{
 				Oid:       binaryChange.String(),
-				Additions: 10,
+				Additions: 0,
 				Deletions: 0,
+				Files:     1,
 			},
 		},
 		{
@@ -182,6 +189,7 @@ func TestCommitStatsSuccess(t *testing.T) {
 				Oid:       initialCommit.String(),
 				Additions: 10,
 				Deletions: 0,
+				Files:     3,
 			},
 		},
 	} {

@@ -71,13 +71,15 @@ func (s *server) commitStats(ctx context.Context, in *gitalypb.CommitStatsReques
 	}
 
 	scanner := bufio.NewScanner(cmd)
-	var added, deleted int32
+	var added, deleted, files int32
 
 	for scanner.Scan() {
 		split := strings.SplitN(scanner.Text(), "\t", 3)
 		if len(split) != 3 {
 			return nil, fmt.Errorf("invalid numstat line %q", scanner.Text())
 		}
+
+		files++
 
 		if split[0] == "-" && split[1] == "-" {
 			// binary file
@@ -111,5 +113,6 @@ func (s *server) commitStats(ctx context.Context, in *gitalypb.CommitStatsReques
 		Oid:       commit.GetId(),
 		Additions: added,
 		Deletions: deleted,
+		Files:     files,
 	}, nil
 }
