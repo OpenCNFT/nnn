@@ -9,7 +9,6 @@ import (
 	"io"
 	"math"
 	"strings"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -47,22 +46,6 @@ var (
 			Buckets: prometheus.ExponentialBucketsRange(1, 10*math.Pow(1024, 3), 20), // up to 10GB
 		})
 )
-
-// Sink is an abstraction over the real storage used for storing/restoring backups.
-type Sink interface {
-	io.Closer
-	// GetWriter saves the written data to relativePath. It is the callers
-	// responsibility to call Close and check any subsequent errors.
-	GetWriter(ctx context.Context, relativePath string) (io.WriteCloser, error)
-	// GetReader returns a reader that servers the data stored by relativePath.
-	// If relativePath doesn't exists the ErrDoesntExist will be returned.
-	GetReader(ctx context.Context, relativePath string) (io.ReadCloser, error)
-	// SignedURL returns a URL that can be used to GET the blob for the duration
-	// specified in expiry.
-	SignedURL(ctx context.Context, relativePath string, expiry time.Duration) (string, error)
-	// Exists returns true if a blob exists at relativePath.
-	Exists(ctx context.Context, relativePath string) (bool, error)
-}
 
 // Backup represents all the information needed to restore a backup for a repository
 type Backup struct {
@@ -151,7 +134,7 @@ type Repository interface {
 }
 
 // ResolveLocator returns a locator implementation based on a locator identifier.
-func ResolveLocator(layout string, sink Sink) (Locator, error) {
+func ResolveLocator(layout string, sink *Sink) (Locator, error) {
 	var locator Locator = LegacyLocator{}
 
 	switch layout {
@@ -174,7 +157,7 @@ func ResolveLocator(layout string, sink Sink) (Locator, error) {
 
 // Manager manages process of the creating/restoring backups.
 type Manager struct {
-	sink    Sink
+	sink    *Sink
 	locator Locator
 	logger  log.Logger
 
@@ -184,7 +167,7 @@ type Manager struct {
 }
 
 // NewManager creates and returns initialized *Manager instance.
-func NewManager(sink Sink, logger log.Logger, locator Locator, pool *client.Pool) *Manager {
+func NewManager(sink *Sink, logger log.Logger, locator Locator, pool *client.Pool) *Manager {
 	return &Manager{
 		sink:    sink,
 		locator: locator,
@@ -206,7 +189,7 @@ func NewManager(sink Sink, logger log.Logger, locator Locator, pool *client.Pool
 
 // NewManagerLocal creates and returns a *Manager instance for operating on local repositories.
 func NewManagerLocal(
-	sink Sink,
+	sink *Sink,
 	logger log.Logger,
 	locator Locator,
 	storageLocator storage.Locator,

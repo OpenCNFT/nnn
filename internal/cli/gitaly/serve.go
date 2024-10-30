@@ -521,7 +521,7 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 
 	streamCache := streamcache.New(cfg.PackObjectsCache, logger)
 
-	var backupSink backup.Sink
+	var backupSink *backup.Sink
 	var backupLocator backup.Locator
 	if cfg.Backup.GoCloudURL != "" {
 		var err error

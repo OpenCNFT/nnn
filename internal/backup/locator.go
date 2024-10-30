@@ -80,7 +80,7 @@ func (l LegacyLocator) newFull(repo storage.Repository) *Backup {
 //	<repo relative path>/<backup id>/<nnn>.refs
 //	<repo relative path>/<backup id>/<nnn>.custom_hooks.tar
 type PointerLocator struct {
-	Sink     Sink
+	Sink     *Sink
 	Fallback Locator
 }
 
@@ -279,7 +279,7 @@ type ManifestLocator struct {
 }
 
 // NewManifestLocator builds a new ManifestLocator.
-func NewManifestLocator(sink Sink, fallback Locator) ManifestLocator {
+func NewManifestLocator(sink *Sink, fallback Locator) ManifestLocator {
 	return ManifestLocator{
 		Loader:   NewManifestLoader(sink),
 		Fallback: fallback,

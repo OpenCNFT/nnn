@@ -13,11 +13,11 @@ import (
 // are used to persist all details about a repository needed to properly
 // restore it to a known state.
 type ManifestLoader struct {
-	sink Sink
+	sink *Sink
 }
 
 // NewManifestLoader builds a new ManifestLoader
-func NewManifestLoader(sink Sink) ManifestLoader {
+func NewManifestLoader(sink *Sink) ManifestLoader {
 	return ManifestLoader{
 		sink: sink,
 	}

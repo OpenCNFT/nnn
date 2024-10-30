@@ -34,7 +34,7 @@ type server struct {
 	uploadArchiveRequestTimeoutTickerFactory func() helper.Ticker
 	packfileNegotiationMetrics               *prometheus.CounterVec
 	backupLocator                            backup.Locator
-	backupSink                               backup.Sink
+	backupSink                               *backup.Sink
 	bundleURISink                            *bundleuri.Sink
 }
 

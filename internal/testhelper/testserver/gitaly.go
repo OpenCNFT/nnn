@@ -289,7 +289,7 @@ type gitalyServerDeps struct {
 	repositoryCounter   *counter.RepositoryCounter
 	updaterWithHooks    *updateref.UpdaterWithHooks
 	housekeepingManager housekeepingmgr.Manager
-	backupSink          backup.Sink
+	backupSink          *backup.Sink
 	backupLocator       backup.Locator
 	bundleURISink       *bundleuri.Sink
 	signingKey          string
@@ -560,7 +560,7 @@ func WithHousekeepingManager(manager housekeepingmgr.Manager) GitalyServerOpt {
 }
 
 // WithBackupSink sets the backup.Sink that will be used for Gitaly services
-func WithBackupSink(backupSink backup.Sink) GitalyServerOpt {
+func WithBackupSink(backupSink *backup.Sink) GitalyServerOpt {
 	return func(deps gitalyServerDeps) gitalyServerDeps {
 		deps.backupSink = backupSink
 		return deps

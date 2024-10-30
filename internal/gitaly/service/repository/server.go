@@ -35,7 +35,7 @@ type server struct {
 	loggingCfg          config.Logging
 	catfileCache        catfile.Cache
 	housekeepingManager housekeepingmgr.Manager
-	backupSink          backup.Sink
+	backupSink          *backup.Sink
 	backupLocator       backup.Locator
 	bundleURISink       *bundleuri.Sink
 	repositoryCounter   *counter.RepositoryCounter
