@@ -350,7 +350,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	txn := &Transaction{
 		write:        opts.Write,
 		commit:       mgr.commit,
-		snapshotLSN:  mgr.appendedLSN,
+		snapshotLSN:  mgr.committedLSN,
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
 		metrics:      mgr.metrics,
@@ -925,7 +925,7 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 //     - The reference verification failures can be ignored instead of aborting the entire transaction.
 //     If done, the references that failed verification are dropped from the transaction but the updates
 //     that passed verification are still performed.
-//  2. The transaction is appended to the write-ahead log. Once the write has been logged, it is effectively
+//  2. The transaction is committed to the write-ahead log. Once the write has been logged, it is effectively
 //     committed and will be applied to the repository even after restarting.
 //  3. The transaction is applied from the write-ahead log to the repository by actually performing the reference
 //     changes.
@@ -998,7 +998,7 @@ type TransactionManager struct {
 	// initializationSuccessful is set if the TransactionManager initialized successfully. If it didn't,
 	// transactions will fail to begin.
 	initializationSuccessful bool
-	// mutex guards access to snapshotLocks and appendedLSN. These fields are accessed by both
+	// mutex guards access to snapshotLocks and committedLSN. These fields are accessed by both
 	// Run and Begin which are ran in different goroutines.
 	mutex sync.Mutex
 
@@ -1008,8 +1008,14 @@ type TransactionManager struct {
 	// snapshotManager is responsible for creation and management of file system snapshots.
 	snapshotManager *snapshot.Manager
 
-	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
-	appendedLSN storage.LSN
+	// ┌─ oldestLSN                    ┌─ committedLSN
+	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □ □ □ □ □ □
+	//               └─ appliedLSN                   └─ appendedLSN
+	//
+	// committedLSN holds the LSN of the last log entry committed to the partition's write-ahead log. A log entry is
+	// considered to be committed if it's accepted by the majority of cluster members. Eventually, it will be
+	// applied by all cluster members.
+	committedLSN storage.LSN
 	// appliedLSN holds the LSN of the last log entry applied to the partition.
 	appliedLSN storage.LSN
 	// oldestLSN holds the LSN of the head of log entries which is still kept in the database. The manager keeps
@@ -1020,7 +1026,7 @@ type TransactionManager struct {
 	// the partition. It's keyed by the LSN the transaction is waiting to be applied and the
 	// value is the resultChannel that is waiting the result.
 	awaitingTransactions map[storage.LSN]resultChannel
-	// committedEntries keeps some latest appended log entries around. Some types of transactions, such as
+	// committedEntries keeps some latest committed log entries around. Some types of transactions, such as
 	// housekeeping, operate on snapshot repository. There is a gap between transaction doing its work and the time
 	// when it is committed. They need to verify if concurrent operations can cause conflict. These log entries are
 	// still kept around even after they are applied. They are removed when there are no active readers accessing
@@ -1228,7 +1234,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	// The reference updates are staged into the transaction when they are verified, including
 	// the packed-refs. While the reference files would generally be small, the packed-refs file
 	// may be large. Sync the contents of the file before entering the critical section to ensure
-	// we don't end up syncing the potentially very large file to disk when we're appending the
+	// we don't end up syncing the potentially very large file to disk when we're committing the
 	// log entry.
 	preImagePackedRefsInode, err := getInode(transaction.originalPackedRefsFilePath())
 	if err != nil {
@@ -1774,7 +1780,7 @@ func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, tran
 		Name: "pack-refs",
 		// By using the '--auto' flag, we ensure that git uses the best heuristic
 		// for compaction. For reftables, it currently uses a geometric progression.
-		// This ensures we don't keep compacting unecessarily to a single file.
+		// This ensures we don't keep compacting unnecessarily to a single file.
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--auto"}},
 	}, gitcmd.WithStderr(&stderr)); err != nil {
 		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
@@ -2131,7 +2137,7 @@ func unwrapExpectedError(err error) error {
 	return err
 }
 
-// Run starts the transaction processing. On start up Run loads the indexes of the last appended and applied
+// Run starts the transaction processing. On start up Run loads the indexes of the last committed and applied
 // log entries from the database. It will then apply any transactions that have been logged but not applied
 // to the repository. Once the recovery is completed, Run starts processing new transactions by verifying the
 // references, logging the transaction and finally applying it to the repository. The transactions are acknowledged
@@ -2162,7 +2168,7 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	}
 
 	for {
-		if mgr.appliedLSN < mgr.appendedLSN {
+		if mgr.appliedLSN < mgr.committedLSN {
 			lsn := mgr.appliedLSN + 1
 
 			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
@@ -2307,13 +2313,13 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		logEntry.Operations = transaction.walEntry.Operations()
 
-		return mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath())
+		return mgr.commitLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath())
 	}(); err != nil {
 		transaction.result <- err
 		return nil
 	}
 
-	mgr.awaitingTransactions[mgr.appendedLSN] = transaction.result
+	mgr.awaitingTransactions[mgr.committedLSN] = transaction.result
 
 	return nil
 }
@@ -2429,7 +2435,7 @@ func (mgr *TransactionManager) snapshotsDir() string {
 	return filepath.Join(mgr.stagingDirectory, "snapshots")
 }
 
-// initialize initializes the TransactionManager's state from the database. It loads the appended and the applied
+// initialize initializes the TransactionManager's state from the database. It loads the committed and the applied
 // LSNs and initializes the notification channels that synchronize transaction beginning with log entry applying.
 func (mgr *TransactionManager) initialize(ctx context.Context) error {
 	defer trace.StartRegion(ctx, "initialize").End()
@@ -2456,24 +2462,24 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("new snapshot manager: %w", err)
 	}
 
-	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
+	// The LSN of the last committed log entry is determined from the LSN of the latest entry in the log and
 	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there
 	// is no transaction refers them. It's possible there are some left-over entries in the database because a
 	// transaction can hold the entry stubbornly. So, the manager could not clean them up in the last session.
 	//
-	// ┌─ oldestLSN                    ┌─ appendedLSN
-	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■
-	//                └─ appliedLSN
+	// ┌─ oldestLSN                    ┌─ committedLSN
+	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □ □ □ □ □ □
+	//               └─ appliedLSN                   └─ appendedLSN
 	//
 	//
 	// oldestLSN is initialized to appliedLSN + 1. If there are no log entries in the log, then everything has been
 	// pruned already or there has not been any log entries yet. Setting this +1 avoids trying to clean up log entries
 	// that do not exist. If there are some, we'll set oldestLSN to the head of the log below.
 	mgr.oldestLSN = mgr.appliedLSN + 1
-	// appendedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
+	// committedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
 	// all log entries have been applied and have been already pruned. If there are some in the log, we'll update this
 	// below to match.
-	mgr.appendedLSN = mgr.appliedLSN
+	mgr.committedLSN = mgr.appliedLSN
 
 	if logEntries, err := os.ReadDir(walFilesPath(mgr.stateDirectory)); err != nil {
 		return fmt.Errorf("read wal directory: %w", err)
@@ -2481,13 +2487,13 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
 			return fmt.Errorf("parse oldest LSN: %w", err)
 		}
-		if mgr.appendedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
-			return fmt.Errorf("parse appended LSN: %w", err)
+		if mgr.committedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
+			return fmt.Errorf("parse committed LSN: %w", err)
 		}
 	}
 
 	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
+		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.committedLSN)
 	}
 
 	// Create a snapshot lock for the applied LSN as it is used for synchronizing
@@ -2497,11 +2503,11 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	// Each unapplied log entry should have a snapshot lock as they are created in normal
 	// operation when committing a log entry. Recover these entries.
-	for i := mgr.appliedLSN + 1; i <= mgr.appendedLSN; i++ {
+	for i := mgr.appliedLSN + 1; i <= mgr.committedLSN; i++ {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
-	if err := mgr.removeStaleWALFiles(ctx, mgr.oldestLSN, mgr.appendedLSN); err != nil {
+	if err := mgr.removeStaleWALFiles(ctx, mgr.oldestLSN, mgr.committedLSN); err != nil {
 		return fmt.Errorf("remove stale packs: %w", err)
 	}
 
@@ -2597,15 +2603,15 @@ func (mgr *TransactionManager) removePackedRefsLocks(ctx context.Context, reposi
 // but the manager was interrupted before successfully persisting the log entry itself.
 // If the manager deletes a log entry successfully from the database but is interrupted before it cleans
 // up the associated files, such a directory can also be left at the head of the log.
-func (mgr *TransactionManager) removeStaleWALFiles(ctx context.Context, oldestLSN, appendedLSN storage.LSN) error {
+func (mgr *TransactionManager) removeStaleWALFiles(ctx context.Context, oldestLSN, committedLSN storage.LSN) error {
 	needsFsync := false
 	for _, possibleStaleFilesPath := range []string{
 		// Log entries are pruned one by one. If a write is interrupted, the only possible stale files would be
 		// for the log entry preceding the oldest log entry.
 		walFilesPathForLSN(mgr.stateDirectory, oldestLSN-1),
-		// Log entries are appended one by one to the log. If a write is interrupted, the only possible stale
+		// Log entries are committed one by one to the log. If a write is interrupted, the only possible stale
 		// files would be for the next LSN. Remove the files if they exist.
-		walFilesPathForLSN(mgr.stateDirectory, appendedLSN+1),
+		walFilesPathForLSN(mgr.stateDirectory, committedLSN+1),
 	} {
 
 		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
@@ -2857,7 +2863,7 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 // to transaction operations.
 //
 // To ensure that we don't modify existing tables and autocompact, we lock the existing tables
-// before applying the updates. This way the reftable backend willl only create new tables
+// before applying the updates. This way the reftable backend will only create new tables
 func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 	ctx context.Context,
 	referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction,
@@ -3139,7 +3145,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	// Check for any concurrent housekeeping between this transaction's snapshot LSN and the latest appended LSN.
+	// Check for any concurrent housekeeping between this transaction's snapshot LSN and the latest committed LSN.
 	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
 		if entry.GetHousekeeping() != nil {
 			return errHousekeepingConflictConcurrent
@@ -3506,11 +3512,11 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 	return nil
 }
 
-// appendLogEntry appends the transaction to the write-ahead log. It first writes the transaction's manifest file
+// commitLogEntry commits the transaction to the write-ahead log. It first writes the transaction's manifest file
 // into the log entry's directory. Afterwards it moves the log entry's directory from the staging area to its final
 // place in the write-ahead log.
-func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
-	defer trace.StartRegion(ctx, "appendLogEntry").End()
+func (mgr *TransactionManager) commitLogEntry(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
+	defer trace.StartRegion(ctx, "commitLogEntry").End()
 
 	manifestBytes, err := proto.Marshal(logEntry)
 	if err != nil {
@@ -3538,7 +3544,7 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	nextLSN := mgr.appendedLSN + 1
+	nextLSN := mgr.committedLSN + 1
 	mgr.testHooks.beforeAppendLogEntry(nextLSN)
 
 	// Move the log entry from the staging directory into its place in the log.
@@ -3566,7 +3572,7 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	// After this latch block, the transaction is committed and all subsequent transactions
 	// are guaranteed to read it.
 	mgr.mutex.Lock()
-	mgr.appendedLSN = nextLSN
+	mgr.committedLSN = nextLSN
 	mgr.snapshotLocks[nextLSN] = &snapshotLock{applied: make(chan struct{})}
 	mgr.committedEntries.PushBack(&committedEntry{
 		lsn:                nextLSN,
