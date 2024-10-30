@@ -444,7 +444,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 
 		relativePaths := opts.RelativePaths
 		if relativePaths == nil {
-			relativePaths = txn.partitionRelativePaths()
+			relativePaths = txn.PartitionRelativePaths()
 		}
 
 		var err error
@@ -503,9 +503,9 @@ func (txn *Transaction) repositoryTarget() bool {
 	return txn.relativePath != ""
 }
 
-// partitionRelativePaths returns all known repository relative paths for the
+// PartitionRelativePaths returns all known repository relative paths for the
 // transactions partition.
-func (txn *Transaction) partitionRelativePaths() []string {
+func (txn *Transaction) PartitionRelativePaths() []string {
 	it := txn.KV().NewIterator(keyvalue.IteratorOptions{
 		Prefix: []byte(relativePathKeyPrefix),
 	})
