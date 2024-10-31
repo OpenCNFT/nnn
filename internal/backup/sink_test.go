@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -230,4 +231,43 @@ func TestStorageServiceSink_SignedURL_notImplemented(t *testing.T) {
 			require.Contains(t, err.Error(), "Unimplemented")
 		})
 	}
+}
+
+func TestSink_List(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+	rootPath := filepath.Join(t.TempDir(), "sink")
+
+	expectedObjects := []string{
+		"a/b/apple",
+		"a/b/banana",
+		"a/b/c/carrot",
+		"a/b/pineapple",
+	}
+
+	fs := fstest.MapFS{
+		".":     {Mode: mode.Directory},
+		"a":     {Mode: mode.Directory},
+		"a/b":   {Mode: mode.Directory},
+		"a/b/c": {Mode: mode.Directory},
+	}
+
+	for _, path := range expectedObjects {
+		fs[path] = &fstest.MapFile{Mode: mode.File, Data: []byte(path)}
+	}
+
+	testhelper.CreateFS(t, rootPath, fs)
+
+	sink, err := ResolveSink(ctx, rootPath)
+	require.NoError(t, err)
+	defer testhelper.MustClose(t, sink)
+
+	var objects []string
+	it := sink.List("a/b/")
+	for it.Next(ctx) {
+		objects = append(objects, it.Path())
+	}
+	require.NoError(t, it.Err())
+	require.Equal(t, expectedObjects, objects)
 }
