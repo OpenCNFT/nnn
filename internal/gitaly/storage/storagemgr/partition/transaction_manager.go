@@ -34,6 +34,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -342,6 +343,12 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 		return nil, errWritableAllRepository
 	}
 
+	if mgr.raftManager != nil && !opts.WithoutRaftReady {
+		if err := mgr.raftManager.WaitReady(); err != nil {
+			return nil, fmt.Errorf("waiting for Raft to be ready: %w", err)
+		}
+	}
+
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.Begin", nil)
 	span.SetTag("write", opts.Write)
 	span.SetTag("relativePath", relativePath)
@@ -387,20 +394,8 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 				mgr.mutex.Lock()
 				removedAnyEntry = mgr.cleanCommittedEntry(entry)
 				mgr.mutex.Unlock()
-
-				// Signal the manager this transaction finishes. The purpose of this signaling is to wake it up
-				// and clean up stale entries in the database. The manager scans and removes leading empty
-				// entries. We signal only if the transaction modifies the in-memory committed entry.
-				// This signal queue is buffered. If the queue is full, the manager hasn't woken up. The
-				// next scan will cover the work of the prior one. So, no need to let the transaction wait.
-				// ┌─ 1st signal        ┌─ The manager scans til here
-				// □ □ □ □ □ □ □ □ □ □ ■ ■ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ⧅ ⧅ ⧅ ⧅ ■
-				//        └─ 2nd signal
 				if removedAnyEntry {
-					select {
-					case mgr.completedQueue <- struct{}{}:
-					default:
-					}
+					mgr.NotifyNewCommittedEntry()
 				}
 			}
 		}()
@@ -1057,6 +1052,24 @@ type TransactionManager struct {
 
 	// metrics stores reporters which facilitate metric recording of transactional operations.
 	metrics ManagerMetrics
+
+	// raftManager controls cross-network replication using the Raft consensus algorithm. Raft manager follows the
+	// life cycle of Transaction Manager. Major interactions between Raft Manager and Transaction Manager are
+	// summarized in the below graph:
+	//
+	//                                                 Without Raft
+	// TransactionManager      New Transaction        ┌────┬───────┐
+	//          │                     ▼               │    ▼       ▼
+	//          └─►Initialize───►txn.Commit()─►Verify─┤ Append  Commit─►Apply  ──...──► Stop
+	//                 │                              │    ▲       ▲                      │
+	//                 ▼                              ▼    │       │                      ▼
+	//          ┌──  Run()──────────...───────────Propose──┴───────┘  ───────...─────── Stop
+	//          │                                   ▲ │
+	// Raft Manager                     Conf Change │ │
+	//                                           ┌──┴─▼─────┐
+	//                                           │Raft Group├◄───► Network
+	//                                           └──────────┘
+	raftManager *raftmgr.Manager
 }
 
 type testHooks struct {
@@ -1082,6 +1095,7 @@ func NewTransactionManager(
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics ManagerMetrics,
 	consumer LogConsumer,
+	raftManager *raftmgr.Manager,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1112,6 +1126,7 @@ func NewTransactionManager(
 		consumer:             consumer,
 		consumerPos:          consumerPos,
 		acknowledgedQueue:    make(chan struct{}, 1),
+		raftManager:          raftManager,
 
 		testHooks: testHooks{
 			beforeInitialization:      func() {},
@@ -2188,9 +2203,19 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 		return fmt.Errorf("initialize: %w", err)
 	}
 
+	if mgr.raftManager != nil {
+		if err := mgr.raftManager.Run(ctx, mgr); err != nil {
+			return fmt.Errorf("starting raft manager: %w", err)
+		}
+	}
+
 	for {
 		// We prioritize applying committed log entries to the partition first.
-		if mgr.appliedLSN < mgr.committedLSN {
+		mgr.mutex.Lock()
+		shouldApply := mgr.appliedLSN < mgr.committedLSN
+		mgr.mutex.Unlock()
+
+		if shouldApply {
 			lsn := mgr.appliedLSN + 1
 
 			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
@@ -2212,7 +2237,9 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 			if err := mgr.deleteLogEntry(ctx, mgr.oldestLSN); err != nil {
 				return fmt.Errorf("deleting log entry: %w", err)
 			}
+			mgr.mutex.Lock()
 			mgr.oldestLSN++
+			mgr.mutex.Unlock()
 			continue
 		}
 
@@ -2226,6 +2253,12 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 // logging it.
 func (mgr *TransactionManager) processTransaction(ctx context.Context) (returnedErr error) {
 	var transaction *Transaction
+
+	var raftDone <-chan struct{}
+	if mgr.raftManager != nil {
+		raftDone = mgr.raftManager.Done()
+	}
+
 	select {
 	case transaction = <-mgr.admissionQueue:
 		defer trace.StartRegion(ctx, "processTransaction").End()
@@ -2244,12 +2277,20 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 	case <-mgr.acknowledgedQueue:
 		return nil
 	case <-ctx.Done():
+	case <-raftDone:
 	}
 
 	// Return if the manager was stopped. The select is indeterministic so this guarantees
 	// the manager stops the processing even if there are transactions in the queue.
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+
+	// If Raft stops, we should not continue processing more entries.
+	if mgr.raftManager != nil {
+		if err := mgr.raftManager.Err(); err != nil {
+			return fmt.Errorf("raft error: %w", err)
+		}
 	}
 
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.processTransaction", nil)
@@ -2447,7 +2488,12 @@ func (mgr *TransactionManager) verifyObjectsExist(ctx context.Context, repositor
 }
 
 // Close stops the transaction processing causing Run to return.
-func (mgr *TransactionManager) Close() { mgr.close() }
+func (mgr *TransactionManager) Close() {
+	if mgr.raftManager != nil {
+		mgr.raftManager.Stop()
+	}
+	mgr.close()
+}
 
 // CloseSnapshots closes any remaining snapshots in the cache. Caller of Run() should
 // call it after there are no more active transactions and no new transactions will be
@@ -2721,6 +2767,11 @@ func manifestPath(logEntryPath string) string {
 // packFilePath returns a log entry's pack file's absolute path in the wal files directory.
 func packFilePath(walFiles string) string {
 	return filepath.Join(walFiles, "transaction.pack")
+}
+
+// LSNDirPath returns the path to WAL dir of a particular LSN.
+func (mgr *TransactionManager) LSNDirPath(lsn storage.LSN) string {
+	return walFilesPathForLSN(mgr.stateDirectory, lsn)
 }
 
 // verifyAlternateUpdate verifies the staged alternate update.
@@ -3085,7 +3136,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 		}
 
 		if containsReferenceDeletions {
-			if err := mgr.walkCommittedEntries(tx, func(entry *gitalypb.LogEntry, dependencies map[git.ObjectID]struct{}) error {
+			if err := mgr.walkCommittedEntries(tx, func(entry *gitalypb.LogEntry, _ map[git.ObjectID]struct{}) error {
 				if entry.GetHousekeeping().GetPackRefs() != nil {
 					return errConcurrentReferencePacking
 				}
@@ -3209,7 +3260,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 	defer mgr.mutex.Unlock()
 
 	// Check for any concurrent housekeeping between this transaction's snapshot LSN and the latest committed LSN.
-	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
+	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, _ map[git.ObjectID]struct{}) error {
 		if entry.GetHousekeeping() != nil {
 			return errHousekeepingConflictConcurrent
 		}
@@ -3341,7 +3392,7 @@ func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transact
 	packRefs := transaction.runHousekeeping.packRefs
 
 	// Check for any concurrent ref deletion between this transaction's snapshot LSN to the end.
-	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
+	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, _ map[git.ObjectID]struct{}) error {
 		for _, refTransaction := range entry.GetReferenceTransactions() {
 			for _, change := range refTransaction.GetChanges() {
 				// We handle HEAD updates through the git-update-ref, but since
@@ -3579,19 +3630,123 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 // manifest file into the log entry's directory. Second, it sends the log entry to other cluster members if needed.
 // Afterwards it moves the log entry's directory from the staging area to its final place in the write-ahead log.
 func (mgr *TransactionManager) proposeLogEntry(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
-	nextLSN := mgr.appendedLSN + 1
-	if err := mgr.appendLogEntry(ctx, nextLSN, logEntry, logEntryPath); err != nil {
-		return fmt.Errorf("append log entry: %w", err)
+	if mgr.raftManager != nil {
+		if err := mgr.raftManager.Propose(ctx, logEntry, logEntryPath); err != nil {
+			return err
+		}
+	} else {
+		nextLSN := mgr.committedLSN + 1
+		if err := mgr.AppendLogEntry(ctx, nextLSN, logEntry, logEntryPath); err != nil {
+			return fmt.Errorf("append log entry: %w", err)
+		}
+		if err := mgr.CommitLogEntry(ctx, nextLSN); err != nil {
+			return fmt.Errorf("commit log entry: %w", err)
+		}
 	}
-	if err := mgr.commitLogEntry(ctx, nextLSN, objectDependencies); err != nil {
-		return fmt.Errorf("commit log entry: %w", err)
+
+	mgr.mutex.Lock()
+	// Tracking object dependencies is only relevant to repacking task that runs in parallel with other operations.
+	// When the task finishes, the Transaction Manager needs to verify the existence of all dependent objects of
+	// entries since the time the repacking task started. The current node must be primary when the task started.
+	// This node need to backfill object dependencies back to the committed entries list in this code path. In
+	// contrast, replicas don't need to do so. If this node wins an election, the next log entry uses the snapshot
+	// from at the latest committed entry; hence prior object dependencies are not relevant.
+	if elm := mgr.committedEntries.Back(); elm != nil {
+		entry := elm.Value.(*committedEntry)
+		entry.objectDependencies = objectDependencies
 	}
+	mgr.mutex.Unlock()
+
 	return nil
 }
 
-// appendLogEntry appends the transaction to the write-ahead log.
-func (mgr *TransactionManager) appendLogEntry(ctx context.Context, nextLSN storage.LSN, logEntry *gitalypb.LogEntry, logEntryPath string) error {
+// InsertLogEntry inserts a KV log entry into the WAL at the specified LSN. The caller can manipulate the data
+// by passing a modification function. It's responsibility of the caller NOT TO append/insert any log entries
+// while this function is running. All adjacent log entries at and after inserting position are wiped.
+func (mgr *TransactionManager) InsertLogEntry(
+	ctx context.Context,
+	lsn storage.LSN,
+	txnFunc func(keyvalue.ReadWriter) error,
+	metadata *gitalypb.LogEntry_Metadata,
+) (_ *gitalypb.LogEntry, returnedErr error) {
+	txn, err := mgr.Begin(ctx, storage.BeginOptions{
+		Write:            true,
+		RelativePaths:    []string{},
+		WithoutRaftReady: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initializing transaction: %w", err)
+	}
+
+	if txnFunc != nil {
+		if err := txnFunc(txn.KV()); err != nil {
+			defer func() {
+				if rollbackErr := txn.Rollback(ctx); rollbackErr != nil {
+					returnedErr = errors.Join(returnedErr, fmt.Errorf("rollback transaction: %w", rollbackErr))
+				}
+			}()
+			return nil, fmt.Errorf("mutate KV transaction: %w", err)
+		}
+	}
+
+	transaction := txn.(*Transaction)
+	defer func() {
+		if err := transaction.finish(); err != nil && returnedErr == nil {
+			returnedErr = fmt.Errorf("finish transaction: %w", err)
+		}
+	}()
+	defer trace.StartRegion(ctx, "commit").End()
+	defer prometheus.NewTimer(transaction.metrics.commitDuration(transaction.write)).ObserveDuration()
+
+	if err = transaction.updateState(transactionStateCommit); err != nil {
+		return nil, err
+	}
+	transaction.admitted = true
+
+	if err = mgr.prepareCommit(ctx, transaction); err != nil {
+		return nil, fmt.Errorf("preparing commit: %w", err)
+	}
+
+	logEntry, logEntryPath, err := mgr.packageLogEntry(ctx, transaction)
+	if err != nil {
+		return nil, fmt.Errorf("packaging log entry: %w", err)
+	}
+
+	if err := mgr.AppendLogEntry(ctx, lsn, logEntry, logEntryPath); err != nil {
+		return nil, fmt.Errorf("appending log entry: %w", err)
+	}
+	return logEntry, nil
+}
+
+// AppendLogEntry appends the transaction to the write-ahead log.
+func (mgr *TransactionManager) AppendLogEntry(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry, logEntryPath string) (err error) {
 	defer trace.StartRegion(ctx, "appendLogEntry").End()
+
+	select {
+	case <-mgr.ctx.Done():
+		return mgr.ctx.Err()
+	default:
+	}
+
+	//                   ┌─ committedLSN
+	// ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □ ⧅ ⧅ ⧅ ⧅ ⧅
+	// └─ appliedLSN           └─ lsn  └─ appendedLSN
+	//
+	// When a new log entry is appended, it needs to be confirmed by peers. If the number of confirmations
+	// (including this node) reach quorum, the log entry is moved to the committed phase. In contrast, that
+	// log entry and following ones are discarded in favor of more up-to-date entries.
+	var removeRange storage.LSN
+	mgr.mutex.Lock()
+	if lsn <= mgr.committedLSN {
+		return fmt.Errorf("out-of-order log entry appending, position %s taken", lsn.String())
+	}
+	if lsn <= mgr.appendedLSN {
+		removeRange = mgr.appendedLSN
+	}
+	mgr.mutex.Unlock()
+	if err := mgr.removeOsboleteLogEntries(lsn, removeRange); err != nil {
+		return fmt.Errorf("removing obsolete log entries: %w", err)
+	}
 
 	manifestBytes, err := proto.Marshal(logEntry)
 	if err != nil {
@@ -3619,10 +3774,10 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, nextLSN stora
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	mgr.testHooks.beforeAppendLogEntry(nextLSN)
+	mgr.testHooks.beforeAppendLogEntry(lsn)
 
 	// Move the log entry from the staging directory into its place in the log.
-	destinationPath := walFilesPathForLSN(mgr.stateDirectory, nextLSN)
+	destinationPath := walFilesPathForLSN(mgr.stateDirectory, lsn)
 	if err := os.Rename(logEntryPath, destinationPath); err != nil {
 		return fmt.Errorf("move wal files: %w", err)
 	}
@@ -3646,42 +3801,117 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, nextLSN stora
 	// After this latch block, the transaction is committed and all subsequent transactions
 	// are guaranteed to read it.
 	mgr.mutex.Lock()
-	mgr.appendedLSN = nextLSN
+	mgr.appendedLSN = lsn
 	mgr.appendedEntries[mgr.appendedLSN] = logEntry
 	mgr.mutex.Unlock()
 
 	return nil
 }
 
-// commitLogEntry commits the transaction to the write-ahead log.
-func (mgr *TransactionManager) commitLogEntry(ctx context.Context, nextLSN storage.LSN, objectDependencies map[git.ObjectID]struct{}) error {
+// ReadLogEntry reads and returns the log entry stored at the specified LSN within the WAL. It first looks into the
+// appended entries before attempting to load it from disk.
+func (mgr *TransactionManager) ReadLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	if lsn < mgr.oldestLSN || lsn > mgr.appendedLSN {
+		return nil, fmt.Errorf("log entry not found")
+	} else if lsn > mgr.committedLSN {
+		// Quick-access from appended entries map.
+		return mgr.appendedEntries[lsn], nil
+	}
+
+	return mgr.readLogEntry(lsn)
+}
+
+// FirstLSN retrieves the first LSN that is still accessible in the WAL.
+func (mgr *TransactionManager) FirstLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	return mgr.oldestLSN
+}
+
+// LastLSN returns the last LSN that has been appended to the WAL, indicating the latest position.
+func (mgr *TransactionManager) LastLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	return mgr.appendedLSN
+}
+
+func (mgr *TransactionManager) removeOsboleteLogEntries(from storage.LSN, to storage.LSN) error {
+	// Remove log entries reversely to prevent holes in between.
+	for lsn := to; lsn >= from; lsn-- {
+		path := walFilesPathForLSN(mgr.stateDirectory, lsn)
+		if _, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CommitLogEntry commits the transaction to the write-ahead log.
+func (mgr *TransactionManager) CommitLogEntry(ctx context.Context, lsn storage.LSN) (err error) {
 	defer trace.StartRegion(ctx, "commitLogEntry").End()
-	mgr.testHooks.beforeCommitLogEntry(nextLSN)
+	mgr.testHooks.beforeCommitLogEntry(lsn)
+
+	select {
+	case <-mgr.ctx.Done():
+		return mgr.ctx.Err()
+	default:
+	}
 
 	// Persist committed LSN before updating internal states.
-	if err := mgr.storeCommittedLSN(nextLSN); err != nil {
+	if err := mgr.storeCommittedLSN(lsn); err != nil {
 		return fmt.Errorf("persisting committed entry: %w", err)
 	}
 
-	mgr.mutex.Lock()
-	mgr.committedLSN = nextLSN
-	mgr.snapshotLocks[nextLSN] = &snapshotLock{applied: make(chan struct{})}
-	if _, exist := mgr.appendedEntries[nextLSN]; !exist {
-		mgr.mutex.Unlock()
-		return fmt.Errorf("log entry %s not found in the appended list", nextLSN)
+	if lsn <= mgr.committedLSN {
+		return fmt.Errorf("out-of-order log entry committing, position %s taken", lsn.String())
 	}
-	delete(mgr.appendedEntries, nextLSN)
-	mgr.committedEntries.PushBack(&committedEntry{
-		lsn:                nextLSN,
-		objectDependencies: objectDependencies,
-	})
+
+	mgr.mutex.Lock()
+	mgr.committedLSN = lsn
+	mgr.snapshotLocks[lsn] = &snapshotLock{applied: make(chan struct{})}
+	if _, exist := mgr.appendedEntries[lsn]; !exist {
+		mgr.mutex.Unlock()
+		return fmt.Errorf("log entry %s not found in the appended list", lsn)
+	}
+	delete(mgr.appendedEntries, lsn)
+	mgr.committedEntries.PushBack(&committedEntry{lsn: lsn})
 	mgr.mutex.Unlock()
 
 	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
+		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), lsn)
 	}
 
 	return nil
+}
+
+// NotifyNewCommittedEntry notifies the Transaction Manager of a new committed log entry. Most of the time, the
+// processing loop of the transaction manager receives completion signal from admission queue. After processing,
+// committing, then applying a log entry, the processing goroutine is put to idle state until there a new transaction
+// commits. This flow works fine if Raft is not enabled. In contrast, when this node acts as a replica, Raft needs to
+// notify the processing goroutine manually.
+func (mgr *TransactionManager) NotifyNewCommittedEntry() {
+	// The purpose of this signaling is to wake it up and clean up stale entries in the database. The manager scans and
+	// removes leading empty entries. We signal only if the transaction modifies the in-memory committed entry. This
+	// signal queue is buffered. If the queue is full, the manager hasn't woken up. The next scan will cover the work
+	// of the prior one. So, no need to let the transaction wait.
+	// ┌─ 1st signal        ┌─ The manager scans til here
+	// □ □ □ □ □ □ □ □ □ □ ■ ■ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ⧅ ⧅ ⧅ ⧅ ■
+	//        └─ 2nd signal
+	select {
+	case mgr.completedQueue <- struct{}{}:
+	default:
+	}
 }
 
 // applyLogEntry reads a log entry at the given LSN and applies it to the repository.

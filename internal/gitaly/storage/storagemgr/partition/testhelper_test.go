@@ -9,11 +9,15 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
@@ -34,10 +38,12 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestMain(m *testing.M) {
@@ -627,13 +633,6 @@ func RequireDatabase(tb testing.TB, ctx context.Context, database keyvalue.Trans
 	if expectedState == nil {
 		expectedState = DatabaseState{}
 	}
-	// Most of the time, persisted committedLSN is equal to appliedLSN except for some intentional tests. Thus, if
-	// appliedLSN is asserted, the test should backfill committedLSN if it's not there.
-	if appliedLSN, appliedExist := expectedState[string(keyAppliedLSN)]; appliedExist {
-		if _, committedExist := expectedState[string(keyCommittedLSN)]; !committedExist {
-			expectedState[string(keyCommittedLSN)] = appliedLSN
-		}
-	}
 
 	actualState := DatabaseState{}
 	unexpectedKeys := []string{}
@@ -663,13 +662,20 @@ func RequireDatabase(tb testing.TB, ctx context.Context, database keyvalue.Trans
 			// Unmarshal the actual value to the same type as the expected value.
 			actualValue := reflect.New(reflect.TypeOf(expectedValue).Elem()).Interface().(proto.Message)
 			require.NoError(tb, proto.Unmarshal(value, actualValue))
+
+			if _, isAny := expectedValue.(*anypb.Any); isAny {
+				// Verify if the database contains the key, but the content does not matter.
+				actualState[string(key)] = expectedValue
+				continue
+			}
+
 			actualState[string(key)] = actualValue
 		}
 
 		return nil
 	}))
 
-	require.Empty(tb, unexpectedKeys, "database contains unexpected keys")
+	require.Emptyf(tb, unexpectedKeys, "database contains unexpected keys")
 	testhelper.ProtoEqual(tb, expectedState, actualState)
 }
 
@@ -954,6 +960,8 @@ type RepositoryAssertion struct {
 type StateAssertion struct {
 	// Database is the expected state of the database.
 	Database DatabaseState
+	// NotOffsetDatabaseInRaft indicates if the LSN in the database should not be shifted.
+	NotOffsetDatabaseInRaft bool
 	// Directory is the expected state of the manager's state directory in the repository.
 	Directory testhelper.DirectoryState
 	// Repositories is the expected state of the repositories in the storage. The key is
@@ -1073,11 +1081,35 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		).Scope(storageName)
 	}
 
+	// Cluster ID and recorder is kept stable in each test run.
+	clusterID := uuid.New().String()
+	var raftEntryRecorder *raftmgr.EntryRecorder
+	var raftManager *raftmgr.Manager
+
+	createRaftManager := func() *raftmgr.Manager {
+		raftManager, err := raftmgr.NewManager(
+			setup.PartitionID,
+			setup.Config.Storages[0].Name,
+			config.DefaultRaftConfig(clusterID),
+			database,
+			logger,
+			raftmgr.WithEntryRecorder(raftEntryRecorder),
+			raftmgr.WithRecordTransport(),
+			raftmgr.WithOpTimeout(1*time.Minute),
+		)
+		require.NoError(t, err)
+		return raftManager
+	}
+	if testhelper.IsRaftEnabled() {
+		raftEntryRecorder = raftmgr.NewEntryRecorder()
+		raftManager = createRaftManager()
+	}
+
 	var (
 		// managerRunning tracks whether the manager is running or closed.
 		managerRunning bool
 		// transactionManager is the current TransactionManager instance.
-		transactionManager = NewTransactionManager(setup.PartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, setup.CommandFactory, storageScopedFactory, newMetrics(), setup.Consumer)
+		transactionManager = NewTransactionManager(setup.PartitionID, logger, database, storageName, storagePath, stateDir, stagingDir, setup.CommandFactory, storageScopedFactory, newMetrics(), setup.Consumer, raftManager)
 		// managerErr is used for synchronizing manager closing and returning
 		// the error from Run.
 		managerErr chan error
@@ -1124,7 +1156,12 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			require.NoError(t, os.RemoveAll(stagingDir))
 			require.NoError(t, os.Mkdir(stagingDir, mode.Directory))
 
-			transactionManager = NewTransactionManager(setup.PartitionID, logger, database, setup.Config.Storages[0].Name, storagePath, stateDir, stagingDir, setup.CommandFactory, storageScopedFactory, newMetrics(), setup.Consumer)
+			if testhelper.IsRaftEnabled() {
+				raftManager = createRaftManager()
+			} else {
+				raftManager = nil
+			}
+			transactionManager = NewTransactionManager(setup.PartitionID, logger, database, setup.Config.Storages[0].Name, storagePath, stateDir, stagingDir, setup.CommandFactory, storageScopedFactory, newMetrics(), setup.Consumer, raftManager)
 			installHooks(transactionManager, &inflightTransactions, step.Hooks)
 
 			go func() {
@@ -1167,7 +1204,11 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			require.NoError(t, err)
 
 			tx := transaction.(*Transaction)
-			require.Equalf(t, step.ExpectedSnapshotLSN, tx.SnapshotLSN(), "mismatched ExpectedSnapshotLSN")
+			expectedSnapshotLSN := step.ExpectedSnapshotLSN
+			if testhelper.IsRaftEnabled() {
+				expectedSnapshotLSN = raftEntryRecorder.Offset(expectedSnapshotLSN)
+			}
+			require.Equal(t, expectedSnapshotLSN, tx.SnapshotLSN())
 			require.NotEmpty(t, tx.Root(), "empty Root")
 			require.Contains(t, tx.Root(), transactionManager.snapshotsDir())
 
@@ -1451,7 +1492,11 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			transaction := openTransactions[step.TransactionID]
 			transaction.WriteCommitGraphs(step.Config)
 		case ConsumerAcknowledge:
-			transactionManager.AcknowledgeTransaction(step.LSN)
+			lsn := step.LSN
+			if testhelper.IsRaftEnabled() {
+				lsn = raftEntryRecorder.Offset(lsn)
+			}
+			transactionManager.AcknowledgeTransaction(lsn)
 		case RepositoryAssertion:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction's snapshot asserted before beginning it")
 			transaction := openTransactions[step.TransactionID]
@@ -1518,6 +1563,39 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		require.NoError(t, err)
 	}
 
+	// Most of the time, persisted committedLSN is equal to appliedLSN except for some intentional tests. Thus, if
+	// appliedLSN is asserted, the test should backfill committedLSN if it's not there.
+	if appliedLSN, appliedExist := tc.expectedState.Database[string(keyAppliedLSN)]; appliedExist {
+		if _, committedExist := tc.expectedState.Database[string(keyCommittedLSN)]; !committedExist {
+			tc.expectedState.Database[string(keyCommittedLSN)] = appliedLSN
+		}
+	}
+
+	// If singular Raft cluster is enabled, the Raft handler starts to insert raft log entries. We need to
+	// offset the expected LSN to account for LSN shifting.
+	if testhelper.IsRaftEnabled() && raftEntryRecorder.Len() > 0 {
+		if !tc.expectedState.NotOffsetDatabaseInRaft {
+			appliedLSN, exist := tc.expectedState.Database[string(keyAppliedLSN)]
+			if exist {
+				// If expected applied LSN is present, offset expected LSN.
+				appliedLSN := appliedLSN.(*gitalypb.LSN)
+				tc.expectedState.Database[string(keyAppliedLSN)] = raftEntryRecorder.Offset(storage.LSN(appliedLSN.GetValue())).ToProto()
+
+				committedLSN := tc.expectedState.Database[string(keyCommittedLSN)].(*gitalypb.LSN)
+				tc.expectedState.Database[string(keyCommittedLSN)] = raftEntryRecorder.Offset(storage.LSN(committedLSN.GetValue())).ToProto()
+			} else {
+				// Otherwise, the test expects no applied log entry in cases such as invalid transactions.
+				// Regardless, raft log entries are applied successfully.
+				if tc.expectedState.Database == nil {
+					tc.expectedState.Database = DatabaseState{}
+				}
+				tc.expectedState.Database[string(keyAppliedLSN)] = raftEntryRecorder.Latest().ToProto()
+				tc.expectedState.Database[string(keyCommittedLSN)] = raftEntryRecorder.Latest().ToProto()
+			}
+		}
+		tc.expectedState.Database[string(raftmgr.KeyHardState)] = &anypb.Any{}
+		tc.expectedState.Database[string(raftmgr.KeyConfState)] = &anypb.Any{}
+	}
 	RequireDatabase(t, ctx, database, tc.expectedState.Database)
 
 	expectedRepositories := tc.expectedState.Repositories
@@ -1553,6 +1631,17 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	require.NoError(t, transactionManager.CloseSnapshots())
 	RequireRepositories(t, ctx, setup.Config, setup.Config.Storages[0].Path, storageScopedFactory.Build, expectedRepositories)
 
+	expectedConsumers := tc.expectedState.Consumers
+	if testhelper.IsRaftEnabled() {
+		expectedConsumers.HighWaterMark = raftEntryRecorder.Offset(expectedConsumers.HighWaterMark)
+		// If the expected manager position is equal to 0, it means the test asserts the starting position of the
+		// consumer or consumer errors. Otherwise, it should be strictly positive as LSN starts at 1.
+		if expectedConsumers.ManagerPosition != 0 {
+			expectedConsumers.ManagerPosition = raftEntryRecorder.Offset(expectedConsumers.ManagerPosition)
+		}
+	}
+	RequireConsumer(t, transactionManager.consumer, transactionManager.consumerPos, expectedConsumers)
+
 	expectedDirectory := tc.expectedState.Directory
 	if expectedDirectory == nil {
 		// Set the base state as the default so we don't have to repeat it in every test case but it
@@ -1563,8 +1652,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		}
 	}
 
-	RequireConsumer(t, transactionManager.consumer, transactionManager.consumerPos, tc.expectedState.Consumers)
-
+	expectedDirectory = modifyDirectoryStateForRaft(t, expectedDirectory, transactionManager)
 	testhelper.RequireDirectoryState(t, stateDir, "", expectedDirectory)
 
 	expectedStagingDirState := testhelper.DirectoryState{
@@ -1580,6 +1668,48 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	}
 
 	testhelper.RequireDirectoryState(t, transactionManager.stagingDirectory, "", expectedStagingDirState)
+}
+
+func modifyDirectoryStateForRaft(t *testing.T, expectedDirectory testhelper.DirectoryState, transactionManager *TransactionManager) testhelper.DirectoryState {
+	if !testhelper.IsRaftEnabled() {
+		return expectedDirectory
+	}
+
+	raftEntryRecorder := transactionManager.raftManager.EntryRecorder
+	newExpectedDirectory := testhelper.DirectoryState{}
+	lsnRegex := regexp.MustCompile(`/wal/(\d+)\/?.*`)
+	for path, state := range expectedDirectory {
+		matches := lsnRegex.FindStringSubmatch(path)
+		if len(matches) == 0 {
+			// If no LSN found, retain the original entry
+			newExpectedDirectory[path] = state
+			continue
+		}
+		// Extract and offset the LSN
+		lsnStr := matches[1]
+		lsn, err := strconv.ParseUint(lsnStr, 10, 64)
+		require.NoError(t, err)
+
+		offsetLSN := raftEntryRecorder.Offset(storage.LSN(lsn))
+		offsetPath := strings.Replace(path, fmt.Sprintf("/%s", lsnStr), fmt.Sprintf("/%s", offsetLSN.String()), 1)
+		newExpectedDirectory[offsetPath] = state
+
+		if entry, isEntry := state.Content.(*gitalypb.LogEntry); isEntry {
+			entry.Metadata = raftEntryRecorder.Metadata(offsetLSN)
+		}
+	}
+
+	// Insert Raft-specific log entries into the new directory structure
+	raftEntries := raftEntryRecorder.FromRaft()
+	for lsn, raftEntry := range raftEntries {
+		if lsn >= transactionManager.oldestLSN {
+			newExpectedDirectory[fmt.Sprintf("/wal/%s", lsn)] = testhelper.DirectoryEntry{Mode: mode.Directory}
+			newExpectedDirectory[fmt.Sprintf("/wal/%s/MANIFEST", lsn)] = manifestDirectoryEntry(raftEntry)
+		}
+	}
+
+	// Update expected directory
+	return newExpectedDirectory
 }
 
 func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan error, mgr *TransactionManager) (bool, error) {

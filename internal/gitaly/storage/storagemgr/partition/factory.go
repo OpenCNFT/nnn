@@ -67,6 +67,7 @@ func (f Factory) New(
 		repoFactory,
 		f.metrics.Scope(storageName),
 		f.logConsumer,
+		nil,
 	)
 }
 

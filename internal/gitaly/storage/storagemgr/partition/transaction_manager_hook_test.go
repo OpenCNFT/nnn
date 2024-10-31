@@ -8,6 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -21,6 +22,8 @@ type hookContext struct {
 	manager *TransactionManager
 	// lsn stores the LSN context when the hook is triggered.
 	lsn storage.LSN
+	// raftManager allows the access to the Raft manager inside TransactionManager.
+	raftManager *raftmgr.Manager
 }
 
 // installHooks takes the hooks in the test setup and configures them in the TransactionManager.
@@ -39,7 +42,8 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 			runHook := source
 			*destination = func() {
 				runHook(hookContext{
-					manager: mgr,
+					manager:     mgr,
+					raftManager: mgr.raftManager,
 				})
 			}
 		}
@@ -55,8 +59,9 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 			runHook := source
 			*destination = func(lsn storage.LSN) {
 				runHook(hookContext{
-					manager: mgr,
-					lsn:     lsn,
+					manager:     mgr,
+					lsn:         lsn,
+					raftManager: mgr.raftManager,
 				})
 			}
 		}
