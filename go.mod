@@ -5,7 +5,7 @@ go 1.21
 // It is a temporary solution, please see https://gitlab.com/gitlab-org/gitaly/-/issues/4423 for details.
 replace github.com/go-enry/go-license-detector/v4 => github.com/gl-gitaly/go-license-detector/v4 v4.0.0-20230524080836-4cc9a3796917
 
-replace github.com/lni/dragonboat/v4 => gitlab.com/gl-gitaly/dragonboat/v4 v4.0.0-20240704102653-8b407058bff6
+replace github.com/lni/dragonboat/v4 => gitlab.com/gl-gitaly/dragonboat/v4 v4.0.0-20240829092220-c2ed2743ead2
 
 replace github.com/lni/vfs => gitlab.com/gl-gitaly/vfs v0.2.1-0.20240704101814-7fa01f8fb89b
 
