@@ -8,6 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -218,11 +219,10 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.ObjectHash.ZeroOID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Second.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.ObjectHash.ZeroOID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 				Begin{
@@ -401,11 +401,10 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.ObjectHash.ZeroOID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Second.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.ObjectHash.ZeroOID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 				CloseManager{},
@@ -713,11 +712,10 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Third.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.Commits.First.OID,
-						ActualOldOID:   setup.Commits.Second.OID,
-						NewOID:         setup.Commits.Third.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.Commits.First.OID.String(),
+						ActualValue:     setup.Commits.Second.OID.String(),
 					},
 				},
 			},

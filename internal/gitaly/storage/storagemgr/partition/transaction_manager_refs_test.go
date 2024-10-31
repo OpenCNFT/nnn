@@ -8,9 +8,9 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -212,9 +212,9 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent/child": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					ExpectedError: updateref.FileDirectoryConflictError{
-						ExistingReferenceName:    "refs/heads/parent",
-						ConflictingReferenceName: "refs/heads/parent/child",
+					ExpectedError: refdb.ParentReferenceExistsError{
+						ExistingReference: "refs/heads/parent",
+						TargetReference:   "refs/heads/parent/child",
 					},
 				},
 			},
@@ -288,9 +288,9 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 						"refs/heads/main":         {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 						"refs/heads/parent/child": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					ExpectedError: updateref.FileDirectoryConflictError{
-						ExistingReferenceName:    "refs/heads/parent",
-						ConflictingReferenceName: "refs/heads/parent/child",
+					ExpectedError: refdb.ParentReferenceExistsError{
+						ExistingReference: "refs/heads/parent",
+						TargetReference:   "refs/heads/parent/child",
 					},
 				},
 			},
@@ -363,11 +363,14 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/parent": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.ObjectHash.ZeroOID},
 					},
+					ExpectedError: refdb.ChildReferencesExistError{
+						TargetReference: "refs/heads/parent",
+					},
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -741,11 +744,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 						"refs/heads/main":            {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.ObjectHash.ZeroOID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Second.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.ObjectHash.ZeroOID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 			},
@@ -818,11 +820,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.ObjectHash.ZeroOID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.First.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.ObjectHash.ZeroOID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 			},
@@ -1102,11 +1103,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.Commits.Third.OID},
 						"refs/heads/non-conflicting": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Third.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.Commits.Second.OID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Third.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.Commits.Second.OID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 			},
@@ -1206,11 +1206,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.Commits.Second.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.Commits.First.OID,
-						ActualOldOID:   setup.ObjectHash.ZeroOID,
-						NewOID:         setup.Commits.Second.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.Commits.First.OID.String(),
+						ActualValue:     setup.ObjectHash.ZeroOID.String(),
 					},
 				},
 			},
@@ -1892,11 +1891,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 						"refs/heads/main":            {OldOID: setup.Commits.Second.OID, NewOID: setup.ObjectHash.ZeroOID},
 						"refs/heads/non-conflicting": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.Commits.Second.OID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.ObjectHash.ZeroOID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.Commits.Second.OID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 			},
@@ -1996,11 +1994,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.Commits.First.OID,
-						ActualOldOID:   setup.ObjectHash.ZeroOID,
-						NewOID:         setup.ObjectHash.ZeroOID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.Commits.First.OID.String(),
+						ActualValue:     setup.ObjectHash.ZeroOID.String(),
 					},
 				},
 			},
@@ -2127,11 +2124,10 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.ObjectHash.ZeroOID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Third.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.ObjectHash.ZeroOID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 			},
@@ -2436,93 +2432,6 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 												{
 													Name:   "refs/heads/main",
 													Target: setup.Commits.Second.OID.String(),
-												},
-											},
-										},
-									},
-								},
-							},
-						),
-					},
-				},
-			},
-		},
-		{
-			desc: "update reference with the incorrect initial value",
-			steps: steps{
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					TransactionID: 1,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-					},
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{setup.RelativePath},
-					ExpectedSnapshotLSN: 1,
-				},
-				RecordInitialReferenceValues{
-					TransactionID: 2,
-					InitialValues: map[git.ReferenceName]git.Reference{
-						"refs/heads/main": git.NewReference("refs/heads/main", setup.Commits.Third.OID),
-					},
-				},
-				UpdateReferences{
-					TransactionID: 2,
-					// The old oid is ignored as the references old value was already recorded.
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main": {NewOID: setup.Commits.Second.OID},
-					},
-				},
-				Commit{
-					TransactionID: 2,
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.Commits.Third.OID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Second.OID,
-					},
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-				},
-				Repositories: RepositoryStates{
-					setup.RelativePath: {
-						References: gittest.FilesOrReftables(
-							&ReferencesState{
-								FilesBackend: &FilesBackendState{
-									LooseReferences: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
-									},
-								},
-							}, &ReferencesState{
-								ReftableBackend: &ReftableBackendState{
-									Tables: []ReftableTable{
-										{
-											MinIndex: 1,
-											MaxIndex: 1,
-											References: []git.Reference{
-												{
-													Name:       "HEAD",
-													Target:     "refs/heads/main",
-													IsSymbolic: true,
-												},
-											},
-										},
-										{
-											MinIndex: 2,
-											MaxIndex: 2,
-											References: []git.Reference{
-												{
-													Name:   "refs/heads/main",
-													Target: setup.Commits.First.OID.String(),
 												},
 											},
 										},

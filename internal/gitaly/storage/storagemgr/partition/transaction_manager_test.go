@@ -28,6 +28,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -697,11 +698,10 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.Second.OID},
 					},
-					ExpectedError: ReferenceVerificationError{
-						ReferenceName:  "refs/heads/main",
-						ExpectedOldOID: setup.ObjectHash.ZeroOID,
-						ActualOldOID:   setup.Commits.First.OID,
-						NewOID:         setup.Commits.Second.OID,
+					ExpectedError: refdb.UnexpectedOldValueError{
+						TargetReference: "refs/heads/main",
+						ExpectedValue:   setup.ObjectHash.ZeroOID.String(),
+						ActualValue:     setup.Commits.First.OID.String(),
 					},
 				},
 				Begin{
