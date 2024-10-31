@@ -136,6 +136,9 @@ func TestBackupPartition(t *testing.T) {
 			require.NoError(t, err)
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
+			testhelper.SkipWithRaft(t, `The test asserts the existence of backup files based on the latest
+				LSN. When Raft is not enabled, the LSN is not static. The test should fetch the latest
+				LSN instead https://gitlab.com/gitlab-org/gitaly/-/issues/6459`)
 			lsn := storage.LSN(2)
 			tarPath := filepath.Join(backupRoot, data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tar, err := os.Open(tarPath)

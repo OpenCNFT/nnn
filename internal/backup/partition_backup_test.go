@@ -110,8 +110,12 @@ func TestPartitionBackup_CreateSuccess(t *testing.T) {
 
 			require.NoError(t, err)
 
+			testhelper.SkipWithRaft(t, `The test asserts the existence of backup files based on the latest
+				LSN. When Raft is not enabled, the LSN is not static. The test should fetch the latest
+				LSN instead https://gitlab.com/gitlab-org/gitaly/-/issues/6459`)
+			lsn := testhelper.WithOrWithoutRaft(storage.LSN(3), storage.LSN(1))
 			for _, expectedArchive := range tc.expectedArchives {
-				tarPath := filepath.Join(backupRoot, cfg.Storages[0].Name, expectedArchive, storage.LSN(1).String()) + ".tar"
+				tarPath := filepath.Join(backupRoot, cfg.Storages[0].Name, expectedArchive, lsn.String()+".tar")
 				tar, err := os.Open(tarPath)
 				require.NoError(t, err)
 				testhelper.MustClose(t, tar)

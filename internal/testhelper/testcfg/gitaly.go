@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
@@ -172,6 +173,10 @@ func (gc *GitalyCfgBuilder) Build(tb testing.TB) config.Cfg {
 	}
 
 	cfg.Transactions.Enabled = testhelper.IsWALEnabled()
+	if testhelper.IsRaftEnabled() {
+		cfg.Transactions.Enabled = true
+		cfg.Raft = config.DefaultRaftConfig(uuid.New().String())
+	}
 
 	// We force the use of bundled (embedded) binaries unless we're specifically executing tests
 	// against a custom version of Git.
