@@ -398,7 +398,25 @@ service RepositoryService {
     };
   }
 
+  // OffloadRepository runs a serials of operations to offload part of the repository's
+  // object storage on to a cloud object storage.
+  rpc OffloadRepository(OffloadRequest) returns (OffloadResponse) {
+    option (op_type) = {
+      op: MAINTENANCE
+    };
+  }
+
+  // RehydrateRepository is the reverse operation of OffloadRepository. It brings back
+  // the offloaded object storage back to Gitaly node.
+  rpc RehydrateRepository(RehydrateRequest) returns (RehydrateResponse) {
+    option (op_type) = {
+      op: MAINTENANCE
+    };
+  }
 }
+
+
+
 
 // RepositoryExistsRequest is a request for the RepositoryExists RPC.
 message RepositoryExistsRequest {
@@ -1325,4 +1343,35 @@ message FastExportRequest {
 message FastExportResponse {
   // data contains the content of the export of the repository.
   bytes data = 1;
+}
+
+// OffloadRequest is the request for the OffloadRepository RPC
+message OffloadRequest {
+  // repository is the repository whose object store we want to offloaded.
+  Repository repository = 1 [(target_repository)=true];
+
+  // filter is the filter used when repacking, default to blob:none.
+  // More info can be found at https://git-scm.com/docs/git-repack#Documentation/git-repack.txt---filterltfilter-specgt
+  string filter = 2;
+
+  // bucket is the bucket name of the cloud object storage
+  string bucket = 3;
+
+}
+
+// OffloadResponse is the response for the OffloadRepository RPC
+message OffloadResponse {
+}
+
+// RehydrateRequest is the request for the RehydrateRepository RPC
+message RehydrateRequest {
+  // repository is the repository whose object store we want to download back.
+  Repository repository = 1 [(target_repository)=true];
+
+  // bucket is the bucket name of the cloud object storage
+  string bucket = 2;
+}
+
+// RehydrateResponse is the response for the RehydrateRepository RPC
+message RehydrateResponse {
 }
