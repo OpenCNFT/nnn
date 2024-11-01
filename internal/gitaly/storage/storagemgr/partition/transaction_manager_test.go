@@ -486,7 +486,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeAppendLogEntry: func(hookContext hookContext) { hookContext.closeManager() },
+						BeforeAppendLogEntry: func(hookContext hookContext) { hookContext.manager.Close() },
 						// This ensures we are testing the context cancellation errors being unwrapped properly
 						// to an storage.ErrTransactionProcessingStopped instead of hitting the general case when
 						// runDone is closed.

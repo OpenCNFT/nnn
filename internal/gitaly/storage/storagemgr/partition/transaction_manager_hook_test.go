@@ -18,8 +18,8 @@ type hookFunc func(hookContext)
 
 // hookContext are the control toggles available in a hook.
 type hookContext struct {
-	// closeManager calls the calls Close on the TransactionManager.
-	closeManager func()
+	// manager points to the subject TransactionManager.
+	manager *TransactionManager
 	// lsn stores the LSN context when the hook is triggered.
 	lsn storage.LSN
 }
@@ -40,7 +40,7 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 			runHook := source
 			*destination = func() {
 				runHook(hookContext{
-					closeManager: mgr.Close,
+					manager: mgr,
 				})
 			}
 		}
@@ -55,8 +55,8 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 			runHook := source
 			*destination = func(lsn storage.LSN) {
 				runHook(hookContext{
-					closeManager: mgr.Close,
-					lsn:          lsn,
+					manager: mgr,
+					lsn:     lsn,
 				})
 			}
 		}
