@@ -145,6 +145,7 @@ type Cfg struct {
 	Transactions           Transactions        `json:"transactions,omitempty"      toml:"transactions,omitempty"`
 	AdaptiveLimiting       AdaptiveLimiting    `json:"adaptive_limiting,omitempty" toml:"adaptive_limiting,omitempty"`
 	Raft                   Raft                `json:"raft,omitempty"              toml:"raft,omitempty"`
+	Offload                Offload             `json:"offload,omitempty"           toml:"offload,omitempty"`
 }
 
 // Transactions configures transaction related options.
@@ -918,6 +919,10 @@ func (cfg *Cfg) Sanitize() error {
 		cfg.Logging.Config.Level = "info"
 	}
 
+	if cfg.Offload.Enabled {
+		cfg.Offload = cfg.Offload.fulfillDefaults()
+	}
+
 	return nil
 }
 
@@ -1300,4 +1305,25 @@ func (r Raft) Validate(transactions Transactions) error {
 	}
 
 	return cfgErr.AsError()
+}
+
+// Offload contains configuration for the Gitaly offloading repository feature.
+type Offload struct {
+	// Enabled enables the Gitaly offloading.
+	Enabled bool `json:"enabled" toml:"enabled"`
+	// CacheRoot is the root dir when temporarily downloading object/pack files back.
+	CacheRoot string `json:"cache_root" toml:"cache_root"`
+}
+
+const (
+	// OffloadingDefaultCacheRoot is the default value of CacheRoot.
+	// We use `/tmp` because it usually has OS level auto cleanup.
+	OffloadingDefaultCacheRoot = "/tmp"
+)
+
+func (r Offload) fulfillDefaults() Offload {
+	if r.CacheRoot == "" {
+		r.CacheRoot = OffloadingDefaultCacheRoot
+	}
+	return r
 }

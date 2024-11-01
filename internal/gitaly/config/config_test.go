@@ -2967,3 +2967,39 @@ initial_members = {1 = "localhost:4001", 2 = "localhost:4002", 3 = "localhost:40
 	require.NoError(t, expectedCfg.Sanitize())
 	require.Equal(t, expectedCfg.Raft, cfg.Raft)
 }
+
+func TestOffloadDisabled(t *testing.T) {
+	cfg, err := Load(strings.NewReader(``))
+	require.NoError(t, err)
+	require.False(t, cfg.Offload.Enabled, "offload is disabled when not configured")
+
+	cfg, err = Load(strings.NewReader(`
+[offload]
+enabled = false
+	`))
+	require.NoError(t, err)
+	require.False(t, cfg.Offload.Enabled, "offload is disabled when enabled is set to false")
+}
+
+func TestOffloadEnableWithDefault(t *testing.T) {
+	cfg, err := Load(strings.NewReader(`
+[offload]
+enabled = true
+	`))
+	require.NoError(t, err)
+
+	require.True(t, cfg.Offload.Enabled)
+	require.Equal(t, cfg.Offload.CacheRoot, "/tmp")
+}
+
+func TestOffloadWithNonDefaultValues(t *testing.T) {
+	cfg, err := Load(strings.NewReader(`
+[offload]
+enabled = true
+cache_root = "/non_temp_dir/repositories"
+	`))
+	require.NoError(t, err)
+
+	require.True(t, cfg.Offload.Enabled)
+	require.Equal(t, cfg.Offload.CacheRoot, "/non_temp_dir/repositories")
+}
