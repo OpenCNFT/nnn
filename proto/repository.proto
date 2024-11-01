@@ -398,7 +398,15 @@ service RepositoryService {
     };
   }
 
+  rpc OffloadRepository(OffloadRequest) returns (OffloadResponse) {
+    option (op_type) = {
+      op: MUTATOR
+    };
+  }
 }
+
+
+
 
 // RepositoryExistsRequest is a request for the RepositoryExists RPC.
 message RepositoryExistsRequest {
@@ -1325,4 +1333,15 @@ message FastExportRequest {
 message FastExportResponse {
   // data contains the content of the export of the repository.
   bytes data = 1;
+}
+
+
+message OffloadRequest {
+  Repository repository = 1 [(target_repository)=true];
+  string filter = 2;
+  string bucket = 3;
+}
+
+message OffloadResponse {
+
 }

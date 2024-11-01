@@ -61,6 +61,7 @@ const (
 	RepositoryService_RestoreRepository_FullMethodName            = "/gitaly.RepositoryService/RestoreRepository"
 	RepositoryService_GetFileAttributes_FullMethodName            = "/gitaly.RepositoryService/GetFileAttributes"
 	RepositoryService_FastExport_FullMethodName                   = "/gitaly.RepositoryService/FastExport"
+	RepositoryService_OffloadRepository_FullMethodName            = "/gitaly.RepositoryService/OffloadRepository"
 )
 
 // RepositoryServiceClient is the client API for RepositoryService service.
@@ -245,6 +246,7 @@ type RepositoryServiceClient interface {
 	GetFileAttributes(ctx context.Context, in *GetFileAttributesRequest, opts ...grpc.CallOption) (*GetFileAttributesResponse, error)
 	// FastExport runs git-fast-export on the repository, streaming the data back through the response
 	FastExport(ctx context.Context, in *FastExportRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FastExportResponse], error)
+	OffloadRepository(ctx context.Context, in *OffloadRequest, opts ...grpc.CallOption) (*OffloadResponse, error)
 }
 
 type repositoryServiceClient struct {
@@ -795,6 +797,16 @@ func (c *repositoryServiceClient) FastExport(ctx context.Context, in *FastExport
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type RepositoryService_FastExportClient = grpc.ServerStreamingClient[FastExportResponse]
 
+func (c *repositoryServiceClient) OffloadRepository(ctx context.Context, in *OffloadRequest, opts ...grpc.CallOption) (*OffloadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OffloadResponse)
+	err := c.cc.Invoke(ctx, RepositoryService_OffloadRepository_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RepositoryServiceServer is the server API for RepositoryService service.
 // All implementations must embed UnimplementedRepositoryServiceServer
 // for forward compatibility.
@@ -977,6 +989,7 @@ type RepositoryServiceServer interface {
 	GetFileAttributes(context.Context, *GetFileAttributesRequest) (*GetFileAttributesResponse, error)
 	// FastExport runs git-fast-export on the repository, streaming the data back through the response
 	FastExport(*FastExportRequest, grpc.ServerStreamingServer[FastExportResponse]) error
+	OffloadRepository(context.Context, *OffloadRequest) (*OffloadResponse, error)
 	mustEmbedUnimplementedRepositoryServiceServer()
 }
 
@@ -1112,6 +1125,9 @@ func (UnimplementedRepositoryServiceServer) GetFileAttributes(context.Context, *
 }
 func (UnimplementedRepositoryServiceServer) FastExport(*FastExportRequest, grpc.ServerStreamingServer[FastExportResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method FastExport not implemented")
+}
+func (UnimplementedRepositoryServiceServer) OffloadRepository(context.Context, *OffloadRequest) (*OffloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method OffloadRepository not implemented")
 }
 func (UnimplementedRepositoryServiceServer) mustEmbedUnimplementedRepositoryServiceServer() {}
 func (UnimplementedRepositoryServiceServer) testEmbeddedByValue()                           {}
@@ -1747,6 +1763,24 @@ func _RepositoryService_FastExport_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type RepositoryService_FastExportServer = grpc.ServerStreamingServer[FastExportResponse]
 
+func _RepositoryService_OffloadRepository_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OffloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RepositoryServiceServer).OffloadRepository(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RepositoryService_OffloadRepository_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RepositoryServiceServer).OffloadRepository(ctx, req.(*OffloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RepositoryService_ServiceDesc is the grpc.ServiceDesc for RepositoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1853,6 +1887,10 @@ var RepositoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFileAttributes",
 			Handler:    _RepositoryService_GetFileAttributes_Handler,
+		},
+		{
+			MethodName: "OffloadRepository",
+			Handler:    _RepositoryService_OffloadRepository_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

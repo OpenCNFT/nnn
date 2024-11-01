@@ -92,6 +92,8 @@ type Transaction interface {
 	IncludeObject(git.ObjectID)
 	// DeleteRepository deletes the repository when the transaction is committed.
 	DeleteRepository()
+	// OffloadRepository runs offloading housekeeping when transaction commits
+	OffloadRepository(housekeepingcfg.OffloadingConfig)
 	// MarkCustomHooksUpdated marks that the custom hooks have been updated. This is
 	// necessary for the changes to custom hooks to be committed.
 	MarkCustomHooksUpdated()

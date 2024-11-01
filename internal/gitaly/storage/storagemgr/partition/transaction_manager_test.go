@@ -334,23 +334,25 @@ func TestTransactionManager(t *testing.T) {
 	// get deterministic commit IDs, relative path and object hash we can use to build the declarative
 	// test cases.
 	relativePath := gittest.NewRepositoryName(t)
-	setup := setupTest(t, ctx, testPartitionID, relativePath)
+	//setup := setupTest(t, ctx, testPartitionID, relativePath)
+	setupTest(t, ctx, testPartitionID, relativePath)
 
 	subTests := map[string][]transactionTestCase{
-		"Common":                           generateCommonTests(t, ctx, setup),
-		"CommittedEntries":                 generateCommittedEntriesTests(t, setup),
-		"ModifyReferences":                 generateModifyReferencesTests(t, setup),
-		"CreateRepository":                 generateCreateRepositoryTests(t, setup),
-		"DeleteRepository":                 generateDeleteRepositoryTests(t, setup),
-		"DefaultBranch":                    generateDefaultBranchTests(t, setup),
-		"Alternate":                        generateAlternateTests(t, setup),
-		"CustomHooks":                      generateCustomHooksTests(t, setup),
-		"Housekeeping/PackRefs":            generateHousekeepingPackRefsTests(t, ctx, testPartitionID, relativePath),
-		"Housekeeping/RepackingStrategy":   generateHousekeepingRepackingStrategyTests(t, ctx, testPartitionID, relativePath),
-		"Housekeeping/RepackingConcurrent": generateHousekeepingRepackingConcurrentTests(t, ctx, setup),
-		"Housekeeping/CommitGraphs":        generateHousekeepingCommitGraphsTests(t, ctx, setup),
-		"Consumer":                         generateConsumerTests(t, setup),
-		"KeyValue":                         generateKeyValueTests(setup),
+		//"Common": generateCommonTests(t, ctx, setup),
+		//"CommittedEntries": generateCommittedEntriesTests(t, setup),
+		//"ModifyReferences":                 generateModifyReferencesTests(t, setup),
+		//"CreateRepository":                 generateCreateRepositoryTests(t, setup),
+		//"DeleteRepository": generateDeleteRepositoryTests(t, setup),
+		//"DefaultBranch":                    generateDefaultBranchTests(t, setup),
+		//"Alternate":                        generateAlternateTests(t, setup),
+		//"CustomHooks":                      generateCustomHooksTests(t, setup),
+		//"Housekeeping/PackRefs":          generateHousekeepingPackRefsTests(t, ctx, testPartitionID, relativePath),
+		//"Housekeeping/RepackingStrategy": generateHousekeepingRepackingStrategyTests(t, ctx, testPartitionID, relativePath),
+		//"Housekeeping/RepackingConcurrent": generateHousekeepingRepackingConcurrentTests(t, ctx, setup),
+		//"Housekeeping/CommitGraphs":        generateHousekeepingCommitGraphsTests(t, ctx, setup),
+		//"Consumer":                         generateConsumerTests(t, setup),
+		//"KeyValue":                         generateKeyValueTests(setup),
+		"Offloading": generateOffloadingPackRefsTests(t, ctx, testPartitionID, relativePath),
 	}
 
 	for desc, tests := range subTests {

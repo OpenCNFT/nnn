@@ -73,6 +73,8 @@ var forceReadOnly = map[string]bool{
 	// transactions if necessary. The RPC itself doesn't need to be considered a write
 	// for that reason.
 	gitalypb.RepositoryService_OptimizeRepository_FullMethodName: true,
+
+	gitalypb.RepositoryService_OffloadRepository_FullMethodName: true,
 }
 
 func isReadOnly(info protoregistry.MethodInfo) bool {

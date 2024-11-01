@@ -62,6 +62,8 @@ type RepositoryState struct {
 	Packfiles *PackfilesState
 	// FullRepackTimestamp tells if the repository has full-repack timestamp file.
 	FullRepackTimestamp *FullRepackTimestamp
+
+	ConfigFile *ConfigState
 }
 
 // FilesBackendState contains the reference state for the files backend. There is
@@ -788,6 +790,14 @@ type RunRepack struct {
 	Config housekeepingcfg.RepackObjectsConfig
 }
 
+// MarkOffloading marks transaction with offloading operation
+type MarkOffloading struct {
+	// TransactionID is the transaction for which the repack task runs.
+	TransactionID int
+	// Config is the desired repacking config for the task.
+	Config housekeepingcfg.OffloadingConfig
+}
+
 // WriteCommitGraphs calls commit-graphs writing housekeeping task on a transaction.
 type WriteCommitGraphs struct {
 	// TransactionID is the transaction for which the repack task runs.
@@ -1436,6 +1446,12 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 
 			transaction := openTransactions[step.TransactionID]
 			transaction.Repack(step.Config)
+		case MarkOffloading:
+			require.Contains(t, openTransactions, step.TransactionID, "test error: offloading task aborted on committed before beginning it")
+
+			transaction := openTransactions[step.TransactionID]
+			transaction.OffloadRepository(step.Config)
+
 		case WriteCommitGraphs:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: repack housekeeping task aborted on committed before beginning it")
 

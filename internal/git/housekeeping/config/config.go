@@ -53,3 +53,10 @@ type RepackObjectsConfig struct {
 	// be expired and thus deleted.
 	CruftExpireBefore time.Time
 }
+
+type OffloadingConfig struct {
+	Filter      string
+	FilterToDir string
+	Bucket      string
+	Prefix      string
+}

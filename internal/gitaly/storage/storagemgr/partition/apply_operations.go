@@ -71,6 +71,21 @@ func applyOperations(ctx context.Context, sync func(context.Context, string) err
 			delete(dirtyDirectories, path)
 			// Sync the parent directory where directory entry was removed from.
 			dirtyDirectories[filepath.Dir(path)] = struct{}{}
+		case *gitalypb.LogEntry_Operation_OffloadDirectoryEntry_:
+			op := wrapper.OffloadDirectoryEntry
+
+			path := string(op.GetPath())
+
+			if err := os.Remove(filepath.Join(storageRoot, path)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("offload: %w", err)
+			}
+
+			// Remove the dirty marker from the removed directory entry if it exists. There's
+			// no need to sync it anymore as it doesn't exist.
+			delete(dirtyDirectories, path)
+			// Sync the parent directory where directory entry was removed from.
+			dirtyDirectories[filepath.Dir(path)] = struct{}{}
+
 		case *gitalypb.LogEntry_Operation_SetKey_:
 			op := wrapper.SetKey
 

@@ -89,15 +89,19 @@ var (
 	errConcurrentAlternateUnlink = errors.New("concurrent alternate unlinking with repack")
 
 	// Below errors are used to error out in cases when updates have been staged in a read-only transaction.
-	errReadOnlyRepositoryDeletion = errors.New("repository deletion staged in a read-only transaction")
-	errReadOnlyHousekeeping       = errors.New("housekeeping in a read-only transaction")
-	errReadOnlyKeyValue           = errors.New("key-value writes in a read-only transaction")
+	errReadOnlyRepositoryDeletion   = errors.New("repository deletion staged in a read-only transaction")
+	errReadOnlyHousekeeping         = errors.New("housekeeping in a read-only transaction")
+	errReadOnlyKeyValue             = errors.New("key-value writes in a read-only transaction")
+	errReadOnlyRepositoryOffloading = errors.New("repository offloading staged in a read-only transaction")
 
 	// errWritableAllRepository is returned when a transaction is started with
 	// no relative path filter specified and is not read-only. Transactions do
 	// not currently support writing to multiple repositories and so a writable
 	// transaction without a specified target relative path would be ambiguous.
 	errWritableAllRepository = errors.New("cannot start writable all repository transaction")
+
+	//errOffloadingConflictPrunedObject
+	errOffloadingConflictHousekeeping = errors.New("offloading conflicts with housekeeping")
 
 	// keyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
 	keyAppliedLSN = []byte("applied_lsn")
@@ -156,6 +160,12 @@ type runHousekeeping struct {
 	packRefs          *runPackRefs
 	repack            *runRepack
 	writeCommitGraphs *writeCommitGraphs
+}
+
+type runOffloading struct {
+	config          housekeepingcfg.OffloadingConfig
+	newPackFiles    []string
+	uploadPackFiles []string
 }
 
 // runPackRefs models refs packing housekeeping task. It packs heads and tags for efficient repository access.
@@ -291,6 +301,7 @@ type Transaction struct {
 	deleteRepository         bool
 	includedObjects          map[git.ObjectID]struct{}
 	runHousekeeping          *runHousekeeping
+	offloadRepository        *runOffloading
 	alternateUpdated         bool
 
 	// objectDependencies are the object IDs this transaction depends on in
@@ -591,6 +602,8 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 		switch {
 		case txn.deleteRepository:
 			return errReadOnlyRepositoryDeletion
+		case txn.offloadRepository != nil:
+			return errReadOnlyRepositoryOffloading
 		case txn.runHousekeeping != nil:
 			return errReadOnlyHousekeeping
 		case len(txn.recordingReadWriter.WriteSet()) > 0:
@@ -603,6 +616,7 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 	if txn.runHousekeeping != nil && (txn.referenceUpdates != nil ||
 		txn.customHooksUpdated ||
 		txn.deleteRepository ||
+		txn.offloadRepository != nil ||
 		txn.includedObjects != nil) {
 		return errHousekeepingConflictOtherUpdates
 	}
@@ -784,6 +798,14 @@ func (txn *Transaction) flattenReferenceTransactions() git.ReferenceUpdates {
 // DeleteRepository deletes the repository when the transaction is committed.
 func (txn *Transaction) DeleteRepository() {
 	txn.deleteRepository = true
+}
+
+// OffloadRepository offloads the repository when the transaction is committed.
+func (txn *Transaction) OffloadRepository(cfg housekeepingcfg.OffloadingConfig) {
+
+	txn.offloadRepository = &runOffloading{
+		config: cfg,
+	}
 }
 
 // MarkCustomHooksUpdated sets a hint to the transaction manager that custom hooks have been updated as part
@@ -1143,6 +1165,10 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 
 	if err := mgr.prepareHousekeeping(ctx, transaction); err != nil {
 		return fmt.Errorf("preparing housekeeping: %w", err)
+	}
+
+	if err := mgr.prepareOffloading(ctx, transaction); err != nil {
+		return fmt.Errorf("preparing offloading: %w", err)
 	}
 
 	if transaction.repositoryCreation != nil {
@@ -2260,7 +2286,8 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("verify object dependencies: %w", err)
 		}
 
-		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
+		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil &&
+			!transaction.deleteRepository && transaction.offloadRepository == nil {
 			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
 			if err != nil {
 				return fmt.Errorf("verify references: %w", err)
@@ -2290,6 +2317,29 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 			if err := transaction.KV().Delete(relativePathKey(transaction.relativePath)); err != nil {
 				return fmt.Errorf("delete relative path: %w", err)
+			}
+		}
+
+		if transaction.offloadRepository != nil {
+			//mgr.logger.Info("TransactionManager.processTransaction")
+			offloadingEntry, err := mgr.verifyOffloading(ctx, transaction)
+			if err != nil {
+				housekeeping.RemoveFromBucket(mgr.logger, ctx,
+					transaction.offloadRepository.config.Bucket,
+					transaction.offloadRepository.config.Prefix,
+					transaction.offloadRepository.uploadPackFiles)
+				return fmt.Errorf("verifying offloading: %w", err)
+			}
+			logEntry.RepositoryOffloading = offloadingEntry
+
+			// TODO not sure if this really make sense
+			// record pack dir removal
+			packDir := filepath.Join(transaction.relativePath, objectsDir, packFileDir)
+			if err := transaction.walEntry.RecordDirectoryRemoval(
+				mgr.storagePath,
+				packDir,
+			); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return fmt.Errorf("record repository removal: %w", err)
 			}
 		}
 
@@ -3612,6 +3662,12 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 	if logEntry.GetRepositoryDeletion() == nil {
 		if err := mgr.applyHousekeeping(ctx, lsn, logEntry); err != nil {
 			return fmt.Errorf("apply housekeeping: %w", err)
+		}
+	}
+
+	if logEntry.GetRepositoryDeletion() == nil && logEntry.GetRepositoryOffloading() != nil {
+		if err := mgr.applyOffloading(ctx, lsn, logEntry); err != nil {
+			return fmt.Errorf("apply offloading: %w", err)
 		}
 	}
 

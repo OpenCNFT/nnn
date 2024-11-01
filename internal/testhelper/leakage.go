@@ -28,6 +28,9 @@ func mustHaveNoGoroutines() {
 		// The backchannel code is somehow stock on closing its connections. I have no clue
 		// why that is, but we should investigate.
 		goleak.IgnoreTopFunction(PkgPath("internal/grpc/backchannel.clientHandshake.serve.func4")),
+
+		//https://github.com/golang/go/issues/25759#issuecomment-395446860
+		goleak.IgnoreTopFunction("internal/poll.runtime_pollWait"),
 	); err != nil {
 		panic(fmt.Errorf("goroutines running: %w", err))
 	}

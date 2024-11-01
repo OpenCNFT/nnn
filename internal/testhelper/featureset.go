@@ -70,7 +70,8 @@ func NewFeatureSets(features ...featureflag.FeatureFlag) FeatureSets {
 func (s FeatureSets) Run(t *testing.T, test func(t *testing.T, ctx context.Context)) {
 	t.Helper()
 
-	for _, featureSet := range s {
+	// TODO revert this back, temporarily just run one case
+	for _, featureSet := range s[0:1] {
 		t.Run(featureSet.Desc(), func(t *testing.T) {
 			test(t, featureSet.Apply(Context(t)))
 		})

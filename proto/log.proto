@@ -34,6 +34,14 @@ message LogEntry {
   message RepositoryDeletion {
   }
 
+  message RepositoryOffloading {
+    // new pack file need to put in objects/pack dir
+    repeated string new_pack_files = 1;
+    // all the old pack file that need to be removed
+    // might not be needed if we record a removal on object/pack dir
+    string new_config_file = 2;
+  }
+
   // Housekeeping models a housekeeping run. It is supposed to handle housekeeping tasks for repositories such as the
   // cleanup of unneeded files and optimizations for the repository's data structures. It is a collection of smaller
   // tasks.
@@ -87,6 +95,8 @@ message LogEntry {
   // housekeeping, when set, indicates this log entry contains a housekeeping task.
   Housekeeping housekeeping = 9;
 
+  RepositoryOffloading repository_offloading = 11;
+
   // Operation models a single operation to be performed.
   message Operation {
     // CreateHardLink creates a hard link. The existing inode metadata, including
@@ -106,6 +116,11 @@ message LogEntry {
     // from the parent directory. When removing a directory,
     // it must be empty.
     message RemoveDirectoryEntry {
+      // path is the relative path of the directory entry to remove in the storage.
+      bytes path = 1;
+    }
+
+    message OffloadDirectoryEntry {
       // path is the relative path of the directory entry to remove in the storage.
       bytes path = 1;
     }
@@ -137,6 +152,9 @@ message LogEntry {
       CreateHardLink       create_hard_link       = 1;
       // remove_directory_entry removes a directory entry from the storage.
       RemoveDirectoryEntry remove_directory_entry = 2;
+
+      OffloadDirectoryEntry offload_directory_entry = 6;
+
       // create_directory creates a directory in the storage.
       CreateDirectory      create_directory       = 3;
       // set_key sets a key with a given value in the key-value store.

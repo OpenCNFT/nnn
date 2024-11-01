@@ -382,6 +382,7 @@ func (s EagerOptimizationStrategy) ShouldRepackObjects(ctx context.Context) (boo
 	// loose objects. This is inefficient as these objects cannot be deltified and thus take up
 	// more space. Instead, we ask git-repack(1) to append unreachable objects to the newly
 	// created packfile.
+
 	if !s.info.IsObjectPool {
 		cfg.Strategy = config.RepackObjectsStrategyFullWithCruft
 		cfg.CruftExpireBefore = s.expireBefore
