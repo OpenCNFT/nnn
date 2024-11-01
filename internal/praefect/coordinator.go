@@ -84,6 +84,8 @@ var transactionRPCs = map[string]transactionsCondition{
 	"/gitaly.SSHService/SSHReceivePack":                      transactionsEnabled,
 	"/gitaly.SmartHTTPService/PostReceivePack":               transactionsEnabled,
 	"/gitaly.HookService/ProcReceiveHook":                    transactionsEnabled,
+	"/gitaly.RepositoryService/OffloadRepository":            transactionsEnabled,
+	"/gitaly.RepositoryService/RehydrateRepository":          transactionsEnabled,
 
 	// The following RPCs currently aren't transactional, but we may consider making them
 	// transactional in the future if the need arises.
