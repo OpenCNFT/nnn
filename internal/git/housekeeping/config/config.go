@@ -53,3 +53,6 @@ type RepackObjectsConfig struct {
 	// be expired and thus deleted.
 	CruftExpireBefore time.Time
 }
+
+// OffloadHouseKeepingConfig is configuration for housekeeping manager to run offloading/rehydrating tasks.
+type OffloadHouseKeepingConfig struct{}
