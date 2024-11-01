@@ -145,6 +145,7 @@ type Cfg struct {
 	Transactions           Transactions        `json:"transactions,omitempty"      toml:"transactions,omitempty"`
 	AdaptiveLimiting       AdaptiveLimiting    `json:"adaptive_limiting,omitempty" toml:"adaptive_limiting,omitempty"`
 	Raft                   Raft                `json:"raft,omitempty"              toml:"raft,omitempty"`
+	Offloading             Offloading          `json:"offload,omitempty"           toml:"offload,omitempty"`
 }
 
 // Transactions configures transaction related options.
@@ -1202,6 +1203,17 @@ func SetupRuntimeDirectory(cfg Cfg, processID int) (string, error) {
 	return runtimeDir, nil
 }
 
+// SetupOffloadingCacheRoot setup the offloading cache root directory.
+func SetupOffloadingCacheRoot(cfg *Cfg) error {
+	if cfg.Offloading.Enabled {
+		if cfg.RuntimeDir == "" {
+			return fmt.Errorf("runtime_dir: is not set")
+		}
+		cfg.Offloading.CacheRoot = filepath.Join(cfg.RuntimeDir, "offloading", "transient")
+	}
+	return nil
+}
+
 func trySocketCreation(dir string) error {
 	// To validate the socket can actually be created, we open and close a socket.
 	// Any error will be assumed persistent for when the gitaly-ruby sockets are created
@@ -1300,4 +1312,15 @@ func (r Raft) Validate(transactions Transactions) error {
 	}
 
 	return cfgErr.AsError()
+}
+
+// Offloading contains configuration for the Gitaly offloading repository feature.
+type Offloading struct {
+	// Enabled enables the Gitaly offloading.
+	Enabled bool `json:"enabled" toml:"enabled"`
+	// CacheRoot is the root dir when temporarily downloading object/pack files back.
+	// TODO We don't expose it for now, since whether if should be configurable is still under discussion.
+	// RuntimeDir may not be suitable, if a gitaly service is down and restart, we would like
+	// the previously downloaded pack still be their to avoid repeated download.
+	CacheRoot string
 }

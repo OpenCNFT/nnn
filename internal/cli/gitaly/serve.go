@@ -198,6 +198,9 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 		return fmt.Errorf("setup runtime directory: %w", err)
 	}
 	cfg.RuntimeDir = runtimeDir
+	if err := config.SetupOffloadingCacheRoot(&cfg); err != nil {
+		return fmt.Errorf("setup offloading cache root: %w", err)
+	}
 
 	cgroupMgr := cgroups.NewManager(cfg.Cgroups, logger, os.Getpid())
 
