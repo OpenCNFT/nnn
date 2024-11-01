@@ -495,7 +495,11 @@ func (c *Command) logProcessComplete() {
 
 	entry.DebugContext(ctx, "spawn complete")
 	if c.stderrBuffer != nil && c.stderrBuffer.Len() > 0 {
-		entry.ErrorContext(ctx, c.stderrBuffer.String())
+		logLevel := entry.WarnContext
+		if exitCode != 0 {
+			logLevel = entry.ErrorContext
+		}
+		logLevel(ctx, c.stderrBuffer.String())
 	}
 
 	if customFields := log.CustomFieldsFromContext(ctx); customFields != nil {
