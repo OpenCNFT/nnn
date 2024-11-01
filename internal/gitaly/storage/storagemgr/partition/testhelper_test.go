@@ -602,12 +602,12 @@ func RequireRepositories(tb testing.TB, ctx context.Context, cfg config.Cfg, sto
 	for _, relativePath := range expectedRelativePaths {
 		func() {
 			defer func() {
-				// RequireRepositoryState works within a repository and doesn't thus print out the
-				// relative path of the repository that failed. If the call failed the test,
-				// print out the relative path to ease troubleshooting.
-				if tb.Failed() {
-					require.Failf(tb, "unexpected repository state", "relative path: %q", relativePath)
-				}
+				// // RequireRepositoryState works within a repository and doesn't thus print out the
+				// // relative path of the repository that failed. If the call failed the test,
+				// // print out the relative path to ease troubleshooting.
+				// if tb.Failed() {
+				// 	require.Failf(tb, "unexpected repository state", "relative path: %q", relativePath)
+				// }
 			}()
 
 			RequireRepositoryState(tb, ctx, cfg, buildRepository(relativePath), expected[relativePath])
