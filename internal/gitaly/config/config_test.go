@@ -2967,3 +2967,24 @@ initial_members = {1 = "localhost:4001", 2 = "localhost:4002", 3 = "localhost:40
 	require.NoError(t, expectedCfg.Sanitize())
 	require.Equal(t, expectedCfg.Raft, cfg.Raft)
 }
+
+func TestLoadOffloadEnable(t *testing.T) {
+	cfg, err := Load(strings.NewReader(`
+[offload]
+enabled = true
+	`))
+	require.NoError(t, err)
+
+	require.True(t, cfg.Offload.Enabled)
+}
+
+func TestLoadOffloadDefault(t *testing.T) {
+	cfg, err := Load(strings.NewReader(`
+[offload]
+enabled = true
+	`))
+	require.NoError(t, err)
+
+	require.True(t, cfg.Offload.Enabled)
+	require.Equal(t, cfg.Offload.CacheRoot, "/tmp")
+}
