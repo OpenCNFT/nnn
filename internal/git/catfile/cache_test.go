@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -261,14 +260,7 @@ func TestRoundToNearestFiveMinutes(t *testing.T) {
 func TestCache_ObjectReader(t *testing.T) {
 	t.Parallel()
 
-	testhelper.NewFeatureSets(
-		featureflag.RemoveCatfileCacheSessionID,
-	).Run(t, testCacheObjectReader)
-}
-
-func testCacheObjectReader(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
+	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -298,11 +290,7 @@ func testCacheObjectReader(t *testing.T, ctx context.Context) {
 
 		allKeys := keys(t, &cache.objectReaders)
 
-		expectedSessionID := "1"
-
-		if featureflag.RemoveCatfileCacheSessionID.IsEnabled(ctx) {
-			expectedSessionID = fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
-		}
+		expectedSessionID := fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
 		require.Equal(t, []key{{
 			sessionID:   expectedSessionID,
 			repoStorage: repo.GetStorageName(),
@@ -363,14 +351,7 @@ func testCacheObjectReader(t *testing.T, ctx context.Context) {
 func TestCache_ObjectReaderWithoutMailmap(t *testing.T) {
 	t.Parallel()
 
-	testhelper.NewFeatureSets(
-		featureflag.RemoveCatfileCacheSessionID,
-	).Run(t, testCacheObjectReaderWithoutMailmap)
-}
-
-func testCacheObjectReaderWithoutMailmap(t *testing.T, ctx context.Context) {
-	t.Parallel()
-
+	ctx := testhelper.Context(t)
 	cfg := testcfg.Build(t)
 
 	repo, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
@@ -399,11 +380,8 @@ func testCacheObjectReaderWithoutMailmap(t *testing.T, ctx context.Context) {
 		cancel()
 
 		allKeys := keys(t, &cache.objectReadersWithoutMailmap)
-		expectedSessionID := "1"
 
-		if featureflag.RemoveCatfileCacheSessionID.IsEnabled(ctx) {
-			expectedSessionID = fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
-		}
+		expectedSessionID := fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
 
 		require.Equal(t, []key{{
 			sessionID:   expectedSessionID,

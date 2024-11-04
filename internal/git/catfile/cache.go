@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
 	"gitlab.com/gitlab-org/labkit/correlation"
@@ -247,15 +245,7 @@ func (c *ProcessCache) getOrCreateProcess(
 	span, ctx := tracing.StartSpanIfHasParent(ctx, spanName, nil)
 	defer span.Finish()
 
-	var sessionID string
-
-	if featureflag.RemoveCatfileCacheSessionID.IsEnabled(ctx) {
-		sessionID = fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now()))
-	} else {
-		sessionID = metadata.GetValue(ctx, SessionIDField)
-	}
-
-	cacheKey, isCacheable := newCacheKey(sessionID, repo)
+	cacheKey, isCacheable := newCacheKey(fmt.Sprintf("%d", roundToNearestFiveMinute(time.Now())), repo)
 
 	if isCacheable {
 		// We only try to look up cached processes in case it is cacheable, which requires a
