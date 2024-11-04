@@ -606,7 +606,7 @@ func RequireRepositories(tb testing.TB, ctx context.Context, cfg config.Cfg, sto
 				// relative path of the repository that failed. If the call failed the test,
 				// print out the relative path to ease troubleshooting.
 				if tb.Failed() {
-					require.Failf(tb, "unexpected repository state", "relative path: %q", relativePath)
+					tb.Log("unexpected repository state", "relative path: %q", relativePath)
 				}
 			}()
 
