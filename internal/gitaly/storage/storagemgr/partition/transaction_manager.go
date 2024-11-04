@@ -158,6 +158,12 @@ type runHousekeeping struct {
 	writeCommitGraphs *writeCommitGraphs
 }
 
+// runOffloading models the offloading task. It is designed to handle offloading tasks for repositories,
+// including uploading packfiles to the offloading storage and replacing the existing packfiles.
+type runOffloading struct {
+	config housekeepingcfg.OffloadHouseKeepingConfig
+}
+
 // runPackRefs models refs packing housekeeping task. It packs heads and tags for efficient repository access.
 type runPackRefs struct {
 	// PrunedRefs contain a list of references pruned by the `git-pack-refs` command. They are used
@@ -291,6 +297,7 @@ type Transaction struct {
 	deleteRepository         bool
 	includedObjects          map[git.ObjectID]struct{}
 	runHousekeeping          *runHousekeeping
+	runOffloading            *runOffloading
 	alternateUpdated         bool
 
 	// objectDependencies are the object IDs this transaction depends on in
@@ -786,6 +793,13 @@ func (txn *Transaction) DeleteRepository() {
 	txn.deleteRepository = true
 }
 
+// OffloadRepository offloads the repository when the transaction is committed.
+func (txn *Transaction) OffloadRepository(cfg housekeepingcfg.OffloadHouseKeepingConfig) {
+	txn.runOffloading = &runOffloading{
+		config: cfg,
+	}
+}
+
 // MarkCustomHooksUpdated sets a hint to the transaction manager that custom hooks have been updated as part
 // of the transaction. This leads to the manager identifying changes and staging them for commit.
 func (txn *Transaction) MarkCustomHooksUpdated() {
@@ -1143,6 +1157,10 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 
 	if err := mgr.prepareHousekeeping(ctx, transaction); err != nil {
 		return fmt.Errorf("preparing housekeeping: %w", err)
+	}
+
+	if err := mgr.prepareOffloading(ctx, transaction); err != nil {
+		return fmt.Errorf("preparing offloading: %w", err)
 	}
 
 	if transaction.repositoryCreation != nil {
@@ -2299,6 +2317,14 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 				return fmt.Errorf("verifying pack refs: %w", err)
 			}
 			logEntry.Housekeeping = housekeepingEntry
+		}
+
+		if transaction.runOffloading != nil {
+			offloadingEntry, err := mgr.verifyOffloading(ctx, transaction)
+			if err != nil {
+				return fmt.Errorf("verifying offloading: %w", err)
+			}
+			logEntry.RepositoryOffloading = offloadingEntry
 		}
 
 		if err := mgr.verifyKeyValueOperations(ctx, transaction); err != nil {
@@ -3612,6 +3638,12 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 	if logEntry.GetRepositoryDeletion() == nil {
 		if err := mgr.applyHousekeeping(ctx, lsn, logEntry); err != nil {
 			return fmt.Errorf("apply housekeeping: %w", err)
+		}
+	}
+
+	if logEntry.GetRepositoryDeletion() == nil && logEntry.GetRepositoryOffloading() != nil {
+		if err := mgr.applyOffloading(ctx, lsn, logEntry); err != nil {
+			return fmt.Errorf("apply offloading: %w", err)
 		}
 	}
 
