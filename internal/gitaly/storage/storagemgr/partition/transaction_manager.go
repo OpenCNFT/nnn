@@ -34,6 +34,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -1008,6 +1009,9 @@ type TransactionManager struct {
 	// snapshotManager is responsible for creation and management of file system snapshots.
 	snapshotManager *snapshot.Manager
 
+	// conflictMgr is responsible for checking concurrent transactions against each other for conflicts.
+	conflictMgr *conflict.Manager
+
 	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
 	appendedLSN storage.LSN
 	// appliedLSN holds the LSN of the last log entry applied to the partition.
@@ -1086,6 +1090,7 @@ func NewTransactionManager(
 		completedQueue:       make(chan struct{}, 1),
 		initialized:          make(chan struct{}),
 		snapshotLocks:        make(map[storage.LSN]*snapshotLock),
+		conflictMgr:          conflict.NewManager(),
 		stateDirectory:       stateDir,
 		stagingDirectory:     stagingDir,
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
@@ -2184,6 +2189,14 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 			if err := mgr.deleteLogEntry(ctx, mgr.oldestLSN); err != nil {
 				return fmt.Errorf("deleting log entry: %w", err)
 			}
+
+			// The WAL entries are deleted only after there are no transactions using an
+			// older read snapshot than the LSN. It's also safe to drop the transaction
+			// from the conflict detection history as there are no transactions reading
+			// at an older snapshot. Since the changes are already in the transaction's
+			// snapshot, it would already base its changes on them.
+			mgr.conflictMgr.EvictLSN(ctx, mgr.oldestLSN)
+
 			mgr.oldestLSN++
 			continue
 		}
@@ -2260,6 +2273,17 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("verify object dependencies: %w", err)
 		}
 
+		// Prepare the transaction to conflict check it. We'll commit it later if we
+		// succeed logging the transaction.
+		preparedTX, err := mgr.conflictMgr.Prepare(ctx, &conflict.Transaction{
+			ReadLSN:            transaction.SnapshotLSN(),
+			DeleteRepository:   transaction.deleteRepository,
+			TargetRelativePath: transaction.relativePath,
+		})
+		if err != nil {
+			return fmt.Errorf("prepare: %w", err)
+		}
+
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
 			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
 			if err != nil {
@@ -2307,7 +2331,14 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		logEntry.Operations = transaction.walEntry.Operations()
 
-		return mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath())
+		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
+			return fmt.Errorf("append log entry: %w", err)
+		}
+
+		// Commit the prepared transaction now that we've managed to commit the log entry.
+		preparedTX.Commit(ctx, mgr.appendedLSN)
+
+		return nil
 	}(); err != nil {
 		transaction.result <- err
 		return nil

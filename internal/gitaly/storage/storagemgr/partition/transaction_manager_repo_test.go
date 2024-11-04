@@ -7,6 +7,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -1265,6 +1266,80 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			expectedState: StateAssertion{
 				Database: DatabaseState{
 					string(keyAppliedLSN):                               storage.LSN(4).ToProto(),
+					"kv/" + string(relativePathKey(setup.RelativePath)): string(""),
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						Objects: []git.ObjectID{},
+					},
+				},
+			},
+		},
+		{
+			desc: "writes concurrent with repository deletion fail",
+			steps: steps{
+				RemoveRepository{},
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				CreateRepository{
+					TransactionID: 1,
+					References: map[git.ReferenceName]git.ObjectID{
+						"refs/heads/main": setup.Commits.First.OID,
+					},
+					Packs: [][]byte{setup.Commits.First.Pack},
+				},
+				Commit{
+					TransactionID: 1,
+				},
+
+				// Start a write. During the write, the repository is deleted
+				// and recreated. We expect this write to fail.
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+
+				// Delete the repository concurrently.
+				Begin{
+					TransactionID:       4,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 1,
+				},
+				Commit{
+					TransactionID:    4,
+					DeleteRepository: true,
+				},
+
+				// Recreate the repository concurrently.
+				Begin{
+					TransactionID:       5,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				CreateRepository{
+					TransactionID: 5,
+				},
+				Commit{
+					TransactionID: 5,
+				},
+
+				// Commit the write that ran during which the repository was concurrently recreated. This
+				// should lead to a conflict.
+				Commit{
+					TransactionID: 3,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
+					},
+					ExpectedError: conflict.ErrRepositoryConcurrentlyDeleted,
+				},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN):                               storage.LSN(3).ToProto(),
 					"kv/" + string(relativePathKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
