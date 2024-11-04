@@ -34,6 +34,16 @@ message LogEntry {
   message RepositoryDeletion {
   }
 
+  // RepositoryOffloading models a repository offloading.
+  message RepositoryOffloading {
+    // new_pack_files are the new pack files need to put in objects/pack dir.
+    repeated string new_pack_files = 1;
+  }
+
+  // RepositoryRehydrating models a repository rehydrating.
+  message RepositoryRehydrating {
+  }
+
   // Housekeeping models a housekeeping run. It is supposed to handle housekeeping tasks for repositories such as the
   // cleanup of unneeded files and optimizations for the repository's data structures. It is a collection of smaller
   // tasks.
@@ -149,6 +159,14 @@ message LogEntry {
   // operations is an ordered list of operations to run in order to apply
   // this log entry.
   repeated Operation operations = 10;
+
+  // repository_offloading, when set, signifies that this log entry contains details of an offloading task,
+  // where repository data is being moved to an offloading storage.
+  RepositoryOffloading repository_offloading = 11;
+  // repository_rehydrating, when set, signifies that this log entry contains details of a rehydrating task,
+  // where previously offloaded data is being restored back to the local storage.
+  RepositoryRehydrating repository_rehydrating = 12;
+
 }
 
 // LSN serializes a log sequence number. It's used for storing a partition's
