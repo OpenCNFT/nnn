@@ -55,4 +55,13 @@ type RepackObjectsConfig struct {
 }
 
 // OffloadHouseKeepingConfig is configuration for housekeeping manager to run offloading/rehydrating tasks.
-type OffloadHouseKeepingConfig struct{}
+type OffloadHouseKeepingConfig struct {
+	// Filter is the `--filter` option used in git-repack(1).
+	Filter string
+	// FilterToDir is `--filter-to` option used in git-repack(1).
+	FilterToDir string
+	// Bucket is the object storage bucket name to store the packed objects.
+	Bucket string
+	// Prefix is the prefix string in object storage bucket name to store the packed objects.
+	Prefix string
+}

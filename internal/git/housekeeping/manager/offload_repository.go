@@ -30,12 +30,12 @@ func (m *RepositoryManager) OffloadRepository(ctx context.Context, repo *localre
 
 // offload is the offloading logic without transaction
 func (m *RepositoryManager) offload(ctx context.Context, repo *localrepo.Repo, cfg config.OffloadHouseKeepingConfig) error {
-	repackCfg, repackOptions := housekeeping.GetOffloadingRepackOptions("", "")
+	repackCfg, repackOptions := housekeeping.GetOffloadingRepackOptions(cfg.Filter, cfg.FilterToDir)
 
 	if err := housekeeping.PerformRepack(ctx, repo, repackCfg, repackOptions...); err != nil {
 		return structerr.NewInternal("repacking: %w", err)
 	}
-	if err := housekeeping.UploadToOffloadingStorage(ctx, "", "", ""); err != nil {
+	if err := housekeeping.UploadToOffloadingStorage(ctx, cfg.Bucket, cfg.Prefix, cfg.FilterToDir); err != nil {
 		return structerr.NewInternal("uploading: %w", err)
 	}
 
