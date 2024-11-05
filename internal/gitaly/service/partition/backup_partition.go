@@ -32,7 +32,7 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 		return nil, structerr.NewInternal("backup partition: transaction not initialized")
 	}
 
-	backupRelativePath := filepath.Join(in.GetStorageName(), in.GetPartitionId(), lsn+".tar")
+	backupRelativePath := filepath.Join("partition-backups", in.GetStorageName(), in.GetPartitionId(), lsn+".tar")
 
 	exists, err := s.backupSink.Exists(ctx, backupRelativePath)
 	if err != nil {

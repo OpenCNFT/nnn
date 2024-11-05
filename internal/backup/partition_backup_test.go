@@ -111,7 +111,7 @@ func TestPartitionBackup_CreateSuccess(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, expectedArchive := range tc.expectedArchives {
-				tarPath := filepath.Join(backupRoot, cfg.Storages[0].Name, expectedArchive, storage.LSN(1).String()) + ".tar"
+				tarPath := filepath.Join(backupRoot, "partition-backups", cfg.Storages[0].Name, expectedArchive, storage.LSN(1).String()) + ".tar"
 				tar, err := os.Open(tarPath)
 				require.NoError(t, err)
 				testhelper.MustClose(t, tar)

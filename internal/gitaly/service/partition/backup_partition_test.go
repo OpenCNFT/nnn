@@ -124,7 +124,7 @@ func TestBackupPartition(t *testing.T) {
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
 			lsn := storage.LSN(1)
-			relativeBackupPath := filepath.Join(data.storageName, data.partitionID, lsn.String()) + ".tar"
+			relativeBackupPath := filepath.Join("partition-backups", data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tarPath := filepath.Join(backupRoot, relativeBackupPath)
 			tar, err := os.Open(tarPath)
 			require.NoError(t, err)
@@ -175,7 +175,7 @@ func TestBackupPartition(t *testing.T) {
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
 			lsn = storage.LSN(2)
-			relativeBackupPath2 := filepath.Join(data.storageName, data.partitionID, lsn.String()) + ".tar"
+			relativeBackupPath2 := filepath.Join("partition-backups", data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tarPath = filepath.Join(backupRoot, relativeBackupPath2)
 			tar2, err := os.Open(tarPath)
 			require.NoError(t, err)
