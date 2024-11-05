@@ -137,6 +137,8 @@ type BeginOptions struct {
 	// This is a temporary workaround for some RPCs that do not work well with shared
 	// read-only snapshots yet.
 	ForceExclusiveSnapshot bool
+	// WithoutRaftReady lets the transaction skip Raft readiness waiting.
+	WithoutRaftReady bool
 }
 
 // Partition is responsible for a single partition of data.

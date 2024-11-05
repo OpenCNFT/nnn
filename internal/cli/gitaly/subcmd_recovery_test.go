@@ -168,6 +168,7 @@ Relative paths:
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
 					nil,
+					nil,
 				),
 				1,
 				storagemgr.NewMetrics(cfg.Prometheus),

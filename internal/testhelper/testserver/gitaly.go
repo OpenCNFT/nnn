@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gitalyauth "gitlab.com/gitlab-org/gitaly/v16/auth"
@@ -30,6 +31,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue/databasemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
@@ -348,6 +350,13 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, ctx context.Conte
 		require.NoError(tb, err)
 		tb.Cleanup(dbMgr.Close)
 
+		var raftManagerFactory raftmgr.RaftManagerFactory
+		if testhelper.IsRaftEnabled() {
+			cfg.Raft = config.DefaultRaftConfig(uuid.New().String())
+			raftManagerFactory = func(ptnID storage.PartitionID, storageName string, db keyvalue.Transactioner, logger log.Logger) (*raftmgr.Manager, error) {
+				return raftmgr.NewManager(ptnID, storageName, cfg.Raft, db, logger)
+			}
+		}
 		nodeMgr, err := nodeimpl.NewManager(
 			cfg.Storages,
 			storagemgr.NewFactory(
@@ -361,6 +370,7 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, ctx context.Conte
 						snapshot.NewMetrics(),
 					),
 					nil,
+					raftManagerFactory,
 				),
 				storagemgr.DefaultMaxInactivePartitions,
 				storagemgr.NewMetrics(cfg.Prometheus),

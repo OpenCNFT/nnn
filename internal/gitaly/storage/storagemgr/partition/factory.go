@@ -8,6 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
@@ -27,10 +28,11 @@ type LogConsumer interface {
 
 // Factory is factory type that can create new partitions.
 type Factory struct {
-	cmdFactory  gitcmd.CommandFactory
-	repoFactory localrepo.Factory
-	metrics     Metrics
-	logConsumer LogConsumer
+	cmdFactory         gitcmd.CommandFactory
+	repoFactory        localrepo.Factory
+	metrics            Metrics
+	logConsumer        LogConsumer
+	raftManagerFactory raftmgr.RaftManagerFactory
 }
 
 // New returns a new Partition instance.
@@ -55,6 +57,14 @@ func (f Factory) New(
 		panic(fmt.Errorf("building a partition for a non-existent storage: %q", storageName))
 	}
 
+	var raftManager *raftmgr.Manager
+	if f.raftManagerFactory != nil {
+		raftManager, err = f.raftManagerFactory(partitionID, storageName, db, logger)
+		if err != nil {
+			panic(fmt.Errorf("creating raft manager: %w", err))
+		}
+	}
+
 	return NewTransactionManager(
 		partitionID,
 		logger,
@@ -67,6 +77,7 @@ func (f Factory) New(
 		repoFactory,
 		f.metrics.Scope(storageName),
 		f.logConsumer,
+		raftManager,
 	)
 }
 
@@ -76,11 +87,13 @@ func NewFactory(
 	repoFactory localrepo.Factory,
 	metrics Metrics,
 	logConsumer LogConsumer,
+	raftManagerFactory raftmgr.RaftManagerFactory,
 ) Factory {
 	return Factory{
-		cmdFactory:  cmdFactory,
-		repoFactory: repoFactory,
-		metrics:     metrics,
-		logConsumer: logConsumer,
+		cmdFactory:         cmdFactory,
+		repoFactory:        repoFactory,
+		metrics:            metrics,
+		logConsumer:        logConsumer,
+		raftManagerFactory: raftManagerFactory,
 	}
 }

@@ -126,6 +126,7 @@ func recoveryStatusAction(ctx *cli.Context) (returnErr error) {
 				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
 				partitionMetrics,
 				nil,
+				nil,
 			),
 			1,
 			storageMetrics,

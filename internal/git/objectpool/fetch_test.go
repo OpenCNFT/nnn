@@ -431,6 +431,7 @@ func testWithAndWithoutTransaction(t *testing.T, ctx context.Context, testFunc f
 					localRepoFactory,
 					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
 					nil,
+					nil,
 				),
 				storagemgr.DefaultMaxInactivePartitions,
 				storagemgr.NewMetrics(cfg.Prometheus),

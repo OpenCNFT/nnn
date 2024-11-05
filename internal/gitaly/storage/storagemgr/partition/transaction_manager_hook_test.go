@@ -8,6 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/raftmgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -17,18 +18,18 @@ type hookFunc func(hookContext)
 
 // hookContext are the control toggles available in a hook.
 type hookContext struct {
-	// closeManager calls the calls Close on the TransactionManager.
-	closeManager func()
+	// manager points to the subject TransactionManager.
+	manager *TransactionManager
+	// lsn stores the LSN context when the hook is triggered.
+	lsn storage.LSN
+	// raftManager allows the access to the Raft manager inside TransactionManager.
+	raftManager *raftmgr.Manager
 }
 
 // installHooks takes the hooks in the test setup and configures them in the TransactionManager.
 func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup, hooks testTransactionHooks) {
 	for destination, source := range map[*func()]hookFunc{
-		&mgr.testHooks.beforeInitialization:      hooks.BeforeReadAppliedLSN,
-		&mgr.testHooks.beforeAppendLogEntry:      hooks.BeforeAppendLogEntry,
-		&mgr.testHooks.beforeApplyLogEntry:       hooks.BeforeApplyLogEntry,
-		&mgr.testHooks.beforeStoreAppliedLSN:     hooks.BeforeStoreAppliedLSN,
-		&mgr.testHooks.beforeDeleteLogEntryFiles: hooks.AfterDeleteLogEntry,
+		&mgr.testHooks.beforeInitialization: hooks.BeforeReadAppliedLSN,
 		&mgr.testHooks.beforeRunExiting: func(hookContext) {
 			if hooks.WaitForTransactionsWhenClosing {
 				inflightTransactions.Wait()
@@ -41,7 +42,26 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 			runHook := source
 			*destination = func() {
 				runHook(hookContext{
-					closeManager: mgr.Close,
+					manager:     mgr,
+					raftManager: mgr.raftManager,
+				})
+			}
+		}
+	}
+	for destination, source := range map[*func(storage.LSN)]hookFunc{
+		&mgr.testHooks.beforeApplyLogEntry:       hooks.BeforeApplyLogEntry,
+		&mgr.testHooks.beforeAppendLogEntry:      hooks.BeforeAppendLogEntry,
+		&mgr.testHooks.beforeCommitLogEntry:      hooks.BeforeCommitLogEntry,
+		&mgr.testHooks.beforeStoreAppliedLSN:     hooks.BeforeStoreAppliedLSN,
+		&mgr.testHooks.beforeDeleteLogEntryFiles: hooks.AfterDeleteLogEntry,
+	} {
+		if source != nil {
+			runHook := source
+			*destination = func(lsn storage.LSN) {
+				runHook(hookContext{
+					manager:     mgr,
+					lsn:         lsn,
+					raftManager: mgr.raftManager,
 				})
 			}
 		}
@@ -89,9 +109,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeStoreAppliedLSN: func(hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeStoreAppliedLSN: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
@@ -139,9 +157,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeApplyLogEntry: func(hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeApplyLogEntry: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
@@ -483,9 +499,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeStoreAppliedLSN: func(hookCtx hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeStoreAppliedLSN: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
@@ -577,9 +591,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeApplyLogEntry: func(hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeApplyLogEntry: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
@@ -671,9 +683,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeApplyLogEntry: func(hookCtx hookContext) {
-							panic(errSimulatedCrash)
-						},
+						BeforeApplyLogEntry: simulateCrashHook(),
 					},
 					ExpectedError: errSimulatedCrash,
 				},
