@@ -2,6 +2,8 @@ package partition_test
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -102,22 +105,6 @@ func TestBackupPartition(t *testing.T) {
 
 			repo, _ := gittest.CreateRepository(t, ctx, data.cfg)
 
-			forkRepository := &gitalypb.Repository{
-				StorageName:  repo.GetStorageName(),
-				RelativePath: gittest.NewRepositoryName(t),
-			}
-
-			// Inject the Gitaly's address information in the context. CreateFork uses this to
-			// fetch from the source repository.
-			ctx = testhelper.MergeOutgoingMetadata(ctx, testcfg.GitalyServersMetadataFromCfg(t, data.cfg))
-
-			createForkResponse, err := data.repoClient.CreateFork(ctx, &gitalypb.CreateForkRequest{
-				Repository:       forkRepository,
-				SourceRepository: repo,
-			})
-			require.NoError(t, err)
-			testhelper.ProtoEqual(t, &gitalypb.CreateForkResponse{}, createForkResponse)
-
 			resp, err := data.ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
 				StorageName: data.storageName,
 				PartitionId: data.partitionID,
@@ -136,17 +123,87 @@ func TestBackupPartition(t *testing.T) {
 			require.NoError(t, err)
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
-			lsn := storage.LSN(2)
-			tarPath := filepath.Join(backupRoot, data.storageName, data.partitionID, lsn.String()) + ".tar"
+			lsn := storage.LSN(1)
+			relativeBackupPath := filepath.Join(data.storageName, data.partitionID, lsn.String()) + ".tar"
+			tarPath := filepath.Join(backupRoot, relativeBackupPath)
 			tar, err := os.Open(tarPath)
 			require.NoError(t, err)
 			defer testhelper.MustClose(t, tar)
 
 			testhelper.ContainsTarState(t, tar, testhelper.DirectoryState{
+				".":                    {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+				repo.GetRelativePath(): {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+			})
+
+			manifestPath := filepath.Join(backupRoot, "partition-manifests", data.storageName, data.partitionID) + ".json"
+			manifestFile, err := os.Open(manifestPath)
+			require.NoError(t, err)
+			defer manifestFile.Close()
+
+			decoder := json.NewDecoder(manifestFile)
+
+			// Read the first entry
+			var firstEntry partition.BackupEntry
+			err = decoder.Decode(&firstEntry)
+			require.NoError(t, err, "Failed to decode first manifest entry")
+			require.NotZero(t, firstEntry.Timestamp, "Entry timestamp should not be zero")
+			require.Equal(t, relativeBackupPath, firstEntry.Path)
+			require.Equal(t, io.EOF, decoder.Decode(&partition.BackupEntry{}), "Expected only one entry in the manifest")
+
+			// Create a fork and backup again to verify that fork is in the same partition and
+			// the manifest file contains two entries.
+			forkRepository := &gitalypb.Repository{
+				StorageName:  repo.GetStorageName(),
+				RelativePath: gittest.NewRepositoryName(t),
+			}
+			ctx = testhelper.MergeOutgoingMetadata(ctx, testcfg.GitalyServersMetadataFromCfg(t, data.cfg))
+			createForkResponse, err := data.repoClient.CreateFork(ctx, &gitalypb.CreateForkRequest{
+				Repository:       forkRepository,
+				SourceRepository: repo,
+			})
+			require.NoError(t, err)
+			testhelper.ProtoEqual(t, &gitalypb.CreateForkResponse{}, createForkResponse)
+
+			resp, err = data.ptnClient.BackupPartition(ctx, &gitalypb.BackupPartitionRequest{
+				StorageName: data.storageName,
+				PartitionId: data.partitionID,
+			})
+			require.NoError(t, err)
+			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
+
+			require.NoError(t, err)
+			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
+
+			lsn = storage.LSN(2)
+			relativeBackupPath2 := filepath.Join(data.storageName, data.partitionID, lsn.String()) + ".tar"
+			tarPath = filepath.Join(backupRoot, relativeBackupPath2)
+			tar2, err := os.Open(tarPath)
+			require.NoError(t, err)
+			defer testhelper.MustClose(t, tar2)
+
+			testhelper.ContainsTarState(t, tar2, testhelper.DirectoryState{
 				".":                              {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 				repo.GetRelativePath():           {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 				forkRepository.GetRelativePath(): {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 			})
+
+			manifestFile, err = os.Open(manifestPath)
+			require.NoError(t, err)
+			defer manifestFile.Close()
+
+			decoder = json.NewDecoder(manifestFile)
+
+			var entries []partition.BackupEntry
+			for decoder.More() {
+				var entry partition.BackupEntry
+				err = decoder.Decode(&entry)
+				require.NoError(t, err, "Failed to decode manifest entry")
+				entries = append(entries, entry)
+			}
+
+			require.Equal(t, 2, len(entries), "Expected two entries in the manifest")
+			require.Equal(t, relativeBackupPath2, entries[0].Path, "Most recent entry should be first")
+			require.Equal(t, relativeBackupPath, entries[1].Path, "Older entry should be second")
 		})
 	}
 }
