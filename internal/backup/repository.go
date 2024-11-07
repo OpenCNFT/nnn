@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
@@ -29,6 +30,91 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// RefIterator is an interface for iterating over refs.
+type RefIterator interface {
+	Next() bool
+	Ref() git.Reference
+	Close() error
+	Err() error
+}
+
+type remoteRefIterator struct {
+	stream gitalypb.RefService_ListRefsClient
+	buffer []*gitalypb.ListRefsResponse_Reference
+	ref    git.Reference
+	err    error
+}
+
+// NewRefIterator creates new ref iterator for remote repository.
+func (rr *remoteRepository) NewRefIterator(ctx context.Context) (RefIterator, error) {
+	refClient := rr.newRefClient()
+	stream, err := refClient.ListRefs(ctx, &gitalypb.ListRefsRequest{
+		Repository: rr.repo,
+		Head:       true,
+		Patterns:   [][]byte{[]byte("refs/")},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("remote repository: new ref iterator: %w", err)
+	}
+
+	return &remoteRefIterator{stream: stream}, nil
+}
+
+// refillBuffer receives the next batch of refs from the stream and adds it to the iterator's buffer.
+func (i *remoteRefIterator) refillBuffer() error {
+	if len(i.buffer) > 0 {
+		return nil
+	}
+
+	resp, err := i.stream.Recv()
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("stream recv: %w", err)
+	}
+
+	i.buffer = resp.GetReferences()
+	return nil
+}
+
+// Next advances the iterator to the next ref.
+func (i *remoteRefIterator) Next() bool {
+	if len(i.buffer) == 0 {
+		if err := i.refillBuffer(); err != nil {
+			i.err = fmt.Errorf("refill buffer: %w", err)
+			return false
+		}
+
+		if len(i.buffer) == 0 {
+			return false
+		}
+	}
+
+	ref := i.buffer[0]
+	i.buffer = i.buffer[1:]
+	i.ref = git.Reference{
+		Name:   git.ReferenceName(ref.GetName()),
+		Target: ref.GetTarget(),
+	}
+
+	return true
+}
+
+// Close closes the ref iterator.
+func (i *remoteRefIterator) Close() error {
+	// The gRPC stream doesn't have a Close method, but we might want to
+	// add any cleanup logic here if needed in the future.
+	return nil
+}
+
+// Ref returns the current reference of the iterator.
+func (i *remoteRefIterator) Ref() git.Reference {
+	return i.ref
+}
+
+// Err returns the error of the iterator.
+func (i *remoteRefIterator) Err() error {
+	return i.err
+}
+
 // remoteRepository implements git repository access over GRPC
 type remoteRepository struct {
 	repo *gitalypb.Repository
@@ -45,32 +131,8 @@ func NewRemoteRepository(repo *gitalypb.Repository, conn *grpc.ClientConn) *remo
 }
 
 // ListRefs fetches the full set of refs and targets for the repository
-func (rr *remoteRepository) ListRefs(ctx context.Context) ([]git.Reference, error) {
-	refClient := rr.newRefClient()
-	stream, err := refClient.ListRefs(ctx, &gitalypb.ListRefsRequest{
-		Repository: rr.repo,
-		Head:       true,
-		Patterns:   [][]byte{[]byte("refs/")},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("remote repository: list refs: %w", err)
-	}
-
-	var refs []git.Reference
-
-	for {
-		resp, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return nil, fmt.Errorf("remote repository: list refs: %w", err)
-		}
-		for _, ref := range resp.GetReferences() {
-			refs = append(refs, git.NewReference(git.ReferenceName(ref.GetName()), git.ObjectID(ref.GetTarget())))
-		}
-	}
-
-	return refs, nil
+func (rr *remoteRepository) ListRefs(ctx context.Context) (RefIterator, error) {
+	return rr.NewRefIterator(ctx)
 }
 
 // GetCustomHooks fetches the custom hooks archive.
@@ -268,9 +330,17 @@ func (rr *remoteRepository) ResetRefs(ctx context.Context, refs []git.Reference)
 		return errors.New("empty refs list")
 	}
 
-	existingRefs, err := rr.ListRefs(ctx)
+	existingRefs := []git.Reference{}
+	iterator, err := rr.ListRefs(ctx)
 	if err != nil {
-		return fmt.Errorf("list existing refs: %w", err)
+		return fmt.Errorf("list refs: %w", err)
+	}
+	for iterator.Next() {
+		ref := iterator.Ref()
+		existingRefs = append(existingRefs, ref)
+	}
+	if err := iterator.Err(); err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("list refs: %w", err)
 	}
 
 	objectHash, err := rr.ObjectHash(ctx)
@@ -495,25 +565,93 @@ func NewLocalRepository(
 	}
 }
 
-// ListRefs fetches the full set of refs and targets for the repository.
-func (r *localRepository) ListRefs(ctx context.Context) ([]git.Reference, error) {
-	refs, err := r.repo.GetReferences(ctx, "refs/")
+type localRefIterator struct {
+	scanner *bufio.Scanner
+	cmd     *command.Command
+	ref     git.Reference
+	init    bool
+	err     error
+}
+
+// Next advances the iterator to the next ref.
+func (i *localRefIterator) Next() bool {
+	// HEAD symref is not returned by the git for-each-ref output but explicitly set
+	// to the iterator when it is created. Thus we are using init flag to return HEAD
+	// first before consuming the actual git for-each-ref output.
+	if i.init {
+		i.init = false
+		return true
+	}
+
+	if !i.scanner.Scan() {
+		if err := i.scanner.Err(); err != nil {
+			i.err = fmt.Errorf("scan error: %w", err)
+		}
+		return false
+	}
+
+	line := bytes.SplitN(i.scanner.Bytes(), []byte{0}, 3)
+	if len(line) != 3 {
+		i.err = errors.New("unexpected reference format")
+		return false
+	}
+
+	i.ref = git.Reference{
+		Name:   git.ReferenceName(line[0]),
+		Target: string(line[1]),
+	}
+
+	return true
+}
+
+// Ref returns the current ref of the iterator.
+func (i *localRefIterator) Ref() git.Reference {
+	return i.ref
+}
+
+// Close wait for the underlying command to finish.
+func (i *localRefIterator) Close() error {
+	return i.cmd.Wait()
+}
+
+// Err returns the error of the iterator.
+func (i *localRefIterator) Err() error {
+	return i.err
+}
+
+// NewRefIterator creates new ref iterator for local repository
+func (r *localRepository) NewRefIterator(ctx context.Context) (RefIterator, error) {
+	cmd, err := r.repo.Exec(ctx, gitcmd.Command{
+		Name:  "for-each-ref",
+		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--format=%(refname)%00%(objectname)%00%(symref)"}},
+		Args:  []string{"refs/"},
+	}, gitcmd.WithSetupStdout())
 	if err != nil {
-		return nil, fmt.Errorf("local repository: list refs: %w", err)
+		return nil, err
+	}
+
+	iterator := localRefIterator{
+		scanner: bufio.NewScanner(cmd),
+		cmd:     cmd,
+		init:    true,
 	}
 
 	headOID, err := r.repo.ResolveRevision(ctx, git.Revision("HEAD"))
 	switch {
 	case errors.Is(err, git.ErrReferenceNotFound):
-		// Nothing to add
+		iterator.init = false
 	case err != nil:
-		return nil, structerr.NewInternal("local repository: list refs: %w", err)
+		return nil, structerr.NewInternal("local repository: resolve head: %w", err)
 	default:
-		head := git.NewReference("HEAD", headOID)
-		refs = append([]git.Reference{head}, refs...)
+		iterator.ref = git.NewReference("HEAD", headOID)
 	}
 
-	return refs, nil
+	return &iterator, nil
+}
+
+// ListRefs returns iterator to fetch the full set of refs for the repository.
+func (r *localRepository) ListRefs(ctx context.Context) (RefIterator, error) {
+	return r.NewRefIterator(ctx)
 }
 
 // GetCustomHooks fetches the custom hooks archive.

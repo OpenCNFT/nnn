@@ -1,7 +1,6 @@
 package backup
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -102,8 +101,8 @@ type Locator interface {
 
 // Repository abstracts git access required to make a repository backup
 type Repository interface {
-	// ListRefs fetches the full set of refs and targets for the repository.
-	ListRefs(ctx context.Context) ([]git.Reference, error)
+	// ListRefs returns an iterator to fetch the full set of refs and targets for the repository.
+	ListRefs(ctx context.Context) (RefIterator, error)
 	// GetCustomHooks fetches the custom hooks archive.
 	GetCustomHooks(ctx context.Context, out io.Writer) error
 	// CreateBundle fetches a bundle that contains refs matching patterns. When
@@ -210,6 +209,47 @@ func NewManagerLocal(
 	}
 }
 
+// streamRefs streams the full set of refs into the backup sink.
+func (mgr *Manager) streamRefs(ctx context.Context, repo Repository, path string) (refCount int, returnErr error) {
+	timer := prometheus.NewTimer(backupLatency.WithLabelValues("refs"))
+	defer timer.ObserveDuration()
+
+	w, err := mgr.sink.GetWriter(ctx, path)
+	if err != nil {
+		return refCount, fmt.Errorf("stream refs: get writer: %w", err)
+	}
+	defer func() {
+		if err := w.Close(); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("stream refs: close writer: %w", err))
+		}
+	}()
+
+	iterator, err := repo.ListRefs(ctx)
+	if err != nil {
+		return refCount, fmt.Errorf("stream refs: %w", err)
+	}
+	defer func() {
+		if err := iterator.Close(); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("stream refs: close iterator: %w", err))
+		}
+	}()
+
+	for iterator.Next() {
+		ref := iterator.Ref()
+		_, err = fmt.Fprintf(w, "%s %s\n", ref.Target, ref.Name)
+		if err != nil {
+			return refCount, fmt.Errorf("stream refs: write ref: %w", err)
+		}
+
+		refCount++
+	}
+	if err := iterator.Err(); err != nil && !errors.Is(err, io.EOF) {
+		return refCount, fmt.Errorf("stream refs: ref iterator: %w", err)
+	}
+
+	return refCount, nil
+}
+
 // Create creates a repository backup.
 func (mgr *Manager) Create(ctx context.Context, req *CreateRequest) error {
 	if req.VanityRepository == nil {
@@ -250,22 +290,20 @@ func (mgr *Manager) Create(ctx context.Context, req *CreateRequest) error {
 	}
 	backup.HeadReference = headRef.String()
 
-	refs, err := repo.ListRefs(ctx)
+	step := &backup.Steps[len(backup.Steps)-1]
+	refCount, err := mgr.streamRefs(ctx, repo, step.RefPath)
 	if err != nil {
 		return fmt.Errorf("manager: %w", err)
 	}
-	backup.Empty = len(refs) == 0
 
-	step := &backup.Steps[len(backup.Steps)-1]
-
-	if err := mgr.writeRefs(ctx, step.RefPath, refs); err != nil {
-		return fmt.Errorf("manager: %w", err)
-	}
-	if len(refs) > 0 {
+	if refCount > 0 {
 		if err := mgr.writeBundle(ctx, repo, step); err != nil {
 			return fmt.Errorf("manager: %w", err)
 		}
+	} else {
+		backup.Empty = true
 	}
+
 	if err := mgr.writeCustomHooks(ctx, repo, step.CustomHooksPath); err != nil {
 		return fmt.Errorf("manager: %w", err)
 	}
@@ -571,37 +609,6 @@ func (mgr *Manager) restoreCustomHooks(ctx context.Context, repo Repository, pat
 	if err := repo.SetCustomHooks(ctx, reader); err != nil {
 		return fmt.Errorf("restore custom hooks, %q: %w", path, err)
 	}
-	return nil
-}
-
-// writeRefs writes the previously fetched list of refs in the same output
-// format as `git-show-ref(1)`
-func (mgr *Manager) writeRefs(ctx context.Context, path string, refs []git.Reference) (returnErr error) {
-	timer := prometheus.NewTimer(backupLatency.WithLabelValues("refs"))
-	defer timer.ObserveDuration()
-
-	w, err := mgr.sink.GetWriter(ctx, path)
-	if err != nil {
-		return fmt.Errorf("write refs: %w", err)
-	}
-	defer func() {
-		if err := w.Close(); err != nil && returnErr == nil {
-			returnErr = fmt.Errorf("write refs: %w", err)
-		}
-	}()
-
-	buf := bufio.NewWriter(w)
-	for _, ref := range refs {
-		_, err = fmt.Fprintf(buf, "%s %s\n", ref.Target, ref.Name)
-		if err != nil {
-			return fmt.Errorf("write refs: %w", err)
-		}
-	}
-
-	if err := buf.Flush(); err != nil {
-		return fmt.Errorf("write refs: %w", err)
-	}
-
 	return nil
 }
 
