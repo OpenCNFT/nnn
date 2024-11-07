@@ -1404,7 +1404,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					//
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
-						packFilePath := packFilePath(walFilesPathForLSN(filepath.Join(storagePath, setup.RelativePath), 1))
+						packFilePath := packFilePath(logEntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
 						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,
@@ -1721,10 +1721,10 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 		for elm := actualList.Front(); elm != nil; elm = elm.Next() {
 			actual := elm.Value.(*committedEntry)
 			require.Equal(t, expected[i].lsn, actual.lsn)
-			require.Equal(t, expected[i].snapshotReaders, actual.snapshotReaders)
+			require.Equal(t, expected[i].snapshotReaders, actual.refs)
 
 			if expected[i].entry != nil {
-				actualEntry, err := manager.readLogEntry(actual.lsn)
+				actualEntry, err := manager.wal.readLogEntry(actual.lsn)
 				require.NoError(t, err)
 
 				expectedEntry := expected[i].entry
@@ -1759,7 +1759,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			steps: steps{
 				StartManager{},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.committedEntries)
+					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
 				}),
 			},
 		},
@@ -1777,7 +1777,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							lsn:             0,
 							snapshotReaders: 1,
 						},
-					}, tm.committedEntries)
+					}, tm.wal.committedEntries)
 				}),
 				Commit{
 					TransactionID: 1,
@@ -1786,7 +1786,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.committedEntries)
+					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
 				}),
 				Begin{
 					TransactionID:       2,
@@ -1799,7 +1799,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							lsn:             1,
 							snapshotReaders: 1,
 						},
-					}, tm.committedEntries)
+					}, tm.wal.committedEntries)
 				}),
 				Commit{
 					TransactionID: 2,
@@ -1808,7 +1808,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.committedEntries)
+					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
 				}),
 			},
 			expectedState: StateAssertion{
@@ -1898,7 +1898,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							lsn:             1,
 							snapshotReaders: 2,
 						},
-					}, tm.committedEntries)
+					}, tm.wal.committedEntries)
 				}),
 				Commit{
 					TransactionID: 2,
@@ -1916,7 +1916,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							lsn:   2,
 							entry: refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID),
 						},
-					}, tm.committedEntries)
+					}, tm.wal.committedEntries)
 				}),
 				Begin{
 					TransactionID:       4,
@@ -1934,7 +1934,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							snapshotReaders: 1,
 							entry:           refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID),
 						},
-					}, tm.committedEntries)
+					}, tm.wal.committedEntries)
 				}),
 				Commit{
 					TransactionID: 3,
@@ -1953,13 +1953,13 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							lsn:   3,
 							entry: refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID),
 						},
-					}, tm.committedEntries)
+					}, tm.wal.committedEntries)
 				}),
 				Rollback{
 					TransactionID: 4,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.committedEntries)
+					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2043,7 +2043,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					TransactionID: 1,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.committedEntries)
+					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
 				}),
 				Begin{
 					TransactionID: 2,
@@ -2054,7 +2054,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					TransactionID: 2,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.committedEntries)
+					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2117,7 +2117,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
 						gittest.FilesOrReftables(testhelper.DirectoryState{
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
@@ -2140,8 +2140,8 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
-					require.Equal(t, tm.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.appendedLSN, storage.LSN(3))
+					require.Equal(t, tm.wal.appliedLSN, storage.LSN(3))
+					require.Equal(t, tm.wal.appendedLSN, storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2268,13 +2268,14 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					require.NoError(t, tm.appendLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
+					_, err := tm.wal.Propose(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath)
+					require.NoError(t, err)
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
 						"/wal/0000000000002":          {Mode: mode.Directory},
@@ -2296,8 +2297,8 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
-					require.Equal(t, tm.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.appendedLSN, storage.LSN(4))
+					require.Equal(t, tm.wal.appliedLSN, storage.LSN(4))
+					require.Equal(t, tm.wal.appendedLSN, storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{

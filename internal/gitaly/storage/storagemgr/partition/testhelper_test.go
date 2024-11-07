@@ -1552,7 +1552,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		}
 	}
 
-	RequireConsumer(t, transactionManager.consumer, transactionManager.consumerPos, tc.expectedState.Consumers)
+	RequireConsumer(t, transactionManager.wal.consumer, transactionManager.wal.consumerPos, tc.expectedState.Consumers)
 
 	testhelper.RequireDirectoryState(t, stateDir, "", expectedDirectory)
 
