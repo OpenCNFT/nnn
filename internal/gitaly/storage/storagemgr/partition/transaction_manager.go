@@ -34,6 +34,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -750,37 +751,6 @@ func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) {
 	txn.referenceUpdates = append(txn.referenceUpdates, u)
 }
 
-// flattenReferenceTransactions flattens the recorded reference transactions by dropping
-// all intermediate states. The returned git.ReferenceUpdates contains the reference changes
-// with the OldOID set to the reference's value at the beginning of the transaction, and the
-// NewOID set to the reference's final value after all of the changes.
-func (txn *Transaction) flattenReferenceTransactions() git.ReferenceUpdates {
-	flattenedUpdates := git.ReferenceUpdates{}
-	for _, updates := range txn.referenceUpdates {
-		for reference, update := range updates {
-			u := git.ReferenceUpdate{
-				OldOID:    update.OldOID,
-				NewOID:    update.NewOID,
-				OldTarget: update.OldTarget,
-				NewTarget: update.NewTarget,
-			}
-
-			if previousUpdate, ok := flattenedUpdates[reference]; ok {
-				if previousUpdate.OldOID != "" {
-					u.OldOID = previousUpdate.OldOID
-				}
-				if previousUpdate.OldTarget != "" {
-					u.OldTarget = previousUpdate.OldTarget
-				}
-			}
-
-			flattenedUpdates[reference] = u
-		}
-	}
-
-	return flattenedUpdates
-}
-
 // DeleteRepository deletes the repository when the transaction is committed.
 func (txn *Transaction) DeleteRepository() {
 	txn.deleteRepository = true
@@ -1008,6 +978,9 @@ type TransactionManager struct {
 	// snapshotManager is responsible for creation and management of file system snapshots.
 	snapshotManager *snapshot.Manager
 
+	// conflictMgr is responsible for checking concurrent transactions against each other for conflicts.
+	conflictMgr *conflict.Manager
+
 	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
 	appendedLSN storage.LSN
 	// appliedLSN holds the LSN of the last log entry applied to the partition.
@@ -1086,6 +1059,7 @@ func NewTransactionManager(
 		completedQueue:       make(chan struct{}, 1),
 		initialized:          make(chan struct{}),
 		snapshotLocks:        make(map[storage.LSN]*snapshotLock),
+		conflictMgr:          conflict.NewManager(),
 		stateDirectory:       stateDir,
 		stagingDirectory:     stagingDir,
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
@@ -2184,6 +2158,14 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 			if err := mgr.deleteLogEntry(ctx, mgr.oldestLSN); err != nil {
 				return fmt.Errorf("deleting log entry: %w", err)
 			}
+
+			// The WAL entries are deleted only after there are no transactions using an
+			// older read snapshot than the LSN. It's also safe to drop the transaction
+			// from the conflict detection history as there are no transactions reading
+			// at an older snapshot. Since the changes are already in the transaction's
+			// snapshot, it would already base its changes on them.
+			mgr.conflictMgr.EvictLSN(ctx, mgr.oldestLSN)
+
 			mgr.oldestLSN++
 			continue
 		}
@@ -2260,8 +2242,32 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("verify object dependencies: %w", err)
 		}
 
+		var zeroOID git.ObjectID
+		if transaction.repositoryTarget() {
+			objectHash, err := transaction.stagingRepository.ObjectHash(ctx)
+			if err != nil {
+				return fmt.Errorf("object hash: %w", err)
+			}
+
+			zeroOID = objectHash.ZeroOID
+		}
+
+		// Prepare the transaction to conflict check it. We'll commit it later if we
+		// succeed logging the transaction.
+		preparedTX, err := mgr.conflictMgr.Prepare(ctx, &conflict.Transaction{
+			ReadLSN:                           transaction.SnapshotLSN(),
+			TargetRelativePath:                transaction.relativePath,
+			DeleteRepository:                  transaction.deleteRepository,
+			ZeroOID:                           zeroOID,
+			SkipReferenceVerificationFailures: transaction.skipVerificationFailures,
+			ReferenceUpdates:                  transaction.referenceUpdates,
+		})
+		if err != nil {
+			return fmt.Errorf("prepare: %w", err)
+		}
+
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
-			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
+			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, preparedTX.FailedReferenceUpdates(), transaction)
 			if err != nil {
 				return fmt.Errorf("verify references: %w", err)
 			}
@@ -2307,7 +2313,14 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		logEntry.Operations = transaction.walEntry.Operations()
 
-		return mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath())
+		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
+			return fmt.Errorf("append log entry: %w", err)
+		}
+
+		// Commit the prepared transaction now that we've managed to commit the log entry.
+		preparedTX.Commit(ctx, mgr.appendedLSN)
+
+		return nil
 	}(); err != nil {
 		transaction.result <- err
 		return nil
@@ -2737,7 +2750,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 // verifyReferences verifies that the references in the transaction apply on top of the already accepted
 // reference changes. The old tips in the transaction are verified against the current actual tips.
 // It returns the write-ahead log entry for the reference transactions successfully verified.
-func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction *Transaction) ([]*gitalypb.LogEntry_ReferenceTransaction, error) {
+func (mgr *TransactionManager) verifyReferences(ctx context.Context, failedReferenceUpdates conflict.FailedReferenceUpdates, transaction *Transaction) ([]*gitalypb.LogEntry_ReferenceTransaction, error) {
 	defer trace.StartRegion(ctx, "verifyReferences").End()
 
 	if len(transaction.referenceUpdates) == 0 {
@@ -2750,66 +2763,29 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyReferences", nil)
 	defer span.Finish()
 
-	// Apply quarantine to the staging repository in order to ensure the new objects are available when we
-	// are verifying references. Without it we'd encounter errors about missing objects as the new objects
-	// are not in the repository.
-	stagingRepositoryWithQuarantine, err := transaction.stagingRepository.Quarantine(ctx, transaction.quarantineDirectory)
-	if err != nil {
-		return nil, fmt.Errorf("quarantine: %w", err)
-	}
-
-	// For the reftable backend, we also need to capture HEAD updates here.
-	// So obtain the reference backend to do the specific checks.
-	refBackend, err := stagingRepositoryWithQuarantine.ReferenceBackend(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("reference backend: %w", err)
-	}
-
-	flattenedReferenceTransactions := transaction.flattenReferenceTransactions()
-	revisions := make([]git.Revision, 0, len(flattenedReferenceTransactions))
-	for referenceName := range flattenedReferenceTransactions {
-		// Transactions should only stage references with valid names as otherwise Git would already
-		// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
-		// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
-		// check that all references modified are within the refs directory.
-		//
-		// HEAD is a special case and refers to a default branch update.
-		if !strings.HasPrefix(referenceName.String(), "refs/") && referenceName != "HEAD" {
-			return nil, InvalidReferenceFormatError{ReferenceName: referenceName}
-		}
-
-		revisions = append(revisions, referenceName.Revision())
-	}
-
 	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
-	if err := checkObjects(ctx, stagingRepositoryWithQuarantine, revisions, func(revision git.Revision, actualOldTip git.ObjectID) error {
-		referenceName := git.ReferenceName(revision)
-		update := flattenedReferenceTransactions[referenceName]
-
-		if update.IsRegularUpdate() && update.OldOID != actualOldTip {
-			if transaction.skipVerificationFailures {
-				droppedReferenceUpdates[referenceName] = struct{}{}
-				return nil
+	for _, refTX := range transaction.referenceUpdates {
+		for ref, update := range refTX {
+			// Transactions should only stage references with valid names as otherwise Git would already
+			// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
+			// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
+			// check that all references modified are within the refs directory.
+			//
+			// HEAD is a special case and refers to a default branch update.
+			if !strings.HasPrefix(ref.String(), "refs/") && ref != "HEAD" {
+				return nil, InvalidReferenceFormatError{ReferenceName: ref}
 			}
 
-			return ReferenceVerificationError{
-				ReferenceName:  referenceName,
-				ExpectedOldOID: update.OldOID,
-				ActualOldOID:   actualOldTip,
-				NewOID:         update.NewOID,
+			if update.OldOID == update.NewOID && update.OldTarget == update.NewTarget {
+				// This was a no-op and doesn't need to be written out. The reference's old value has been
+				// verified now to match what is expected.
+				droppedReferenceUpdates[ref] = struct{}{}
+			}
+
+			if failure, ok := failedReferenceUpdates[ref]; ok {
+				droppedReferenceUpdates[failure.TargetReference] = struct{}{}
 			}
 		}
-
-		if update.OldOID == update.NewOID && update.OldTarget == update.NewTarget {
-			// This was a no-op and doesn't need to be written out. The reference's old value has been
-			// verified now to match what is expected.
-			droppedReferenceUpdates[referenceName] = struct{}{}
-			return nil
-		}
-
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("check objects: %w", err)
 	}
 
 	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
@@ -2838,6 +2814,21 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		referenceTransactions = append(referenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
 			Changes: changes,
 		})
+	}
+
+	// Apply quarantine to the staging repository in order to ensure the new objects are available when we
+	// are verifying references. Without it we'd encounter errors about missing objects as the new objects
+	// are not in the repository.
+	stagingRepositoryWithQuarantine, err := transaction.stagingRepository.Quarantine(ctx, transaction.quarantineDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("quarantine: %w", err)
+	}
+
+	// For the reftable backend, we also need to capture HEAD updates here.
+	// So obtain the reference backend to do the specific checks.
+	refBackend, err := stagingRepositoryWithQuarantine.ReferenceBackend(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("reference backend: %w", err)
 	}
 
 	if refBackend == git.ReferenceBackendReftables {

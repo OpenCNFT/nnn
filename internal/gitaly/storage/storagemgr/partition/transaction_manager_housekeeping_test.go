@@ -15,6 +15,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -1924,11 +1925,10 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: errConflictRepositoryDeletion,
+					ExpectedError: conflict.ErrRepositoryConcurrentlyDeleted,
 				},
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 					"housekeeping_task=total,stage=prepare":     1,
-					"housekeeping_task=total,stage=verify":      1,
 					"housekeeping_task=pack-refs,stage=prepare": 1,
 				}},
 			},

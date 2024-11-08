@@ -21,7 +21,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -764,6 +764,8 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 	repoProto, repoPath, commits := setupRepoWithMergeableCommits(t, ctx, cfg, "branch")
 	repo := localrepo.NewTestRepo(t, cfg, repoProto)
 
+	concurrentCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("concurrent commit"))
+
 	stream, err := client.UserMergeBranch(ctx)
 	require.NoError(t, err)
 
@@ -782,8 +784,16 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 	require.NoError(t, err, "receive first response")
 
 	// This concurrent update of the branch we are merging into should make the merge fail.
-	concurrentCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("branch"))
 	require.NotEqual(t, concurrentCommitID, firstResponse.GetCommitId())
+	concurrentResp, err := client.UserUpdateBranch(ctx, &gitalypb.UserUpdateBranchRequest{
+		Repository: repoProto,
+		BranchName: []byte("branch"),
+		User:       gittest.TestUser,
+		Newrev:     []byte(concurrentCommitID),
+		Oldrev:     []byte(commits.left),
+	})
+	require.NoError(t, err)
+	testhelper.ProtoEqual(t, &gitalypb.UserUpdateBranchResponse{}, concurrentResp)
 
 	require.NoError(t, stream.Send(&gitalypb.UserMergeBranchRequest{Apply: true}), "apply merge")
 	require.NoError(t, stream.CloseSend(), "close send")
@@ -805,12 +815,11 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 	}
 
 	expectedErr := testhelper.WithOrWithoutWAL(
-		structerr.NewFailedPrecondition("%w", partition.ReferenceVerificationError{
-			ReferenceName:  "refs/heads/branch",
-			ExpectedOldOID: git.ObjectID(commits.left.String()),
-			ActualOldOID:   concurrentCommitID,
-			NewOID:         mergeCommitOID,
-		}).WithDetail(expectedDetail),
+		structerr.NewAborted("target update: running post-receive hooks: commit transaction: prepare: reference conflict: %w", refdb.UnexpectedOldValueError{
+			TargetReference: "refs/heads/branch",
+			ExpectedValue:   commits.left.String(),
+			ActualValue:     concurrentCommitID.String(),
+		}),
 		structerr.NewFailedPrecondition("reference update: reference does not point to expected object").
 			WithDetail(&testproto.ErrorMetadata{
 				Key:   []byte("actual_object_id"),
