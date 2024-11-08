@@ -48,7 +48,10 @@ func NewSink(ctx context.Context, uri string) (*Sink, error) {
 // relativePath returns a relative path of the bundle-URI bundle inside the
 // bucket.
 func (s *Sink) relativePath(repo storage.Repository, name string) string {
-	repoPath := strings.TrimSuffix(repo.GetRelativePath(), ".git")
+	repoPath := filepath.Join(
+		repo.GetStorageName(),
+		repo.GetRelativePath(),
+	)
 
 	return filepath.Join(repoPath, "uri", name+".bundle")
 }

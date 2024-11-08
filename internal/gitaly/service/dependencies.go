@@ -25,29 +25,30 @@ import (
 
 // Dependencies assembles set of components required by different kinds of services.
 type Dependencies struct {
-	Logger              log.Logger
-	Cfg                 config.Cfg
-	GitalyHookManager   gitalyhook.Manager
-	TransactionManager  transaction.Manager
-	StorageLocator      storage.Locator
-	ClientPool          *client.Pool
-	GitCmdFactory       gitcmd.CommandFactory
-	BackchannelRegistry *backchannel.Registry
-	GitlabClient        gitlab.Client
-	CatfileCache        catfile.Cache
-	DiskCache           cache.Cache
-	PackObjectsCache    streamcache.Cache
-	PackObjectsLimiter  limiter.Limiter
-	LimitHandler        *limithandler.LimiterMiddleware
-	RepositoryCounter   *counter.RepositoryCounter
-	UpdaterWithHooks    *updateref.UpdaterWithHooks
-	HousekeepingManager housekeepingmgr.Manager
-	TransactionRegistry *storagemgr.TransactionRegistry
-	Node                storage.Node
-	BackupSink          *backup.Sink
-	BackupLocator       backup.Locator
-	BundleURISink       *bundleuri.Sink
-	ProcReceiveRegistry *gitalyhook.ProcReceiveRegistry
+	Logger                  log.Logger
+	Cfg                     config.Cfg
+	GitalyHookManager       gitalyhook.Manager
+	TransactionManager      transaction.Manager
+	StorageLocator          storage.Locator
+	ClientPool              *client.Pool
+	GitCmdFactory           gitcmd.CommandFactory
+	BackchannelRegistry     *backchannel.Registry
+	GitlabClient            gitlab.Client
+	CatfileCache            catfile.Cache
+	DiskCache               cache.Cache
+	PackObjectsCache        streamcache.Cache
+	PackObjectsLimiter      limiter.Limiter
+	LimitHandler            *limithandler.LimiterMiddleware
+	RepositoryCounter       *counter.RepositoryCounter
+	UpdaterWithHooks        *updateref.UpdaterWithHooks
+	HousekeepingManager     housekeepingmgr.Manager
+	TransactionRegistry     *storagemgr.TransactionRegistry
+	Node                    storage.Node
+	BackupSink              *backup.Sink
+	BackupLocator           backup.Locator
+	BundleURISink           *bundleuri.Sink
+	ProcReceiveRegistry     *gitalyhook.ProcReceiveRegistry
+	BundleGenerationManager *bundleuri.GenerationManager
 }
 
 // GetLogger returns the logger.
