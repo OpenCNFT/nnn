@@ -1,6 +1,8 @@
 package backup_test
 
 import (
+	"context"
+	"errors"
 	"io"
 	"math/rand"
 	"slices"
@@ -33,6 +35,28 @@ func removeHeadReference(refs []git.Reference) []git.Reference {
 	return refs
 }
 
+func getRefs(ctx context.Context, r backup.Repository) (refs []git.Reference, returnErr error) {
+	iterator, err := r.ListRefs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := iterator.Close(); err != nil && returnErr == nil {
+			returnErr = err
+		}
+	}()
+
+	for iterator.Next() {
+		ref := iterator.Ref()
+		refs = append(refs, ref)
+	}
+	if err := iterator.Err(); err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+
+	return refs, nil
+}
+
 func TestRemoteRepository_ResetRefs(t *testing.T) {
 	cfg := testcfg.Build(t)
 	testcfg.BuildGitalyHooks(t, cfg)
@@ -60,7 +84,7 @@ func TestRemoteRepository_ResetRefs(t *testing.T) {
 	rr := backup.NewRemoteRepository(repo, conn)
 
 	// "Snapshot" the refs to pretend this is our backup.
-	backupRefState, err := rr.ListRefs(ctx)
+	backupRefState, err := getRefs(ctx, rr)
 	require.NoError(t, err)
 	backupRefState = removeHeadReference(backupRefState)
 
@@ -89,14 +113,14 @@ func TestRemoteRepository_ResetRefs(t *testing.T) {
 	require.NoError(t, err)
 	testhelper.ProtoEqual(t, &gitalypb.UpdateReferencesResponse{}, resp)
 
-	intermediateRefState, err := rr.ListRefs(ctx)
+	intermediateRefState, err := getRefs(ctx, rr)
 	require.NoError(t, err)
 	require.Equal(t, 4, len(intermediateRefState)) // 3 branches + HEAD
 
 	// Reset the state of the refs to the backup.
 	require.NoError(t, rr.ResetRefs(ctx, backupRefState))
 
-	actualRefState, err := rr.ListRefs(ctx)
+	actualRefState, err := getRefs(ctx, rr)
 	require.NoError(t, err)
 
 	actualRefState = removeHeadReference(actualRefState)

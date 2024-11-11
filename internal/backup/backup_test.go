@@ -624,7 +624,7 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 				non_existent = false
 				object_format = %q
 				head_reference = 'refs/heads/main'
-				
+
 				[[steps]]
 				bundle_path = '%s/%s/001.bundle'
 				ref_path = '%s/%s/001.refs'
