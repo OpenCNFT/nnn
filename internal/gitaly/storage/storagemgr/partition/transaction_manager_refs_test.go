@@ -179,7 +179,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 				Begin{
 					RelativePaths: []string{setup.RelativePath},
 				},
-				Commit{
+				UpdateReferences{
 					ReferenceUpdates: git.ReferenceUpdates{
 						"not-in-refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
@@ -187,6 +187,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 						ReferenceName: "not-in-refs/heads/main",
 					},
 				},
+				Rollback{},
 			},
 		},
 		{

@@ -860,6 +860,8 @@ type UpdateReferences struct {
 	TransactionID int
 	// ReferenceUpdates are the reference updates to make.
 	ReferenceUpdates git.ReferenceUpdates
+	// ExpectedError is the error that is expected to be returned when calling UpdateReferences.
+	ExpectedError error
 }
 
 // SetKey calls SetKey on a transaction.
@@ -1019,7 +1021,7 @@ type transactionTestCase struct {
 	expectedState StateAssertion
 }
 
-func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo gitcmd.RepositoryExecutor, updates git.ReferenceUpdates) {
+func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo gitcmd.RepositoryExecutor, updates git.ReferenceUpdates) error {
 	updater, err := updateref.New(ctx, rewrittenRepo)
 	require.NoError(t, err)
 
@@ -1029,7 +1031,7 @@ func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction,
 	}
 	require.NoError(t, updater.Commit())
 
-	require.NoError(t, tx.UpdateReferences(updates))
+	return tx.UpdateReferences(updates)
 }
 
 func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCase, setup testTransactionSetup) {
@@ -1226,7 +1228,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.ReferenceUpdates != nil {
-					performReferenceUpdates(t, ctx, transaction, rewrittenRepo, step.ReferenceUpdates)
+					require.NoError(t, performReferenceUpdates(t, ctx, transaction, rewrittenRepo, step.ReferenceUpdates))
 				}
 
 				if step.DefaultBranchUpdate != nil {
@@ -1297,7 +1299,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}),
 			)
 
-			performReferenceUpdates(t, ctx, transaction, rewrittenRepo, step.ReferenceUpdates)
+			require.Equal(t, step.ExpectedError, performReferenceUpdates(t, ctx, transaction, rewrittenRepo, step.ReferenceUpdates))
 		case ReadKey:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: read key called on transaction before beginning it")
 
