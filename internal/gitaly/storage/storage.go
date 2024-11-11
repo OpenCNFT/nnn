@@ -78,7 +78,7 @@ type Transaction interface {
 	// committed as 'oid-1 -> oid-3'. The old OIDs of the intermediate states are not verified when
 	// committing the write to the actual repository and are discarded from the final committed log
 	// entry.
-	UpdateReferences(git.ReferenceUpdates)
+	UpdateReferences(git.ReferenceUpdates) error
 	// RecordInitialReferenceValues records the initial values of the references for the next UpdateReferences call. If oid is
 	// not a zero OID, it's used as the initial value. If oid is a zero value, the reference's actual value is resolved.
 	//

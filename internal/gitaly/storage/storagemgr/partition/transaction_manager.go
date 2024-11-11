@@ -700,7 +700,7 @@ func (txn *Transaction) RecordInitialReferenceValues(ctx context.Context, initia
 // committed as 'oid-1 -> oid-3'. The old OIDs of the intermediate states are not verified when
 // committing the write to the actual repository and are discarded from the final committed log
 // entry.
-func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) {
+func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) error {
 	u := git.ReferenceUpdates{}
 
 	for reference, update := range updates {
@@ -743,10 +743,12 @@ func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) {
 	txn.initialReferenceValues = nil
 
 	if len(u) == 0 {
-		return
+		return nil
 	}
 
 	txn.referenceUpdates = append(txn.referenceUpdates, u)
+
+	return nil
 }
 
 // DeleteRepository deletes the repository when the transaction is committed.

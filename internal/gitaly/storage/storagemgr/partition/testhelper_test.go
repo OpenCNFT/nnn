@@ -1020,8 +1020,6 @@ type transactionTestCase struct {
 }
 
 func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction, rewrittenRepo gitcmd.RepositoryExecutor, updates git.ReferenceUpdates) {
-	tx.UpdateReferences(updates)
-
 	updater, err := updateref.New(ctx, rewrittenRepo)
 	require.NoError(t, err)
 
@@ -1030,6 +1028,8 @@ func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction,
 		require.NoError(t, updater.Update(reference, update.NewOID, update.OldOID))
 	}
 	require.NoError(t, updater.Commit())
+
+	require.NoError(t, tx.UpdateReferences(updates))
 }
 
 func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCase, setup testTransactionSetup) {
@@ -1230,9 +1230,9 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.DefaultBranchUpdate != nil {
-					transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
+					require.NoError(t, transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
 						"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
-					})
+					}))
 
 					require.NoError(t, rewrittenRepo.SetDefaultBranch(storage.ContextWithTransaction(ctx, transaction), nil, step.DefaultBranchUpdate.Reference))
 				}
