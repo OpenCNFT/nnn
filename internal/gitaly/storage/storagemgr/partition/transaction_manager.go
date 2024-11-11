@@ -1187,7 +1187,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	// may be large. Sync the contents of the file before entering the critical section to ensure
 	// we don't end up syncing the potentially very large file to disk when we're appending the
 	// log entry.
-	preImagePackedRefsInode, err := getInode(transaction.originalPackedRefsFilePath())
+	preImagePackedRefsInode, err := wal.GetInode(transaction.originalPackedRefsFilePath())
 	if err != nil {
 		return fmt.Errorf("get pre-image packed-refs inode: %w", err)
 	}
@@ -1195,7 +1195,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	postImagePackedRefsPath := mgr.getAbsolutePath(
 		transaction.snapshot.RelativePath(transaction.relativePath), "packed-refs",
 	)
-	postImagePackedRefsInode, err := getInode(postImagePackedRefsPath)
+	postImagePackedRefsInode, err := wal.GetInode(postImagePackedRefsPath)
 	if err != nil {
 		return fmt.Errorf("get post-image packed-refs inode: %w", err)
 	}
@@ -2954,7 +2954,7 @@ func (txn *Transaction) containsReferenceDeletions(ctx context.Context, stagingR
 func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transaction, stagingRepository *localrepo.Repo) error {
 	// Get the inode of the `packed-refs` file as it was before the transaction. This was
 	// recorded when the transaction began.
-	preImagePackedRefsInode, err := getInode(tx.originalPackedRefsFilePath())
+	preImagePackedRefsInode, err := wal.GetInode(tx.originalPackedRefsFilePath())
 	if err != nil {
 		return fmt.Errorf("get pre-image packed-refs inode: %w", err)
 	}
@@ -2962,7 +2962,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 	// Get the inode of the `packed-refs` file as it is in the snapshot after the transaction. This contains
 	// all of the modifications the transaction has performed on it.
 	postImagePackedRefsPath := mgr.getAbsolutePath(tx.snapshot.RelativePath(tx.relativePath), "packed-refs")
-	postImagePackedRefsInode, err := getInode(postImagePackedRefsPath)
+	postImagePackedRefsInode, err := wal.GetInode(postImagePackedRefsPath)
 	if err != nil {
 		return fmt.Errorf("get post-image packed-refs inode: %w", err)
 	}
@@ -3010,7 +3010,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 	}
 
 	currentPackedRefsPath := filepath.Join(stagingRepoPath, "packed-refs")
-	currentPackedRefsInode, err := getInode(currentPackedRefsPath)
+	currentPackedRefsInode, err := wal.GetInode(currentPackedRefsPath)
 	if err != nil {
 		return fmt.Errorf("get current packed-refs inode: %w", err)
 	}
@@ -3080,7 +3080,12 @@ func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, refe
 		return fmt.Errorf("object hash: %w", err)
 	}
 
-	recorder, err := wal.NewReferenceRecorder(tx.walEntry, tx.stagingSnapshot.Root(), tx.relativePath, objectHash.ZeroOID)
+	tmpDir := filepath.Join(tx.stagingDirectory, "ref-recorder")
+	if err := os.Mkdir(tmpDir, mode.Directory); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	recorder, err := wal.NewReferenceRecorder(tmpDir, tx.walEntry, tx.stagingSnapshot.Root(), tx.relativePath, objectHash.ZeroOID)
 	if err != nil {
 		return fmt.Errorf("new recorder: %w", err)
 	}
@@ -3093,6 +3098,10 @@ func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, refe
 		if err := recorder.RecordReferenceUpdates(ctx, referenceTransaction); err != nil {
 			return fmt.Errorf("record reference updates: %w", err)
 		}
+	}
+
+	if err := recorder.StagePackedRefs(); err != nil {
+		return fmt.Errorf("stage packed-refs: %w", err)
 	}
 
 	return nil
