@@ -704,6 +704,16 @@ func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) error {
 	u := git.ReferenceUpdates{}
 
 	for reference, update := range updates {
+		// Transactions should only stage references with valid names as otherwise Git would already
+		// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
+		// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
+		// check that all references modified are within the refs directory.
+		//
+		// HEAD is a special case and refers to a default branch update.
+		if !strings.HasPrefix(reference.String(), "refs/") && reference != "HEAD" {
+			return InvalidReferenceFormatError{ReferenceName: reference}
+		}
+
 		oldOID := update.OldOID
 		oldTarget := update.OldTarget
 
@@ -2761,20 +2771,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyReferences", nil)
 	defer span.Finish()
-
-	for _, refTX := range transaction.referenceUpdates {
-		for ref, update := range refTX {
-			// Transactions should only stage references with valid names as otherwise Git would already
-			// fail when they try to stage them against their snapshot. `update-ref` happily accepts references
-			// outside of `refs` directory so such references could theoretically arrive here. We thus sanity
-			// check that all references modified are within the refs directory.
-			//
-			// HEAD is a special case and refers to a default branch update.
-			if !strings.HasPrefix(ref.String(), "refs/") && ref != "HEAD" {
-				return nil, InvalidReferenceFormatError{ReferenceName: ref}
-			}
-		}
-	}
 
 	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
 	for _, updates := range transaction.referenceUpdates {
