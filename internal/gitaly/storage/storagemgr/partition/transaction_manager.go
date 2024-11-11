@@ -727,6 +727,11 @@ func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) {
 			}
 		}
 
+		if update.OldOID == update.NewOID && update.OldTarget == update.NewTarget {
+			// This was a no-op.
+			continue
+		}
+
 		u[reference] = git.ReferenceUpdate{
 			OldOID:    oldOID,
 			NewOID:    update.NewOID,
@@ -736,6 +741,11 @@ func (txn *Transaction) UpdateReferences(updates git.ReferenceUpdates) {
 	}
 
 	txn.initialReferenceValues = nil
+
+	if len(u) == 0 {
+		return
+	}
+
 	txn.referenceUpdates = append(txn.referenceUpdates, u)
 }
 
@@ -2750,7 +2760,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyReferences", nil)
 	defer span.Finish()
 
-	droppedReferenceUpdates := map[git.ReferenceName]struct{}{}
 	for _, refTX := range transaction.referenceUpdates {
 		for ref, update := range refTX {
 			// Transactions should only stage references with valid names as otherwise Git would already
@@ -2762,12 +2771,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 			if !strings.HasPrefix(ref.String(), "refs/") && ref != "HEAD" {
 				return nil, InvalidReferenceFormatError{ReferenceName: ref}
 			}
-
-			if update.OldOID == update.NewOID && update.OldTarget == update.NewTarget {
-				// This was a no-op and doesn't need to be written out. The reference's old value has been
-				// verified now to match what is expected.
-				droppedReferenceUpdates[ref] = struct{}{}
-			}
 		}
 	}
 
@@ -2775,10 +2778,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 	for _, updates := range transaction.referenceUpdates {
 		changes := make([]*gitalypb.LogEntry_ReferenceTransaction_Change, 0, len(updates))
 		for reference, update := range updates {
-			if _, ok := droppedReferenceUpdates[reference]; ok {
-				continue
-			}
-
 			changes = append(changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
 				ReferenceName: []byte(reference),
 				NewOid:        []byte(update.NewOID),
