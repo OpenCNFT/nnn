@@ -14,6 +14,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type restoreRequest struct {
@@ -228,7 +230,8 @@ func removeRepository(ctx context.Context, pool *client.Pool, repo *gitalypb.Rep
 	repoClient := gitalypb.NewRepositoryServiceClient(conn)
 
 	_, err = repoClient.RemoveRepository(ctx, &gitalypb.RemoveRepositoryRequest{Repository: repo})
-	if err != nil {
+	// NotFound error is harmless and doesn't need to be reported.
+	if err != nil && status.Code(err) != codes.NotFound {
 		return fmt.Errorf("remove repo: remove: %w", err)
 	}
 
