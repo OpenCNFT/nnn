@@ -721,8 +721,6 @@ type testTransactionHooks struct {
 	BeforeApplyLogEntry hookFunc
 	// BeforeAppendLogEntry is called before a log entry is appended to the log.
 	BeforeAppendLogEntry hookFunc
-	// AfterDeleteLogEntry is called after a log entry is deleted.
-	AfterDeleteLogEntry hookFunc
 	// BeforeReadAppliedLSN is invoked before the applied LSN is read.
 	BeforeReadAppliedLSN hookFunc
 	// BeforeStoreAppliedLSN is invoked before the applied LSN is stored.

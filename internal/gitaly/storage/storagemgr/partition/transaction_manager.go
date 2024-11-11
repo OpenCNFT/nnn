@@ -993,12 +993,11 @@ type TransactionManager struct {
 }
 
 type testHooks struct {
-	beforeInitialization      func()
-	beforeAppendLogEntry      func(storage.LSN)
-	beforeApplyLogEntry       func(storage.LSN)
-	beforeStoreAppliedLSN     func(storage.LSN)
-	beforeDeleteLogEntryFiles func(storage.LSN)
-	beforeRunExiting          func()
+	beforeInitialization  func()
+	beforeAppendLogEntry  func(storage.LSN)
+	beforeApplyLogEntry   func(storage.LSN)
+	beforeStoreAppliedLSN func(storage.LSN)
+	beforeRunExiting      func()
 }
 
 // NewTransactionManager returns a new TransactionManager for the given repository.
@@ -1046,12 +1045,11 @@ func NewTransactionManager(
 		acknowledgedQueue:    make(chan struct{}, 1),
 
 		testHooks: testHooks{
-			beforeInitialization:      func() {},
-			beforeAppendLogEntry:      func(storage.LSN) {},
-			beforeApplyLogEntry:       func(storage.LSN) {},
-			beforeStoreAppliedLSN:     func(storage.LSN) {},
-			beforeDeleteLogEntryFiles: func(storage.LSN) {},
-			beforeRunExiting:          func() {},
+			beforeInitialization:  func() {},
+			beforeAppendLogEntry:  func(storage.LSN) {},
+			beforeApplyLogEntry:   func(storage.LSN) {},
+			beforeStoreAppliedLSN: func(storage.LSN) {},
+			beforeRunExiting:      func() {},
 		},
 	}
 }
@@ -1724,7 +1722,7 @@ func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, tran
 		Name: "pack-refs",
 		// By using the '--auto' flag, we ensure that git uses the best heuristic
 		// for compaction. For reftables, it currently uses a geometric progression.
-		// This ensures we don't keep compacting unecessarily to a single file.
+		// This ensures we don't keep compacting unnecessarily to a single file.
 		Flags: []gitcmd.Option{gitcmd.Flag{Name: "--auto"}},
 	}, gitcmd.WithStderr(&stderr)); err != nil {
 		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
@@ -2890,7 +2888,7 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, failedRefer
 // to transaction operations.
 //
 // To ensure that we don't modify existing tables and autocompact, we lock the existing tables
-// before applying the updates. This way the reftable backend willl only create new tables
+// before applying the updates. This way the reftable backend will only create new tables
 func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 	ctx context.Context,
 	referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction,
