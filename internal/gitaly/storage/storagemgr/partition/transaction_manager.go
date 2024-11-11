@@ -2254,7 +2254,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
-			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, preparedTX.FailedReferenceUpdates(), transaction)
+			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
 			if err != nil {
 				return fmt.Errorf("verify references: %w", err)
 			}
@@ -2737,7 +2737,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 // verifyReferences verifies that the references in the transaction apply on top of the already accepted
 // reference changes. The old tips in the transaction are verified against the current actual tips.
 // It returns the write-ahead log entry for the reference transactions successfully verified.
-func (mgr *TransactionManager) verifyReferences(ctx context.Context, failedReferenceUpdates conflict.FailedReferenceUpdates, transaction *Transaction) ([]*gitalypb.LogEntry_ReferenceTransaction, error) {
+func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction *Transaction) ([]*gitalypb.LogEntry_ReferenceTransaction, error) {
 	defer trace.StartRegion(ctx, "verifyReferences").End()
 
 	if len(transaction.referenceUpdates) == 0 {
@@ -2767,10 +2767,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, failedRefer
 				// This was a no-op and doesn't need to be written out. The reference's old value has been
 				// verified now to match what is expected.
 				droppedReferenceUpdates[ref] = struct{}{}
-			}
-
-			if failure, ok := failedReferenceUpdates[ref]; ok {
-				droppedReferenceUpdates[failure.TargetReference] = struct{}{}
 			}
 		}
 	}
