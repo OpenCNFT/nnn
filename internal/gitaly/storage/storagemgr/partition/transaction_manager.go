@@ -128,23 +128,6 @@ func newConflictingKeyValueOperationError(key string) error {
 	return structerr.NewAborted("conflicting key-value operations").WithMetadata("key", key)
 }
 
-// ReferenceVerificationError is returned when a reference's old OID did not match the expected.
-type ReferenceVerificationError struct {
-	// ReferenceName is the name of the reference that failed verification.
-	ReferenceName git.ReferenceName
-	// ExpectedOldOID is the OID the reference was expected to point to.
-	ExpectedOldOID git.ObjectID
-	// ActualOldOID is the OID the reference actually pointed to.
-	ActualOldOID git.ObjectID
-	// NewOID is the OID the reference was attempted to be pointed to.
-	NewOID git.ObjectID
-}
-
-// Error returns the formatted error string.
-func (err ReferenceVerificationError) Error() string {
-	return fmt.Sprintf("expected %q to point to %q but it pointed to %q", err.ReferenceName, err.ExpectedOldOID, err.ActualOldOID)
-}
-
 // repositoryCreation models a repository creation in a transaction.
 type repositoryCreation struct {
 	// objectHash defines the object format the repository is created with.
