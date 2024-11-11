@@ -1,4 +1,4 @@
-package wal
+package reftree
 
 import (
 	"errors"
@@ -7,10 +7,117 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReferenceTree(t *testing.T) {
+func TestTree(t *testing.T) {
 	t.Parallel()
 
-	rt := newReferenceTree()
+	t.Run("InsertReference requires fully-qualified reference", func(t *testing.T) {
+		t.Parallel()
+
+		root := New()
+
+		require.Equal(t,
+			root.InsertReference("non-refs/prefixed"),
+			errors.New("expected a fully qualified reference"),
+		)
+	})
+
+	t.Run("InsertNode", func(t *testing.T) {
+		t.Run("creates parents when asked to", func(t *testing.T) {
+			root := New()
+
+			require.NoError(t, root.InsertNode("parent-1/directory", true, true))
+			require.NoError(t, root.InsertNode("parent-1/file", true, false))
+
+			require.NoError(t, root.InsertNode("parent-2/file", true, false))
+			require.NoError(t, root.InsertNode("parent-2/directory", true, true))
+
+			require.Equal(t,
+				&Node{
+					children: children{
+						"parent-1": {
+							children{
+								"directory": {children: children{}},
+								"file":      {},
+							},
+						},
+						"parent-2": {
+							children{
+								"file":      {},
+								"directory": {children: children{}},
+							},
+						},
+					},
+				},
+				root,
+			)
+		})
+
+		t.Run("does not creates parents when not asked to", func(t *testing.T) {
+			root := New()
+			require.Equal(t, errParentNotFound, root.InsertNode("parent-1/directory", false, true))
+			require.Equal(t, errParentNotFound, root.InsertNode("parent-1/file", false, false))
+		})
+
+		t.Run("fails if parent is not a directory", func(t *testing.T) {
+			root := New()
+			require.NoError(t, root.InsertNode("refs", false, false))
+			require.Equal(t, errParentIsNotDirectory, root.InsertNode("refs/file", false, false))
+		})
+
+		t.Run("fails if target node already exists", func(t *testing.T) {
+			root := New()
+			require.NoError(t, root.InsertNode("refs/heads/directory", true, true))
+			require.NoError(t, root.InsertNode("refs/heads/file", false, false))
+
+			require.Equal(t,
+				errTargetAlreadyExists,
+				root.InsertReference("refs/heads/directory"),
+			)
+
+			require.Equal(t,
+				errTargetAlreadyExists,
+				root.InsertReference("refs/heads/file"),
+			)
+		})
+	})
+
+	t.Run("RemoveNode", func(t *testing.T) {
+		t.Run("fails if target does not exist", func(t *testing.T) {
+			root := New()
+			require.Equal(t, errTargetNotFound, root.RemoveNode("refs"))
+		})
+
+		t.Run("fails if parent does not exist", func(t *testing.T) {
+			root := New()
+			require.Equal(t, errParentNotFound, root.RemoveNode("refs/heads"))
+		})
+
+		t.Run("fails if target has children", func(t *testing.T) {
+			root := New()
+			require.NoError(t, root.InsertNode("refs/heads/main", true, false))
+			require.Equal(t, errTargetHasChildren, root.RemoveNode("refs/heads"))
+		})
+
+		t.Run("successfully removes a node", func(t *testing.T) {
+			root := New()
+			require.NoError(t, root.InsertNode("refs/heads/main", true, false))
+			require.NoError(t, root.RemoveNode("refs/heads/main"))
+			require.Equal(t,
+				&Node{
+					children: children{
+						"refs": {
+							children{
+								"heads": {children: children{}},
+							},
+						},
+					},
+				},
+				root,
+			)
+		})
+	})
+
+	root := New()
 
 	for _, ref := range []string{
 		"refs/root-branch-1",
@@ -24,74 +131,48 @@ func TestReferenceTree(t *testing.T) {
 		"refs/tags/subdir/tag-3",
 		"refs/tags/subdir/tag-4",
 	} {
-		require.NoError(t, rt.Insert(ref))
+		require.NoError(t, root.InsertReference(ref))
 	}
 
 	require.Equal(t,
-		&referenceTree{
-			component: "refs",
-			children: map[string]*referenceTree{
-				"root-branch-1": {component: "root-branch-1"},
-				"root-branch-2": {component: "root-branch-2"},
-				"heads": {
-					component: "heads",
-					children: map[string]*referenceTree{
-						"branch-1": {component: "branch-1"},
-						"branch-2": {component: "branch-2"},
-						"subdir": {
-							component: "subdir",
-							children: map[string]*referenceTree{
-								"branch-3": {component: "branch-3"},
-								"branch-4": {component: "branch-4"},
+		&Node{
+			children: children{
+				"refs": {
+					children{
+						"root-branch-1": {},
+						"root-branch-2": {},
+						"heads": {
+							children: children{
+								"branch-1": {},
+								"branch-2": {},
+								"subdir": {
+									children: children{
+										"branch-3": {},
+										"branch-4": {},
+									},
+								},
 							},
 						},
-					},
-				},
-				"tags": {
-					component: "tags",
-					children: map[string]*referenceTree{
-						"tag-1": {component: "tag-1"},
-						"tag-2": {component: "tag-2"},
-						"subdir": {
-							component: "subdir",
-							children: map[string]*referenceTree{
-								"tag-3": {component: "tag-3"},
-								"tag-4": {component: "tag-4"},
+						"tags": {
+							children: children{
+								"tag-1": {},
+								"tag-2": {},
+								"subdir": {
+									children: children{
+										"tag-3": {},
+										"tag-4": {},
+									},
+								},
 							},
 						},
 					},
 				},
 			},
 		},
-		rt,
+		root,
 	)
 
-	t.Run("insert requires fully-qualified reference", func(t *testing.T) {
-		t.Parallel()
-
-		require.Equal(t,
-			rt.Insert("non-refs/prefixed"),
-			errors.New("expected a fully qualified reference"),
-		)
-	})
-
-	t.Run("insert detects directory-file conflicts", func(t *testing.T) {
-		t.Parallel()
-
-		require.Equal(t,
-			rt.Insert("refs/heads/branch-1/child"),
-			errors.New("directory-file conflict"),
-		)
-	})
-
-	t.Run("insert fails if the path already exists", func(t *testing.T) {
-		require.Equal(t,
-			errors.New("path already exists"),
-			rt.Insert("refs/heads/branch-1"),
-		)
-	})
-
-	t.Run("contains", func(t *testing.T) {
+	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
 		for _, entry := range []struct {
@@ -123,7 +204,7 @@ func TestReferenceTree(t *testing.T) {
 			{reference: "refs/tags/subdir/non-existent"},
 			{reference: "refs/tags/subdir/tag-4/non-existent"},
 		} {
-			require.Equal(t, rt.Contains(entry.reference), entry.contains)
+			require.Equal(t, root.Contains(entry.reference), entry.contains)
 		}
 	})
 
@@ -139,13 +220,13 @@ func TestReferenceTree(t *testing.T) {
 
 		for _, tc := range []struct {
 			desc            string
-			walk            func(walkCallback) error
+			walk            func(WalkCallback) error
 			pathToFailOn    string
 			expectedResults []result
 		}{
 			{
 				desc: "pre-order",
-				walk: rt.WalkPreOrder,
+				walk: root.WalkPreOrder,
 				expectedResults: []result{
 					{path: "refs", isDir: true},
 					{path: "refs/heads", isDir: true},
@@ -166,7 +247,7 @@ func TestReferenceTree(t *testing.T) {
 			},
 			{
 				desc:         "pre-order failure on directory",
-				walk:         rt.WalkPreOrder,
+				walk:         root.WalkPreOrder,
 				pathToFailOn: "refs/heads/subdir",
 				expectedResults: []result{
 					{path: "refs", isDir: true},
@@ -178,7 +259,7 @@ func TestReferenceTree(t *testing.T) {
 			},
 			{
 				desc:         "pre-order failure on file",
-				walk:         rt.WalkPreOrder,
+				walk:         root.WalkPreOrder,
 				pathToFailOn: "refs/heads/subdir/branch-3",
 				expectedResults: []result{
 					{path: "refs", isDir: true},
@@ -191,7 +272,7 @@ func TestReferenceTree(t *testing.T) {
 			},
 			{
 				desc: "post-order",
-				walk: rt.WalkPostOrder,
+				walk: root.WalkPostOrder,
 				expectedResults: []result{
 					{path: "refs/heads/branch-1"},
 					{path: "refs/heads/branch-2"},
@@ -212,7 +293,7 @@ func TestReferenceTree(t *testing.T) {
 			},
 			{
 				desc:         "post-order failure on directory",
-				walk:         rt.WalkPostOrder,
+				walk:         root.WalkPostOrder,
 				pathToFailOn: "refs/heads/subdir",
 				expectedResults: []result{
 					{path: "refs/heads/branch-1"},
@@ -224,7 +305,7 @@ func TestReferenceTree(t *testing.T) {
 			},
 			{
 				desc:         "post-order failure on file",
-				walk:         rt.WalkPostOrder,
+				walk:         root.WalkPostOrder,
 				pathToFailOn: "refs/heads/subdir/branch-3",
 				expectedResults: []result{
 					{path: "refs/heads/branch-1"},
@@ -261,6 +342,22 @@ func TestReferenceTree(t *testing.T) {
 		}
 	})
 
+	t.Run("walking empty tree", func(t *testing.T) {
+		t.Run("post-order", func(t *testing.T) {
+			require.NoError(t, New().WalkPostOrder(func(string, bool) error {
+				t.Fatalf("callback should not be invoked on an empty tree.")
+				return nil
+			}))
+		})
+
+		t.Run("pre-order", func(t *testing.T) {
+			require.NoError(t, New().WalkPreOrder(func(string, bool) error {
+				t.Fatalf("callback should not be invoked on an empty tree.")
+				return nil
+			}))
+		})
+	})
+
 	t.Run("string formatting", func(t *testing.T) {
 		require.Equal(t, `refs
  heads
@@ -277,6 +374,6 @@ func TestReferenceTree(t *testing.T) {
    tag-4
   tag-1
   tag-2
-`, rt.String())
+`, root.String())
 	})
 }

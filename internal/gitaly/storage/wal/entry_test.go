@@ -655,8 +655,6 @@ func TestRecordReferenceUpdates(t *testing.T) {
 						var ops operations
 						ops.removeDirectoryEntry("relative-path/HEAD")
 						ops.createHardLink("1", "relative-path/HEAD", false)
-						ops.createDirectory("relative-path/refs")
-						ops.createDirectory("relative-path/refs")
 						return ops
 					}(),
 					expectedDirectory: testhelper.DirectoryState{

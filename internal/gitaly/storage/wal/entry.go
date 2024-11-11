@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal/reftree"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -317,8 +318,8 @@ func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapsho
 		return nil
 	}
 
-	creations := newReferenceTree()
-	deletions := newReferenceTree()
+	creations := reftree.New()
+	deletions := reftree.New()
 	defaultBranchUpdated := false
 	preImagePaths := map[string]struct{}{}
 	for _, change := range refTX.GetChanges() {
@@ -333,7 +334,7 @@ func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapsho
 		}
 
 		referenceName := string(change.GetReferenceName())
-		if err := tree.Insert(referenceName); err != nil {
+		if err := tree.InsertReference(referenceName); err != nil {
 			return fmt.Errorf("insert into tree: %w", err)
 		}
 
