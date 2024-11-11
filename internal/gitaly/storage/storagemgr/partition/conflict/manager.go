@@ -6,7 +6,6 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb/historymgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
@@ -15,20 +14,11 @@ import (
 // another transaction.
 var ErrRepositoryConcurrentlyDeleted = structerr.NewAborted("repository concurrently deleted")
 
-// FailedReferenceUpdates associates reference names with the cause behind their update failures.
-type FailedReferenceUpdates map[git.ReferenceName]refdb.UnexpectedOldValueError
-
 // PreparedTransaction is a transaction that has been conflict checked and is ready to be committed.
 // The changes are not applied until Commit() is called. If the changes should not be committed, the
 // transaction can be discarded.
 type PreparedTransaction struct {
-	commit                 func(storage.LSN)
-	failedReferenceUpdates FailedReferenceUpdates
-}
-
-// FailedReferenceUpdates returns references that failed to be updated with the cause of the failure.
-func (tx *PreparedTransaction) FailedReferenceUpdates() FailedReferenceUpdates {
-	return tx.failedReferenceUpdates
+	commit func(storage.LSN)
 }
 
 // Commit commits the prepared transaction and persists all of the changes it
@@ -73,10 +63,6 @@ type Transaction struct {
 
 	// ZeroOID is the zero OID used in the repository.
 	ZeroOID git.ObjectID
-	// SkipFailedReferenceUpdates determines whether reference verification failures should be skipped.
-	// Reference verification failures by default lead to an error. If this is set, the reference updates
-	// that failed due to unexpected old value are dropped from the transaction.
-	SkipReferenceVerificationFailures bool
 	// ReferenceUpdates are the reference updates to commit with the transaction.
 	ReferenceUpdates []git.ReferenceUpdates
 }
@@ -117,32 +103,15 @@ func (mgr *Manager) Prepare(ctx context.Context, tx *Transaction) (*PreparedTran
 		return &PreparedTransaction{commit: func(storage.LSN) {}}, nil
 	}
 
-	failedReferenceUpdates := FailedReferenceUpdates{}
 	refTX := mgr.referenceHistory.Begin(tx.TargetRelativePath, tx.ZeroOID)
 	for _, updates := range tx.ReferenceUpdates {
-		failedUpdates, err := refTX.ApplyUpdates(updates)
-		if err != nil {
+		if err := refTX.ApplyUpdates(updates); err != nil {
 			return nil, structerr.NewAborted("reference conflict: %w", err)
-		}
-
-		for _, failure := range failedUpdates {
-			if !tx.SkipReferenceVerificationFailures {
-				return nil, structerr.NewAborted("reference conflict: %w", failure)
-			}
-
-			if _, ok := failedReferenceUpdates[failure.TargetReference]; ok {
-				// Only record the first error on the reference as the subsequent
-				// errors would be due to the first failure.
-				continue
-			}
-
-			failedReferenceUpdates[failure.TargetReference] = failure
 		}
 	}
 
 	return &PreparedTransaction{
-		failedReferenceUpdates: failedReferenceUpdates,
-		commit:                 func(commitLSN storage.LSN) { refTX.Commit(commitLSN) },
+		commit: func(commitLSN storage.LSN) { refTX.Commit(commitLSN) },
 	}, nil
 }
 

@@ -30,23 +30,19 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx1 := history.Begin()
-		failedUpdates, err := tx1.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx1.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx1.Commit(1)
 
 		// We leave this transaction uncommitted and assert the history
 		// is unchanged.
 		tx2 := history.Begin()
-		failedUpdates, err = tx2.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx2.ApplyUpdates(git.ReferenceUpdates{
 			"HEAD":               {NewTarget: "refs/heads/main"},
 			"refs/heads/main":    {OldOID: "oid-1", NewOID: "oid-2"},
 			"refs/heads/deleted": {NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 
 		require.Equal(t, &node{
 			childReferences: 2,
@@ -89,11 +85,9 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"HEAD": {NewTarget: "refs/heads/new-default"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -108,17 +102,13 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"HEAD": {NewTarget: "refs/heads/new-default-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"HEAD": {OldTarget: "refs/heads/new-default-1", NewTarget: "refs/heads/new-default-2"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -133,81 +123,63 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"HEAD": {NewTarget: "refs/heads/new-default-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
-			"HEAD": {OldTarget: "refs/heads/main", NewTarget: "refs/heads/new-default-2"},
-		})
 		require.Equal(t, UnexpectedOldValueError{
 			TargetReference: "HEAD",
 			ExpectedValue:   "refs/heads/main",
 			ActualValue:     "refs/heads/new-default-1",
-		}, err)
-		require.Nil(t, failedUpdates)
+		}, tx.ApplyUpdates(git.ReferenceUpdates{
+			"HEAD": {OldTarget: "refs/heads/main", NewTarget: "refs/heads/new-default-2"},
+		}))
 	})
 
 	t.Run("parent references exist", func(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
-			"refs/heads/main/child": {NewOID: "oid-1"},
-		})
 		require.Equal(t, ParentReferenceExistsError{
 			ExistingReference: "refs/heads/main",
 			TargetReference:   "refs/heads/main/child",
-		}, err)
-		require.Nil(t, failedUpdates)
+		}, tx.ApplyUpdates(git.ReferenceUpdates{
+			"refs/heads/main/child": {NewOID: "oid-1"},
+		}))
 	})
 
 	t.Run("child references exist", func(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main/child": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
-			"refs/heads/main": {NewOID: "oid-1"},
-		})
 		require.Equal(t, ChildReferencesExistError{
 			TargetReference: "refs/heads/main",
-		}, err)
-		require.Nil(t, failedUpdates)
+		}, tx.ApplyUpdates(git.ReferenceUpdates{
+			"refs/heads/main": {NewOID: "oid-1"},
+		}))
 	})
 
 	t.Run("resolved directory-file conflict in history", func(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		}))
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {OldOID: "oid-1", NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		}))
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main/child": {NewOID: "oid-2"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -239,20 +211,16 @@ func TestTree(t *testing.T) {
 
 		// Child reference is first deleted.
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main/child": {NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		// And then a parent reference is created.
 		tx = history.Begin()
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(2)
 
 		// We expect the history to contain a record of the deletion regardless
@@ -295,11 +263,9 @@ func TestTree(t *testing.T) {
 
 		// Delete the parent reference again.
 		tx = history.Begin()
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {OldOID: "oid-1", NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(3)
 
 		// A subsequent transaction should still consider the recorded
@@ -307,15 +273,13 @@ func TestTree(t *testing.T) {
 		// should not be removed even if we created a reference above it at
 		// `refs/heads/main` and subsequently deleted `refs/heads/main` again.
 		tx = history.Begin()
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
-			"refs/heads/main/child": {OldOID: "oid-1", NewOID: "oid-2"},
-		})
-		require.NoError(t, err)
-		require.Equal(t, []UnexpectedOldValueError{{
+		require.Equal(t, UnexpectedOldValueError{
 			TargetReference: "refs/heads/main/child",
 			ExpectedValue:   "oid-1",
 			ActualValue:     zeroOID.String(),
-		}}, failedUpdates)
+		}, tx.ApplyUpdates(git.ReferenceUpdates{
+			"refs/heads/main/child": {OldOID: "oid-1", NewOID: "oid-2"},
+		}))
 
 		require.Equal(t,
 			&History{
@@ -355,11 +319,9 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -384,16 +346,12 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		}))
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {OldOID: "oid-1", NewOID: "oid-2"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -418,32 +376,26 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
-			"refs/heads/main": {OldOID: "oid-2", NewOID: "oid-3"},
-		})
-		require.NoError(t, err)
-		require.Equal(t, []UnexpectedOldValueError{{
+		require.Equal(t, UnexpectedOldValueError{
 			TargetReference: "refs/heads/main",
 			ExpectedValue:   "oid-2",
 			ActualValue:     "oid-1",
-		}}, failedUpdates)
+		}, tx.ApplyUpdates(git.ReferenceUpdates{
+			"refs/heads/main": {OldOID: "oid-2", NewOID: "oid-3"},
+		}))
 	})
 
 	t.Run("reference deletion", func(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -465,16 +417,12 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		}))
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {OldOID: zeroOID, NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		require.Equal(t, &node{
@@ -499,7 +447,7 @@ func TestTree(t *testing.T) {
 		history := NewHistory(zeroOID)
 
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/tx-1-created":                            {NewOID: "oid-1"},
 			"refs/heads/tx-1-deleted":                            {NewOID: zeroOID},
 			"refs/heads/tx-2-updated":                            {NewOID: "oid-1"},
@@ -509,13 +457,11 @@ func TestTree(t *testing.T) {
 			"refs/has-child-refs/tx-1-deleted":                   {NewOID: zeroOID},
 			"refs/has-deleted-child-refs/tx-1-deleted":           {NewOID: zeroOID},
 			"refs/to-have-parent-refs/tx-2-created/tx-1-deleted": {NewOID: zeroOID},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		tx = history.Begin()
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/tx-2-created":                               {NewOID: "oid-1"},
 			"refs/heads/tx-2-deleted":                               {NewOID: zeroOID},
 			"refs/heads/tx-2-updated":                               {OldOID: "oid-1", NewOID: "oid-2"},
@@ -523,9 +469,7 @@ func TestTree(t *testing.T) {
 			"refs/has-child-refs/tx-1-deleted/tx-2-created":         {NewOID: "oid-1"},
 			"refs/has-deleted-child-refs/tx-1-deleted/tx-2-deleted": {NewOID: zeroOID},
 			"refs/to-have-parent-refs/tx-2-created":                 {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(2)
 
 		require.Equal(t,
@@ -735,19 +679,15 @@ func TestTree(t *testing.T) {
 
 		// Create a reference and then overwrite it from another transaction.
 		tx := history.Begin()
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {NewOID: "oid-1"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(1)
 
 		tx = history.Begin()
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{
 			"refs/heads/main": {OldOID: "oid-1", NewOID: "oid-2"},
-		})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		}))
 		tx.Commit(2)
 
 		// Records related to the first LSN have already been dropped as all of its
