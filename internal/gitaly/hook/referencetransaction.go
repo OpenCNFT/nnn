@@ -91,7 +91,9 @@ func (m *GitLabHookManager) ReferenceTransactionHook(ctx context.Context, state 
 				return fmt.Errorf("parse changes: %w", err)
 			}
 
-			tx.UpdateReferences(updates)
+			if err := tx.UpdateReferences(updates); err != nil {
+				return fmt.Errorf("update references: %w", err)
+			}
 		}
 	default:
 		return nil
