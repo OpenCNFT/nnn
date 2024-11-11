@@ -257,16 +257,15 @@ type Transaction struct {
 	stagingSnapshot snapshot.FileSystem
 
 	// walEntry is the log entry where the transaction stages its state for committing.
-	walEntry                 *wal.Entry
-	skipVerificationFailures bool
-	initialReferenceValues   map[git.ReferenceName]git.Reference
-	referenceUpdates         []git.ReferenceUpdates
-	customHooksUpdated       bool
-	repositoryCreation       *repositoryCreation
-	deleteRepository         bool
-	includedObjects          map[git.ObjectID]struct{}
-	runHousekeeping          *runHousekeeping
-	alternateUpdated         bool
+	walEntry               *wal.Entry
+	initialReferenceValues map[git.ReferenceName]git.Reference
+	referenceUpdates       []git.ReferenceUpdates
+	customHooksUpdated     bool
+	repositoryCreation     *repositoryCreation
+	deleteRepository       bool
+	includedObjects        map[git.ObjectID]struct{}
+	runHousekeeping        *runHousekeeping
+	alternateUpdated       bool
 
 	// objectDependencies are the object IDs this transaction depends on in
 	// the repository. The dependencies are used to guard against invalid packs
@@ -617,17 +616,6 @@ func (txn *Transaction) SnapshotLSN() storage.LSN {
 // Root returns the path to the read snapshot.
 func (txn *Transaction) Root() string {
 	return txn.snapshot.Root()
-}
-
-// SkipVerificationFailures configures the transaction to skip reference updates that fail verification.
-// If a reference update fails verification with this set, the update is dropped from the transaction but
-// other successful reference updates will be made. By default, the entire transaction is aborted if a
-// reference fails verification.
-//
-// The default behavior models `git push --atomic`. Toggling this option models the behavior without
-// the `--atomic` flag.
-func (txn *Transaction) SkipVerificationFailures() {
-	txn.skipVerificationFailures = true
 }
 
 // RecordInitialReferenceValues records the initial values of the references for the next UpdateReferences call. If oid is
@@ -2288,12 +2276,11 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		// Prepare the transaction to conflict check it. We'll commit it later if we
 		// succeed logging the transaction.
 		preparedTX, err := mgr.conflictMgr.Prepare(ctx, &conflict.Transaction{
-			ReadLSN:                           transaction.SnapshotLSN(),
-			TargetRelativePath:                transaction.relativePath,
-			DeleteRepository:                  transaction.deleteRepository,
-			ZeroOID:                           zeroOID,
-			SkipReferenceVerificationFailures: transaction.skipVerificationFailures,
-			ReferenceUpdates:                  transaction.referenceUpdates,
+			ReadLSN:            transaction.SnapshotLSN(),
+			TargetRelativePath: transaction.relativePath,
+			DeleteRepository:   transaction.deleteRepository,
+			ZeroOID:            zeroOID,
+			ReferenceUpdates:   transaction.referenceUpdates,
 		})
 		if err != nil {
 			return fmt.Errorf("prepare: %w", err)

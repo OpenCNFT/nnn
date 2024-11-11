@@ -828,8 +828,6 @@ type Commit struct {
 	// run instead of asserting the error.
 	ExpectedError any
 
-	// SkipVerificationFailures sets the verification failure handling for this commit.
-	SkipVerificationFailures bool
 	// ReferenceUpdates are the reference updates to commit.
 	ReferenceUpdates git.ReferenceUpdates
 	// QuarantinedPacks are the packs to include in the quarantine directory of the transaction.
@@ -1174,10 +1172,6 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction committed before beginning it")
 
 			transaction := openTransactions[step.TransactionID]
-			if step.SkipVerificationFailures {
-				transaction.SkipVerificationFailures()
-			}
-
 			if transaction.relativePath != "" {
 				rewrittenRepo := setup.RepositoryFactory.Build(
 					transaction.RewriteRepository(&gitalypb.Repository{
