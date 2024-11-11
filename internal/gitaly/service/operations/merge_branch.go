@@ -10,7 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -127,7 +127,7 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 		var notAllowedError hook.NotAllowedError
 		var customHookErr updateref.CustomHookError
 		var updateRefError updateref.Error
-		var errReferenceVerification partition.ReferenceVerificationError
+		var errUnexpectedOldValue refdb.UnexpectedOldValueError
 
 		if errors.As(err, &notAllowedError) {
 			return structerr.NewPermissionDenied("%w", notAllowedError).WithDetail(
@@ -165,14 +165,14 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 					},
 				},
 			)
-		} else if errors.As(err, &errReferenceVerification) {
-			return structerr.NewFailedPrecondition("%w", &errReferenceVerification).WithDetail(
+		} else if errors.As(err, &errUnexpectedOldValue) {
+			return structerr.NewFailedPrecondition("%w", &errUnexpectedOldValue).WithDetail(
 				&gitalypb.UserMergeBranchError{
 					Error: &gitalypb.UserMergeBranchError_ReferenceUpdate{
 						ReferenceUpdate: &gitalypb.ReferenceUpdateError{
-							ReferenceName: []byte(errReferenceVerification.ReferenceName),
-							OldOid:        errReferenceVerification.ExpectedOldOID.String(),
-							NewOid:        errReferenceVerification.NewOID.String(),
+							ReferenceName: []byte(errUnexpectedOldValue.TargetReference),
+							OldOid:        revision.String(),
+							NewOid:        mergeCommitID,
 						},
 					},
 				},

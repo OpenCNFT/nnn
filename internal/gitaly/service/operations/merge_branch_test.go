@@ -21,7 +21,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/hook"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -815,11 +814,7 @@ func testUserMergeBranchConcurrentUpdate(t *testing.T, ctx context.Context) {
 	}
 
 	expectedErr := testhelper.WithOrWithoutWAL(
-		structerr.NewAborted("target update: running post-receive hooks: commit transaction: prepare: reference conflict: %w", refdb.UnexpectedOldValueError{
-			TargetReference: "refs/heads/branch",
-			ExpectedValue:   commits.left.String(),
-			ActualValue:     concurrentCommitID.String(),
-		}),
+		structerr.NewFailedPrecondition("unexpected old value").WithDetail(expectedDetail),
 		structerr.NewFailedPrecondition("reference update: reference does not point to expected object").
 			WithDetail(&testproto.ErrorMetadata{
 				Key:   []byte("actual_object_id"),
