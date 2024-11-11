@@ -3097,17 +3097,17 @@ func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, refe
 		return fmt.Errorf("object hash: %w", err)
 	}
 
+	recorder, err := wal.NewReferenceRecorder(tx.walEntry, tx.stagingSnapshot.Root(), tx.relativePath, objectHash.ZeroOID)
+	if err != nil {
+		return fmt.Errorf("new recorder: %w", err)
+	}
+
 	for _, referenceTransaction := range referenceTransactions {
-		if err := tx.walEntry.RecordReferenceUpdates(ctx,
-			mgr.storagePath,
-			tx.stagingSnapshot.Prefix(),
-			tx.relativePath,
-			referenceTransaction,
-			objectHash,
-			func(changes []*gitalypb.LogEntry_ReferenceTransaction_Change) error {
-				return mgr.applyReferenceTransaction(ctx, changes, repo)
-			},
-		); err != nil {
+		if err := mgr.applyReferenceTransaction(ctx, referenceTransaction.GetChanges(), repo); err != nil {
+			return fmt.Errorf("apply reference transaction: %w", err)
+		}
+
+		if err := recorder.RecordReferenceUpdates(ctx, referenceTransaction); err != nil {
 			return fmt.Errorf("record reference updates: %w", err)
 		}
 	}
