@@ -26,17 +26,22 @@ import (
 //
 // RecordReferenceUpdates should be called after each committed reference transaction to determine
 // the changes made, and to update the pre-image for a possible subsequent reference transaction.
+//
+// After the all changes are done, CommitPackedRefs should be called to commit the packed-refs changes
+// potentially performed. It's only logged once at the end to avoid logging it multiple times.
 type ReferenceRecorder struct {
 	snapshotRoot string
 	relativePath string
 	zeroOID      git.ObjectID
 
-	preImage *reftree.Node
-	entry    *Entry
+	preImage                *reftree.Node
+	preImagePackedRefsPath  string
+	postImagePackedRefsPath string
+	entry                   *Entry
 }
 
 // NewReferenceRecorder returns a new reference recorder.
-func NewReferenceRecorder(entry *Entry, snapshotRoot, relativePath string, zeroOID git.ObjectID) (*ReferenceRecorder, error) {
+func NewReferenceRecorder(tmpDir string, entry *Entry, snapshotRoot, relativePath string, zeroOID git.ObjectID) (*ReferenceRecorder, error) {
 	preImage := reftree.New()
 
 	repoRoot := filepath.Join(snapshotRoot, relativePath)
@@ -60,12 +65,20 @@ func NewReferenceRecorder(entry *Entry, snapshotRoot, relativePath string, zeroO
 		return nil, err
 	}
 
+	preImagePackedRefsPath := filepath.Join(tmpDir, "packed-refs")
+	postImagePackedRefsPath := filepath.Join(repoRoot, "packed-refs")
+	if err := os.Link(postImagePackedRefsPath, preImagePackedRefsPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("record pre-image packed-refs: %w", err)
+	}
+
 	return &ReferenceRecorder{
-		snapshotRoot: snapshotRoot,
-		relativePath: relativePath,
-		zeroOID:      zeroOID,
-		preImage:     preImage,
-		entry:        entry,
+		snapshotRoot:            snapshotRoot,
+		relativePath:            relativePath,
+		zeroOID:                 zeroOID,
+		preImage:                preImage,
+		preImagePackedRefsPath:  preImagePackedRefsPath,
+		postImagePackedRefsPath: postImagePackedRefsPath,
+		entry:                   entry,
 	}, nil
 }
 
@@ -92,9 +105,6 @@ func NewReferenceRecorder(entry *Entry, snapshotRoot, relativePath string, zeroO
 //
 // Each recorded operation is staged against the target relative path by omitting the snapshotPrefix. This works as
 // the snapshots retain the directory hierarchy of the original storage.
-//
-// Only the state changes inside `refs` directory are captured. To fully apply the reference transaction, changes to
-// `packed-refs` should be captured separately.
 //
 // The method assumes the reference directory is in good shape and doesn't have hierarchies of empty directories. It
 // thus doesn't record the deletion of such directories. If a directory such as `refs/heads/parent/child/subdir`
@@ -239,6 +249,40 @@ func (r *ReferenceRecorder) RecordReferenceUpdates(ctx context.Context, refTX *g
 		return nil
 	}); err != nil {
 		return fmt.Errorf("walk deletions post-order: %w", err)
+	}
+
+	return nil
+}
+
+// StagePackedRefs should be called once there are no more changes to perform. It checks the
+// packed-refs file for modifications, and logs it if it has been modified.
+func (r *ReferenceRecorder) StagePackedRefs() error {
+	preImageInode, err := GetInode(r.preImagePackedRefsPath)
+	if err != nil {
+		return fmt.Errorf("pre-image inode: %w", err)
+	}
+
+	postImageInode, err := GetInode(r.postImagePackedRefsPath)
+	if err != nil {
+		return fmt.Errorf("post-imaga inode: %w", err)
+	}
+
+	if preImageInode == postImageInode {
+		return nil
+	}
+
+	packedRefsRelativePath := filepath.Join(r.relativePath, "packed-refs")
+	if preImageInode > 0 {
+		r.entry.operations.removeDirectoryEntry(packedRefsRelativePath)
+	}
+
+	if postImageInode > 0 {
+		fileID, err := r.entry.stageFile(r.postImagePackedRefsPath)
+		if err != nil {
+			return fmt.Errorf("stage packed-refs: %w", err)
+		}
+
+		r.entry.operations.createHardLink(fileID, packedRefsRelativePath, false)
 	}
 
 	return nil

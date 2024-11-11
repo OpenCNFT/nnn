@@ -55,11 +55,12 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 	umask := testhelper.Umask()
 
 	type setupData struct {
-		existingReferences    referenceTransaction
-		referenceTransactions []referenceTransaction
-		expectedOperations    operations
-		expectedDirectory     testhelper.DirectoryState
-		expectedError         error
+		existingPackedReferences referenceTransaction
+		existingReferences       referenceTransaction
+		referenceTransactions    []referenceTransaction
+		expectedOperations       operations
+		expectedDirectory        testhelper.DirectoryState
+		expectedError            error
 	}
 
 	for _, tc := range []struct {
@@ -106,6 +107,93 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 						"/3": {Mode: mode.File, Content: []byte(oids[2] + "\n")},
 						"/4": {Mode: mode.File, Content: []byte(oids[3] + "\n")},
 						"/5": {Mode: mode.File, Content: []byte(oids[4] + "\n")},
+					},
+				}
+			},
+		},
+		{
+			desc: "reference deleted outside of packed-refs",
+			setup: func(t *testing.T, oids []git.ObjectID) setupData {
+				return setupData{
+					existingPackedReferences: referenceTransaction{
+						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
+					},
+					existingReferences: referenceTransaction{
+						"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[0]},
+					},
+					referenceTransactions: []referenceTransaction{
+						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[1]}},
+						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
+						{"refs/heads/branch-3": git.ReferenceUpdate{NewOID: oids[2]}},
+					},
+					expectedOperations: func() operations {
+						var ops operations
+						ops.createHardLink("1", "relative-path/refs/heads/branch-1", false)
+						ops.removeDirectoryEntry("relative-path/refs/heads/branch-2")
+						ops.createHardLink("2", "relative-path/refs/heads/branch-3", false)
+						return ops
+					}(),
+					expectedDirectory: testhelper.DirectoryState{
+						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+						"/1": {Mode: mode.File, Content: []byte(oids[1] + "\n")},
+						"/2": {Mode: mode.File, Content: []byte(oids[2] + "\n")},
+					},
+				}
+			},
+		},
+		{
+			desc: "reference deleted from packed-refs",
+			setup: func(t *testing.T, oids []git.ObjectID) setupData {
+				return setupData{
+					existingPackedReferences: referenceTransaction{
+						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
+					},
+					referenceTransactions: []referenceTransaction{
+						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
+						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[1]}},
+					},
+					expectedOperations: func() operations {
+						var ops operations
+						ops.createHardLink("1", "relative-path/refs/heads/branch-2", false)
+						ops.removeDirectoryEntry("relative-path/packed-refs")
+						ops.createHardLink("2", "relative-path/packed-refs", false)
+						return ops
+					}(),
+					expectedDirectory: testhelper.DirectoryState{
+						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+						"/1": {Mode: mode.File, Content: []byte(oids[1] + "\n")},
+						"/2": {Mode: mode.File, Content: []byte("# pack-refs with: peeled fully-peeled sorted \n")},
+					},
+				}
+			},
+		},
+		{
+			desc: "only a single packed-refs file is logged",
+			setup: func(t *testing.T, oids []git.ObjectID) setupData {
+				return setupData{
+					existingPackedReferences: referenceTransaction{
+						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
+						"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[1]},
+						"refs/heads/branch-3": git.ReferenceUpdate{NewOID: oids[2]},
+					},
+					referenceTransactions: []referenceTransaction{
+						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
+						{"refs/heads/branch-4": git.ReferenceUpdate{NewOID: oids[3]}},
+						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
+					},
+					expectedOperations: func() operations {
+						var ops operations
+						ops.createHardLink("1", "relative-path/refs/heads/branch-4", false)
+						ops.removeDirectoryEntry("relative-path/packed-refs")
+						ops.createHardLink("2", "relative-path/packed-refs", false)
+						return ops
+					}(),
+					expectedDirectory: testhelper.DirectoryState{
+						"/":  {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+						"/1": {Mode: mode.File, Content: []byte(oids[3] + "\n")},
+						"/2": {Mode: mode.File, Content: []byte(
+							fmt.Sprintf("# pack-refs with: peeled fully-peeled sorted \n%s refs/heads/branch-3\n", oids[2]),
+						)},
 					},
 				}
 			},
@@ -343,12 +431,15 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 
 			setupData := tc.setup(t, commitIDs)
 
+			performChanges(t, updater, referenceTransactionToProto(setupData.existingPackedReferences).GetChanges())
+			gittest.Exec(t, cfg, "-C", repoPath, "pack-refs", "--all")
+
 			performChanges(t, updater, referenceTransactionToProto(setupData.existingReferences).GetChanges())
 
 			snapshotRoot := filepath.Join(storageRoot, "snapshot")
 			stateDir := t.TempDir()
 			entry := NewEntry(stateDir)
-			recorder, err := NewReferenceRecorder(entry, snapshotRoot, relativePath, gittest.DefaultObjectHash.ZeroOID)
+			recorder, err := NewReferenceRecorder(t.TempDir(), entry, snapshotRoot, relativePath, gittest.DefaultObjectHash.ZeroOID)
 			require.NoError(t, err)
 
 			for _, refTX := range setupData.referenceTransactions {
@@ -359,6 +450,8 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 					return
 				}
 			}
+
+			require.NoError(t, recorder.StagePackedRefs())
 
 			require.Nil(t, setupData.expectedError)
 			testhelper.ProtoEqual(t, setupData.expectedOperations, entry.operations)
