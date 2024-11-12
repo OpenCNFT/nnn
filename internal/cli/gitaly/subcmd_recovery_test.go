@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,7 @@ func TestRecoveryCLI_status(t *testing.T) {
 		locator       storage.Locator
 		gitCmdFactory gitcmd.CommandFactory
 		catfileCache  catfile.Cache
+		backupRoot    string
 	}
 
 	type setupData struct {
@@ -92,7 +94,7 @@ Applied LSN: %s
 			},
 		},
 		{
-			desc: "success",
+			desc: "success, no backups",
 			setup: func(tb testing.TB, ctx context.Context, opts setupOptions) setupData {
 				logger := testhelper.SharedLogger(t)
 				repo := &gitalypb.Repository{
@@ -138,12 +140,73 @@ Relative paths:
 				}
 			},
 		},
+		{
+			desc: "success, backups",
+			setup: func(tb testing.TB, ctx context.Context, opts setupOptions) setupData {
+				logger := testhelper.SharedLogger(t)
+				repo := &gitalypb.Repository{
+					StorageName:  opts.cfg.Storages[0].Name,
+					RelativePath: gittest.NewRepositoryName(t),
+				}
+
+				txn, err := opts.storageMgr.Begin(ctx, storage.TransactionOptions{
+					RelativePath: repo.GetRelativePath(),
+					AllowPartitionAssignmentWithoutRepository: true,
+				})
+				require.NoError(t, err)
+
+				err = repoutil.Create(
+					ctx,
+					logger,
+					opts.locator,
+					opts.gitCmdFactory,
+					opts.catfileCache,
+					transaction.NewTrackingManager(),
+					counter.NewRepositoryCounter(opts.cfg.Storages),
+					txn.RewriteRepository(repo),
+					func(repo *gitalypb.Repository) error {
+						return nil
+					},
+				)
+				require.NoError(t, err)
+
+				require.NoError(t, txn.Commit(ctx))
+
+				partitionPath := filepath.Join(repo.GetStorageName(), fmt.Sprintf("%d", storage.PartitionID(2)))
+				testhelper.WriteFiles(t, opts.backupRoot, map[string]any{
+					filepath.Join(partitionPath, storage.LSN(1).String()+".tar"): "",
+					filepath.Join(partitionPath, storage.LSN(2).String()+".tar"): "",
+					filepath.Join(partitionPath, storage.LSN(3).String()+".tar"): "",
+				})
+
+				return setupData{
+					storageName: repo.GetStorageName(),
+					partitionID: 2,
+					expectedOutput: fmt.Sprintf(`Partition ID: %s
+Applied LSN: %s
+Relative paths:
+ - %s
+Available backup entries:
+ - %s
+ - %s
+`,
+						storage.PartitionID(2),
+						storage.LSN(1),
+						repo.GetRelativePath(),
+						storage.LSN(2),
+						storage.LSN(3),
+					),
+				}
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
+			backupRoot := t.TempDir()
 			ctx := testhelper.Context(t)
 			cfg := testcfg.Build(t)
+			cfg.Backup.WALGoCloudURL = backupRoot
 			configPath := testcfg.WriteTemporaryGitalyConfigFile(t, cfg)
 			testcfg.BuildGitaly(t, cfg)
 
@@ -180,6 +243,7 @@ Relative paths:
 				locator:       locator,
 				gitCmdFactory: gitCmdFactory,
 				catfileCache:  catfileCache,
+				backupRoot:    backupRoot,
 			})
 
 			// Stop storage and DB so that we can run the command "offline"
