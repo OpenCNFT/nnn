@@ -69,6 +69,15 @@ func RecordKeyCreation(txn storage.Transaction, relativePath string) error {
 	return nil
 }
 
+// RecordKeyDeletion records in the provided transaction a migration key deletion.
+func RecordKeyDeletion(txn storage.Transaction, relativePath string) error {
+	if err := txn.KV().Delete(migrationKey(relativePath)); err != nil {
+		return fmt.Errorf("deleting key: %w", err)
+	}
+
+	return nil
+}
+
 // uint64ToBytes marshals the provided uint64 into a slice of bytes.
 func uint64ToBytes(i uint64) []byte {
 	val := make([]byte, binary.Size(i))
