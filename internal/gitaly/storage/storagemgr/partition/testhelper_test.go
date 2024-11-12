@@ -1031,7 +1031,7 @@ func performReferenceUpdates(t *testing.T, ctx context.Context, tx *Transaction,
 	}
 	require.NoError(t, updater.Commit())
 
-	return tx.UpdateReferences(updates)
+	return tx.UpdateReferences(ctx, updates)
 }
 
 func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCase, setup testTransactionSetup) {
@@ -1232,7 +1232,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.DefaultBranchUpdate != nil {
-					require.NoError(t, transaction.UpdateReferences(map[git.ReferenceName]git.ReferenceUpdate{
+					require.NoError(t, transaction.UpdateReferences(ctx, map[git.ReferenceName]git.ReferenceUpdate{
 						"HEAD": {NewTarget: step.DefaultBranchUpdate.Reference},
 					}))
 
