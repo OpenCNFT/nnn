@@ -32,8 +32,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testentry"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
-	"google.golang.org/protobuf/proto"
 )
 
 // errSimulatedCrash is used in the tests to simulate a crash at a certain point during
@@ -45,126 +45,6 @@ var simulateCrashHook = func() func(hookContext) {
 	return func(hookContext) {
 		panic(errSimulatedCrash)
 	}
-}
-
-func manifestDirectoryEntry(expected *gitalypb.LogEntry) testhelper.DirectoryEntry {
-	return testhelper.DirectoryEntry{
-		Mode:    mode.File,
-		Content: expected,
-		ParseContent: func(tb testing.TB, path string, content []byte) any {
-			var logEntry gitalypb.LogEntry
-			require.NoError(tb, proto.Unmarshal(content, &logEntry))
-			return &logEntry
-		},
-	}
-}
-
-// buildReftableDirectory builds the testhelper.DirectoryState for reftables.
-// In the file system backend, we know for certain the files which will be included
-// and also their content. But in the reftable backend, we have a binary format
-// which we cannot verify and this is not deterministic. So let's do a best effort
-// basis here. We verify that the number of tables are correct and that the tables.list
-// constituents of reftables. We do not verify the content of the reftable themselves
-// here.
-func buildReftableDirectory(data map[int][]git.ReferenceUpdates) testhelper.DirectoryState {
-	state := testhelper.DirectoryState{
-		"/":    {Mode: mode.Directory},
-		"/wal": {Mode: mode.Directory},
-	}
-
-	for id, updates := range data {
-		prefix := fmt.Sprintf("/wal/000000000000%d", id)
-		numTables := uint(len(updates))
-
-		state[prefix] = testhelper.DirectoryEntry{Mode: mode.Directory}
-		state[prefix+"/MANIFEST"] = testhelper.DirectoryEntry{
-			Mode:    mode.File,
-			Content: true,
-			ParseContent: func(tb testing.TB, path string, content []byte) any {
-				var logEntry gitalypb.LogEntry
-				require.NoError(tb, proto.Unmarshal(content, &logEntry))
-
-				// If there are no reftables being created, we exit early.
-				if numTables == 0 {
-					return true
-				}
-
-				// If there are reftables being created, we need to account for
-				// N tables and +2 for the tables.list being updated.
-				require.Equal(tb, numTables+2, uint(len(logEntry.GetOperations())))
-
-				// The reftables should only be created.
-				for i := uint(0); i < numTables; i++ {
-					create := logEntry.GetOperations()[i].GetCreateHardLink()
-					require.NotNil(tb, create)
-					require.True(tb, git.ReftableTableNameRegex.Match(create.GetDestinationPath()))
-				}
-
-				// The tables.list should be deleted and create (updated).
-				delete := logEntry.GetOperations()[numTables].GetRemoveDirectoryEntry()
-				require.NotNil(tb, delete)
-				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
-
-				create := logEntry.GetOperations()[numTables].GetRemoveDirectoryEntry()
-				require.NotNil(tb, create)
-				require.True(tb, strings.Contains(string(delete.GetPath()), "tables.list"))
-
-				return true
-			},
-		}
-
-		// Parse the reftable and check its references.
-		for i := uint(1); i <= numTables; i++ {
-			state[fmt.Sprintf("%s/%d", prefix, i)] = testhelper.DirectoryEntry{
-				Mode:    mode.File,
-				Content: updates[i-1],
-				ParseContent: func(tb testing.TB, path string, content []byte) any {
-					table, err := git.NewReftable(content)
-					require.NoError(tb, err)
-
-					references, err := table.IterateRefs()
-					require.NoError(tb, err)
-
-					refUpdates := make(git.ReferenceUpdates)
-
-					for _, reference := range references {
-						update := git.ReferenceUpdate{}
-
-						if reference.IsSymbolic {
-							update.NewTarget = git.ReferenceName(reference.Target)
-						} else {
-							update.NewOID = git.ObjectID(reference.Target)
-						}
-
-						refUpdates[reference.Name] = update
-					}
-
-					return refUpdates
-				},
-			}
-		}
-
-		// For tables.list, we can verify that all the lines within that file are
-		// reftables indeed.
-		if numTables > 0 {
-			state[fmt.Sprintf("%s/%d", prefix, numTables+1)] = testhelper.DirectoryEntry{
-				Mode:    mode.File,
-				Content: true,
-				ParseContent: func(tb testing.TB, path string, content []byte) any {
-					for _, file := range strings.Split(string(content), "\n") {
-						if len(file) == 0 {
-							break
-						}
-
-						require.True(tb, git.ReftableTableNameRegex.Match([]byte(file)))
-					}
-					return true
-				},
-			}
-		}
-	}
-
-	return state
 }
 
 func validCustomHooks(tb testing.TB) []byte {
@@ -203,51 +83,6 @@ func validCustomHooks(tb testing.TB) []byte {
 
 	require.NoError(tb, writer.Close())
 	return hooks.Bytes()
-}
-
-func refChangeLogEntry(setup testTransactionSetup, ref string, oid git.ObjectID) *gitalypb.LogEntry {
-	entry := &gitalypb.LogEntry{
-		RelativePath: setup.RelativePath,
-		ReferenceTransactions: []*gitalypb.LogEntry_ReferenceTransaction{
-			{
-				Changes: []*gitalypb.LogEntry_ReferenceTransaction_Change{
-					{
-						ReferenceName: []byte(ref),
-						NewOid:        []byte(oid),
-					},
-				},
-			},
-		},
-		Operations: []*gitalypb.LogEntry_Operation{
-			{
-				Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
-					CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
-						SourcePath:      []byte("1"),
-						DestinationPath: []byte(filepath.Join(setup.RelativePath, ref)),
-					},
-				},
-			},
-		},
-	}
-
-	if testhelper.IsReftableEnabled() {
-		entry.Operations = append(entry.Operations, &gitalypb.LogEntry_Operation{
-			Operation: &gitalypb.LogEntry_Operation_RemoveDirectoryEntry_{
-				RemoveDirectoryEntry: &gitalypb.LogEntry_Operation_RemoveDirectoryEntry{
-					Path: []byte(filepath.Join(setup.RelativePath, "reftable/tables.list")),
-				},
-			},
-		}, &gitalypb.LogEntry_Operation{
-			Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
-				CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
-					SourcePath:      []byte("2"),
-					DestinationPath: []byte(filepath.Join(setup.RelativePath, "reftable/tables.list")),
-				},
-			},
-		})
-	}
-
-	return entry
 }
 
 func setupTest(t *testing.T, ctx context.Context, testPartitionID storage.PartitionID, relativePath string) testTransactionSetup {
@@ -536,7 +371,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					"/":                  {Mode: mode.Directory},
 					"/wal":               {Mode: mode.Directory},
 					"/wal/0000000000001": {Mode: mode.Directory},
-					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(&gitalypb.LogEntry{
+					"/wal/0000000000001/MANIFEST": testentry.ManifestDirectoryEntry(&gitalypb.LogEntry{
 						RelativePath: setup.RelativePath,
 						ReferenceTransactions: []*gitalypb.LogEntry_ReferenceTransaction{
 							{
@@ -560,7 +395,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 						},
 					}),
 					"/wal/0000000000001/1": {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+				}, testentry.BuildReftableDirectory(map[int][]git.ReferenceUpdates{
 					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
 				})),
 			},
@@ -1914,7 +1749,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						},
 						{
 							lsn:   2,
-							entry: refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID),
+							entry: testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID),
 						},
 					}, tm.wal.committedEntries)
 				}),
@@ -1932,7 +1767,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						{
 							lsn:             2,
 							snapshotReaders: 1,
-							entry:           refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID),
+							entry:           testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID),
 						},
 					}, tm.wal.committedEntries)
 				}),
@@ -1946,12 +1781,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
 						{
 							lsn:             2,
-							entry:           refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID),
+							entry:           testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID),
 							snapshotReaders: 1,
 						},
 						{
 							lsn:   3,
-							entry: refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID),
+							entry: testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-2", setup.Commits.First.OID),
 						},
 					}, tm.wal.committedEntries)
 				}),
@@ -2122,12 +1957,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
 							"/wal/0000000000002":          {Mode: mode.Directory},
-							"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
+							"/wal/0000000000002/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID)),
 							"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 							"/wal/0000000000003":          {Mode: mode.Directory},
-							"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
+							"/wal/0000000000003/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-2", setup.Commits.First.OID)),
 							"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
+						}, testentry.BuildReftableDirectory(map[int][]git.ReferenceUpdates{
 							2: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
 							3: {{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
 						})))
@@ -2268,7 +2103,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					_, err := tm.wal.Propose(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath)
+					_, err := tm.wal.Propose(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath)
 					require.NoError(t, err)
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
@@ -2279,13 +2114,13 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
 						"/wal/0000000000002":          {Mode: mode.Directory},
-						"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
+						"/wal/0000000000002/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID)),
 						"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 						"/wal/0000000000003":          {Mode: mode.Directory},
-						"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
+						"/wal/0000000000003/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-2", setup.Commits.First.OID)),
 						"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 						"/wal/0000000000004":          {Mode: mode.Directory},
-						"/wal/0000000000004/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID)),
+						"/wal/0000000000004/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-3", setup.Commits.First.OID)),
 						"/wal/0000000000004/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 					})
 				}),
