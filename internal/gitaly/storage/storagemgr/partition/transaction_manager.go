@@ -3089,12 +3089,12 @@ func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, refe
 		return fmt.Errorf("new recorder: %w", err)
 	}
 
-	for _, referenceTransaction := range referenceTransactions {
-		if err := mgr.applyReferenceTransaction(ctx, referenceTransaction.GetChanges(), repo); err != nil {
+	for i, updates := range tx.referenceUpdates {
+		if err := mgr.applyReferenceTransaction(ctx, referenceTransactions[i].GetChanges(), repo); err != nil {
 			return fmt.Errorf("apply reference transaction: %w", err)
 		}
 
-		if err := recorder.RecordReferenceUpdates(ctx, referenceTransaction); err != nil {
+		if err := recorder.RecordReferenceUpdates(ctx, updates); err != nil {
 			return fmt.Errorf("record reference updates: %w", err)
 		}
 	}
