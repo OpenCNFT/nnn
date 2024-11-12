@@ -268,7 +268,8 @@ type Transaction struct {
 	// db is the transaction's snapshot of the partition's key-value state. The keyvalue.Transaction is
 	// discarded when the transaction finishes. The recorded writes are write-ahead logged and applied
 	// to the partition from the WAL.
-	db keyvalue.Transaction
+	db                keyvalue.Transaction
+	referenceRecorder *wal.ReferenceRecorder
 	// recordingReadWriter is a ReadWriter operating on db that also records operations performed. This
 	// is used to record the operations performed so they can be conflict checked and write-ahead logged.
 	recordingReadWriter keyvalue.RecordingReadWriter
@@ -357,7 +358,13 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	}
 
 	mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Add(1)
-	defer mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Done()
+
+	var snapshotDoneOnce sync.Once
+	snapshotDone := func() {
+		snapshotDoneOnce.Do(mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Done)
+	}
+
+	defer snapshotDone()
 	readReady := mgr.snapshotLocks[txn.snapshotLSN].applied
 
 	var entry *committedEntry
@@ -460,6 +467,15 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 			return nil, fmt.Errorf("get snapshot: %w", err)
 		}
 
+		snapshotDone()
+
+		// Create a directory to store all staging files.
+		if err := os.Mkdir(txn.walFilesPath(), mode.Directory); err != nil {
+			return nil, fmt.Errorf("create wal files directory: %w", err)
+		}
+
+		txn.walEntry = wal.NewEntry(txn.walFilesPath())
+
 		if txn.repositoryTarget() {
 			txn.repositoryExists, err = mgr.doesRepositoryExist(ctx, txn.snapshot.RelativePath(txn.relativePath))
 			if err != nil {
@@ -487,6 +503,20 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 					txn.snapshotRepository, err = txn.snapshotRepository.Quarantine(ctx, txn.quarantineDirectory)
 					if err != nil {
 						return nil, fmt.Errorf("quarantine: %w", err)
+					}
+
+					refRecorderTmpDir := filepath.Join(txn.stagingDirectory, "ref-recorder")
+					if err := os.Mkdir(refRecorderTmpDir, os.ModePerm); err != nil {
+						return nil, fmt.Errorf("create reference recorder tmp dir: %w", err)
+					}
+
+					objectHash, err := txn.snapshotRepository.ObjectHash(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("object hash: %w", err)
+					}
+
+					if txn.referenceRecorder, err = wal.NewReferenceRecorder(refRecorderTmpDir, txn.walEntry, txn.snapshot.Root(), txn.relativePath, objectHash.ZeroOID); err != nil {
+						return nil, fmt.Errorf("new reference recorder: %w", err)
 					}
 				} else {
 					txn.quarantineDirectory = filepath.Join(mgr.storagePath, txn.snapshot.RelativePath(txn.relativePath), "objects")
@@ -754,6 +784,10 @@ func (txn *Transaction) UpdateReferences(ctx context.Context, updates git.Refere
 
 	if len(u) == 0 {
 		return nil
+	}
+
+	if err := txn.referenceRecorder.RecordReferenceUpdates(ctx, updates); err != nil {
+		return fmt.Errorf("record reference updates: %w", err)
 	}
 
 	txn.referenceUpdates = append(txn.referenceUpdates, u)
@@ -1114,13 +1148,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 	}
 
-	// Create a directory to store all staging files.
-	if err := os.Mkdir(transaction.walFilesPath(), mode.Directory); err != nil {
-		return fmt.Errorf("create wal files directory: %w", err)
-	}
-
-	transaction.walEntry = wal.NewEntry(transaction.walFilesPath())
-
 	if err := mgr.packObjects(ctx, transaction); err != nil {
 		return fmt.Errorf("pack objects: %w", err)
 	}
@@ -1201,6 +1228,12 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 				); err != nil {
 					return fmt.Errorf("record file creation: %w", err)
 				}
+			}
+		}
+
+		if transaction.referenceRecorder != nil {
+			if err := transaction.referenceRecorder.StagePackedRefs(); err != nil {
+				return fmt.Errorf("stage packed refs: %w", err)
 			}
 		}
 	}
@@ -2815,10 +2848,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		if err := mgr.verifyReferencesWithGitForReftables(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
 			return nil, fmt.Errorf("verify references with git: %w", err)
 		}
-	} else {
-		if err := mgr.verifyReferencesWithGit(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
-			return nil, fmt.Errorf("verify references with git: %w", err)
-		}
 	}
 
 	return referenceTransactions, nil
@@ -2926,179 +2955,6 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 		if err := os.Remove(lockedTable); err != nil {
 			return fmt.Errorf("deleting locked file: %w", err)
 		}
-	}
-
-	return nil
-}
-
-func (txn *Transaction) containsReferenceDeletions(ctx context.Context, stagingRepository *localrepo.Repo) (bool, error) {
-	objectHash, err := stagingRepository.ObjectHash(ctx)
-	if err != nil {
-		return false, fmt.Errorf("object hash: %w", err)
-	}
-
-	for _, refTX := range txn.referenceUpdates {
-		for _, update := range refTX {
-			if update.NewOID == objectHash.ZeroOID {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transaction, stagingRepository *localrepo.Repo) error {
-	// Get the inode of the `packed-refs` file as it was before the transaction. This was
-	// recorded when the transaction began.
-	preImagePackedRefsInode, err := wal.GetInode(tx.originalPackedRefsFilePath())
-	if err != nil {
-		return fmt.Errorf("get pre-image packed-refs inode: %w", err)
-	}
-
-	// Get the inode of the `packed-refs` file as it is in the snapshot after the transaction. This contains
-	// all of the modifications the transaction has performed on it.
-	postImagePackedRefsPath := mgr.getAbsolutePath(tx.snapshot.RelativePath(tx.relativePath), "packed-refs")
-	postImagePackedRefsInode, err := wal.GetInode(postImagePackedRefsPath)
-	if err != nil {
-		return fmt.Errorf("get post-image packed-refs inode: %w", err)
-	}
-
-	if preImagePackedRefsInode == postImagePackedRefsInode {
-		// The transaction itself didn't modify the packed-refs file. However, if there was
-		// a concurrent reference packing operation, it would have moved the loose references
-		// into packed-refs. As they were loose references in our snapshot, we would have deleted
-		// just the loose references. The concurrently committed packed-refs file would now contain
-		// the deleted references. This would require us to rewrite the pack as part of applying the
-		// reference updates. Abort the transaction due to the conflict as we can't just replace the
-		// packed-refs file with our own anymore as it would also lose the other references that were
-		// packed.
-		//
-		// If our transaction includes any reference deletions, ensure there hasn't been a concurrent
-		// reference packing operation.
-		//
-		// We allow modifications to packed-refs other than repacking. This would only be reference
-		// deletions. If our transaction didn't modify the packed-refs file, the references we are
-		// deleting were not packed. They don't conflict with removal of other references that were
-		// removed from the packed-refs file by a concurrent transaction.
-		containsReferenceDeletions, err := tx.containsReferenceDeletions(ctx, stagingRepository)
-		if err != nil {
-			return fmt.Errorf("contains reference deletions: %w", err)
-		}
-
-		if containsReferenceDeletions {
-			if err := mgr.walkCommittedEntries(tx, func(entry *gitalypb.LogEntry, dependencies map[git.ObjectID]struct{}) error {
-				if entry.GetHousekeeping().GetPackRefs() != nil {
-					return errConcurrentReferencePacking
-				}
-				return nil
-			}); err != nil {
-				return fmt.Errorf("check for concurrent reference packing: %w", err)
-			}
-		}
-
-		return nil
-	}
-
-	// Get the inode of the `packed-refs` file as it is currently in the repository.
-	stagingRepoPath, err := stagingRepository.Path(ctx)
-	if err != nil {
-		return fmt.Errorf("staging repo path: %w", err)
-	}
-
-	currentPackedRefsPath := filepath.Join(stagingRepoPath, "packed-refs")
-	currentPackedRefsInode, err := wal.GetInode(currentPackedRefsPath)
-	if err != nil {
-		return fmt.Errorf("get current packed-refs inode: %w", err)
-	}
-
-	if preImagePackedRefsInode != currentPackedRefsInode {
-		// There's a conflict, the packed-refs file has been concurrently changed.
-		return errConcurrentPackedRefsWrite
-	}
-
-	packedRefsRelativePath := filepath.Join(tx.relativePath, "packed-refs")
-	if currentPackedRefsInode > 0 {
-		// If the repository has a packed-refs file already, remove it.
-		tx.walEntry.RecordDirectoryEntryRemoval(packedRefsRelativePath)
-
-		// Remove the current packed-refs file from the staging repository if the transaction
-		// changed the packed-refs file. If the packed-refs file was removed, this applies
-		// the removal. If it was updated, we'll link the new one in place below.
-		if err := os.Remove(currentPackedRefsPath); err != nil {
-			return fmt.Errorf("remove packed-refs: %w", err)
-		}
-	}
-
-	if postImagePackedRefsInode > 0 {
-		// If there is a new packed refs file, stage it.
-		if err := tx.walEntry.RecordFileCreation(
-			postImagePackedRefsPath,
-			packedRefsRelativePath,
-		); err != nil {
-			return fmt.Errorf("record new packed-refs: %w", err)
-		}
-
-		// If the transaction created or modified the packed-refs file, link the new one into
-		// the staging repository.
-		if err := os.Link(
-			postImagePackedRefsPath,
-			currentPackedRefsPath,
-		); err != nil {
-			return fmt.Errorf("link post-image packed-refs: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// verifyReferencesWithGit verifies the reference updates with git by committing them against a snapshot of the target
-// repository. This ensures the updates will go through when they are being applied from the log. This also catches any
-// invalid reference names and file/directory conflicts with Git's loose reference storage which can occur with references
-// like 'refs/heads/parent' and 'refs/heads/parent/child'.
-func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction, tx *Transaction, repo *localrepo.Repo) error {
-	// We don't want to delete references from the packed-refs in `RecordReferenceUpdates` below as it can be very
-	// slow and blocks all other transaction processing. We avoid this by staging the packed-refs file from
-	// transaction's post-image into the staging repository. All references the transaction would have deleted
-	// from the packed-refs file thus no longer exist there so `applyReferenceUpdates` below does not have to
-	// remove them. Any loose references we must delete are still in the repository, and will be recorded
-	// as we apply the deletions.
-	//
-	// As we're staging the transaction's modified packed-refs file as is, we must ensure no other transaction
-	// has modified the file. We do this by checking whether the packed-refs file's inode is the same as it was
-	// when our transaction began. If not, someone has modified the packed-refs file and us overriding the changes
-	// there could lead to lost updates.
-	if err := mgr.stagePackedRefs(ctx, tx, repo); err != nil {
-		return fmt.Errorf("stage packed-refs: %w", err)
-	}
-
-	objectHash, err := repo.ObjectHash(ctx)
-	if err != nil {
-		return fmt.Errorf("object hash: %w", err)
-	}
-
-	tmpDir := filepath.Join(tx.stagingDirectory, "ref-recorder")
-	if err := os.Mkdir(tmpDir, mode.Directory); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
-	}
-
-	recorder, err := wal.NewReferenceRecorder(tmpDir, tx.walEntry, tx.stagingSnapshot.Root(), tx.relativePath, objectHash.ZeroOID)
-	if err != nil {
-		return fmt.Errorf("new recorder: %w", err)
-	}
-
-	for i, updates := range tx.referenceUpdates {
-		if err := mgr.applyReferenceTransaction(ctx, referenceTransactions[i].GetChanges(), repo); err != nil {
-			return fmt.Errorf("apply reference transaction: %w", err)
-		}
-
-		if err := recorder.RecordReferenceUpdates(ctx, updates); err != nil {
-			return fmt.Errorf("record reference updates: %w", err)
-		}
-	}
-
-	if err := recorder.StagePackedRefs(); err != nil {
-		return fmt.Errorf("stage packed-refs: %w", err)
 	}
 
 	return nil
