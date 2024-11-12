@@ -24,6 +24,12 @@ No changes.
 
 - [protobuf: Mark SSHUploadPack RPC as deprecated](gitlab-org/gitaly@b4e224d975fb33e1fa91efe3e61d92b426a37560) ([merge request](gitlab-org/gitaly!7324))
 
+## 17.4.4 (2024-11-12)
+
+### Fixed (1 change)
+
+- [Update GoCloud to a version that supports s3ForcePathStyle](gitlab-org/security/gitaly@11319648541a78dd717783745ed5c14ce385c5ae)
+
 ## 17.4.3 (2024-10-22)
 
 ### Fixed (1 change)
