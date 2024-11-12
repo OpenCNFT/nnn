@@ -337,11 +337,10 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	defer mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Done()
 	readReady := mgr.snapshotLocks[txn.snapshotLSN].applied
 
-	var entry *committedEntry
+	var entryRef *EntryReference
 	if txn.write {
-		entry = mgr.wal.updateCommittedEntry(txn.snapshotLSN)
+		entryRef = mgr.wal.IncrementEntryReference(txn.snapshotLSN)
 	}
-
 	mgr.mutex.Unlock()
 
 	span.SetTag("snapshotLSN", txn.snapshotLSN)
@@ -356,8 +355,8 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 				txn.db.Discard()
 			}
 
-			if txn.write {
-				mgr.wal.cleanCommittedEntry(entry)
+			if entryRef != nil {
+				mgr.wal.DecrementEntryReference(entryRef)
 			}
 		}()
 
@@ -2220,7 +2219,7 @@ func (mgr *TransactionManager) verifyKeyValueOperations(ctx context.Context, tx 
 	defer trace.StartRegion(ctx, "verifyKeyValueOperations").End()
 
 	if readSet := tx.recordingReadWriter.ReadSet(); len(readSet) > 0 {
-		if err := mgr.wal.walkCommittedEntries(tx.SnapshotLSN(), tx.relativePath, func(entry *gitalypb.LogEntry, _ map[git.ObjectID]struct{}) error {
+		if err := mgr.wal.WalkCommittedEntries(tx.SnapshotLSN(), tx.relativePath, func(entry *gitalypb.LogEntry, _ map[git.ObjectID]struct{}) error {
 			for _, op := range entry.GetOperations() {
 				var key []byte
 				switch op := op.GetOperation().(type) {
@@ -2750,7 +2749,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 		}
 
 		if containsReferenceDeletions {
-			if err := mgr.wal.walkCommittedEntries(tx.SnapshotLSN(), tx.relativePath, func(entry *gitalypb.LogEntry, dependencies map[git.ObjectID]struct{}) error {
+			if err := mgr.wal.WalkCommittedEntries(tx.SnapshotLSN(), tx.relativePath, func(entry *gitalypb.LogEntry, dependencies map[git.ObjectID]struct{}) error {
 				if entry.GetHousekeeping().GetPackRefs() != nil {
 					return errConcurrentReferencePacking
 				}
@@ -2874,7 +2873,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 	defer mgr.mutex.Unlock()
 
 	// Check for any concurrent housekeeping between this transaction's snapshot LSN and the latest appended LSN.
-	if err := mgr.wal.walkCommittedEntries(transaction.SnapshotLSN(), transaction.relativePath, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
+	if err := mgr.wal.WalkCommittedEntries(transaction.SnapshotLSN(), transaction.relativePath, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
 		if entry.GetHousekeeping() != nil {
 			return errHousekeepingConflictConcurrent
 		}
@@ -3006,7 +3005,7 @@ func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transact
 	packRefs := transaction.runHousekeeping.packRefs
 
 	// Check for any concurrent ref deletion between this transaction's snapshot LSN to the end.
-	if err := mgr.wal.walkCommittedEntries(transaction.SnapshotLSN(), transaction.relativePath, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
+	if err := mgr.wal.WalkCommittedEntries(transaction.SnapshotLSN(), transaction.relativePath, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
 		for _, refTransaction := range entry.GetReferenceTransactions() {
 			for _, change := range refTransaction.GetChanges() {
 				// We handle HEAD updates through the git-update-ref, but since
@@ -3151,7 +3150,7 @@ func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction 
 	// Collect object dependencies. All of them should exist in the resulting packfile or new concurrent
 	// packfiles while repacking is running.
 	objectDependencies := map[git.ObjectID]struct{}{}
-	if err := mgr.wal.walkCommittedEntries(transaction.SnapshotLSN(), transaction.relativePath, func(entry *gitalypb.LogEntry, txnObjectDependencies map[git.ObjectID]struct{}) error {
+	if err := mgr.wal.WalkCommittedEntries(transaction.SnapshotLSN(), transaction.relativePath, func(entry *gitalypb.LogEntry, txnObjectDependencies map[git.ObjectID]struct{}) error {
 		for oid := range txnObjectDependencies {
 			objectDependencies[oid] = struct{}{}
 		}

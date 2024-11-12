@@ -22,9 +22,9 @@ import (
 )
 
 var (
-	// errCommittedEntryGone is returned when the log entry of a LSN is gone from database while it's still
+	// errEntryReferenceGone is returned when the log entry of a LSN is gone from database while it's still
 	// accessed by other transactions.
-	errCommittedEntryGone = errors.New("in-used committed entry is gone")
+	errEntryReferenceGone = errors.New("in-used entry references is gone")
 	// keyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
 	keyAppliedLSN = []byte("applied_lsn")
 )
@@ -44,9 +44,9 @@ func manifestPath(logEntryPath string) string {
 	return filepath.Join(logEntryPath, "MANIFEST")
 }
 
-// committedEntry is a wrapper for a log entry. It is used to keep track of entries which are still referenced
+// EntryReference is a wrapper for a log entry reference. It is used to keep track of entries which are still referenced
 // by other transactions.
-type committedEntry struct {
+type EntryReference struct {
 	// lsn is the associated LSN of the entry
 	lsn storage.LSN
 	// refs accounts for the number of references to this entry.
@@ -110,11 +110,11 @@ type LogManager struct {
 	// them because they are still referred by a transaction.
 	oldestLSN storage.LSN
 
-	// committedEntries keeps some latest appended log entries around. Some types of transactions, such as
+	// entryReferences keeps some latest appended log entries around. Some types of transactions, such as
 	// housekeeping, operate on snapshot repository. There is a gap between transaction doing its work and the time
 	// when it is committed. They need to verify if concurrent operations can cause conflict. These log entries are
 	// still kept around even after they are applied. They are removed when there are no references.
-	committedEntries *list.List
+	entryReferences *list.List
 
 	// consumer is an the external caller that may perform read-only operations against applied
 	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
@@ -138,7 +138,7 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, db keyva
 		partitionID:      partitionID,
 		stagingDirectory: stagingDirectory,
 		stateDirectory:   stateDirectory,
-		committedEntries: list.New(),
+		entryReferences:  list.New(),
 		consumer:         consumer,
 		consumerPos:      &consumerPosition{},
 		notifyQueue:      make(chan struct{}, 1),
@@ -275,7 +275,7 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 	// are guaranteed to read it.
 	mgr.mutex.Lock()
 	mgr.appendedLSN = nextLSN
-	mgr.committedEntries.PushBack(&committedEntry{
+	mgr.entryReferences.PushBack(&EntryReference{
 		lsn:                nextLSN,
 		objectDependencies: objectDependencies,
 	})
@@ -504,12 +504,12 @@ func (mgr *LogManager) lowWaterMark() storage.LSN {
 		}
 	}
 
-	elm := mgr.committedEntries.Front()
+	elm := mgr.entryReferences.Front()
 	if elm == nil {
 		return minConsumed
 	}
 
-	committed := elm.Value.(*committedEntry).lsn
+	committed := elm.Value.(*EntryReference).lsn
 	if minConsumed < committed {
 		return minConsumed
 	}
@@ -517,41 +517,43 @@ func (mgr *LogManager) lowWaterMark() storage.LSN {
 	return committed
 }
 
-// updateCommittedEntry updates the ref counter of a committed entry.
-func (mgr *LogManager) updateCommittedEntry(lsn storage.LSN) *committedEntry {
+// IncrementEntryReference updates the ref counter of a committed entry. An entry reference is created after the
+// corresponding log entry is appended. WAL allows the caller to refer to latest appended log entry only. It does not
+// allow cross-reference to an entry in the middle of the list. So, this method increases the ref counter of the tail of
+// the list or create a new one if the list does not exist.
+func (mgr *LogManager) IncrementEntryReference(lsn storage.LSN) *EntryReference {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	if elm := mgr.committedEntries.Back(); elm != nil {
-		entry := elm.Value.(*committedEntry)
+	if elm := mgr.entryReferences.Back(); elm != nil {
+		entry := elm.Value.(*EntryReference)
 		entry.refs++
 		return entry
 	}
 
-	entry := &committedEntry{
+	entry := &EntryReference{
 		lsn:  lsn,
 		refs: 1,
 	}
-
-	mgr.committedEntries.PushBack(entry)
+	mgr.entryReferences.PushBack(entry)
 
 	return entry
 }
 
-// walkCommittedEntries walks all committed entries after input LSN. It loads the content of the
+// WalkCommittedEntries walks all committed entries after input LSN. It loads the content of the
 // entry from disk and triggers the callback with entry content.
-func (mgr *LogManager) walkCommittedEntries(lsn storage.LSN, relativePath string, callback func(*gitalypb.LogEntry, map[git.ObjectID]struct{}) error) error {
+func (mgr *LogManager) WalkCommittedEntries(lsn storage.LSN, relativePath string, callback func(*gitalypb.LogEntry, map[git.ObjectID]struct{}) error) error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	for elm := mgr.committedEntries.Front(); elm != nil; elm = elm.Next() {
-		committed := elm.Value.(*committedEntry)
+	for elm := mgr.entryReferences.Front(); elm != nil; elm = elm.Next() {
+		committed := elm.Value.(*EntryReference)
 		if committed.lsn <= lsn {
 			continue
 		}
 		entry, err := mgr.readLogEntry(committed.lsn)
 		if err != nil {
-			return errCommittedEntryGone
+			return errEntryReferenceGone
 		}
 		// Transaction manager works on the partition level, including a repository and all of its pool
 		// member repositories (if any). We need to filter log entries of the repository this
@@ -566,28 +568,34 @@ func (mgr *LogManager) walkCommittedEntries(lsn storage.LSN, relativePath string
 	return nil
 }
 
-// cleanCommittedEntry reduces the ref counter of the committed entry. It also removes entries with no more readers at
+// DecrementEntryReference reduces the ref counter of the committed entry. It also removes entries with no more readers at
 // the head of the list.
-func (mgr *LogManager) cleanCommittedEntry(entry *committedEntry) {
+func (mgr *LogManager) DecrementEntryReference(entry *EntryReference) {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
 	entry.refs--
+	if entry.refs < 0 {
+		panic("negative log entry reference counter")
+	}
+	mgr.cleanupEntryReferences()
+}
 
+func (mgr *LogManager) cleanupEntryReferences() {
 	removedAnyEntry := false
-	elm := mgr.committedEntries.Front()
+	elm := mgr.entryReferences.Front()
 	for elm != nil {
-		front := elm.Value.(*committedEntry)
+		front := elm.Value.(*EntryReference)
 		if front.refs > 0 {
 			// If the first entry had some references, that means our transaction was not the oldest reader.
 			// We can't remove any entries as they'll still be needed for conflict checking the older
 			// transactions.
-			return
+			break
 		}
 
-		mgr.committedEntries.Remove(elm)
+		mgr.entryReferences.Remove(elm)
 		removedAnyEntry = true
-		elm = mgr.committedEntries.Front()
+		elm = mgr.entryReferences.Front()
 	}
 	if removedAnyEntry {
 		// Signal the manager this transaction finishes. The purpose of this signaling is to wake it up

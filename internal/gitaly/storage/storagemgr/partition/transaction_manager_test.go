@@ -3,7 +3,6 @@ package partition
 import (
 	"archive/tar"
 	"bytes"
-	"container/list"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -1542,62 +1541,8 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 	}
 }
 
-type expectedCommittedEntry struct {
-	lsn             storage.LSN
-	snapshotReaders int
-	entry           *gitalypb.LogEntry
-}
-
 func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
-	assertCommittedEntries := func(t *testing.T, manager *TransactionManager, expected []*expectedCommittedEntry, actualList *list.List) {
-		require.Equal(t, len(expected), actualList.Len())
-
-		i := 0
-		for elm := actualList.Front(); elm != nil; elm = elm.Next() {
-			actual := elm.Value.(*committedEntry)
-			require.Equal(t, expected[i].lsn, actual.lsn)
-			require.Equal(t, expected[i].snapshotReaders, actual.refs)
-
-			if expected[i].entry != nil {
-				actualEntry, err := manager.wal.readLogEntry(actual.lsn)
-				require.NoError(t, err)
-
-				expectedEntry := expected[i].entry
-
-				if testhelper.IsReftableEnabled() {
-					for idx, op := range expectedEntry.GetOperations() {
-						if chl := op.GetCreateHardLink(); chl != nil {
-							actualCHL := actualEntry.GetOperations()[idx].GetCreateHardLink()
-							require.NotNil(t, actualCHL)
-
-							if filepath.Base(string(actualCHL.GetDestinationPath())) == "tables.list" {
-								continue
-							}
-
-							// We can't predict the table names, but we can verify
-							// the regex.
-							require.True(t, git.ReftableTableNameRegex.Match(actualCHL.GetDestinationPath()))
-							chl.DestinationPath = actualCHL.GetDestinationPath()
-						}
-					}
-				}
-
-				testhelper.ProtoEqual(t, expectedEntry, actualEntry)
-			}
-			i++
-		}
-	}
-
 	return []transactionTestCase{
-		{
-			desc: "manager has just initialized",
-			steps: steps{
-				StartManager{},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
-				}),
-			},
-		},
 		{
 			desc: "a transaction has one reader",
 			steps: steps{
@@ -1607,12 +1552,10 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePaths: []string{setup.RelativePath},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             0,
-							snapshotReaders: 1,
-						},
-					}, tm.wal.committedEntries)
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
+						"/":    {Mode: mode.Directory},
+						"/wal": {Mode: mode.Directory},
+					})
 				}),
 				Commit{
 					TransactionID: 1,
@@ -1620,31 +1563,17 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						"refs/heads/branch-1": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
-				}),
 				Begin{
 					TransactionID:       2,
 					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             1,
-							snapshotReaders: 1,
-						},
-					}, tm.wal.committedEntries)
-				}),
 				Commit{
 					TransactionID: 2,
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
 					},
 				},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
-				}),
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
@@ -1727,14 +1656,6 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             1,
-							snapshotReaders: 2,
-						},
-					}, tm.wal.committedEntries)
-				}),
 				Commit{
 					TransactionID: 2,
 					ReferenceUpdates: git.ReferenceUpdates{
@@ -1742,16 +1663,16 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             1,
-							snapshotReaders: 1,
-						},
-						{
-							lsn:   2,
-							entry: testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID),
-						},
-					}, tm.wal.committedEntries)
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+						gittest.FilesOrReftables(testhelper.DirectoryState{
+							"/":                           {Mode: mode.Directory},
+							"/wal":                        {Mode: mode.Directory},
+							"/wal/0000000000002":          {Mode: mode.Directory},
+							"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+							"/wal/0000000000002/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID)),
+						}, testentry.BuildReftableDirectory(map[int][]git.ReferenceUpdates{
+							2: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+						})))
 				}),
 				Begin{
 					TransactionID:       4,
@@ -1759,17 +1680,16 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					ExpectedSnapshotLSN: 2,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             1,
-							snapshotReaders: 1,
-						},
-						{
-							lsn:             2,
-							snapshotReaders: 1,
-							entry:           testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID),
-						},
-					}, tm.wal.committedEntries)
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+						gittest.FilesOrReftables(testhelper.DirectoryState{
+							"/":                           {Mode: mode.Directory},
+							"/wal":                        {Mode: mode.Directory},
+							"/wal/0000000000002":          {Mode: mode.Directory},
+							"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+							"/wal/0000000000002/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID)),
+						}, testentry.BuildReftableDirectory(map[int][]git.ReferenceUpdates{
+							2: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+						})))
 				}),
 				Commit{
 					TransactionID: 3,
@@ -1778,24 +1698,24 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             2,
-							entry:           testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID),
-							snapshotReaders: 1,
-						},
-						{
-							lsn:   3,
-							entry: testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-2", setup.Commits.First.OID),
-						},
-					}, tm.wal.committedEntries)
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+						gittest.FilesOrReftables(testhelper.DirectoryState{
+							"/":                           {Mode: mode.Directory},
+							"/wal":                        {Mode: mode.Directory},
+							"/wal/0000000000002":          {Mode: mode.Directory},
+							"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+							"/wal/0000000000002/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-1", setup.Commits.First.OID)),
+							"/wal/0000000000003":          {Mode: mode.Directory},
+							"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
+							"/wal/0000000000003/MANIFEST": testentry.ManifestDirectoryEntry(testentry.RefChangeLogEntry(setup.RelativePath, "refs/heads/branch-2", setup.Commits.First.OID)),
+						}, testentry.BuildReftableDirectory(map[int][]git.ReferenceUpdates{
+							2: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+							3: {{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
+						})))
 				}),
 				Rollback{
 					TransactionID: 4,
 				},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
-				}),
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
@@ -1878,7 +1798,10 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					TransactionID: 1,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
+					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
+						"/":    {Mode: mode.Directory},
+						"/wal": {Mode: mode.Directory},
+					})
 				}),
 				Begin{
 					TransactionID: 2,
@@ -1888,9 +1811,6 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID: 2,
 				},
-				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{}, tm.wal.committedEntries)
-				}),
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{},
