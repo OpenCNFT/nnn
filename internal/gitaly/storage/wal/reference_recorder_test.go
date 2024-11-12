@@ -14,7 +14,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 func TestRecorderRecordReferenceUpdates(t *testing.T) {
@@ -22,31 +21,13 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 
 	t.Parallel()
 
-	type referenceTransaction map[git.ReferenceName]git.ReferenceUpdate
-
-	referenceTransactionToProto := func(refTX referenceTransaction) *gitalypb.LogEntry_ReferenceTransaction {
-		var protoRefTX gitalypb.LogEntry_ReferenceTransaction
-		for reference, update := range refTX {
-			protoRefTX.Changes = append(protoRefTX.Changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
-				ReferenceName: []byte(reference),
-				NewOid:        []byte(update.NewOID),
-				NewTarget:     []byte(update.NewTarget),
-			})
-		}
-		return &protoRefTX
-	}
-
-	performChanges := func(t *testing.T, updater *updateref.Updater, changes []*gitalypb.LogEntry_ReferenceTransaction_Change) {
+	performChanges := func(t *testing.T, updater *updateref.Updater, updates git.ReferenceUpdates) {
 		t.Helper()
 
 		require.NoError(t, updater.Start())
-		for _, change := range changes {
+		for reference, update := range updates {
 			require.NoError(t,
-				updater.Update(
-					git.ReferenceName(change.GetReferenceName()),
-					git.ObjectID(change.GetNewOid()),
-					"",
-				),
+				updater.Update(reference, update.NewOID, ""),
 			)
 		}
 		require.NoError(t, updater.Commit())
@@ -55,9 +36,9 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 	umask := testhelper.Umask()
 
 	type setupData struct {
-		existingPackedReferences referenceTransaction
-		existingReferences       referenceTransaction
-		referenceTransactions    []referenceTransaction
+		existingPackedReferences git.ReferenceUpdates
+		existingReferences       git.ReferenceUpdates
+		referenceTransactions    []git.ReferenceUpdates
 		expectedOperations       operations
 		expectedDirectory        testhelper.DirectoryState
 		expectedError            error
@@ -71,7 +52,7 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "empty transaction",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					referenceTransactions: []referenceTransaction{{}},
+					referenceTransactions: []git.ReferenceUpdates{{}},
 					expectedDirectory: testhelper.DirectoryState{
 						"/": {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
 					},
@@ -82,7 +63,7 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "various references created",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]}},
 						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[1]}},
 						{"refs/heads/subdir/branch-3": git.ReferenceUpdate{NewOID: oids[2]}},
@@ -115,13 +96,13 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "reference deleted outside of packed-refs",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingPackedReferences: referenceTransaction{
+					existingPackedReferences: git.ReferenceUpdates{
 						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
 					},
-					existingReferences: referenceTransaction{
+					existingReferences: git.ReferenceUpdates{
 						"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[0]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[1]}},
 						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
 						{"refs/heads/branch-3": git.ReferenceUpdate{NewOID: oids[2]}},
@@ -145,10 +126,10 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "reference deleted from packed-refs",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingPackedReferences: referenceTransaction{
+					existingPackedReferences: git.ReferenceUpdates{
 						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
 						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[1]}},
 					},
@@ -171,12 +152,12 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "only a single packed-refs file is logged",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingPackedReferences: referenceTransaction{
+					existingPackedReferences: git.ReferenceUpdates{
 						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/heads/branch-2": git.ReferenceUpdate{NewOID: oids[1]},
 						"refs/heads/branch-3": git.ReferenceUpdate{NewOID: oids[2]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
 						{"refs/heads/branch-4": git.ReferenceUpdate{NewOID: oids[3]}},
 						{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID}},
@@ -202,11 +183,11 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "heads and tags remain empty",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingReferences: referenceTransaction{
+					existingReferences: git.ReferenceUpdates{
 						"refs/heads/branch-1": git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/tags/tag-1":     git.ReferenceUpdate{NewOID: oids[1]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{
 							"refs/heads/branch-1": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 							"refs/tags/tag-1":     git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
@@ -230,14 +211,14 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "various references changes",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingReferences: referenceTransaction{
+					existingReferences: git.ReferenceUpdates{
 						"refs/heads/branch-1":                    git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/heads/branch-2":                    git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/heads/subdir/branch-3":             git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/heads/subdir/branch-4":             git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/heads/subdir/secondlevel/branch-5": git.ReferenceUpdate{NewOID: oids[0]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{
 							"refs/heads/branch-1":                    git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 							"refs/heads/branch-2":                    git.ReferenceUpdate{NewOID: oids[1]},
@@ -278,14 +259,14 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "delete references",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingReferences: referenceTransaction{
+					existingReferences: git.ReferenceUpdates{
 						"refs/heads/branch-1":                git.ReferenceUpdate{NewOID: oids[0]},
 						"refs/heads/branch-2":                git.ReferenceUpdate{NewOID: oids[1]},
 						"refs/heads/subdir/branch-3":         git.ReferenceUpdate{NewOID: oids[2]},
 						"refs/heads/subdir/branch-4":         git.ReferenceUpdate{NewOID: oids[3]},
 						"refs/heads/subdir/no-refs/branch-5": git.ReferenceUpdate{NewOID: oids[4]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{
 							"refs/heads/branch-1":        git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 							"refs/heads/branch-2":        git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
@@ -314,10 +295,10 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "directory-file conflict resolved",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingReferences: referenceTransaction{
+					existingReferences: git.ReferenceUpdates{
 						"refs/heads/parent": git.ReferenceUpdate{NewOID: oids[0]},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{
 							"refs/heads/parent": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 						},
@@ -350,7 +331,7 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "deletion creates a directory",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{
 							"refs/remotes/upstream/deleted-branch": git.ReferenceUpdate{NewOID: gittest.DefaultObjectHash.ZeroOID},
 						},
@@ -382,10 +363,10 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			desc: "HEAD ref changes",
 			setup: func(t *testing.T, oids []git.ObjectID) setupData {
 				return setupData{
-					existingReferences: referenceTransaction{
+					existingReferences: git.ReferenceUpdates{
 						"HEAD": git.ReferenceUpdate{NewTarget: "refs/heads/main"},
 					},
-					referenceTransactions: []referenceTransaction{
+					referenceTransactions: []git.ReferenceUpdates{
 						{
 							"HEAD": git.ReferenceUpdate{NewTarget: "refs/heads/branch-2"},
 						},
@@ -431,10 +412,10 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 
 			setupData := tc.setup(t, commitIDs)
 
-			performChanges(t, updater, referenceTransactionToProto(setupData.existingPackedReferences).GetChanges())
+			performChanges(t, updater, setupData.existingPackedReferences)
 			gittest.Exec(t, cfg, "-C", repoPath, "pack-refs", "--all")
 
-			performChanges(t, updater, referenceTransactionToProto(setupData.existingReferences).GetChanges())
+			performChanges(t, updater, setupData.existingReferences)
 
 			snapshotRoot := filepath.Join(storageRoot, "snapshot")
 			stateDir := t.TempDir()
@@ -443,9 +424,8 @@ func TestRecorderRecordReferenceUpdates(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, refTX := range setupData.referenceTransactions {
-				protoRefTX := referenceTransactionToProto(refTX)
-				performChanges(t, updater, protoRefTX.GetChanges())
-				if err := recorder.RecordReferenceUpdates(ctx, protoRefTX); err != nil {
+				performChanges(t, updater, refTX)
+				if err := recorder.RecordReferenceUpdates(ctx, refTX); err != nil {
 					require.ErrorIs(t, err, setupData.expectedError)
 					return
 				}

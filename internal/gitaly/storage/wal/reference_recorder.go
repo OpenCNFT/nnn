@@ -1,7 +1,6 @@
 package wal
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal/reftree"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 // ReferenceRecorder records the file system operations performed by reference transactions.
@@ -109,8 +107,8 @@ func NewReferenceRecorder(tmpDir string, entry *Entry, snapshotRoot, relativePat
 // The method assumes the reference directory is in good shape and doesn't have hierarchies of empty directories. It
 // thus doesn't record the deletion of such directories. If a directory such as `refs/heads/parent/child/subdir`
 // exists, and a reference called `refs/heads/parent` is created, we don't handle the deletions of empty directories.
-func (r *ReferenceRecorder) RecordReferenceUpdates(ctx context.Context, refTX *gitalypb.LogEntry_ReferenceTransaction) error {
-	if len(refTX.GetChanges()) == 0 {
+func (r *ReferenceRecorder) RecordReferenceUpdates(ctx context.Context, refTX git.ReferenceUpdates) error {
+	if len(refTX) == 0 {
 		return nil
 	}
 
@@ -118,23 +116,22 @@ func (r *ReferenceRecorder) RecordReferenceUpdates(ctx context.Context, refTX *g
 	deletions := reftree.New()
 	defaultBranchUpdated := false
 	preImagePaths := map[string]struct{}{}
-	for _, change := range refTX.GetChanges() {
-		if bytes.Equal(change.GetReferenceName(), []byte("HEAD")) {
+	for reference, update := range refTX {
+		if reference.String() == "HEAD" {
 			defaultBranchUpdated = true
 			continue
 		}
 
 		tree := creations
-		if git.ObjectID(change.GetNewOid()) == r.zeroOID {
+		if update.NewOID == r.zeroOID {
 			tree = deletions
 		}
 
-		referenceName := string(change.GetReferenceName())
-		if err := tree.InsertReference(referenceName); err != nil {
+		if err := tree.InsertReference(reference.String()); err != nil {
 			return fmt.Errorf("insert into tree: %w", err)
 		}
 
-		for component, remainder, haveMore := "", referenceName, true; haveMore; {
+		for component, remainder, haveMore := "", reference.String(), true; haveMore; {
 			var newComponent string
 			newComponent, remainder, haveMore = strings.Cut(remainder, "/")
 
