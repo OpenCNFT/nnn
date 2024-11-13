@@ -29,6 +29,13 @@ func setupTestDirectory(t *testing.T, path string) {
 	require.NoError(t, os.WriteFile(filepath.Join(sharedSubDir, "file-3"), []byte("file-3"), mode.File))
 }
 
+func TestEntry_Directory(t *testing.T) {
+	t.Parallel()
+
+	stateDir := t.TempDir()
+	require.Equal(t, stateDir, NewEntry(stateDir).Directory())
+}
+
 func TestEntry(t *testing.T) {
 	t.Parallel()
 
