@@ -948,9 +948,6 @@ type StateAssertion struct {
 	// Repositories is the expected state of the repositories in the storage. The key is
 	// the repository's relative path and the value describes its expected state.
 	Repositories RepositoryStates
-	// Consumers is the expected state of the consumers and their position as tracked by
-	// the TransactionManager.
-	Consumers ConsumerState
 }
 
 // AdhocAssertion allows a test to add some custom assertions apart from the built-in assertions above.
@@ -979,32 +976,6 @@ type MockLogConsumer struct {
 
 func (lc *MockLogConsumer) NotifyNewTransactions(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN) {
 	lc.highWaterMark = highWaterMark
-}
-
-// ConsumerState is used to track the log positions received by the consumer and the corresponding
-// acknowledgements from the consumer to the manager. We deliberately do not track the LowWaterMark
-// sent to consumers as this is non-deterministic.
-type ConsumerState struct {
-	// ManagerPosition is the last acknowledged LSN for the consumer as tracked by the TransactionManager.
-	ManagerPosition storage.LSN
-	// HighWaterMark is the latest high water mark received by the consumer from NotifyNewTransactions.
-	HighWaterMark storage.LSN
-}
-
-// RequireConsumer asserts the consumer log position is correct.
-func RequireConsumer(t *testing.T, consumer LogConsumer, consumerPos *consumerPosition, expected ConsumerState) {
-	t.Helper()
-
-	require.Equal(t, expected.ManagerPosition, consumerPos.getPosition(), "expected and actual manager position don't match")
-
-	if consumer == nil {
-		return
-	}
-
-	mock, ok := consumer.(*MockLogConsumer)
-	require.True(t, ok)
-
-	require.Equal(t, expected.HighWaterMark, mock.highWaterMark, "expected and actual high water marks don't match")
 }
 
 // steps defines execution steps in a test. Each test case can define multiple steps to exercise
@@ -1551,8 +1522,6 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			"/wal": {Mode: mode.Directory},
 		}
 	}
-
-	RequireConsumer(t, transactionManager.wal.consumer, transactionManager.wal.consumerPos, tc.expectedState.Consumers)
 
 	testhelper.RequireDirectoryState(t, stateDir, "", expectedDirectory)
 

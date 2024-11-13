@@ -202,7 +202,7 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 		return fmt.Errorf("remove stale packs: %w", err)
 	}
 
-	if mgr.consumer != nil {
+	if mgr.consumer != nil && mgr.appendedLSN != 0 {
 		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
 	}
 
@@ -216,7 +216,8 @@ func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 
 // Propose proposes a log etnry of a transaction to the write-ahead log. It first writes the transaction's manifest file
 // into the log entry's directory. Second, it sends the log entry to other cluster members if needed. Afterwards it
-// moves the log entry's directory from the staging area to its final place in the write-ahead log.
+// moves the log entry's directory from the staging area to its final place in the write-ahead log. The landing order of
+// proposals is nondeterministic. The caller is responsible for serialization, if it needs to, before calling Propose().
 func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) (storage.LSN, error) {
 	defer trace.StartRegion(ctx, "appendLogEntry").End()
 
@@ -337,7 +338,6 @@ func (mgr *LogManager) removeStaleWALFiles(ctx context.Context) error {
 		// files would be for the next LSN. Remove the files if they exist.
 		logEntryPath(mgr.stateDirectory, mgr.appendedLSN+1),
 	} {
-
 		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("stat: %w", err)
