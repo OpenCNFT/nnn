@@ -3576,8 +3576,14 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 
 	mgr.testHooks.beforeApplyLogEntry()
 
-	if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry, mgr.db); err != nil {
-		return fmt.Errorf("apply operations: %w", err)
+	if err := mgr.db.Update(func(tx keyvalue.ReadWriter) error {
+		if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry.GetOperations(), tx); err != nil {
+			return fmt.Errorf("apply operations: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("update: %w", err)
 	}
 
 	// If the repository is being deleted, just delete it without any other changes given

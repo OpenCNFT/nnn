@@ -12,7 +12,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
-	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 func TestApplyOperations(t *testing.T) {
@@ -54,8 +53,9 @@ func TestApplyOperations(t *testing.T) {
 
 	storageRoot := t.TempDir()
 	var syncedPaths []string
-	require.NoError(t,
-		applyOperations(
+
+	require.NoError(t, db.Update(func(tx keyvalue.ReadWriter) error {
+		return applyOperations(
 			ctx,
 			func(ctx context.Context, path string) error {
 				syncedPaths = append(syncedPaths, path)
@@ -63,10 +63,10 @@ func TestApplyOperations(t *testing.T) {
 			},
 			storageRoot,
 			walEntryDirectory,
-			&gitalypb.LogEntry{Operations: walEntry.Operations()},
-			db,
-		),
-	)
+			walEntry.Operations(),
+			tx,
+		)
+	}))
 
 	require.ElementsMatch(t, []string{
 		storageRoot,
