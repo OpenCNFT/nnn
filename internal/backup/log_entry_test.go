@@ -23,7 +23,7 @@ import (
 )
 
 type mockNode struct {
-	managers map[partitionInfo]*mockLogManager
+	managers map[PartitionInfo]*mockLogManager
 	t        *testing.T
 
 	sync.Mutex
@@ -43,7 +43,7 @@ func (m mockStorage) GetPartition(ctx context.Context, partitionID storage.Parti
 	m.node.Lock()
 	defer m.node.Unlock()
 
-	info := partitionInfo{m.storageName, partitionID}
+	info := PartitionInfo{m.storageName, partitionID}
 	mgr, ok := m.node.managers[info]
 	assert.True(m.node.t, ok)
 
@@ -51,7 +51,7 @@ func (m mockStorage) GetPartition(ctx context.Context, partitionID storage.Parti
 }
 
 type mockLogManager struct {
-	partitionInfo partitionInfo
+	partitionInfo PartitionInfo
 	archiver      *LogEntryArchiver
 	notifications []notification
 	acknowledged  []storage.LSN
@@ -103,13 +103,13 @@ func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
 
 func (lm *mockLogManager) SendNotification() {
 	n := lm.notifications[0]
-	lm.archiver.NotifyNewTransactions(lm.partitionInfo.storageName, lm.partitionInfo.partitionID, n.lowWaterMark, n.highWaterMark)
+	lm.archiver.NotifyNewTransactions(lm.partitionInfo.StorageName, lm.partitionInfo.PartitionID, n.lowWaterMark, n.highWaterMark)
 
 	lm.notifications = lm.notifications[1:]
 }
 
 func (lm *mockLogManager) GetTransactionPath(lsn storage.LSN) string {
-	return filepath.Join(partitionPath(lm.entryRootPath, lm.partitionInfo.storageName, lm.partitionInfo.partitionID), lsn.String())
+	return filepath.Join(partitionPath(lm.entryRootPath, lm.partitionInfo), lsn.String())
 }
 
 type notification struct {
@@ -295,7 +295,7 @@ func TestLogEntryArchiver(t *testing.T) {
 			var wg sync.WaitGroup
 
 			accessor := &mockNode{
-				managers: make(map[partitionInfo]*mockLogManager, len(tc.partitions)),
+				managers: make(map[PartitionInfo]*mockLogManager, len(tc.partitions)),
 				t:        t,
 			}
 
@@ -305,11 +305,11 @@ func TestLogEntryArchiver(t *testing.T) {
 
 			const storageName = "default"
 
-			managers := make(map[partitionInfo]*mockLogManager, len(tc.partitions))
+			managers := make(map[PartitionInfo]*mockLogManager, len(tc.partitions))
 			for _, partitionID := range tc.partitions {
-				info := partitionInfo{
-					storageName: storageName,
-					partitionID: partitionID,
+				info := PartitionInfo{
+					StorageName: storageName,
+					PartitionID: partitionID,
 				}
 
 				waitCount := tc.waitCount
@@ -340,7 +340,7 @@ func TestLogEntryArchiver(t *testing.T) {
 						for lsn := notification.lowWaterMark; lsn <= notification.highWaterMark; lsn++ {
 							// Don't recreate entries.
 							if !slices.Contains(sentLSNs, lsn) {
-								createEntryDir(t, entryRootPath, info.storageName, partitionID, lsn)
+								createEntryDir(t, entryRootPath, info, lsn)
 							}
 
 							sentLSNs = append(sentLSNs, lsn)
@@ -362,17 +362,17 @@ func TestLogEntryArchiver(t *testing.T) {
 				lastAck := manager.acknowledged[len(manager.acknowledged)-1]
 				require.Equal(t, tc.finalLSN, lastAck)
 
-				partitionDir := partitionPath(cmpDir, info.storageName, info.partitionID)
+				partitionDir := partitionPath(cmpDir, info)
 				require.NoError(t, os.Mkdir(partitionDir, mode.Directory))
 
 				for _, lsn := range manager.acknowledged {
-					tarPath := filepath.Join(partitionPath(archivePath, info.storageName, info.partitionID), lsn.String()+".tar")
+					tarPath := filepath.Join(partitionPath(archivePath, info), lsn.String()+".tar")
 					tar, err := os.Open(tarPath)
 					require.NoError(t, err)
 					testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
 						lsn.String():                                {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 						filepath.Join(lsn.String(), "LSN"):          {Mode: archive.TarFileMode, Content: []byte(lsn.String())},
-						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+						filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.PartitionID))},
 					})
 				}
 			}
@@ -417,7 +417,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.NoError(t, err)
 
 	accessor := &mockNode{
-		managers: make(map[partitionInfo]*mockLogManager, 1),
+		managers: make(map[PartitionInfo]*mockLogManager, 1),
 		t:        t,
 	}
 
@@ -426,9 +426,9 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	archiver.Run()
 	defer archiver.Close()
 
-	info := partitionInfo{
-		storageName: "default",
-		partitionID: 1,
+	info := PartitionInfo{
+		StorageName: "default",
+		PartitionID: 1,
 	}
 
 	manager := &mockLogManager{
@@ -459,7 +459,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.Equal(t, "log entry archiver: failed to backup log entry", hook.LastEntry().Message)
 
 	// Create entry so retry will succeed.
-	createEntryDir(t, entryRootPath, info.storageName, info.partitionID, lsn)
+	createEntryDir(t, entryRootPath, info, lsn)
 
 	// Add to wg, this will be decremented when the retry completes.
 	wg.Add(1)
@@ -471,36 +471,73 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	wg.Wait()
 
 	cmpDir := testhelper.TempDir(t)
-	partitionDir := partitionPath(cmpDir, info.storageName, info.partitionID)
+	partitionDir := partitionPath(cmpDir, info)
 	require.NoError(t, os.MkdirAll(partitionDir, mode.Directory))
 
-	tarPath := filepath.Join(partitionPath(archivePath, info.storageName, info.partitionID), lsn.String()) + ".tar"
+	tarPath := filepath.Join(partitionPath(archivePath, info), lsn.String()) + ".tar"
 	tar, err := os.Open(tarPath)
 	require.NoError(t, err)
 
 	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
 		lsn.String():                                {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
 		filepath.Join(lsn.String(), "LSN"):          {Mode: archive.TarFileMode, Content: []byte(lsn.String())},
-		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.partitionID))},
+		filepath.Join(lsn.String(), "PARTITION_ID"): {Mode: archive.TarFileMode, Content: []byte(fmt.Sprintf("%d", info.PartitionID))},
 	})
 
 	testhelper.RequirePromMetrics(t, archiver.backupCounter, buildMetrics(t, 1, 1))
 }
 
-func partitionPath(root string, storageName string, partitionID storage.PartitionID) string {
-	return filepath.Join(root, storageName, fmt.Sprintf("%d", partitionID))
+func TestLogEntryStore_Query(t *testing.T) {
+	t.Parallel()
+
+	ctx := testhelper.Context(t)
+	rootPath := t.TempDir()
+
+	info := PartitionInfo{
+		StorageName: "default",
+		PartitionID: 1,
+	}
+
+	testhelper.WriteFiles(t, rootPath, map[string]any{
+		archivePath(info, 1): "",
+		archivePath(info, 2): "",
+		archivePath(info, 3): "",
+		archivePath(info, 4): "",
+		archivePath(info, 8): "",
+		archivePath(info, 9): "",
+	})
+
+	sink, err := ResolveSink(ctx, rootPath)
+	require.NoError(t, err)
+	defer testhelper.MustClose(t, sink)
+
+	store := NewLogEntryStore(sink)
+
+	var lsns []storage.LSN
+
+	it := store.Query(info, storage.LSN(3))
+	for it.Next(ctx) {
+		lsns = append(lsns, it.LSN())
+	}
+
+	require.NoError(t, it.Err())
+	require.Equal(t, []storage.LSN{3, 4, 8, 9}, lsns)
 }
 
-func createEntryDir(t *testing.T, entryRootPath string, storageName string, partitionID storage.PartitionID, lsn storage.LSN) {
+func partitionPath(root string, info PartitionInfo) string {
+	return filepath.Join(root, partitionDir(info))
+}
+
+func createEntryDir(t *testing.T, entryRootPath string, partitionInfo PartitionInfo, lsn storage.LSN) {
 	t.Helper()
 
-	partitionPath := partitionPath(entryRootPath, storageName, partitionID)
+	partitionPath := partitionPath(entryRootPath, partitionInfo)
 	require.NoError(t, os.MkdirAll(partitionPath, mode.Directory))
 
 	testhelper.CreateFS(t, filepath.Join(partitionPath, lsn.String()), fstest.MapFS{
 		".":            {Mode: mode.Directory},
 		"LSN":          {Mode: mode.File, Data: []byte(lsn.String())},
-		"PARTITION_ID": {Mode: mode.File, Data: []byte(fmt.Sprintf("%d", partitionID))},
+		"PARTITION_ID": {Mode: mode.File, Data: []byte(fmt.Sprintf("%d", partitionInfo.PartitionID))},
 	})
 }
 
