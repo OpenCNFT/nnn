@@ -5842,8 +5842,6 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 		"housekeeping_task=total,stage=verify":         1,
 		"housekeeping_task=total,stage=apply":          1,
 		"housekeeping_task=commit-graph,stage=prepare": 1,
-		"housekeeping_task=commit-graph,stage=verify":  1,
-		"housekeeping_task=commit-graph,stage=apply":   1,
 	}}
 	return []transactionTestCase{
 		{
@@ -6137,8 +6135,6 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 					"housekeeping_task=total,stage=verify":         3,
 					"housekeeping_task=total,stage=apply":          3,
 					"housekeeping_task=commit-graph,stage=prepare": 2,
-					"housekeeping_task=commit-graph,stage=verify":  2,
-					"housekeeping_task=commit-graph,stage=apply":   2,
 					"housekeeping_task=repack,stage=prepare":       1,
 					"housekeeping_task=repack,stage=verify":        1,
 				}},
