@@ -1,5 +1,11 @@
 # Gitaly changelog
 
+## 17.5.2 (2024-11-12)
+
+### Fixed (1 change)
+
+- [Update GoCloud to a version that supports s3ForcePathStyle](gitlab-org/security/gitaly@617e231f803e6a16714e9b13052afe91afcc58d7)
+
 ## 17.5.1 (2024-10-22)
 
 No changes.
