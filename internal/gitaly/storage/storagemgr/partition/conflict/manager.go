@@ -6,6 +6,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb/historymgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
@@ -40,6 +41,7 @@ type Manager struct {
 	repositoryDeletionsByLSN map[storage.LSN]string
 	// referenceHistory keeps track of the reference changes made in the past.
 	referenceHistory *historymgr.Manager
+	fsHistory        *fshistory.History
 }
 
 // NewManager returns a new Manager.
@@ -48,6 +50,7 @@ func NewManager() *Manager {
 		repositoryDeletions:      map[string]storage.LSN{},
 		repositoryDeletionsByLSN: map[storage.LSN]string{},
 		referenceHistory:         historymgr.New(),
+		fsHistory:                fshistory.New(),
 	}
 }
 
@@ -109,6 +112,8 @@ func (mgr *Manager) Prepare(ctx context.Context, tx *Transaction) (*PreparedTran
 			return nil, structerr.NewAborted("reference conflict: %w", err)
 		}
 	}
+
+	//fsTX := mgr.fsHistory.Begin(tx.ReadLSN)
 
 	return &PreparedTransaction{
 		commit: func(commitLSN storage.LSN) { refTX.Commit(commitLSN) },

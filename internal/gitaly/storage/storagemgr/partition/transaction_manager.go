@@ -2327,6 +2327,10 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		if transaction.deleteRepository {
+			if len(transaction.walEntry.Operations()) > 0 {
+				return errors.New("repository deleting transaction contained other operations")
+			}
+
 			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 
 			if err := transaction.walEntry.RecordDirectoryRemoval(
