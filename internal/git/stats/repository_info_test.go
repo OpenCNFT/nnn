@@ -549,7 +549,7 @@ func TestRepositoryInfoForRepository(t *testing.T) {
 		{
 			desc: "last full repack timestamp",
 			setup: func(t *testing.T, repoPath string) setupData {
-				timestampPath := filepath.Join(repoPath, fullRepackTimestampFilename)
+				timestampPath := filepath.Join(repoPath, FullRepackTimestampFilename)
 				writeFileWithMtime(t, timestampPath, nil, date)
 
 				return setupData{
