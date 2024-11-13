@@ -46,19 +46,6 @@ message LogEntry {
       repeated bytes pruned_refs = 1;
     }
 
-    // Repack models a repacking housekeeping task. The task re-organizes the packfiles for faster access and prune
-    // unreachable objects if any.
-    message Repack {
-      // new_files are the new packfiles that will be added to the repository. They are the result of `git-repack(1)`
-      // command.
-      repeated string new_files = 1;
-      // deleted_files are the redundant packfiles which are already packed into the new packfiles above. We keep that
-      // list to prevent deleting new packfiles introduced by other concurrent updates.
-      repeated string deleted_files = 2;
-      // is_full_repack tells if the repacking task is a full repack or not.
-      bool is_full_repack = 3;
-    }
-
     // WriteCommitGraphs models commit-graphs updates. An up-to-date
     // commit-graphs structure accelerates commit graph walks.
     message WriteCommitGraphs {
@@ -66,9 +53,6 @@ message LogEntry {
 
     // pack_refs signifies if the housekeeping run includes a pack-refs task.
     PackRefs pack_refs = 1;
-
-    // repack signifies if the housekeeping run includes a repacking task.
-    Repack repack = 2;
 
     // write_commit_graphs signififies if the housekeeping run includes commit-graphs updates.
     WriteCommitGraphs write_commit_graphs = 3;
