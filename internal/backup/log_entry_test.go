@@ -16,10 +16,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testentry"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 type mockPartition struct {
@@ -545,4 +552,157 @@ func buildMetrics(t *testing.T, successCt, failCt int) string {
 	}
 
 	return builder.String()
+}
+
+// TestLogEntryArchiver_WithRealLogManager runs the log archiver with a real WAL log manager. This test aims to assert
+// the flow between the two components to avoid uncaught errors due to mocking. Test setup and verification are
+// extremely verbose. There's no reliable way to simulate more sophisticated scenarios because the test could not
+// intercept internal states of log archiver or log manager. The log manager doesn't expose the current consumer
+// position. Thus, this test verifies the most basic archiving. Unit tests using mocking will cover the rest.
+func TestLogEntryArchiver_WithRealLogManager(t *testing.T) {
+	t.Parallel()
+	ctx := testhelper.Context(t)
+
+	// Setup node
+	accessor := &mockNode{
+		partitions: make(map[partitionInfo]*mockPartition),
+		t:          t,
+	}
+	node := storage.Node(accessor)
+
+	// Setup archiver
+	archivePath := testhelper.TempDir(t)
+	archiveSink, err := ResolveSink(ctx, archivePath)
+	require.NoError(t, err)
+
+	archiver := NewLogEntryArchiver(testhelper.NewLogger(t), archiveSink, 1, &node)
+	archiver.Run()
+
+	// Setup WAL log manager and plug it to storage
+	const storageName = "default"
+	var logManagers []*wal.LogManager
+	for i := 1; i <= 3; i++ {
+		info := partitionInfo{
+			storageName: storageName,
+			partitionID: storage.PartitionID(i),
+		}
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
+		logManager := wal.NewLogManager(storageName, storage.PartitionID(i), database, testhelper.TempDir(t), testhelper.TempDir(t), archiver)
+		require.NoError(t, logManager.Initialize(ctx))
+
+		accessor.Lock()
+		accessor.partitions[info] = &mockPartition{t: t, manager: logManager}
+		accessor.Unlock()
+
+		logManagers = append(logManagers, logManager)
+	}
+
+	// Update 1 ref
+	relativePath1, commitIDs1 := setupTestRepo(t, ctx, 1)
+	entry1 := testentry.RefChangeLogEntry(relativePath1, "branch-1", commitIDs1[0])
+
+	proposeLogEntry(t, ctx, logManagers[0], nil, entry1, map[string][]byte{
+		"1": []byte(commitIDs1[0] + "\n"),
+	})
+
+	// Update 2 refs
+	relativePath2, commitIDs2 := setupTestRepo(t, ctx, 2)
+	entry2 := testentry.MultipleRefChangesLogEntry(relativePath2, []testentry.RefChange{
+		{Ref: "branch-1", Oid: commitIDs2[0]},
+		{Ref: "branch-2", Oid: commitIDs2[1]},
+	})
+	proposeLogEntry(t, ctx, logManagers[1], nil, entry2, map[string][]byte{
+		"1": []byte(commitIDs2[0] + "\n"),
+		"2": []byte(commitIDs2[1] + "\n"),
+	})
+
+	// KV operation without any file.
+	relativePath3, _ := setupTestRepo(t, ctx, 0)
+	entry3 := testentry.MultipleKVLogEntry(relativePath3, []testentry.KVOperation{
+		{Key: []byte("key-1"), Value: []byte("value-1")},
+		{Key: []byte("key-2"), Value: []byte("value-2")},
+	})
+	proposeLogEntry(t, ctx, logManagers[2], nil, entry3, nil)
+
+	// Wait for acknolwedgements
+	for _, manager := range logManagers {
+		<-manager.NotifyQueue()
+	}
+	archiver.Close()
+
+	cmpDir := testhelper.TempDir(t)
+	require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), mode.Directory))
+
+	lsnPrefix := storage.LSN(1).String()
+
+	// Assert manager 1
+	tarPath := filepath.Join(partitionPath(archivePath, storageName, storage.PartitionID(1)), lsnPrefix+".tar")
+	tar, err := os.Open(tarPath)
+	require.NoError(t, err)
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsnPrefix:                            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		filepath.Join(lsnPrefix, "MANIFEST"): testentry.ManifestDirectoryEntryInTar(entry1),
+		filepath.Join(lsnPrefix, "1"):        {Mode: archive.TarFileMode, Content: []byte(commitIDs1[0] + "\n")},
+	})
+	testhelper.MustClose(t, tar)
+
+	// Assert manager 2
+	tarPath = filepath.Join(partitionPath(archivePath, storageName, storage.PartitionID(2)), lsnPrefix+".tar")
+	tar, err = os.Open(tarPath)
+	require.NoError(t, err)
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsnPrefix:                            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		filepath.Join(lsnPrefix, "MANIFEST"): testentry.ManifestDirectoryEntryInTar(entry2),
+		filepath.Join(lsnPrefix, "1"):        {Mode: archive.TarFileMode, Content: []byte(commitIDs2[0] + "\n")},
+		filepath.Join(lsnPrefix, "2"):        {Mode: archive.TarFileMode, Content: []byte(commitIDs2[1] + "\n")},
+	})
+	testhelper.MustClose(t, tar)
+
+	// Assert manager 3
+	tarPath = filepath.Join(partitionPath(archivePath, storageName, storage.PartitionID(3)), lsnPrefix+".tar")
+	tar, err = os.Open(tarPath)
+	require.NoError(t, err)
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsnPrefix:                            {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		filepath.Join(lsnPrefix, "MANIFEST"): testentry.ManifestDirectoryEntryInTar(entry3), // No file
+	})
+	testhelper.MustClose(t, tar)
+
+	// Finally, assert the metrics.
+	testhelper.RequirePromMetrics(t, archiver.backupCounter, buildMetrics(t, 3, 0))
+}
+
+func proposeLogEntry(t *testing.T, ctx context.Context, manager *wal.LogManager, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, files map[string][]byte) storage.LSN {
+	t.Helper()
+
+	logEntryPath := testhelper.TempDir(t)
+	for name, value := range files {
+		path := filepath.Join(logEntryPath, name)
+		require.NoError(t, os.WriteFile(path, value, mode.File))
+	}
+
+	nextLSN, err := manager.Propose(ctx, objectDependencies, logEntry, logEntryPath)
+	require.NoError(t, err)
+
+	return nextLSN
+}
+
+func setupTestRepo(t *testing.T, ctx context.Context, numCommits int) (string, []git.ObjectID) {
+	relativePath := gittest.NewRepositoryName(t)
+	cfg := testcfg.Build(t)
+	_, repoPath := gittest.CreateRepository(t, ctx, cfg, gittest.CreateRepositoryConfig{
+		SkipCreationViaService: true,
+		RelativePath:           relativePath,
+	})
+
+	var commitIDs []git.ObjectID
+	for i := 0; i < numCommits; i++ {
+		commitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents())
+		commitIDs = append(commitIDs, commitID)
+	}
+
+	return relativePath, commitIDs
 }
