@@ -9,6 +9,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -27,8 +28,8 @@ type hookContext struct {
 // installHooks takes the hooks in the test setup and configures them in the TransactionManager.
 func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup, hooks testTransactionHooks) {
 	for destination, source := range map[*func()]hookFunc{
-		&mgr.testHooks.beforeInitialization: hooks.BeforeReadAppliedLSN,
-		&mgr.testHooks.beforeRunExiting: func(hookContext) {
+		&mgr.TestHooks.beforeInitialization: hooks.BeforeReadAppliedLSN,
+		&mgr.TestHooks.beforeRunExiting: func(hookContext) {
 			if hooks.WaitForTransactionsWhenClosing {
 				inflightTransactions.Wait()
 			}
@@ -46,9 +47,9 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 		}
 	}
 	for destination, source := range map[*func(storage.LSN)]hookFunc{
-		&mgr.testHooks.beforeApplyLogEntry:       hooks.BeforeApplyLogEntry,
-		&mgr.wal.testHooks.beforeAppendLogEntry:  hooks.BeforeAppendLogEntry,
-		&mgr.wal.testHooks.beforeStoreAppliedLSN: hooks.BeforeStoreAppliedLSN,
+		&mgr.TestHooks.beforeApplyLogEntry:       hooks.BeforeApplyLogEntry,
+		&mgr.wal.TestHooks.BeforeAppendLogEntry:  hooks.BeforeAppendLogEntry,
+		&mgr.wal.TestHooks.BeforeStoreAppliedLSN: hooks.BeforeStoreAppliedLSN,
 	} {
 		if source != nil {
 			runHook := source
@@ -90,7 +91,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
 					"/":    {Mode: mode.Directory},
@@ -125,7 +126,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
 					"/":    {Mode: mode.Directory},
@@ -197,7 +198,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
 					"/":    {Mode: mode.Directory},
@@ -248,7 +249,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -333,7 +334,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -432,7 +433,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -524,7 +525,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -616,7 +617,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -724,7 +725,7 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {

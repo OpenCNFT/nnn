@@ -1,4 +1,4 @@
-package partition
+package wal
 
 import (
 	"context"
@@ -521,7 +521,7 @@ func TestLogManager_Propose(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 3)
 
-		logManager.testHooks.beforeAppendLogEntry = func(lsn storage.LSN) {
+		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {
 			if lsn == 2 {
 				panic("crash please")
 			}
@@ -564,7 +564,7 @@ func TestLogManager_Propose(t *testing.T) {
 		})
 
 		// Remove the hook and retry the last proposal.
-		logManager.testHooks.beforeAppendLogEntry = func(lsn storage.LSN) {}
+		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {}
 		proposeLogEntry(t, ctx, logManager, nil, refEntry2, setup.GetFileMappingForEntry(1, 2))
 
 		require.Equal(t, logManager.appendedLSN, storage.LSN(2))

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 )
 
 func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transactionTestCase {
@@ -22,9 +23,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-2",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-2",
 				},
 			},
 		},
@@ -49,9 +50,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-3",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-3",
 				},
 			},
 		},
@@ -69,9 +70,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-3",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-3",
 				},
 			},
 		},
@@ -96,8 +97,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},
@@ -115,8 +116,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},
@@ -132,7 +133,7 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 			},
 		},
@@ -155,8 +156,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-2",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-2",
 				},
 			},
 		},
@@ -187,7 +188,7 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 			},
 		},
@@ -218,8 +219,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
-					"kv/key-1":            "value-2",
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
+					"kv/key-1":                "value-2",
 				},
 			},
 		},
@@ -250,7 +251,7 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 			},
 		},
@@ -276,8 +277,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},
@@ -303,8 +304,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},
@@ -338,7 +339,7 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 			},
 		},
@@ -369,8 +370,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},
@@ -401,8 +402,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},
@@ -444,10 +445,10 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-2-modified",
-					"kv/key-3":            "value-3",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-2-modified",
+					"kv/key-3":                "value-3",
 				},
 			},
 		},
@@ -489,9 +490,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-3":            "value-3",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-3":                "value-3",
 				},
 			},
 		},
@@ -531,10 +532,10 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-2",
-					"kv/key-3":            "value-3",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-2",
+					"kv/key-3":                "value-3",
 				},
 			},
 		},
@@ -571,10 +572,10 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
-					"kv/prefix-1/key-1":   "value-1",
-					"kv/prefix-1/key-3":   "value-3",
-					"kv/prefix-2/key-2":   "value-2",
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
+					"kv/prefix-1/key-1":       "value-1",
+					"kv/prefix-1/key-3":       "value-3",
+					"kv/prefix-2/key-2":       "value-2",
 				},
 			},
 		},
@@ -596,9 +597,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 					RelativePaths:       []string{},
 					ExpectedSnapshotLSN: 1,
 				},
-				ReadKey{TransactionID: 2, Key: string(keyAppliedLSN), ExpectedError: badger.ErrKeyNotFound},
+				ReadKey{TransactionID: 2, Key: string(wal.KeyAppliedLSN), ExpectedError: badger.ErrKeyNotFound},
 				ReadKeyPrefix{TransactionID: 2, ExpectedValues: map[string]string{
-					// We don't expect to see keyAppliedLSN here
+					// We don't expect to see wal.KeyAppliedLSN here
 					"key-1": "value-1",
 					"key-2": "value-2",
 				}},
@@ -606,9 +607,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-2",
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-2",
 				},
 			},
 		},
@@ -638,9 +639,9 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
-					"kv/key-2":            "value-2",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
+					"kv/key-2":                "value-2",
 				},
 			},
 		},
@@ -666,8 +667,8 @@ func generateKeyValueTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
-					"kv/key-1":            "value-1",
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/key-1":                "value-1",
 				},
 			},
 		},

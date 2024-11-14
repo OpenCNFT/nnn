@@ -8,6 +8,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testentry"
 )
@@ -39,7 +40,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
@@ -113,7 +114,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
 					"/":    {Mode: mode.Directory},
@@ -193,7 +194,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Directory: testhelper.DirectoryState{
 					"/":    {Mode: mode.Directory},
@@ -282,7 +283,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
@@ -391,7 +392,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},
@@ -492,7 +493,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
 					"/":                           {Mode: mode.Directory},

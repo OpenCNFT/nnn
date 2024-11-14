@@ -11,6 +11,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -34,7 +35,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -109,7 +110,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 			},
 		},
@@ -128,7 +129,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -220,7 +221,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -296,7 +297,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -370,7 +371,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -447,7 +448,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -519,7 +520,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -605,7 +606,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -655,7 +656,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -753,7 +754,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -829,7 +830,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -901,7 +902,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -997,7 +998,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1112,7 +1113,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1215,7 +1216,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 			},
 		},
@@ -1247,7 +1248,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1319,7 +1320,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 			},
 		},
@@ -1378,7 +1379,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1435,7 +1436,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1510,7 +1511,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(5).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(5).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1551,7 +1552,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 			},
 		},
@@ -1590,7 +1591,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1683,7 +1684,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1786,7 +1787,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1900,7 +1901,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2003,7 +2004,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 			},
 		},
@@ -2022,7 +2023,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 			},
 		},
@@ -2047,7 +2048,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2133,7 +2134,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2192,7 +2193,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 			},
 		},
@@ -2218,7 +2219,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2299,7 +2300,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2390,7 +2391,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2464,7 +2465,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2549,7 +2550,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2594,7 +2595,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2694,7 +2695,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {

@@ -337,7 +337,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	defer mgr.snapshotLocks[txn.snapshotLSN].activeSnapshotters.Done()
 	readReady := mgr.snapshotLocks[txn.snapshotLSN].applied
 
-	var entryRef *EntryReference
+	var entryRef *wal.EntryReference
 	if txn.write {
 		entryRef = mgr.wal.IncrementEntryReference(txn.snapshotLSN)
 	}
@@ -866,7 +866,7 @@ type TransactionManager struct {
 	// db is the handle to the key-value store used for storing the write-ahead log related state.
 	db keyvalue.Transactioner
 	// wal manages the underlying Write-Ahead Log entries.
-	wal *LogManager
+	wal *wal.LogManager
 	// admissionQueue is where the incoming writes are waiting to be admitted to the transaction
 	// manager.
 	admissionQueue chan *Transaction
@@ -895,9 +895,9 @@ type TransactionManager struct {
 	// value is the resultChannel that is waiting the result.
 	awaitingTransactions map[storage.LSN]resultChannel
 
-	// testHooks are used in the tests to trigger logic at certain points in the execution.
+	// TestHooks are used in the tests to trigger logic at certain points in the execution.
 	// They are used to synchronize more complex test scenarios. Not used in production.
-	testHooks testHooks
+	TestHooks testHooks
 
 	// metrics stores reporters which facilitate metric recording of transactional operations.
 	metrics ManagerMetrics
@@ -937,7 +937,7 @@ func NewTransactionManager(
 		storagePath:          storagePath,
 		partitionID:          ptnID,
 		db:                   db,
-		wal:                  NewLogManager(storageName, ptnID, db, stagingDir, stateDir, consumer),
+		wal:                  wal.NewLogManager(storageName, ptnID, db, stagingDir, stateDir, consumer),
 		admissionQueue:       make(chan *Transaction),
 		initialized:          make(chan struct{}),
 		snapshotLocks:        make(map[storage.LSN]*snapshotLock),
@@ -946,7 +946,7 @@ func NewTransactionManager(
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
 		metrics:              metrics,
 
-		testHooks: testHooks{
+		TestHooks: testHooks{
 			beforeInitialization: func() {},
 			beforeApplyLogEntry:  func(storage.LSN) {},
 			beforeRunExiting:     func() {},
@@ -2003,7 +2003,7 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	// Defer the Stop in order to release all on-going Commit calls in case of error.
 	defer close(mgr.closed)
 	defer mgr.Close()
-	defer mgr.testHooks.beforeRunExiting()
+	defer mgr.TestHooks.beforeRunExiting()
 
 	if err := mgr.initialize(ctx); err != nil {
 		return fmt.Errorf("initialize: %w", err)
@@ -2331,7 +2331,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
-	mgr.testHooks.beforeInitialization()
+	mgr.TestHooks.beforeInitialization()
 	mgr.initializationSuccessful = true
 
 	return nil
@@ -3253,7 +3253,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 	delete(mgr.snapshotLocks, previousLSN)
 	mgr.mutex.Unlock()
 
-	mgr.testHooks.beforeApplyLogEntry(lsn)
+	mgr.TestHooks.beforeApplyLogEntry(lsn)
 
 	if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, mgr.wal.GetEntryPath(lsn), logEntry, mgr.db); err != nil {
 		return fmt.Errorf("apply operations: %w", err)

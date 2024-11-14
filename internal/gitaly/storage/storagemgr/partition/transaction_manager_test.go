@@ -29,6 +29,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testentry"
@@ -277,7 +278,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				},
 				expectedState: StateAssertion{
 					Database: DatabaseState{
-						string(keyAppliedLSN): storage.LSN(1).ToProto(),
+						string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 					},
 					Repositories: RepositoryStates{
 						setup.RelativePath: {
@@ -577,7 +578,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -650,7 +651,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -727,7 +728,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -804,7 +805,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -883,7 +884,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -969,7 +970,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1033,7 +1034,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1061,7 +1062,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1093,7 +1094,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1162,7 +1163,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1219,7 +1220,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1238,7 +1239,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					//
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
-						packFilePath := packFilePath(logEntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
+						packFilePath := packFilePath(wal.LogEntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
 						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,
@@ -1319,7 +1320,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 			},
 		},
@@ -1337,7 +1338,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 			},
 		},
@@ -1476,7 +1477,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1552,7 +1553,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePaths: []string{setup.RelativePath},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "", testhelper.DirectoryState{
 						"/":    {Mode: mode.Directory},
 						"/wal": {Mode: mode.Directory},
 					})
@@ -1577,7 +1578,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(2).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1663,7 +1664,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "",
 						gittest.FilesOrReftables(testhelper.DirectoryState{
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
@@ -1680,7 +1681,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					ExpectedSnapshotLSN: 2,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "",
 						gittest.FilesOrReftables(testhelper.DirectoryState{
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
@@ -1698,7 +1699,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "",
 						gittest.FilesOrReftables(testhelper.DirectoryState{
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
@@ -1719,7 +1720,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1798,7 +1799,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					TransactionID: 1,
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "", testhelper.DirectoryState{
 						"/":    {Mode: mode.Directory},
 						"/wal": {Mode: mode.Directory},
 					})
@@ -1869,10 +1870,10 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
-						string(keyAppliedLSN): storage.LSN(3).ToProto(),
+						string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "",
 						gittest.FilesOrReftables(testhelper.DirectoryState{
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
@@ -1893,7 +1894,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					// When the manager finishes initialization, the left-over log entries are
 					// cleaned up.
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
-						string(keyAppliedLSN): storage.LSN(3).ToProto(),
+						string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.wal.AppliedLSN(), storage.LSN(3))
 					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(3))
@@ -1901,7 +1902,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -2027,10 +2028,10 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					require.NoError(t, err)
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
-						string(keyAppliedLSN): storage.LSN(3).ToProto(),
+						string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "", testhelper.DirectoryState{
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
 						"/wal/0000000000002":          {Mode: mode.Directory},
@@ -2050,7 +2051,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					// When the manager finishes initialization, the left-over log entries are
 					// cleaned up.
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
-						string(keyAppliedLSN): storage.LSN(4).ToProto(),
+						string(wal.KeyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.wal.AppliedLSN(), storage.LSN(4))
 					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(4))
@@ -2058,7 +2059,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(4).ToProto(),
+					string(wal.KeyAppliedLSN): storage.LSN(4).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {

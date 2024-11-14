@@ -1,4 +1,4 @@
-package partition
+package wal
 
 import (
 	"container/list"
@@ -22,11 +22,11 @@ import (
 )
 
 var (
-	// errEntryReferenceGone is returned when the log entry of a LSN is gone from database while it's still
+	// ErrEntryReferenceGone is returned when the log entry of a LSN is gone from database while it's still
 	// accessed by other transactions.
-	errEntryReferenceGone = errors.New("in-used entry references is gone")
-	// keyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
-	keyAppliedLSN = []byte("applied_lsn")
+	ErrEntryReferenceGone = errors.New("in-used entry references is gone")
+	// KeyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
+	KeyAppliedLSN = []byte("applied_lsn")
 )
 
 // walStatePath returns the WAL directory's path.
@@ -34,8 +34,8 @@ func walStatePath(stateDir string) string {
 	return filepath.Join(stateDir, "wal")
 }
 
-// logEntryPath returns an absolute path to a given log entry's WAL files.
-func logEntryPath(stateDir string, lsn storage.LSN) string {
+// LogEntryPath returns an absolute path to a given log entry's WAL files.
+func LogEntryPath(stateDir string, lsn storage.LSN) string {
 	return filepath.Join(walStatePath(stateDir), lsn.String())
 }
 
@@ -77,8 +77,8 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 }
 
 type testLogHooks struct {
-	beforeAppendLogEntry  func(storage.LSN)
-	beforeStoreAppliedLSN func(storage.LSN)
+	BeforeAppendLogEntry  func(storage.LSN)
+	BeforeStoreAppliedLSN func(storage.LSN)
 }
 
 // LogManager is responsible for managing the Write-Ahead Log (WAL) entries on disk. It maintains the in-memory state
@@ -125,9 +125,9 @@ type LogManager struct {
 	// notifyQueue is a queue notifying when there is a new change.
 	notifyQueue chan struct{}
 
-	// testHooks are used in the tests to trigger logic at certain points in the execution.
+	// TestHooks are used in the tests to trigger logic at certain points in the execution.
 	// They are used to synchronize more complex test scenarios. Not used in production.
-	testHooks testLogHooks
+	TestHooks testLogHooks
 }
 
 // NewLogManager returns an instance of LogManager.
@@ -142,9 +142,9 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, db keyva
 		consumer:         consumer,
 		consumerPos:      &consumerPosition{},
 		notifyQueue:      make(chan struct{}, 1),
-		testHooks: testLogHooks{
-			beforeAppendLogEntry:  func(storage.LSN) {},
-			beforeStoreAppliedLSN: func(storage.LSN) {},
+		TestHooks: testLogHooks{
+			BeforeAppendLogEntry:  func(storage.LSN) {},
+			BeforeStoreAppliedLSN: func(storage.LSN) {},
 		},
 	}
 }
@@ -158,7 +158,7 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, db keyva
 // crucial for maintaining data consistency and ensuring that log entries are managed accurately upon system startup.
 func (mgr *LogManager) Initialize(ctx context.Context) error {
 	var appliedLSN gitalypb.LSN
-	if err := mgr.readKey(keyAppliedLSN, &appliedLSN); err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
+	if err := mgr.readKey(KeyAppliedLSN, &appliedLSN); err != nil && !errors.Is(err, badger.ErrKeyNotFound) {
 		return fmt.Errorf("read applied LSN: %w", err)
 	}
 
@@ -209,6 +209,11 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 	return nil
 }
 
+// StateDirectory returns the state directory under the management of this manager.
+func (mgr *LogManager) StateDirectory() string {
+	return mgr.stateDirectory
+}
+
 // NotifyQueue returns a notify channel so that caller can poll new changes.
 func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 	return mgr.notifyQueue
@@ -248,7 +253,7 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 	}
 
 	nextLSN := mgr.appendedLSN + 1
-	mgr.testHooks.beforeAppendLogEntry(nextLSN)
+	mgr.TestHooks.BeforeAppendLogEntry(nextLSN)
 
 	// Move the log entry from the staging directory into its place in the log.
 	destinationPath := mgr.GetEntryPath(nextLSN)
@@ -333,10 +338,10 @@ func (mgr *LogManager) removeStaleWALFiles(ctx context.Context) error {
 	for _, possibleStaleFilesPath := range []string{
 		// Log entries are pruned one by one. If a write is interrupted, the only possible stale files would be
 		// for the log entry preceding the oldest log entry.
-		logEntryPath(mgr.stateDirectory, mgr.oldestLSN-1),
+		LogEntryPath(mgr.stateDirectory, mgr.oldestLSN-1),
 		// Log entries are appended one by one to the log. If a write is interrupted, the only possible stale
 		// files would be for the next LSN. Remove the files if they exist.
-		logEntryPath(mgr.stateDirectory, mgr.appendedLSN+1),
+		LogEntryPath(mgr.stateDirectory, mgr.appendedLSN+1),
 	} {
 		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -419,12 +424,12 @@ func (mgr *LogManager) AppliedLSN() storage.LSN {
 
 // StoreAppliedLSN stores the partition's applied LSN in the database.
 func (mgr *LogManager) StoreAppliedLSN(lsn storage.LSN) error {
-	mgr.testHooks.beforeStoreAppliedLSN(lsn)
+	mgr.TestHooks.BeforeStoreAppliedLSN(lsn)
 
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	if err := mgr.setKey(keyAppliedLSN, lsn.ToProto()); err != nil {
+	if err := mgr.setKey(KeyAppliedLSN, lsn.ToProto()); err != nil {
 		return fmt.Errorf("storing applied LSN: %w", err)
 	}
 	mgr.appliedLSN = lsn
@@ -446,7 +451,7 @@ func (mgr *LogManager) AcknowledgeConsumerPos(lsn storage.LSN) {
 
 // GetEntryPath returns the path of the log entry's root directory.
 func (mgr *LogManager) GetEntryPath(lsn storage.LSN) string {
-	return logEntryPath(mgr.stateDirectory, lsn)
+	return LogEntryPath(mgr.stateDirectory, lsn)
 }
 
 // deleteLogEntry deletes the log entry at the given LSN from the log.
@@ -458,7 +463,7 @@ func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) erro
 		return fmt.Errorf("mkdir temp: %w", err)
 	}
 
-	logEntryPath := logEntryPath(mgr.stateDirectory, lsn)
+	logEntryPath := LogEntryPath(mgr.stateDirectory, lsn)
 	// We can't delete a directory atomically as we have to first delete all of its content.
 	// If the deletion was interrupted, we'd be left with a corrupted log entry on the disk.
 	// To perform the deletion atomically, we move the to be deleted log entry out from the
@@ -485,7 +490,7 @@ func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) erro
 
 // ReadLogEntry returns the log entry from the given position in the log.
 func (mgr *LogManager) ReadLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
-	manifestBytes, err := os.ReadFile(manifestPath(logEntryPath(mgr.stateDirectory, lsn)))
+	manifestBytes, err := os.ReadFile(manifestPath(LogEntryPath(mgr.stateDirectory, lsn)))
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
 	}
@@ -592,7 +597,7 @@ func (mgr *LogManager) WalkCommittedEntries(lsn storage.LSN, relativePath string
 		}
 		entry, err := mgr.ReadLogEntry(committed.lsn)
 		if err != nil {
-			return errEntryReferenceGone
+			return ErrEntryReferenceGone
 		}
 		// Transaction manager works on the partition level, including a repository and all of its pool
 		// member repositories (if any). We need to filter log entries of the repository this
