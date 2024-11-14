@@ -44,18 +44,14 @@ func TestRemoveRepository_doesNotExist(t *testing.T) {
 		Repository: &gitalypb.Repository{StorageName: cfg.Storages[0].Name, RelativePath: "/does/not/exist"},
 	})
 
-	errRepositoryDoesNotExist := structerr.NewNotFound("repository does not exist")
 	testhelper.RequireGrpcError(t,
 		testhelper.GitalyOrPraefect[error](
-			testhelper.WithOrWithoutWAL[error](
-				testhelper.WithInterceptedMetadataItems(
-					structerr.NewNotFound("repository not found"),
-					structerr.MetadataItem{Key: "relative_path", Value: "/does/not/exist"},
-					structerr.MetadataItem{Key: "storage_name", Value: cfg.Storages[0].Name},
-				),
-				errRepositoryDoesNotExist,
+			testhelper.WithInterceptedMetadataItems(
+				structerr.NewNotFound("repository not found"),
+				structerr.MetadataItem{Key: "relative_path", Value: "OVERRIDDEN_BY_TESTHELPER"},
+				structerr.MetadataItem{Key: "storage_name", Value: cfg.Storages[0].Name},
 			),
-			errRepositoryDoesNotExist,
+			structerr.NewNotFound("repository does not exist"),
 		),
 		err,
 	)

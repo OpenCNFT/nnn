@@ -15,6 +15,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/service/setup"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testserver"
@@ -224,5 +225,41 @@ custom_hooks_path = '%[2]s/custom_hooks.tar'
 
 		output := gittest.Exec(t, cfg, "-C", repoPath, "bundle", "verify", bundlePath)
 		require.Contains(t, string(output), "The bundle records a complete history")
+	}
+}
+
+func TestRemoveRepository(t *testing.T) {
+	t.Parallel()
+
+	cfg := testcfg.Build(t)
+	cfg.SocketPath = testserver.RunGitalyServer(t, cfg, setup.RegisterAll)
+	ctx := testhelper.MergeIncomingMetadata(testhelper.Context(t), testcfg.GitalyServersMetadataFromCfg(t, cfg))
+
+	for _, tc := range []struct {
+		desc            string
+		repositorySetup func() *gitalypb.Repository
+	}{
+		{
+			desc: "with valid repository",
+			repositorySetup: func() *gitalypb.Repository {
+				repo, _ := gittest.CreateRepository(t, ctx, cfg)
+				return repo
+			},
+		},
+		{
+			desc: "with non-existent repository",
+			repositorySetup: func() *gitalypb.Repository {
+				return &gitalypb.Repository{StorageName: "default", RelativePath: "nonexistent"}
+			},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
+
+			pool := client.NewPool()
+			defer testhelper.MustClose(t, pool)
+
+			require.NoError(t, removeRepository(ctx, pool, tc.repositorySetup()))
+		})
 	}
 }
