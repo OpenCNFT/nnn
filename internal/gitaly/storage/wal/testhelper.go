@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -17,6 +18,19 @@ import (
 func ManifestDirectoryEntry(expected *gitalypb.LogEntry) testhelper.DirectoryEntry {
 	return testhelper.DirectoryEntry{
 		Mode:    mode.File,
+		Content: expected,
+		ParseContent: func(tb testing.TB, path string, content []byte) any {
+			var logEntry gitalypb.LogEntry
+			require.NoError(tb, proto.Unmarshal(content, &logEntry))
+			return &logEntry
+		},
+	}
+}
+
+// ManifestDirectoryEntryInTar is a variant of ManifestDirectoryEntry for asserting manifest in a tar file.
+func ManifestDirectoryEntryInTar(expected *gitalypb.LogEntry) testhelper.DirectoryEntry {
+	return testhelper.DirectoryEntry{
+		Mode:    archive.TarFileMode,
 		Content: expected,
 		ParseContent: func(tb testing.TB, path string, content []byte) any {
 			var logEntry gitalypb.LogEntry
