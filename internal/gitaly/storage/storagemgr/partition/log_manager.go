@@ -118,7 +118,7 @@ type LogManager struct {
 
 	// consumer is an the external caller that may perform read-only operations against applied
 	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
-	consumer LogConsumer
+	consumer storage.LogConsumer
 	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
 	consumerPos *consumerPosition
 
@@ -131,7 +131,7 @@ type LogManager struct {
 }
 
 // NewLogManager returns an instance of LogManager.
-func NewLogManager(storageName string, partitionID storage.PartitionID, db keyvalue.Transactioner, stagingDirectory string, stateDirectory string, consumer LogConsumer) *LogManager {
+func NewLogManager(storageName string, partitionID storage.PartitionID, db keyvalue.Transactioner, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *LogManager {
 	return &LogManager{
 		db:               db,
 		storageName:      storageName,
@@ -203,7 +203,7 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 	}
 
 	if mgr.consumer != nil && mgr.appendedLSN != 0 {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
 	}
 
 	return nil
@@ -283,7 +283,7 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 	mgr.mutex.Unlock()
 
 	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
 	}
 	return nextLSN, nil
 }
@@ -429,6 +429,19 @@ func (mgr *LogManager) StoreAppliedLSN(lsn storage.LSN) error {
 	}
 	mgr.appliedLSN = lsn
 	return nil
+}
+
+// AcknowledgeConsumerPos acknowledges log entries up and including lsn as successfully processed
+// for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
+// completed transaction.
+func (mgr *LogManager) AcknowledgeConsumerPos(lsn storage.LSN) {
+	mgr.consumerPos.setPosition(lsn)
+
+	// Alert the manager. If it has a pending acknowledgement already no action is required.
+	select {
+	case mgr.notifyQueue <- struct{}{}:
+	default:
+	}
 }
 
 // GetEntryPath returns the path of the log entry's root directory.

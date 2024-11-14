@@ -790,22 +790,10 @@ type snapshotLock struct {
 	activeSnapshotters sync.WaitGroup
 }
 
-// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
-// for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
-// completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(lsn storage.LSN) {
-	mgr.wal.consumerPos.setPosition(lsn)
-
-	// Alert the manager. If it has a pending acknowledgement already no action is required.
-	select {
-	case mgr.acknowledgedQueue <- struct{}{}:
-	default:
-	}
-}
-
-// GetTransactionPath returns the path of the log entry's root directory.
-func (mgr *TransactionManager) GetTransactionPath(lsn storage.LSN) string {
-	return mgr.wal.GetEntryPath(lsn)
+// GetLogManager provides controlled access to underlying log management system for log consumption purpose. It
+// allows the consumers to access to on-disk location of a LSN and acknowledge consumed position.
+func (mgr *TransactionManager) GetLogManager() storage.LogManager {
+	return mgr.wal
 }
 
 // TransactionManager is responsible for transaction management of a single repository. Each repository has
@@ -907,9 +895,6 @@ type TransactionManager struct {
 	// value is the resultChannel that is waiting the result.
 	awaitingTransactions map[storage.LSN]resultChannel
 
-	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
-	acknowledgedQueue chan struct{}
-
 	// testHooks are used in the tests to trigger logic at certain points in the execution.
 	// They are used to synchronize more complex test scenarios. Not used in production.
 	testHooks testHooks
@@ -936,7 +921,7 @@ func NewTransactionManager(
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics ManagerMetrics,
-	consumer LogConsumer,
+	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -960,7 +945,6 @@ func NewTransactionManager(
 		stagingDirectory:     stagingDir,
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
 		metrics:              metrics,
-		acknowledgedQueue:    make(chan struct{}, 1),
 
 		testHooks: testHooks{
 			beforeInitialization: func() {},
@@ -2071,8 +2055,6 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			}
 		}()
 	case <-mgr.wal.NotifyQueue():
-		return nil
-	case <-mgr.acknowledgedQueue:
 		return nil
 	case <-ctx.Done():
 	}

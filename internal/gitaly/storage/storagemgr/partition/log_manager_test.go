@@ -126,7 +126,7 @@ func (ts *testSetup) GetFileContent(index int) []byte {
 	return []byte(ts.commitIDs[index] + "\n")
 }
 
-func setupLogManager(t *testing.T, ctx context.Context, consumer LogConsumer) *LogManager {
+func setupLogManager(t *testing.T, ctx context.Context, consumer storage.LogConsumer) *LogManager {
 	database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { testhelper.MustClose(t, database) })
@@ -731,7 +731,7 @@ type mockLogConsumer struct {
 	busy      atomic.Bool
 }
 
-func (c *mockLogConsumer) NotifyNewTransactions(storageName string, partitionID storage.PartitionID, oldestLSN, appendedLSN storage.LSN) {
+func (c *mockLogConsumer) NotifyNewEntries(storageName string, partitionID storage.PartitionID, oldestLSN, appendedLSN storage.LSN) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

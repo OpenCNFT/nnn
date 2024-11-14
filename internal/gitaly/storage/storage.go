@@ -139,12 +139,35 @@ type BeginOptions struct {
 	ForceExclusiveSnapshot bool
 }
 
+// LogConsumer is the interface of a log consumer that is passed to a WAL. The LogConsumer may perform read-only
+// operations against the on-disk log entry. The WAL notifies the consumer of new log entries by invoking the
+// NotifyNewEntries method after they are committed.
+type LogConsumer interface {
+	// NotifyNewEntries alerts the LogConsumer that new log entries are available for consumption. The method
+	// invoked both when the WAL initializes and when new log entries are committed. Both the low and high water
+	// mark LSNs are sent so that a newly initialized consumer is aware of the full range of entries it can process.
+	NotifyNewEntries(storageName string, partitionID PartitionID, lowWaterMark, highWaterMark LSN)
+}
+
+// LogManager is the interface used on the consumer side of the integration. The consumer has the ability to acknowledge
+// log entries as having been processed with AcknowledgeConsumerPos.
+type LogManager interface {
+	// AcknowledgeConsumerPos acknowledges log entries up and including lsn as successfully processed
+	// for the specified LogConsumer.
+	AcknowledgeConsumerPos(lsn LSN)
+	// GetEntryPath returns the path of the log entry's root directory.
+	GetEntryPath(lsn LSN) string
+}
+
 // Partition is responsible for a single partition of data.
 type Partition interface {
 	// Begin begins a transaction against the partition.
 	Begin(context.Context, BeginOptions) (Transaction, error)
 	// Close closes the partition handle to signal the caller is done using it.
 	Close()
+	// GetLogManager provides controlled access to underlying log management system for log consumption purpose. It
+	// allows the consumers to access to on-disk location of a LSN and acknowledge consumed position.
+	GetLogManager() LogManager
 }
 
 // TransactionOptions are used to pass transaction options into Begin.

@@ -22,9 +22,25 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
+type mockPartition struct {
+	t       *testing.T
+	manager storage.LogManager
+}
+
+func (p *mockPartition) Begin(context.Context, storage.BeginOptions) (storage.Transaction, error) {
+	p.t.Errorf("should not be called")
+	return nil, nil
+}
+
+func (p *mockPartition) Close() {}
+
+func (p *mockPartition) GetLogManager() storage.LogManager {
+	return p.manager
+}
+
 type mockNode struct {
-	managers map[partitionInfo]*mockLogManager
-	t        *testing.T
+	partitions map[partitionInfo]*mockPartition
+	t          *testing.T
 
 	sync.Mutex
 }
@@ -44,7 +60,7 @@ func (m mockStorage) GetPartition(ctx context.Context, partitionID storage.Parti
 	defer m.node.Unlock()
 
 	info := partitionInfo{m.storageName, partitionID}
-	mgr, ok := m.node.managers[info]
+	mgr, ok := m.node.partitions[info]
 	assert.True(m.node.t, ok)
 
 	return mgr, nil
@@ -61,12 +77,11 @@ type mockLogManager struct {
 	finishCount   int
 
 	sync.Mutex
-	storage.Partition
 }
 
 func (lm *mockLogManager) Close() {}
 
-func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
+func (lm *mockLogManager) AcknowledgeConsumerPos(lsn storage.LSN) {
 	lm.Lock()
 	defer lm.Unlock()
 
@@ -103,14 +118,19 @@ func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
 
 func (lm *mockLogManager) SendNotification() {
 	n := lm.notifications[0]
-	lm.archiver.NotifyNewTransactions(lm.partitionInfo.storageName, lm.partitionInfo.partitionID, n.lowWaterMark, n.highWaterMark)
+	lm.archiver.NotifyNewEntries(lm.partitionInfo.storageName, lm.partitionInfo.partitionID, n.lowWaterMark, n.highWaterMark)
 
 	lm.notifications = lm.notifications[1:]
 }
 
-func (lm *mockLogManager) GetTransactionPath(lsn storage.LSN) string {
+func (lm *mockLogManager) GetEntryPath(lsn storage.LSN) string {
 	return filepath.Join(partitionPath(lm.entryRootPath, lm.partitionInfo.storageName, lm.partitionInfo.partitionID), lsn.String())
 }
+
+var (
+	_ = storage.LogManager(&mockLogManager{})
+	_ = storage.Partition(&mockPartition{})
+)
 
 type notification struct {
 	lowWaterMark, highWaterMark, sendAt storage.LSN
@@ -295,8 +315,8 @@ func TestLogEntryArchiver(t *testing.T) {
 			var wg sync.WaitGroup
 
 			accessor := &mockNode{
-				managers: make(map[partitionInfo]*mockLogManager, len(tc.partitions)),
-				t:        t,
+				partitions: make(map[partitionInfo]*mockPartition, len(tc.partitions)),
+				t:          t,
 			}
 
 			node := storage.Node(accessor)
@@ -330,7 +350,7 @@ func TestLogEntryArchiver(t *testing.T) {
 				managers[info] = manager
 
 				accessor.Lock()
-				accessor.managers[info] = manager
+				accessor.partitions[info] = &mockPartition{t: t, manager: manager}
 				accessor.Unlock()
 
 				// Send partitions in parallel to mimic real usage.
@@ -358,7 +378,8 @@ func TestLogEntryArchiver(t *testing.T) {
 			cmpDir := testhelper.TempDir(t)
 			require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), mode.Directory))
 
-			for info, manager := range accessor.managers {
+			for info, partition := range accessor.partitions {
+				manager := partition.GetLogManager().(*mockLogManager)
 				lastAck := manager.acknowledged[len(manager.acknowledged)-1]
 				require.Equal(t, tc.finalLSN, lastAck)
 
@@ -417,8 +438,8 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.NoError(t, err)
 
 	accessor := &mockNode{
-		managers: make(map[partitionInfo]*mockLogManager, 1),
-		t:        t,
+		partitions: make(map[partitionInfo]*mockPartition, 1),
+		t:          t,
 	}
 
 	node := storage.Node(accessor)
@@ -447,7 +468,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	}
 
 	accessor.Lock()
-	accessor.managers[info] = manager
+	accessor.partitions[info] = &mockPartition{t: t, manager: manager}
 	accessor.Unlock()
 
 	wg.Add(1)
