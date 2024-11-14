@@ -6,6 +6,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -39,6 +40,12 @@ func (s *server) CreateRepository(ctx context.Context, req *gitalypb.CreateRepos
 		repoutil.WithObjectHash(hash),
 	); err != nil {
 		return nil, structerr.NewInternal("creating repository: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := migration.RecordKeyCreation(tx, repository.GetRelativePath()); err != nil {
+			return nil, structerr.NewInternal("recording migration key: %w", err)
+		}
 	}
 
 	return &gitalypb.CreateRepositoryResponse{}, nil

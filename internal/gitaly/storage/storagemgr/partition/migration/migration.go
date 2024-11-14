@@ -9,8 +9,12 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 )
 
-// errInvalidMigration is returned if a migration being run is improperly configured.
-var errInvalidMigration = errors.New("invalid migration")
+var (
+	// migrations is a list of configured migrations that must be performed on repositories.
+	migrations []migration
+	// errInvalidMigration is returned if a migration being run is improperly configured.
+	errInvalidMigration = errors.New("invalid migration")
+)
 
 const migrationKeyPrefix = "m/"
 
@@ -46,6 +50,23 @@ func (m migration) run(ctx context.Context, txn storage.Transaction, relativePat
 func (m migration) recordID(txn storage.Transaction, relativePath string) error {
 	val := uint64ToBytes(m.id)
 	return txn.KV().Set(migrationKey(relativePath), val)
+}
+
+// RecordKeyCreation initializes the migration key for a new repository.
+func RecordKeyCreation(txn storage.Transaction, relativePath string) error {
+	// Generally, migration keys should be initialized to the latest migration because we should not
+	// be created repositories with outdated state. The ID of the latest configured migration is
+	// recorded in the transaction. If no migrations are configured, the ID is set to zero.
+	var migr migration
+	if len(migrations) > 0 {
+		migr = migrations[len(migrations)-1]
+	}
+
+	if err := migr.recordID(txn, relativePath); err != nil {
+		return fmt.Errorf("initializing key: %w", err)
+	}
+
+	return nil
 }
 
 // uint64ToBytes marshals the provided uint64 into a slice of bytes.
