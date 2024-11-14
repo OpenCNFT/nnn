@@ -1,4 +1,4 @@
-package partition
+package wal
 
 import (
 	"errors"
@@ -8,10 +8,10 @@ import (
 	"syscall"
 )
 
-// getInode gets the inode of a file system object at the given path.
+// GetInode gets the inode of a file system object at the given path.
 // If the file does not exist, zero is returned as the inode number with
 // no error raised.
-func getInode(path string) (uint64, error) {
+func GetInode(path string) (uint64, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {

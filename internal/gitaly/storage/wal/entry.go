@@ -1,8 +1,6 @@
 package wal
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -276,184 +272,6 @@ func (e *Entry) RecordAlternateUnlink(storageRoot, relativePath, alternatePath s
 
 	destinationAlternatesPath := filepath.Join(destinationObjectsDir, "info", "alternates")
 	e.RecordDirectoryEntryRemoval(destinationAlternatesPath)
-
-	return nil
-}
-
-// RecordReferenceUpdates performs reference updates against a snapshot repository and records the file system
-// Git performed in the log entry.
-//
-// The file system operations are recorded by first recording the pre-image of the repository. This is done by
-// going through each of the paths that could be modified in the transaction and recording whether they exist.
-// If `refs/heads/main` is updated, we walk each of the components to see whether they existed before
-// the reference transaction. For example, we'd check `refs`, `refs/heads` and `refs/heads/main` and record their
-// existence in the pre-image.
-//
-// While going through the reference changes, we'll build two tree representations of the references being updated
-// The first tree consists of operations that create a file, namely refererence updates and creations. The second
-// tree consists of operations that may delete files, so reference deletions.
-//
-// With the pre-image state built, the reference changes are applied to the repository. We then figure out the
-// changes by walking the two trees we built.
-//
-// File and directory creations are identified by walking from the refs directory downwards in the hierarchy. Each
-// directory and file that was did not exist in the pre-image state is recorded as a creation.
-//
-// File and directory removals are identified by walking from the leaf nodes, the references, towards the root 'refs'.
-// directory. Each file and directory that existed in the pre-image but doesn't exist anymore is recorded as having
-// been removed.
-//
-// Each recorded operation is staged against the target relative path by omitting the snapshotPrefix. This is works as
-// the snapshots retain the directory hierarchy of the original storage.
-//
-// Only the state changes inside `refs` directory are captured. To fully apply the reference transaction, changes to
-// `packed-refs` should be captured separately.
-//
-// The method assumes the reference directory is in good shape and doesn't have hierarchies of empty directories. It
-// thus doesn't record the deletion of such directories. If a directory such as `refs/heads/parent/child/subdir`
-// exists, and a reference called `refs/heads/parent` is created, we don't handle the deletions of empty directories.
-func (e *Entry) RecordReferenceUpdates(ctx context.Context, storageRoot, snapshotPrefix, relativePath string, refTX *gitalypb.LogEntry_ReferenceTransaction, objectHash git.ObjectHash, performReferenceUpdates func([]*gitalypb.LogEntry_ReferenceTransaction_Change) error) error {
-	if len(refTX.GetChanges()) == 0 {
-		return nil
-	}
-
-	creations := newReferenceTree()
-	deletions := newReferenceTree()
-	defaultBranchUpdated := false
-	preImagePaths := map[string]struct{}{}
-	for _, change := range refTX.GetChanges() {
-		if bytes.Equal(change.GetReferenceName(), []byte("HEAD")) {
-			defaultBranchUpdated = true
-			continue
-		}
-
-		tree := creations
-		if objectHash.IsZeroOID(git.ObjectID(change.GetNewOid())) {
-			tree = deletions
-		}
-
-		referenceName := string(change.GetReferenceName())
-		if err := tree.Insert(referenceName); err != nil {
-			return fmt.Errorf("insert into tree: %w", err)
-		}
-
-		for component, remainder, haveMore := "", referenceName, true; haveMore; {
-			var newComponent string
-			newComponent, remainder, haveMore = strings.Cut(remainder, "/")
-
-			component = filepath.Join(component, newComponent)
-			info, err := os.Stat(filepath.Join(storageRoot, snapshotPrefix, relativePath, component))
-			if err != nil {
-				if !errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("stat for pre-image: %w", err)
-				}
-
-				// The path did not exist before applying the transaction.
-				// None of its children exist either.
-				break
-			}
-
-			if !info.IsDir() && haveMore {
-				return updateref.FileDirectoryConflictError{
-					ExistingReferenceName:    component,
-					ConflictingReferenceName: filepath.Join(component, remainder),
-				}
-			}
-
-			preImagePaths[component] = struct{}{}
-		}
-	}
-
-	if err := performReferenceUpdates(refTX.GetChanges()); err != nil {
-		return fmt.Errorf("perform reference updates: %w", err)
-	}
-
-	// Record default branch updates
-	if defaultBranchUpdated {
-		targetRelativePath := filepath.Join(relativePath, "HEAD")
-
-		e.operations.removeDirectoryEntry(targetRelativePath)
-		fileID, err := e.stageFile(filepath.Join(storageRoot, snapshotPrefix, targetRelativePath))
-		if err != nil {
-			return fmt.Errorf("stage file: %w", err)
-		}
-
-		e.operations.createHardLink(fileID, targetRelativePath, false)
-	}
-
-	// Record creations
-	if err := creations.WalkPreOrder(func(path string, isDir bool) error {
-		targetRelativePath := filepath.Join(relativePath, path)
-		if isDir {
-			if _, ok := preImagePaths[path]; ok {
-				// The directory existed already in the pre-image and doesn't need to be recreated.
-				return nil
-			}
-
-			e.operations.createDirectory(targetRelativePath)
-
-			return nil
-		}
-
-		if _, ok := preImagePaths[path]; ok {
-			// The file already existed in the pre-image. This means the file has been updated
-			// and we should remove the previous file before we can link the updated one in place.
-			e.operations.removeDirectoryEntry(targetRelativePath)
-		}
-
-		fileID, err := e.stageFile(filepath.Join(storageRoot, snapshotPrefix, relativePath, path))
-		if err != nil {
-			return fmt.Errorf("stage file: %w", err)
-		}
-
-		e.operations.createHardLink(fileID, targetRelativePath, false)
-
-		return nil
-	}); err != nil {
-		return fmt.Errorf("walk creations pre-order: %w", err)
-	}
-
-	// Check if the deletion created directories. This can happen if Git has special cased a directory
-	// to not be deleted, such as 'refs/heads', 'refs/tags' and 'refs/remotes'. Git may create the
-	// directory to create a lock and leave it in place after the transaction.
-	if err := deletions.WalkPreOrder(func(path string, isDir bool) error {
-		info, err := os.Stat(filepath.Join(storageRoot, snapshotPrefix, relativePath, path))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("stat for dir permissions: %w", err)
-		}
-
-		if _, existedPreImaged := preImagePaths[path]; info != nil && !existedPreImaged {
-			e.operations.createDirectory(filepath.Join(relativePath, path))
-		}
-
-		return nil
-	}); err != nil {
-		return fmt.Errorf("walk deletion directory creations pre-order: %w", err)
-	}
-
-	// Walk down from the leaves of reference deletions towards the root.
-	if err := deletions.WalkPostOrder(func(path string, isDir bool) error {
-		if _, ok := preImagePaths[path]; !ok {
-			// If the path did not exist in the pre-image, no need to check further. The reference deletion
-			// was targeting a reference in the packed-refs file, and not in the loose reference hierarchy.
-			return nil
-		}
-
-		if _, err := os.Stat(filepath.Join(storageRoot, snapshotPrefix, relativePath, path)); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("stat for deletion: %w", err)
-			}
-
-			// The path doesn't exist in the post-image after the transaction was applied.
-			e.operations.removeDirectoryEntry(filepath.Join(relativePath, path))
-			return nil
-		}
-
-		// The path existed. Continue checking other paths whether they've been removed or not.
-		return nil
-	}); err != nil {
-		return fmt.Errorf("walk deletions post-order: %w", err)
-	}
 
 	return nil
 }

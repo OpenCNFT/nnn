@@ -1,4 +1,4 @@
-package partition
+package wal
 
 import (
 	"os"
@@ -21,17 +21,17 @@ func TestGetInode(t *testing.T) {
 	require.NoError(t, os.WriteFile(file2Path, nil, mode.Directory))
 	require.NoError(t, os.Link(file1Path, linkPath))
 
-	file1Inode, err := getInode(file1Path)
+	file1Inode, err := GetInode(file1Path)
 	require.NoError(t, err)
-	file2Inode, err := getInode(file2Path)
+	file2Inode, err := GetInode(file2Path)
 	require.NoError(t, err)
-	linkInode, err := getInode(linkPath)
+	linkInode, err := GetInode(linkPath)
 	require.NoError(t, err)
 
 	require.Equal(t, file1Inode, linkInode)
 	require.NotEqual(t, file1Inode, file2Inode)
 
-	nonExistentInode, err := getInode(filepath.Join(tempDir, "non-existent"))
+	nonExistentInode, err := GetInode(filepath.Join(tempDir, "non-existent"))
 	require.NoError(t, err)
 	require.EqualValues(t, nonExistentInode, 0)
 }
