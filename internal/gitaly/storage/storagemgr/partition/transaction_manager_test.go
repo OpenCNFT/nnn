@@ -1895,8 +1895,8 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
-					require.Equal(t, tm.wal.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.wal.appendedLSN, storage.LSN(3))
+					require.Equal(t, tm.wal.AppliedLSN(), storage.LSN(3))
+					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2052,8 +2052,8 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
-					require.Equal(t, tm.wal.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.wal.appendedLSN, storage.LSN(4))
+					require.Equal(t, tm.wal.AppliedLSN(), storage.LSN(4))
+					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{

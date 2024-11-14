@@ -219,7 +219,7 @@ func TestLogManager_Initialize(t *testing.T) {
 			entries = append(entries, entry)
 		}
 
-		require.NoError(t, logManager.storeAppliedLSN(2))
+		require.NoError(t, logManager.StoreAppliedLSN(2))
 		require.NoError(t, logManager.Initialize(ctx))
 
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
@@ -261,7 +261,7 @@ func TestLogManager_Initialize(t *testing.T) {
 			entries = append(entries, entry)
 		}
 
-		require.NoError(t, logManager.storeAppliedLSN(3))
+		require.NoError(t, logManager.StoreAppliedLSN(3))
 		require.NoError(t, logManager.Initialize(ctx))
 
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
@@ -316,7 +316,7 @@ func TestLogManager_RemoveAppliedLogEntries(t *testing.T) {
 		injectLogEntry(t, ctx, logManager, 1, entry, setup.GetFileMappingForEntry(0))
 
 		// Set this entry as applied
-		require.NoError(t, logManager.storeAppliedLSN(1))
+		require.NoError(t, logManager.StoreAppliedLSN(1))
 
 		// Attempt to remove applied log entries
 		removedLSN, err := logManager.RemoveAppliedLogEntries(ctx)
@@ -350,7 +350,7 @@ func TestLogManager_RemoveAppliedLogEntries(t *testing.T) {
 		}
 
 		// Set the applied LSN to 2
-		require.NoError(t, logManager.storeAppliedLSN(2))
+		require.NoError(t, logManager.StoreAppliedLSN(2))
 
 		// Manually set the consumer's position to the first entry, forcing low-water mark to retain it
 		logManager.consumerPos.setPosition(1)
@@ -392,7 +392,7 @@ func TestLogManager_RemoveAppliedLogEntries(t *testing.T) {
 		}
 
 		// Set the applied LSN to 3, allowing the first three entries to be pruned
-		require.NoError(t, logManager.storeAppliedLSN(3))
+		require.NoError(t, logManager.StoreAppliedLSN(3))
 
 		for i := 0; i < 3; i++ {
 			removedLSN, err := logManager.RemoveAppliedLogEntries(ctx)
@@ -747,7 +747,7 @@ func TestLogManager_Consumer(t *testing.T) {
 	simulatePositions := func(t *testing.T, logManager *LogManager, consumed storage.LSN, applied storage.LSN) {
 		logManager.consumerPos.setPosition(consumed)
 
-		require.NoError(t, logManager.storeAppliedLSN(applied))
+		require.NoError(t, logManager.StoreAppliedLSN(applied))
 		logManager.cleanupEntryReferences()
 		for {
 			removedLSN, err := logManager.RemoveAppliedLogEntries(ctx)

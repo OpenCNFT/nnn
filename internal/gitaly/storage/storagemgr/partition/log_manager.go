@@ -391,8 +391,34 @@ func (mgr *LogManager) RemoveAppliedLogEntries(ctx context.Context) (storage.LSN
 	return 0, nil
 }
 
-// storeAppliedLSN stores the partition's applied LSN in the database.
-func (mgr *LogManager) storeAppliedLSN(lsn storage.LSN) error {
+// NextApplyLSN returns the LSN of the next entry to apply. If all entries are applied, default zero value is returned.
+func (mgr *LogManager) NextApplyLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+	if mgr.appliedLSN < mgr.appendedLSN {
+		return mgr.appliedLSN + 1
+	}
+	return 0
+}
+
+// AppendedLSN returns the index of latest appended log entry.
+func (mgr *LogManager) AppendedLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	return mgr.appendedLSN
+}
+
+// AppliedLSN returns the index of latest applied log entry.
+func (mgr *LogManager) AppliedLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	return mgr.appliedLSN
+}
+
+// StoreAppliedLSN stores the partition's applied LSN in the database.
+func (mgr *LogManager) StoreAppliedLSN(lsn storage.LSN) error {
 	mgr.testHooks.beforeStoreAppliedLSN(lsn)
 
 	mgr.mutex.Lock()
@@ -444,8 +470,8 @@ func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) erro
 	return nil
 }
 
-// readLogEntry returns the log entry from the given position in the log.
-func (mgr *LogManager) readLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
+// ReadLogEntry returns the log entry from the given position in the log.
+func (mgr *LogManager) ReadLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
 	manifestBytes, err := os.ReadFile(manifestPath(logEntryPath(mgr.stateDirectory, lsn)))
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
@@ -551,7 +577,7 @@ func (mgr *LogManager) WalkCommittedEntries(lsn storage.LSN, relativePath string
 		if committed.lsn <= lsn {
 			continue
 		}
-		entry, err := mgr.readLogEntry(committed.lsn)
+		entry, err := mgr.ReadLogEntry(committed.lsn)
 		if err != nil {
 			return errEntryReferenceGone
 		}
