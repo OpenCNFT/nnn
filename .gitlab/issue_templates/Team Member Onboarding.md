@@ -22,6 +22,8 @@ Please complete all but the "Reading material" section in your first few working
 - Acquire necessary access: a Role Based Access Request should have been opened for you based on [this template](https://gitlab.com/gitlab-com/team-member-epics/access-requests/-/blob/master/.gitlab/issue_templates/role_baseline_access_request_tasks/department_internal_infrastructure/role_backend_engineer_gitaly.md?ref_type=heads).
   - [ ] If that's not the case, let a manager know and open one following [these instructions](https://internal.gitlab.com/handbook/it/end-user-services/access-request/baseline-entitlements/#how-can-i-create-a-new-ar-using-a-baseline-template).
   - [ ] Complete the `Team Member Self Service` section of that issue, and note what you're getting access to.
+- Open a merge request in the [Infrastructure Management](https://gitlab.com/gitlab-com/gl-infra/infra-mgmt) project to add
+  yourself as a member under `gitaly` in `data/teams/data-access.yml`
 - If transferring from another team within GitLab:
   - [ ] update your [Team page entry](https://about.gitlab.com/handbook/git-page-update/#12-add-yourself-to-the-team-page)
   - [ ] update your Slack profile ("What I do")
@@ -39,4 +41,4 @@ Please complete all but the "Reading material" section in your first few working
 
 /confidential
 /assign me
-/cc @andrashorvath @jcaigitlab
+/cc @jcaigitlab
