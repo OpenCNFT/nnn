@@ -2,10 +2,15 @@ package partition
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -27,7 +32,7 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 		return nil, structerr.NewInternal("backup partition: transaction not initialized")
 	}
 
-	backupRelativePath := filepath.Join(in.GetStorageName(), in.GetPartitionId(), lsn+".tar")
+	backupRelativePath := filepath.Join("partition-backups", in.GetStorageName(), in.GetPartitionId(), lsn+".tar")
 
 	exists, err := s.backupSink.Exists(ctx, backupRelativePath)
 	if err != nil {
@@ -60,5 +65,85 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 		return nil, fmt.Errorf("write tarball: %w", err)
 	}
 
+	manifestRelativePath := filepath.Join("partition-manifests", in.GetStorageName(), in.GetPartitionId()+".json")
+	if err := s.updateManifest(ctx, manifestRelativePath, backupRelativePath); err != nil {
+		return nil, fmt.Errorf("update manifest: %w", err)
+	}
+
 	return &gitalypb.BackupPartitionResponse{}, nil
+}
+
+// BackupEntry represents a single backup in the manifest
+type BackupEntry struct {
+	// Timestamp is the time when the backup was created.
+	Timestamp time.Time `json:"timestamp"`
+	// Path is the relative path to the backup in the backup bucket.
+	Path string `json:"path"`
+}
+
+// updateManifest updates the backup manifest file for specific partition.
+// Since goblob doesn't support in place updates, we need to stream the existing
+// content into an temp file and then upload the temp file to the manifest path.
+func (s *server) updateManifest(ctx context.Context, manifestRelativePath, backupRelativePath string) (returnErr error) {
+	// Create a temporary file locally.
+	tempFile, err := os.CreateTemp("", "manifest-*.json")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	defer func() {
+		if err = tempFile.Close(); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("close temp file: %w", err))
+		}
+		if err = os.Remove(tempFile.Name()); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("remove temp file: %w", err))
+		}
+	}()
+
+	// Add the new entry first to create reverse chronological order
+	// so that when we restore, the newest backups are read first.
+	if err := json.NewEncoder(tempFile).Encode(BackupEntry{
+		Timestamp: time.Now(),
+		Path:      backupRelativePath,
+	}); err != nil {
+		return fmt.Errorf("encode new entry: %w", err)
+	}
+
+	// Copy existing entries after the new entry.
+	r, err := s.backupSink.GetReader(ctx, manifestRelativePath)
+	if err != nil && !errors.Is(err, backup.ErrDoesntExist) {
+		return fmt.Errorf("get reader: %w", err)
+	}
+	if r != nil {
+		defer func() {
+			if err := r.Close(); err != nil {
+				returnErr = errors.Join(returnErr, fmt.Errorf("close reader %w", err))
+			}
+		}()
+
+		if _, err := tempFile.ReadFrom(r); err != nil {
+			return fmt.Errorf("read existing manifest: %w", err)
+		}
+	}
+
+	// Rewind the temp file to the beginning before reading from it.
+	if _, err := tempFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("seek temp file: %w", err)
+	}
+
+	// Upload the temp file to the sink.
+	w, err := s.backupSink.GetWriter(ctx, manifestRelativePath)
+	if err != nil {
+		return fmt.Errorf("get writer: %w", err)
+	}
+	defer func() {
+		if err := w.Close(); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("close writer %w", err))
+		}
+	}()
+
+	if _, err := tempFile.WriteTo(w); err != nil {
+		return fmt.Errorf("write manifest: %w", err)
+	}
+
+	return nil
 }
