@@ -703,8 +703,8 @@ type testTransactionSetup struct {
 type testTransactionHooks struct {
 	// BeforeApplyLogEntry is called before a log entry is applied to the repository.
 	BeforeApplyLogEntry hookFunc
-	// BeforeAppendLogEntry is called before a log entry is appended to the log.
-	BeforeAppendLogEntry hookFunc
+	// BeforeCommitLogEntry is called before a log entry is committed to the log.
+	BeforeCommitLogEntry hookFunc
 	// BeforeReadAppliedLSN is invoked before the applied LSN is read.
 	BeforeReadAppliedLSN hookFunc
 	// BeforeStoreAppliedLSN is invoked before the applied LSN is stored.

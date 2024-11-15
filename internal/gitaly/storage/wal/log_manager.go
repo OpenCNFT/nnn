@@ -77,7 +77,7 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 }
 
 type testLogHooks struct {
-	BeforeAppendLogEntry  func(storage.LSN)
+	BeforeCommitLogEntry  func(storage.LSN)
 	BeforeStoreAppliedLSN func(storage.LSN)
 }
 
@@ -102,15 +102,21 @@ type LogManager struct {
 	// stateDirectory is an absolute path to a directory where write-ahead log stores log entries
 	stateDirectory string
 
-	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
-	appendedLSN storage.LSN
+	// ┌─ oldestLSN                    ┌─ committedLSN
+	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □ □ □ □ □ □
+	//               └─ appliedLSN                   └─ appendedLSN
+	//
+	// committedLSN holds the LSN of the last log entry committed to the partition's write-ahead log. A log entry is
+	// considered to be committed if it's accepted by the majority of cluster members. Eventually, it will be
+	// applied by all cluster members.
+	committedLSN storage.LSN
 	// appliedLSN holds the LSN of the last log entry applied to the partition.
 	appliedLSN storage.LSN
 	// oldestLSN holds the LSN of the head of log entries which is still kept in the database. The manager keeps
 	// them because they are still referred by a transaction.
 	oldestLSN storage.LSN
 
-	// entryReferences keeps some latest appended log entries around. Some types of transactions, such as
+	// entryReferences keeps some latest committed log entries around. Some types of transactions, such as
 	// housekeeping, operate on snapshot repository. There is a gap between transaction doing its work and the time
 	// when it is committed. They need to verify if concurrent operations can cause conflict. These log entries are
 	// still kept around even after they are applied. They are removed when there are no references.
@@ -143,7 +149,7 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, db keyva
 		consumerPos:      &consumerPosition{},
 		notifyQueue:      make(chan struct{}, 1),
 		TestHooks: testLogHooks{
-			BeforeAppendLogEntry:  func(storage.LSN) {},
+			BeforeCommitLogEntry:  func(storage.LSN) {},
 			BeforeStoreAppliedLSN: func(storage.LSN) {},
 		},
 	}
@@ -151,7 +157,7 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, db keyva
 
 // Initialize sets up the initial state of the LogManager, preparing it to manage the write-ahead log entries. It reads
 // the last applied LSN from the database to resume from where it left off, creates necessary directories, and
-// initializes in-memory tracking variables such as appendedLSN and oldestLSN based on the files present in the WAL
+// initializes in-memory tracking variables such as committedLSN and oldestLSN based on the files present in the WAL
 // directory. This method also removes any stale log files that may have been left due to interrupted operations,
 // ensuring the WAL directory only contains valid log entries. If a LogConsumer is present, it notifies it of the
 // initial log entry state, enabling consumers to start processing from the correct point. Proper initialization is
@@ -173,19 +179,18 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 	// is no transaction refers them. It's possible there are some left-over entries in the database because a
 	// transaction can hold the entry stubbornly. So, the manager could not clean them up in the last session.
 	//
-	// ┌─ oldestLSN                    ┌─ appendedLSN
-	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■
-	//                └─ appliedLSN
-	//
+	// ┌─ oldestLSN                    ┌─ committedLSN
+	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □ □ □ □ □ □
+	//               └─ appliedLSN                   └─ appendedLSN
 	//
 	// oldestLSN is initialized to appliedLSN + 1. If there are no log entries in the log, then everything has been
 	// pruned already or there has not been any log entries yet. Setting this +1 avoids trying to clean up log entries
 	// that do not exist. If there are some, we'll set oldestLSN to the head of the log below.
 	mgr.oldestLSN = mgr.appliedLSN + 1
-	// appendedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
+	// committedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
 	// all log entries have been applied and have been already pruned. If there are some in the log, we'll update this
 	// below to match.
-	mgr.appendedLSN = mgr.appliedLSN
+	mgr.committedLSN = mgr.appliedLSN
 
 	if logEntries, err := os.ReadDir(walStatePath(mgr.stateDirectory)); err != nil {
 		return fmt.Errorf("read wal directory: %w", err)
@@ -193,8 +198,8 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 		if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
 			return fmt.Errorf("parse oldest LSN: %w", err)
 		}
-		if mgr.appendedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
-			return fmt.Errorf("parse appended LSN: %w", err)
+		if mgr.committedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
+			return fmt.Errorf("parse committed LSN: %w", err)
 		}
 	}
 
@@ -202,8 +207,8 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 		return fmt.Errorf("remove stale packs: %w", err)
 	}
 
-	if mgr.consumer != nil && mgr.appendedLSN != 0 {
-		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
+	if mgr.consumer != nil && mgr.committedLSN != 0 {
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.committedLSN)
 	}
 
 	return nil
@@ -224,7 +229,7 @@ func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 // moves the log entry's directory from the staging area to its final place in the write-ahead log. The landing order of
 // proposals is nondeterministic. The caller is responsible for serialization, if it needs to, before calling Propose().
 func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) (storage.LSN, error) {
-	defer trace.StartRegion(ctx, "appendLogEntry").End()
+	defer trace.StartRegion(ctx, "proposeLogEntry").End()
 
 	manifestBytes, err := proto.Marshal(logEntry)
 	if err != nil {
@@ -252,8 +257,8 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 		return 0, fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	nextLSN := mgr.appendedLSN + 1
-	mgr.TestHooks.BeforeAppendLogEntry(nextLSN)
+	nextLSN := mgr.committedLSN + 1
+	mgr.TestHooks.BeforeCommitLogEntry(nextLSN)
 
 	// Move the log entry from the staging directory into its place in the log.
 	destinationPath := mgr.GetEntryPath(nextLSN)
@@ -280,7 +285,7 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 	// After this latch block, the transaction is committed and all subsequent transactions
 	// are guaranteed to read it.
 	mgr.mutex.Lock()
-	mgr.appendedLSN = nextLSN
+	mgr.committedLSN = nextLSN
 	mgr.entryReferences.PushBack(&EntryReference{
 		lsn:                nextLSN,
 		objectDependencies: objectDependencies,
@@ -339,9 +344,9 @@ func (mgr *LogManager) removeStaleWALFiles(ctx context.Context) error {
 		// Log entries are pruned one by one. If a write is interrupted, the only possible stale files would be
 		// for the log entry preceding the oldest log entry.
 		LogEntryPath(mgr.stateDirectory, mgr.oldestLSN-1),
-		// Log entries are appended one by one to the log. If a write is interrupted, the only possible stale
+		// Log entries are committed one by one to the log. If a write is interrupted, the only possible stale
 		// files would be for the next LSN. Remove the files if they exist.
-		LogEntryPath(mgr.stateDirectory, mgr.appendedLSN+1),
+		LogEntryPath(mgr.stateDirectory, mgr.committedLSN+1),
 	} {
 		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -400,18 +405,18 @@ func (mgr *LogManager) RemoveAppliedLogEntries(ctx context.Context) (storage.LSN
 func (mgr *LogManager) NextApplyLSN() storage.LSN {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
-	if mgr.appliedLSN < mgr.appendedLSN {
+	if mgr.appliedLSN < mgr.committedLSN {
 		return mgr.appliedLSN + 1
 	}
 	return 0
 }
 
-// AppendedLSN returns the index of latest appended log entry.
-func (mgr *LogManager) AppendedLSN() storage.LSN {
+// CommittedLSN returns the index of latest committed log entry.
+func (mgr *LogManager) CommittedLSN() storage.LSN {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	return mgr.appendedLSN
+	return mgr.committedLSN
 }
 
 // AppliedLSN returns the index of latest applied log entry.
@@ -562,7 +567,7 @@ func (mgr *LogManager) lowWaterMark() storage.LSN {
 }
 
 // IncrementEntryReference updates the ref counter of a committed entry. An entry reference is created after the
-// corresponding log entry is appended. WAL allows the caller to refer to latest appended log entry only. It does not
+// corresponding log entry is committed. WAL allows the caller to refer to latest committed log entry only. It does not
 // allow cross-reference to an entry in the middle of the list. So, this method increases the ref counter of the tail of
 // the list or create a new one if the list does not exist.
 func (mgr *LogManager) IncrementEntryReference(lsn storage.LSN) *EntryReference {

@@ -259,7 +259,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				steps: steps{
 					StartManager{
 						Hooks: testTransactionHooks{
-							BeforeAppendLogEntry: func(hookCtx hookContext) {
+							BeforeCommitLogEntry: func(hookCtx hookContext) {
 								// Cancel the context used in Commit
 								cancel()
 							},
@@ -328,7 +328,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeAppendLogEntry: func(hookContext hookContext) { hookContext.manager.Close() },
+						BeforeCommitLogEntry: func(hookContext hookContext) { hookContext.manager.Close() },
 						// This ensures we are testing the context cancellation errors being unwrapped properly
 						// to an storage.ErrTransactionProcessingStopped instead of hitting the general case when
 						// runDone is closed.
@@ -1823,7 +1823,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 		},
 		{
-			desc: "transaction manager cleans up left-over committed entries when appliedLSN == appendedLSN",
+			desc: "transaction manager cleans up left-over committed entries when appliedLSN == committedLSN",
 			steps: steps{
 				StartManager{},
 				Begin{
@@ -1897,7 +1897,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(wal.KeyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.wal.AppliedLSN(), storage.LSN(3))
-					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(3))
+					require.Equal(t, tm.wal.CommittedLSN(), storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -1969,7 +1969,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			},
 		},
 		{
-			desc: "transaction manager cleans up left-over committed entries when appliedLSN < appendedLSN",
+			desc: "transaction manager cleans up left-over committed entries when appliedLSN < committedLSN",
 			skip: func(t *testing.T) {
 				testhelper.SkipWithReftable(t, "test requires manual log addition")
 			},
@@ -2020,7 +2020,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
 					// Insert an out-of-band log-entry directly into the database for easier test
 					// setup. It's a bit tricky to simulate committed log entries and un-processed
-					// appended log entries at the same time.
+					// committed log entries at the same time.
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
@@ -2054,7 +2054,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(wal.KeyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.wal.AppliedLSN(), storage.LSN(4))
-					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(4))
+					require.Equal(t, tm.wal.CommittedLSN(), storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{
