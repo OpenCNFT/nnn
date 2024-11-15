@@ -25,6 +25,8 @@ var (
 	// ErrEntryReferenceGone is returned when the log entry of a LSN is gone from database while it's still
 	// accessed by other transactions.
 	ErrEntryReferenceGone = errors.New("in-used entry references is gone")
+	// KeyCommittedLSN is the database key storing a partition's last committed log entry's LSN.
+	KeyCommittedLSN = []byte("committed_lsn")
 	// KeyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
 	KeyAppliedLSN = []byte("applied_lsn")
 )
@@ -77,6 +79,7 @@ func (p *consumerPosition) setPosition(pos storage.LSN) {
 }
 
 type testLogHooks struct {
+	BeforeAppendLogEntry  func(storage.LSN)
 	BeforeCommitLogEntry  func(storage.LSN)
 	BeforeStoreAppliedLSN func(storage.LSN)
 }
@@ -106,6 +109,10 @@ type LogManager struct {
 	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■ □ □ □ □ □ □ □
 	//               └─ appliedLSN                   └─ appendedLSN
 	//
+	// appendedLSN holds the LSN of the last log entry emitted by the current node but not yet acknowledged by other
+	// nodes. After so, the committedLSN is increment respectively and catches up with appendedLSN. If Raft is not
+	// enabled or functions as a single-node cluster, committedLSN is increment instantly.
+	appendedLSN storage.LSN
 	// committedLSN holds the LSN of the last log entry committed to the partition's write-ahead log. A log entry is
 	// considered to be committed if it's accepted by the majority of cluster members. Eventually, it will be
 	// applied by all cluster members.
@@ -115,6 +122,10 @@ type LogManager struct {
 	// oldestLSN holds the LSN of the head of log entries which is still kept in the database. The manager keeps
 	// them because they are still referred by a transaction.
 	oldestLSN storage.LSN
+
+	// appendedEntries keeps track of appended but not-yet committed entries. After an entry is committed, it is
+	// removed from this map. This provides quick reference to those entries without the need for disk operations.
+	appendedEntries map[storage.LSN]*gitalypb.LogEntry
 
 	// entryReferences keeps some latest committed log entries around. Some types of transactions, such as
 	// housekeeping, operate on snapshot repository. There is a gap between transaction doing its work and the time
@@ -145,10 +156,12 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, db keyva
 		stagingDirectory: stagingDirectory,
 		stateDirectory:   stateDirectory,
 		entryReferences:  list.New(),
+		appendedEntries:  map[storage.LSN]*gitalypb.LogEntry{},
 		consumer:         consumer,
 		consumerPos:      &consumerPosition{},
 		notifyQueue:      make(chan struct{}, 1),
 		TestHooks: testLogHooks{
+			BeforeAppendLogEntry:  func(storage.LSN) {},
 			BeforeCommitLogEntry:  func(storage.LSN) {},
 			BeforeStoreAppliedLSN: func(storage.LSN) {},
 		},
@@ -187,19 +200,50 @@ func (mgr *LogManager) Initialize(ctx context.Context) error {
 	// pruned already or there has not been any log entries yet. Setting this +1 avoids trying to clean up log entries
 	// that do not exist. If there are some, we'll set oldestLSN to the head of the log below.
 	mgr.oldestLSN = mgr.appliedLSN + 1
-	// committedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
-	// all log entries have been applied and have been already pruned. If there are some in the log, we'll update this
-	// below to match.
-	mgr.committedLSN = mgr.appliedLSN
+	// CommittedLSN is loaded from DB. A log entry is appended first and marked as committed later. There's a chance
+	// that log entry is never marked as committed. After a restart, especially after a crash, the manager won't be
+	// able to tell if it's committed or not. Thus, we need to persist this index.
+	// Because index persistence is introduced later, we need to fallback to appliedLSN if that key does not exist
+	// in the DB.
+	var committedLSN gitalypb.LSN
+	if err := mgr.readKey(KeyCommittedLSN, &committedLSN); err != nil {
+		if !errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("read committed LSN: %w", err)
+		}
+		mgr.committedLSN = mgr.appliedLSN
+	} else {
+		mgr.committedLSN = storage.LSN(committedLSN.GetValue())
+	}
+
+	// appendedLSN is always set to committedLSN after starting. If a log entry hasn't been committed, it could be
+	// discarded. Its caller never received the acknowledgement.
+	mgr.appendedLSN = mgr.committedLSN
 
 	if logEntries, err := os.ReadDir(walStatePath(mgr.stateDirectory)); err != nil {
 		return fmt.Errorf("read wal directory: %w", err)
 	} else if len(logEntries) > 0 {
-		if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
-			return fmt.Errorf("parse oldest LSN: %w", err)
-		}
-		if mgr.committedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
-			return fmt.Errorf("parse committed LSN: %w", err)
+		// All log entries starting from mgr.committedLSN + 1 are not committed. No reason to keep them around.
+		// Returned log entries are sorted in ascending order. We iterate backward and break when the iterating
+		// LSN drops below committedLSN.
+		for i := len(logEntries) - 1; i >= 0; i-- {
+			logEntry := logEntries[i]
+
+			lsn, err := storage.ParseLSN(logEntry.Name())
+			if err != nil {
+				return fmt.Errorf("parse LSN: %w", err)
+			}
+			if lsn <= mgr.committedLSN {
+				// Found some on-disk log entries older than or equal to committedLSN. They might be
+				// referenced by other transactions before restart. Eventually, they'll be removed in
+				// the main loop.
+				if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
+					return fmt.Errorf("parse oldest LSN: %w", err)
+				}
+				break
+			}
+			if err := mgr.deleteLogEntry(ctx, lsn); err != nil {
+				return fmt.Errorf("cleaning uncommitted log entry: %w", err)
+			}
 		}
 	}
 
@@ -231,15 +275,35 @@ func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) (storage.LSN, error) {
 	defer trace.StartRegion(ctx, "proposeLogEntry").End()
 
+	nextLSN := mgr.appendedLSN + 1
+	if err := mgr.AppendLogEntry(ctx, nextLSN, logEntry, logEntryPath); err != nil {
+		return 0, fmt.Errorf("append log entry: %w", err)
+	}
+
+	if err := mgr.CommitLogEntry(ctx, nextLSN, objectDependencies); err != nil {
+		return 0, fmt.Errorf("commit log entry: %w", err)
+	}
+
+	if mgr.consumer != nil {
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
+	}
+
+	return nextLSN, nil
+}
+
+// AppendLogEntry appends a new log entry at the specified LSN (Log Sequence Number), using the provided log entry data
+// and file path, ensuring the entry is durably written. An appended entry is not safe to be referenced in the snapshot
+// because it might be overriden by log entries having the same LSN.
+func (mgr *LogManager) AppendLogEntry(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry, logEntryPath string) error {
 	manifestBytes, err := proto.Marshal(logEntry)
 	if err != nil {
-		return 0, fmt.Errorf("marshal manifest: %w", err)
+		return fmt.Errorf("marshal manifest: %w", err)
 	}
 
 	// Finalize the log entry by writing the MANIFEST file into the log entry's directory.
 	manifestPath := manifestPath(logEntryPath)
 	if err := os.WriteFile(manifestPath, manifestBytes, mode.File); err != nil {
-		return 0, fmt.Errorf("write manifest: %w", err)
+		return fmt.Errorf("write manifest: %w", err)
 	}
 
 	// Sync the log entry completely before committing it.
@@ -254,16 +318,15 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 	// addressed, we could stage the transaction entirely before queuing it for commit, and thus not
 	// need to sync here.
 	if err := safe.NewSyncer().SyncRecursive(ctx, logEntryPath); err != nil {
-		return 0, fmt.Errorf("synchronizing WAL directory: %w", err)
+		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	nextLSN := mgr.committedLSN + 1
-	mgr.TestHooks.BeforeCommitLogEntry(nextLSN)
+	mgr.TestHooks.BeforeCommitLogEntry(lsn)
 
 	// Move the log entry from the staging directory into its place in the log.
-	destinationPath := mgr.GetEntryPath(nextLSN)
+	destinationPath := mgr.GetEntryPath(lsn)
 	if err := os.Rename(logEntryPath, destinationPath); err != nil {
-		return 0, fmt.Errorf("move wal files: %w", err)
+		return fmt.Errorf("move wal files: %w", err)
 	}
 
 	// Sync the WAL directory. The manifest has been synced above, and all of the other files
@@ -279,23 +342,40 @@ func (mgr *LogManager) Propose(ctx context.Context, objectDependencies map[git.O
 		// will later be replaced with a panic that terminates Gitaly.
 		//
 		// For more details, see: https://gitlab.com/gitlab-org/gitaly/-/issues/5774
-		return 0, fmt.Errorf("sync log entry: %w", err)
+		return fmt.Errorf("sync log entry: %w", err)
 	}
 
-	// After this latch block, the transaction is committed and all subsequent transactions
-	// are guaranteed to read it.
 	mgr.mutex.Lock()
-	mgr.committedLSN = nextLSN
+	mgr.appendedLSN = lsn
+	mgr.appendedEntries[mgr.appendedLSN] = logEntry
+	mgr.mutex.Unlock()
+
+	return nil
+}
+
+// CommitLogEntry marks the log entry at the given LSN as committed. Afterward, that entry is safe to be referenced by
+// snapshots. Eventually, it will be applied.
+func (mgr *LogManager) CommitLogEntry(ctx context.Context, nextLSN storage.LSN, objectDependencies map[git.ObjectID]struct{}) error {
+	mgr.TestHooks.BeforeCommitLogEntry(nextLSN)
+
+	// Persist committed LSN before updating other internal states.
+	if err := mgr.storeCommittedLSN(nextLSN); err != nil {
+		return fmt.Errorf("persisting committed entry: %w", err)
+	}
+
+	mgr.mutex.Lock()
+	if _, exist := mgr.appendedEntries[nextLSN]; !exist {
+		mgr.mutex.Unlock()
+		return fmt.Errorf("log entry %s not found in the appended list", nextLSN)
+	}
+	delete(mgr.appendedEntries, nextLSN)
 	mgr.entryReferences.PushBack(&EntryReference{
 		lsn:                nextLSN,
 		objectDependencies: objectDependencies,
 	})
 	mgr.mutex.Unlock()
 
-	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
-	}
-	return nextLSN, nil
+	return nil
 }
 
 func (mgr *LogManager) createStateDirectory(ctx context.Context) error {
@@ -438,6 +518,18 @@ func (mgr *LogManager) StoreAppliedLSN(lsn storage.LSN) error {
 		return fmt.Errorf("storing applied LSN: %w", err)
 	}
 	mgr.appliedLSN = lsn
+	return nil
+}
+
+// StoreCommittedLSN stores the partition's committed LSN in the database.
+func (mgr *LogManager) storeCommittedLSN(lsn storage.LSN) error {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	if err := mgr.setKey(KeyCommittedLSN, lsn.ToProto()); err != nil {
+		return fmt.Errorf("storing committedLSN: %w", err)
+	}
+	mgr.committedLSN = lsn
 	return nil
 }
 

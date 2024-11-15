@@ -42,7 +42,12 @@ func proposeLogEntry(t *testing.T, ctx context.Context, manager *LogManager, obj
 	return nextLSN
 }
 
-func injectLogEntry(t *testing.T, ctx context.Context, manager *LogManager, lsn storage.LSN, logEntry *gitalypb.LogEntry, files map[string][]byte) {
+func injectCommittedLogEntry(t *testing.T, ctx context.Context, manager *LogManager, lsn storage.LSN, logEntry *gitalypb.LogEntry, files map[string][]byte) {
+	injectUncommittedLogEntry(t, ctx, manager, lsn, logEntry, files)
+	require.NoError(t, manager.storeCommittedLSN(lsn))
+}
+
+func injectUncommittedLogEntry(t *testing.T, ctx context.Context, manager *LogManager, lsn storage.LSN, logEntry *gitalypb.LogEntry, files map[string][]byte) {
 	t.Helper()
 
 	require.NoError(t, manager.createStateDirectory(ctx))
@@ -179,8 +184,8 @@ func TestLogManager_Initialize(t *testing.T) {
 			{Ref: "branch-2", Oid: setup.commitIDs[1]},
 		})
 
-		injectLogEntry(t, ctx, logManager, 1, entry1, setup.GetFileMappingForEntry(0))
-		injectLogEntry(t, ctx, logManager, 2, entry2, setup.GetFileMappingForEntry(1))
+		injectCommittedLogEntry(t, ctx, logManager, 1, entry1, setup.GetFileMappingForEntry(0))
+		injectCommittedLogEntry(t, ctx, logManager, 2, entry2, setup.GetFileMappingForEntry(1))
 
 		require.NoError(t, logManager.Initialize(ctx))
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
@@ -215,7 +220,7 @@ func TestLogManager_Initialize(t *testing.T) {
 			entry := testentry.MultipleRefChangesLogEntry(setup.relativePath, []testentry.RefChange{
 				{Ref: fmt.Sprintf("branch-%d", i+1), Oid: commitID},
 			})
-			injectLogEntry(t, ctx, logManager, storage.LSN(i+1), entry, setup.GetFileMappingForEntry(i))
+			injectCommittedLogEntry(t, ctx, logManager, storage.LSN(i+1), entry, setup.GetFileMappingForEntry(i))
 			entries = append(entries, entry)
 		}
 
@@ -257,7 +262,7 @@ func TestLogManager_Initialize(t *testing.T) {
 			entry := testentry.MultipleKVLogEntry(setup.relativePath, []testentry.KVOperation{
 				{Key: []byte(fmt.Sprintf("Key-%d", i+1)), Value: []byte("content")},
 			})
-			injectLogEntry(t, ctx, logManager, storage.LSN(i+1), entry, nil)
+			injectCommittedLogEntry(t, ctx, logManager, storage.LSN(i+1), entry, nil)
 			entries = append(entries, entry)
 		}
 
@@ -313,7 +318,7 @@ func TestLogManager_RemoveAppliedLogEntries(t *testing.T) {
 		entry := testentry.MultipleRefChangesLogEntry(setup.relativePath, []testentry.RefChange{
 			{Ref: "branch-1", Oid: setup.commitIDs[0]},
 		})
-		injectLogEntry(t, ctx, logManager, 1, entry, setup.GetFileMappingForEntry(0))
+		injectCommittedLogEntry(t, ctx, logManager, 1, entry, setup.GetFileMappingForEntry(0))
 
 		// Set this entry as applied
 		require.NoError(t, logManager.StoreAppliedLSN(1))
@@ -346,7 +351,7 @@ func TestLogManager_RemoveAppliedLogEntries(t *testing.T) {
 			})
 		}
 		for i := 0; i < 3; i++ {
-			injectLogEntry(t, ctx, logManager, storage.LSN(i+1), entry(i), setup.GetFileMappingForEntry(i))
+			injectCommittedLogEntry(t, ctx, logManager, storage.LSN(i+1), entry(i), setup.GetFileMappingForEntry(i))
 		}
 
 		// Set the applied LSN to 2
@@ -388,7 +393,7 @@ func TestLogManager_RemoveAppliedLogEntries(t *testing.T) {
 			})
 		}
 		for i := 0; i < 5; i++ {
-			injectLogEntry(t, ctx, logManager, storage.LSN(i+1), entry(i), setup.GetFileMappingForEntry(i))
+			injectCommittedLogEntry(t, ctx, logManager, storage.LSN(i+1), entry(i), setup.GetFileMappingForEntry(i))
 		}
 
 		// Set the applied LSN to 3, allowing the first three entries to be pruned
@@ -798,9 +803,9 @@ func TestLogManager_Consumer(t *testing.T) {
 
 		// Inject 3, 4
 		entry3 := testentry.RefChangeLogEntry(setup.relativePath, "refs/heads/main", setup.commitIDs[2])
-		injectLogEntry(t, ctx, logManager, 3, entry3, setup.GetFileMappingForEntry(2))
+		injectCommittedLogEntry(t, ctx, logManager, 3, entry3, setup.GetFileMappingForEntry(2))
 		entry4 := testentry.RefChangeLogEntry(setup.relativePath, "refs/heads/main", setup.commitIDs[3])
-		injectLogEntry(t, ctx, logManager, 4, entry4, setup.GetFileMappingForEntry(3))
+		injectCommittedLogEntry(t, ctx, logManager, 4, entry4, setup.GetFileMappingForEntry(3))
 
 		// Close log manager
 		testhelper.MustClose(t, database)
