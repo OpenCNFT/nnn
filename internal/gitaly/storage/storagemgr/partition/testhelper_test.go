@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -164,6 +165,21 @@ func sortPackfilesState(packfilesState *PackfilesState) {
 	sort.Slice(packfilesState.Packfiles, func(i, j int) bool {
 		return concatObjects(packfilesState.Packfiles[i].Objects) < concatObjects(packfilesState.Packfiles[j].Objects)
 	})
+}
+
+// isDirEmpty checks if a directory is empty.
+func isDirEmpty(dir string) (bool, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	// Read at most one entry from the directory. If we get EOF, the directory is empty
+	if _, err = f.Readdirnames(1); errors.Is(err, io.EOF) {
+		return true, nil
+	}
+	return false, err
 }
 
 // RequireRepositoryState asserts the given repository matches the expected state.

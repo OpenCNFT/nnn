@@ -3779,21 +3779,6 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 	return nil
 }
 
-// isDirEmpty checks if a directory is empty.
-func isDirEmpty(dir string) (bool, error) {
-	f, err := os.Open(dir)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	// Read at most one entry from the directory. If we get EOF, the directory is empty
-	if _, err = f.Readdirnames(1); errors.Is(err, io.EOF) {
-		return true, nil
-	}
-	return false, err
-}
-
 // deleteLogEntry deletes the log entry at the given LSN from the log.
 func (mgr *TransactionManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) error {
 	defer trace.StartRegion(ctx, "deleteLogEntry").End()
