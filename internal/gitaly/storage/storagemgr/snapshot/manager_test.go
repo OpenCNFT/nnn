@@ -39,6 +39,55 @@ func TestManager(t *testing.T) {
 		expectedMetrics metricValues
 	}{
 		{
+			desc: "existing parent directories of non-existent repositories are snapshotted",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				fs, err := mgr.GetSnapshot(ctx, []string{"repositories/non-existent-parent/non-existent-repo"}, true)
+				require.NoError(t, err)
+				defer testhelper.MustClose(t, fs)
+
+				testhelper.RequireDirectoryState(t, fs.Root(), "", testhelper.DirectoryState{
+					// The snapshotting process does not use the existing permissions for
+					// directories in the hierarchy before the repository directories.
+					"/":             {Mode: mode.Directory},
+					"/repositories": {Mode: mode.Directory},
+				})
+			},
+			expectedMetrics: metricValues{
+				createdExclusiveSnapshotCounter:   1,
+				destroyedExclusiveSnapshotCounter: 1,
+			},
+		},
+		{
+			desc: "existing parent directories of non-existent alternates are snapshotted",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/d"}, true)
+				require.NoError(t, err)
+				defer testhelper.MustClose(t, fs1)
+
+				testhelper.RequireDirectoryState(t, fs1.Root(), "", testhelper.DirectoryState{
+					// The snapshotting process does not use the existing permissions for
+					// directories in the hierarchy before the repository directories.
+					"/":                            {Mode: mode.Directory},
+					"/repositories":                {Mode: mode.Directory},
+					"/repositories/d":              {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/refs":         {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/objects":      {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/HEAD":         {Mode: umask.Mask(fs.ModePerm), Content: []byte("c content")},
+					"/repositories/d/objects/info": {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/objects/info/alternates": {Mode: umask.Mask(fs.ModePerm), Content: []byte("../../../pools/non-existent/objects")},
+					"/pools": {Mode: mode.Directory},
+				})
+			},
+			expectedMetrics: metricValues{
+				createdExclusiveSnapshotCounter:   1,
+				destroyedExclusiveSnapshotCounter: 1,
+			},
+		},
+		{
 			desc: "exclusive snapshots are not shared",
 			run: func(t *testing.T, mgr *Manager) {
 				defer testhelper.MustClose(t, mgr)
@@ -486,6 +535,13 @@ func TestManager(t *testing.T) {
 				"repositories/c/objects":                 {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/c/objects/info":            {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/c/objects/info/alternates": {Mode: fs.ModePerm, Data: []byte("../../../pools/b/objects")},
+				// We use the below repository just to test parent directory creation logic for alternates.
+				"repositories/d":                         {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/HEAD":                    {Mode: fs.ModePerm, Data: []byte("c content")},
+				"repositories/d/refs":                    {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/objects":                 {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/objects/info":            {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/objects/info/alternates": {Mode: fs.ModePerm, Data: []byte("../../../pools/non-existent/objects")},
 			})
 
 			metrics := NewMetrics()

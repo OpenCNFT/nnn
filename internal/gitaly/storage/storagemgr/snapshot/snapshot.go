@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -135,6 +136,10 @@ func createRepositorySnapshots(ctx context.Context, storageRoot, snapshotRoot st
 			continue
 		}
 
+		if err := createParentDirectories(storageRoot, snapshotRoot, relativePath, stats); err != nil {
+			return fmt.Errorf("create parent directories: %w", err)
+		}
+
 		if err := storage.ValidateGitDirectory(filepath.Join(storageRoot, relativePath)); err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				// It's okay if the repository does not exist. We'll create a snapshot without the directory,
@@ -168,6 +173,10 @@ func createRepositorySnapshots(ctx context.Context, storageRoot, snapshotRoot st
 				continue
 			}
 
+			if err := createParentDirectories(storageRoot, snapshotRoot, alternateRelativePath, stats); err != nil {
+				return fmt.Errorf("create parent directories: %w", err)
+			}
+
 			// Include the alternate repository in the snapshot as well.
 			if err := createRepositorySnapshot(ctx,
 				storageRoot,
@@ -185,41 +194,55 @@ func createRepositorySnapshots(ctx context.Context, storageRoot, snapshotRoot st
 	return nil
 }
 
+// createParentDirectories creates the parent directory hierarchy of the repository. It also doesn't consider the
+// permissions in the storage. While not 100% correct, we have no logic that cares about the storage hierarchy above
+// repositories.
+//
+// The repository's directory itself is not yet created as whether it should be created depends on whether the
+// repository exists or not.
+func createParentDirectories(storageRoot, snapshotRoot, relativePath string, stats *snapshotStatistics) error {
+	var (
+		currentRelativePath string
+		currentSuffix       = filepath.Dir(relativePath)
+		hasMore             = true
+	)
+
+	for hasMore {
+		var prefix string
+		prefix, currentSuffix, hasMore = strings.Cut(currentSuffix, "/")
+		currentRelativePath = filepath.Join(currentRelativePath, prefix)
+
+		if _, err := os.Lstat(filepath.Join(storageRoot, currentRelativePath)); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				break
+			}
+
+			return fmt.Errorf("stat parent directory: %w", err)
+		}
+
+		if err := os.Mkdir(filepath.Join(snapshotRoot, currentRelativePath), mode.Directory); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				// It's possible a parent directory has been already created as part of snapshotting
+				// another repository into this snapshot. Continue as we don't know if all of the
+				// parent directories have been created.
+				continue
+			}
+
+			return fmt.Errorf("create parent directory: %w", err)
+		}
+		stats.directoryCount++
+	}
+
+	return nil
+}
+
 // createRepositorySnapshot snapshots a repository's current state at snapshotPath. This is done by
 // recreating the repository's directory structure and hard linking the repository's files in their
 // correct locations there. This effectively does a copy-free clone of the repository. Since the files
 // are shared between the snapshot and the repository, they must not be modified. Git doesn't modify
 // existing files but writes new ones so this property is upheld.
 func createRepositorySnapshot(ctx context.Context, storageRoot, snapshotRoot, relativePath string, stats *snapshotStatistics) error {
-	destinationRepositoryPath := filepath.Join(snapshotRoot, relativePath)
-
-	repositoryParentDir := filepath.Dir(destinationRepositoryPath)
-	// Measure how many directories we're about to create as part of the MkdirAll call below.
-	for currentPath := repositoryParentDir; ; {
-		if _, err := os.Lstat(currentPath); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				stats.directoryCount++
-				currentPath = filepath.Dir(currentPath)
-				continue
-			}
-
-			return fmt.Errorf("lstat: %w", err)
-		}
-
-		break
-	}
-
-	// This creates the parent directory hierarchy regardless of whether the repository exists or not. It also
-	// doesn't consider the permissions in the storage. While not 100% correct, we have no logic that cares about
-	// the storage hierarchy above repositories.
-	//
-	// The repository's directory itself is not yet created as whether it should be created depends on whether the
-	// repository exists or not.
-	if err := os.MkdirAll(repositoryParentDir, mode.Directory); err != nil {
-		return fmt.Errorf("create parent directory hierarchy: %w", err)
-	}
-
-	if err := createDirectorySnapshot(ctx, filepath.Join(storageRoot, relativePath), destinationRepositoryPath, map[string]struct{}{
+	if err := createDirectorySnapshot(ctx, filepath.Join(storageRoot, relativePath), filepath.Join(snapshotRoot, relativePath), map[string]struct{}{
 		// Don't include worktrees in the snapshot. All of the worktrees in the repository should be leftover
 		// state from before transaction management was introduced as the transactions would create their
 		// worktrees in the snapshot.
