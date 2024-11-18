@@ -46,9 +46,9 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 		}
 	}
 	for destination, source := range map[*func(storage.LSN)]hookFunc{
-		&mgr.testHooks.beforeApplyLogEntry:   hooks.BeforeApplyLogEntry,
-		&mgr.testHooks.beforeAppendLogEntry:  hooks.BeforeAppendLogEntry,
-		&mgr.testHooks.beforeStoreAppliedLSN: hooks.BeforeStoreAppliedLSN,
+		&mgr.testHooks.beforeApplyLogEntry:      hooks.BeforeApplyLogEntry,
+		&mgr.testHooks.beforeStoreAppliedLSN:    hooks.BeforeStoreAppliedLSN,
+		&mgr.wal.testHooks.beforeAppendLogEntry: hooks.BeforeAppendLogEntry,
 	} {
 		if source != nil {
 			runHook := source

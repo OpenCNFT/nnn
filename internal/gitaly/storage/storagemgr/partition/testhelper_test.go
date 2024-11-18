@@ -1008,9 +1008,12 @@ type ConsumerState struct {
 }
 
 // RequireConsumer asserts the consumer log position is correct.
-func RequireConsumer(t *testing.T, consumer LogConsumer, consumerPos *consumerPosition, expected ConsumerState) {
+func RequireConsumer(t *testing.T, consumer LogConsumer, consumerPos *position, expected ConsumerState) {
 	t.Helper()
 
+	if consumerPos == nil {
+		return
+	}
 	require.Equal(t, expected.ManagerPosition, consumerPos.getPosition(), "expected and actual manager position don't match")
 
 	if consumer == nil {
@@ -1568,7 +1571,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		}
 	}
 
-	RequireConsumer(t, transactionManager.consumer, transactionManager.consumerPos, tc.expectedState.Consumers)
+	RequireConsumer(t, transactionManager.wal.consumer, transactionManager.wal.positions[consumerPosition], tc.expectedState.Consumers)
 
 	testhelper.RequireDirectoryState(t, stateDir, "", expectedDirectory)
 
