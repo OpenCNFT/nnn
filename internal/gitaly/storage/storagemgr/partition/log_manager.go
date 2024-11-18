@@ -182,7 +182,7 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 		return fmt.Errorf("remove stale packs: %w", err)
 	}
 
-	if mgr.consumer != nil {
+	if mgr.consumer != nil && mgr.appendedLSN != 0 {
 		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
 	}
 
@@ -342,7 +342,6 @@ func (mgr *LogManager) removeStaleWALFiles(ctx context.Context) error {
 		// files would be for the next LSN. Remove the files if they exist.
 		logEntryPath(mgr.stateDirectory, mgr.appendedLSN+1),
 	} {
-
 		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("stat: %w", err)
