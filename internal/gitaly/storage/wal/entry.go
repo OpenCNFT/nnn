@@ -35,6 +35,11 @@ func NewEntry(stateDirectory string) *Entry {
 	return &Entry{stateDirectory: stateDirectory}
 }
 
+// Directory returns the absolute path of the directory where the log entry is staging its state.
+func (e *Entry) Directory() string {
+	return e.stateDirectory
+}
+
 // Operations returns the operations of the log entry.
 func (e *Entry) Operations() []*gitalypb.LogEntry_Operation {
 	return e.operations

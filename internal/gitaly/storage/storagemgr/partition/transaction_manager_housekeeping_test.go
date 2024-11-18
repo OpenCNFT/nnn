@@ -2796,7 +2796,6 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 		"housekeeping_task=total,stage=apply":    1,
 		"housekeeping_task=repack,stage=prepare": 1,
 		"housekeeping_task=repack,stage=verify":  1,
-		"housekeeping_task=repack,stage=apply":   1,
 	}}
 
 	return []transactionTestCase{
@@ -3321,7 +3320,6 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 					"housekeeping_task=total,stage=apply":    2,
 					"housekeeping_task=repack,stage=prepare": 2,
 					"housekeeping_task=repack,stage=verify":  2,
-					"housekeeping_task=repack,stage=apply":   2,
 				}},
 			},
 			expectedState: StateAssertion{
@@ -3404,7 +3402,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 		"housekeeping_task=total,stage=apply":    1,
 		"housekeeping_task=repack,stage=prepare": 1,
 		"housekeeping_task=repack,stage=verify":  1,
-		"housekeeping_task=repack,stage=apply":   1,
 	}}
 
 	return []transactionTestCase{
@@ -5728,7 +5725,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 					"housekeeping_task=total,stage=apply":    1,
 					"housekeeping_task=repack,stage=prepare": 2,
 					"housekeeping_task=repack,stage=verify":  1,
-					"housekeeping_task=repack,stage=apply":   1,
 				}},
 			},
 			expectedState: StateAssertion{
@@ -5846,8 +5842,6 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 		"housekeeping_task=total,stage=verify":         1,
 		"housekeeping_task=total,stage=apply":          1,
 		"housekeeping_task=commit-graph,stage=prepare": 1,
-		"housekeeping_task=commit-graph,stage=verify":  1,
-		"housekeeping_task=commit-graph,stage=apply":   1,
 	}}
 	return []transactionTestCase{
 		{
@@ -6141,11 +6135,8 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 					"housekeeping_task=total,stage=verify":         3,
 					"housekeeping_task=total,stage=apply":          3,
 					"housekeeping_task=commit-graph,stage=prepare": 2,
-					"housekeeping_task=commit-graph,stage=verify":  2,
-					"housekeeping_task=commit-graph,stage=apply":   2,
 					"housekeeping_task=repack,stage=prepare":       1,
 					"housekeeping_task=repack,stage=verify":        1,
-					"housekeeping_task=repack,stage=apply":         1,
 				}},
 			},
 			expectedState: StateAssertion{

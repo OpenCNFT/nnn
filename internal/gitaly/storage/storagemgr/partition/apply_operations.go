@@ -18,15 +18,12 @@ import (
 // during an earlier interrupted attempt to apply the log entry. Similarly ErrNotExist is ignored
 // when removing directory entries. We can be stricter once log entry application becomes atomic
 // through https://gitlab.com/gitlab-org/gitaly/-/issues/5765.
-func applyOperations(ctx context.Context, sync func(context.Context, string) error, storageRoot, walEntryDirectory string, entry *gitalypb.LogEntry, db keyvalue.Transactioner) error {
-	wb := db.NewWriteBatch()
-	defer wb.Cancel()
-
+func applyOperations(ctx context.Context, sync func(context.Context, string) error, storageRoot, walEntryDirectory string, operations []*gitalypb.LogEntry_Operation, db keyvalue.ReadWriter) error {
 	// dirtyDirectories holds all directories that have been dirtied by the operations.
 	// As files have already been synced to the disk when the log entry was written, we
 	// only need to sync the operations on directories.
 	dirtyDirectories := map[string]struct{}{}
-	for _, wrappedOp := range entry.GetOperations() {
+	for _, wrappedOp := range operations {
 		switch wrapper := wrappedOp.GetOperation().(type) {
 		case *gitalypb.LogEntry_Operation_CreateHardLink_:
 			op := wrapper.CreateHardLink
@@ -74,13 +71,13 @@ func applyOperations(ctx context.Context, sync func(context.Context, string) err
 		case *gitalypb.LogEntry_Operation_SetKey_:
 			op := wrapper.SetKey
 
-			if err := wb.Set(op.GetKey(), op.GetValue()); err != nil {
+			if err := db.Set(op.GetKey(), op.GetValue()); err != nil {
 				return fmt.Errorf("set key: %w", err)
 			}
 		case *gitalypb.LogEntry_Operation_DeleteKey_:
 			op := wrapper.DeleteKey
 
-			if err := wb.Delete(op.GetKey()); err != nil {
+			if err := db.Delete(op.GetKey()); err != nil {
 				return fmt.Errorf("delete key: %w", err)
 			}
 		default:
@@ -93,10 +90,6 @@ func applyOperations(ctx context.Context, sync func(context.Context, string) err
 		if err := sync(ctx, filepath.Join(storageRoot, relativePath)); err != nil {
 			return fmt.Errorf("sync: %w", err)
 		}
-	}
-
-	if err := wb.Flush(); err != nil {
-		return fmt.Errorf("flush write batch: %w", err)
 	}
 
 	return nil

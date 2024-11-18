@@ -161,16 +161,7 @@ type runPackRefs struct {
 // is tracked in https://gitlab.com/gitlab-org/gitaly/-/issues/5709.
 type runRepack struct {
 	// config tells which strategy and baggaged options.
-	config       housekeepingcfg.RepackObjectsConfig
-	isFullRepack bool
-	// newFiles contains the list of new packfiles to be applied into the destination repository.
-	newFiles []string
-	// deletedFiles contains the list of packfiles that should be removed in the destination repository. The repacking
-	// command runs in the snapshot repository for a significant amount of time. Meanwhile, other requests
-	// containing new objects can land and be applied before housekeeping task finishes. So, we keep a snapshot of
-	// the packfile structure before and after running the task. When the manager applies the task, it targets those
-	// known files only. Other packfiles can still co-exist along side with the resulting repacked packfile(s).
-	deletedFiles []string
+	config housekeepingcfg.RepackObjectsConfig
 }
 
 // writeCommitGraphs models a commit graph update.
@@ -1848,6 +1839,9 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 	return nil
 }
 
+// Git stores loose objects in the object directory under subdirectories with two hex digits in their name.
+var regexpLooseObjectDir = regexp.MustCompile("^[[:xdigit:]]{2}$")
+
 // prepareRepacking runs git-repack(1) command against the snapshot repository using desired repacking strategy. Each
 // strategy has a different cost and effect corresponding to scheduling frequency.
 // - IncrementalWithUnreachable: pack all loose objects into one packfile. This strategy is a no-op because all new
@@ -1887,7 +1881,8 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 	workingRepository := mgr.repositoryFactory.Build(transaction.snapshot.RelativePath(transaction.relativePath))
 	repoPath := mgr.getAbsolutePath(workingRepository.GetRelativePath())
 
-	if repack.isFullRepack, err = housekeeping.ValidateRepacking(repack.config); err != nil {
+	isFullRepack, err := housekeeping.ValidateRepacking(repack.config)
+	if err != nil {
 		return fmt.Errorf("validating repacking: %w", err)
 	}
 
@@ -1907,6 +1902,22 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 	beforeFiles, err := mgr.collectPackfiles(ctx, repoPath)
 	if err != nil {
 		return fmt.Errorf("collecting existing packfiles: %w", err)
+	}
+
+	// All of the repacking operations pack/remove all loose objects. New ones are not written anymore with transactions.
+	// As we're packing them away not, log their removal.
+	objectsDirRelativePath := filepath.Join(transaction.relativePath, "objects")
+	objectsDirEntries, err := os.ReadDir(filepath.Join(transaction.snapshot.Root(), objectsDirRelativePath))
+	if err != nil {
+		return fmt.Errorf("read objects dir: %w", err)
+	}
+
+	for _, entry := range objectsDirEntries {
+		if entry.IsDir() && regexpLooseObjectDir.MatchString(entry.Name()) {
+			if err := transaction.walEntry.RecordDirectoryRemoval(transaction.snapshot.Root(), filepath.Join(objectsDirRelativePath, entry.Name())); err != nil {
+				return fmt.Errorf("record loose object dir removal: %w", err)
+			}
+		}
 	}
 
 	switch repack.config.Strategy {
@@ -1974,20 +1985,46 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 	for file := range beforeFiles {
 		// We delete the files only if it's missing from the before set.
 		if _, exist := afterFiles[file]; !exist {
-			repack.deletedFiles = append(repack.deletedFiles, file)
+			transaction.walEntry.RecordDirectoryEntryRemoval(filepath.Join(
+				objectsDirRelativePath, "pack", file,
+			))
 		}
 	}
 
 	for file := range afterFiles {
 		// Similarly, we don't need to link existing packfiles.
 		if _, exist := beforeFiles[file]; !exist {
-			repack.newFiles = append(repack.newFiles, file)
-			if err := os.Link(
-				filepath.Join(filepath.Join(repoPath, "objects", "pack"), file),
-				filepath.Join(transaction.walFilesPath(), file),
+			fileRelativePath := filepath.Join(objectsDirRelativePath, "pack", file)
+
+			if err := transaction.walEntry.RecordFileCreation(
+				filepath.Join(transaction.snapshot.Root(), fileRelativePath),
+				fileRelativePath,
 			); err != nil {
-				return fmt.Errorf("copying packfiles to WAL directory: %w", err)
+				return fmt.Errorf("record pack file creations: %q: %w", file, err)
 			}
+		}
+	}
+
+	if isFullRepack {
+		timestampRelativePath := filepath.Join(transaction.relativePath, stats.FullRepackTimestampFilename)
+		timestampAbsolutePath := filepath.Join(transaction.snapshot.Root(), timestampRelativePath)
+
+		info, err := os.Stat(timestampAbsolutePath)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("stat repack timestamp file: %w", err)
+		}
+
+		if err := stats.UpdateFullRepackTimestamp(filepath.Join(transaction.snapshot.Root(), transaction.relativePath), time.Now()); err != nil {
+			return fmt.Errorf("updating repack timestamp: %w", err)
+		}
+
+		if info != nil {
+			// The file existed and needs to be removed first.
+			transaction.walEntry.RecordDirectoryEntryRemoval(timestampRelativePath)
+		}
+
+		if err := transaction.walEntry.RecordFileCreation(timestampAbsolutePath, timestampRelativePath); err != nil {
+			return fmt.Errorf("stage repacking timestamp: %w", err)
 		}
 	}
 
@@ -2012,30 +2049,43 @@ func (mgr *TransactionManager) prepareCommitGraphs(ctx context.Context, transact
 	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("commit-graph", "prepare")
 	defer finishTimer()
 
-	workingRepository := mgr.repositoryFactory.Build(transaction.snapshot.RelativePath(transaction.relativePath))
-	repoPath := mgr.getAbsolutePath(workingRepository.GetRelativePath())
+	// Check if the legacy commit-graph file exists. If so, remove it as we'd replace it with a
+	// commit-graph chain.
+	commitGraphRelativePath := filepath.Join(transaction.relativePath, "objects", "info", "commit-graph")
+	if info, err := os.Stat(filepath.Join(
+		transaction.snapshot.Root(),
+		commitGraphRelativePath,
+	)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("stat commit-graph: %w", err)
+	} else if info != nil {
+		transaction.walEntry.RecordDirectoryEntryRemoval(commitGraphRelativePath)
+	}
 
-	if err := housekeeping.WriteCommitGraph(ctx, workingRepository, transaction.runHousekeeping.writeCommitGraphs.config); err != nil {
+	// Check for an existing commit-graphs directory. If so, delete it as
+	// we log all commit graphs created.
+	commitGraphsRelativePath := filepath.Join(transaction.relativePath, "objects", "info", "commit-graphs")
+	commitGraphsAbsolutePath := filepath.Join(transaction.snapshot.Root(), commitGraphsRelativePath)
+	if info, err := os.Stat(commitGraphsAbsolutePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("stat commit-graphs pre-image: %w", err)
+	} else if info != nil {
+		if err := transaction.walEntry.RecordDirectoryRemoval(transaction.snapshot.Root(), commitGraphsRelativePath); err != nil {
+			return fmt.Errorf("record commit-graphs removal: %w", err)
+		}
+	}
+
+	if err := housekeeping.WriteCommitGraph(ctx,
+		mgr.repositoryFactory.Build(transaction.snapshot.RelativePath(transaction.relativePath)),
+		transaction.runHousekeeping.writeCommitGraphs.config,
+	); err != nil {
 		return fmt.Errorf("re-writing commit graph: %w", err)
 	}
 
-	commitGraphsDir := filepath.Join(repoPath, "objects", "info", "commit-graphs")
-	if graphEntries, err := os.ReadDir(commitGraphsDir); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("reading commit-graphs directory: %w", err)
-		}
-	} else if len(graphEntries) > 0 {
-		walGraphsDir := filepath.Join(transaction.walFilesPath(), "commit-graphs")
-		if err := os.Mkdir(walGraphsDir, mode.Directory); err != nil {
-			return fmt.Errorf("creating commit-graphs dir in WAL dir: %w", err)
-		}
-		for _, entry := range graphEntries {
-			if err := os.Link(
-				filepath.Join(commitGraphsDir, entry.Name()),
-				filepath.Join(walGraphsDir, entry.Name()),
-			); err != nil {
-				return fmt.Errorf("linking commit-graph entry to WAL dir: %w", err)
-			}
+	// If the directory exists after the operation, log all of the new state.
+	if info, err := os.Stat(commitGraphsAbsolutePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("stat commit-graphs post-image: %w", err)
+	} else if info != nil {
+		if err := transaction.walEntry.RecordDirectoryCreation(transaction.snapshot.Root(), commitGraphsRelativePath); err != nil {
+			return fmt.Errorf("record commit-graphs creation: %w", err)
 		}
 	}
 
@@ -3158,20 +3208,12 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 		return nil, fmt.Errorf("verifying pack refs: %w", err)
 	}
 
-	repackEntry, err := mgr.verifyRepacking(ctx, transaction)
-	if err != nil {
+	if err := mgr.verifyRepacking(ctx, transaction); err != nil {
 		return nil, fmt.Errorf("verifying repacking: %w", err)
 	}
 
-	commitGraphsEntry, err := mgr.verifyCommitGraphs(ctx, transaction)
-	if err != nil {
-		return nil, fmt.Errorf("verifying commit graph update: %w", err)
-	}
-
 	return &gitalypb.LogEntry_Housekeeping{
-		PackRefs:          packRefsEntry,
-		Repack:            repackEntry,
-		WriteCommitGraphs: commitGraphsEntry,
+		PackRefs: packRefsEntry,
 	}, nil
 }
 
@@ -3340,10 +3382,10 @@ func (mgr *TransactionManager) verifyPackRefs(ctx context.Context, transaction *
 //
 // As we don't have a list of pruned objects at hand, the conflicts are identified by checking whether the recorded
 // dependencies of a transaction would still exist in the repository after applying the pruning operation.
-func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction *Transaction) (_ *gitalypb.LogEntry_Housekeeping_Repack, returnedErr error) {
+func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction *Transaction) (returnedErr error) {
 	repack := transaction.runHousekeeping.repack
 	if repack == nil {
-		return nil, nil
+		return nil
 	}
 
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.verifyRepacking", nil)
@@ -3355,18 +3397,14 @@ func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction 
 	// Other strategies re-organize packfiles without pruning unreachable objects. No need to run following
 	// expensive verification.
 	if repack.config.Strategy != housekeepingcfg.RepackObjectsStrategyFullWithCruft {
-		return &gitalypb.LogEntry_Housekeeping_Repack{
-			NewFiles:     repack.newFiles,
-			DeletedFiles: repack.deletedFiles,
-			IsFullRepack: repack.isFullRepack,
-		}, nil
+		return nil
 	}
 
 	// Setup a working repository of the destination repository and all changes of current transactions. All
 	// concurrent changes must land in that repository already.
 	snapshot, err := mgr.snapshotManager.GetSnapshot(ctx, []string{transaction.relativePath}, true)
 	if err != nil {
-		return nil, fmt.Errorf("setting up new snapshot for verifying repacking: %w", err)
+		return fmt.Errorf("setting up new snapshot for verifying repacking: %w", err)
 	}
 	defer func() {
 		if err := snapshot.Close(); err != nil {
@@ -3374,27 +3412,23 @@ func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction 
 		}
 	}()
 
-	workingRepository := mgr.repositoryFactory.Build(snapshot.RelativePath(transaction.relativePath))
-	workingRepositoryPath, err := workingRepository.Path(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting working repository path: %w", err)
-	}
+	// To verify the housekeeping transaction, we apply the operations it staged to a snapshot of the target
+	// repository's current state. We then check whether the resulting state is valid.
+	if err := func() error {
+		dbTX := mgr.db.NewTransaction(true)
+		defer dbTX.Discard()
 
-	// Remove loose objects as we'd do on application.
-	if err := mgr.pruneLooseObjects(workingRepositoryPath); err != nil {
-		return nil, fmt.Errorf("prune loose objects: %w", err)
-	}
-
-	// Apply the changes of current transaction.
-	if err := mgr.replacePackfiles(ctx, workingRepositoryPath, transaction.walFilesPath(), repack.newFiles, repack.deletedFiles); err != nil {
-		return nil, fmt.Errorf("applying packfiles for verifying repacking: %w", err)
-	}
-
-	// Apply new commit graph if any. Although commit graph update belongs to another task, a repacking task will
-	// result in rewriting the commit graph. It would be nice to apply the commit graph when setting up working
-	// repository for repacking task.
-	if err := mgr.replaceCommitGraphs(ctx, workingRepositoryPath, transaction.walFilesPath()); err != nil {
-		return nil, fmt.Errorf("applying commit graph for verifying repacking: %w", err)
+		return applyOperations(
+			ctx,
+			// We're not committing the changes in to the snapshot, so no need to fsync anything.
+			func(context.Context, string) error { return nil },
+			snapshot.Root(),
+			transaction.walEntry.Directory(),
+			transaction.walEntry.Operations(),
+			dbTX,
+		)
+	}(); err != nil {
+		return fmt.Errorf("apply operations: %w", err)
 	}
 
 	// Collect object dependencies. All of them should exist in the resulting packfile or new concurrent
@@ -3407,36 +3441,19 @@ func (mgr *TransactionManager) verifyRepacking(ctx context.Context, transaction 
 
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("walking committed entries: %w", err)
+		return fmt.Errorf("walking committed entries: %w", err)
 	}
 
-	if err := mgr.verifyObjectsExist(ctx, workingRepository, objectDependencies); err != nil {
+	if err := mgr.verifyObjectsExist(ctx, mgr.repositoryFactory.Build(snapshot.RelativePath(transaction.relativePath)), objectDependencies); err != nil {
 		var errInvalidObject localrepo.InvalidObjectError
 		if errors.As(err, &errInvalidObject) {
-			return nil, errRepackConflictPrunedObject
+			return errRepackConflictPrunedObject
 		}
 
-		return nil, fmt.Errorf("verify objects exist: %w", err)
+		return fmt.Errorf("verify objects exist: %w", err)
 	}
 
-	return &gitalypb.LogEntry_Housekeeping_Repack{
-		NewFiles:     repack.newFiles,
-		DeletedFiles: repack.deletedFiles,
-		IsFullRepack: repack.isFullRepack,
-	}, nil
-}
-
-// verifyCommitGraphs verifies if the commit-graph update is valid. As we replace the whole commit-graph directory by
-// the new directory, this step is a no-op now.
-func (mgr *TransactionManager) verifyCommitGraphs(ctx context.Context, transaction *Transaction) (*gitalypb.LogEntry_Housekeeping_WriteCommitGraphs, error) {
-	if transaction.runHousekeeping.writeCommitGraphs == nil {
-		return nil, nil
-	}
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("commit-graph", "verify")
-	defer finishTimer()
-
-	return &gitalypb.LogEntry_Housekeeping_WriteCommitGraphs{}, nil
+	return nil
 }
 
 // applyReferenceTransaction applies a reference transaction with `git update-ref`.
@@ -3585,8 +3602,14 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 
 	mgr.testHooks.beforeApplyLogEntry()
 
-	if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry, mgr.db); err != nil {
-		return fmt.Errorf("apply operations: %w", err)
+	if err := mgr.db.Update(func(tx keyvalue.ReadWriter) error {
+		if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry.GetOperations(), tx); err != nil {
+			return fmt.Errorf("apply operations: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("update: %w", err)
 	}
 
 	// If the repository is being deleted, just delete it without any other changes given
@@ -3662,14 +3685,6 @@ func (mgr *TransactionManager) applyHousekeeping(ctx context.Context, lsn storag
 
 	if err := mgr.applyPackRefs(ctx, lsn, logEntry); err != nil {
 		return fmt.Errorf("applying pack refs: %w", err)
-	}
-
-	if err := mgr.applyRepacking(ctx, lsn, logEntry); err != nil {
-		return fmt.Errorf("applying repacking: %w", err)
-	}
-
-	if err := mgr.applyCommitGraphs(ctx, lsn, logEntry); err != nil {
-		return fmt.Errorf("applying the commit graph: %w", err)
 	}
 
 	return nil
@@ -3760,161 +3775,6 @@ func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LS
 	// Sync the root of the repository to flush packed-refs replacement.
 	if err := syncer.SyncParent(ctx, packedRefsPath); err != nil {
 		return fmt.Errorf("sync parent: %w", err)
-	}
-	return nil
-}
-
-// applyRepacking applies the new packfile set and removed known pruned packfiles. New packfiles created by concurrent
-// changes are kept intact.
-func (mgr *TransactionManager) applyRepacking(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	if logEntry.GetHousekeeping().GetRepack() == nil {
-		return nil
-	}
-
-	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyRepacking", nil)
-	defer span.Finish()
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("repack", "apply")
-	defer finishTimer()
-
-	repack := logEntry.GetHousekeeping().GetRepack()
-	repoPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
-
-	if err := mgr.replacePackfiles(ctx, repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn), repack.GetNewFiles(), repack.GetDeletedFiles()); err != nil {
-		return fmt.Errorf("applying packfiles into destination repository: %w", err)
-	}
-
-	// During migration to the new transaction system, loose objects might still exist here and there. So, this task
-	// needs to clean up redundant loose objects. After the target repository runs repacking for the first time,
-	// there shouldn't be any further loose objects. All of them exist in packfiles. Afterward, this command will
-	// exist instantly. We can remove this run after the transaction system is fully applied.
-	if err := mgr.pruneLooseObjects(repoPath); err != nil {
-		return fmt.Errorf("prune loose objects: %w", err)
-	}
-
-	if repack.GetIsFullRepack() {
-		if err := stats.UpdateFullRepackTimestamp(mgr.getAbsolutePath(logEntry.GetRelativePath()), time.Now()); err != nil {
-			return fmt.Errorf("updating repack timestamp: %w", err)
-		}
-	}
-
-	if err := safe.NewSyncer().Sync(ctx, filepath.Join(repoPath, "objects")); err != nil {
-		return fmt.Errorf("sync objects dir: %w", err)
-	}
-	return nil
-}
-
-// Git stores loose objects in the object directory under subdirectories with two hex digits in their name.
-var regexpLooseObjectDir = regexp.MustCompile("^[[:xdigit:]]{2}$")
-
-// pruneLooseObjects removes all loose objects from the object directory.
-func (mgr *TransactionManager) pruneLooseObjects(repositoryPath string) error {
-	absoluteObjectDirectory := filepath.Join(repositoryPath, "objects")
-
-	entries, err := os.ReadDir(absoluteObjectDirectory)
-	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() && regexpLooseObjectDir.MatchString(entry.Name()) {
-			if err := os.RemoveAll(filepath.Join(absoluteObjectDirectory, entry.Name())); err != nil {
-				return fmt.Errorf("remove all: %w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// applyCommitGraphs replaces the existing commit-graph folder or monolithic file by the new commit-graph chain. The
-// new chain can be identical to the existing chain, but the fee of checking is similar to the replacement fee. Thus, we
-// can simply remove and link new directory over. Apart from commit-graph task, the repacking task also replaces the
-// chain before verification.
-func (mgr *TransactionManager) applyCommitGraphs(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	if logEntry.GetHousekeeping().GetWriteCommitGraphs() == nil {
-		return nil
-	}
-
-	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyCommitGraphs", nil)
-	defer span.Finish()
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("commit-graph", "apply")
-	defer finishTimer()
-
-	repoPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
-	if err := mgr.replaceCommitGraphs(ctx, repoPath, walFilesPathForLSN(mgr.stateDirectory, lsn)); err != nil {
-		return fmt.Errorf("rewriting commit-graph: %w", err)
-	}
-
-	return nil
-}
-
-// replacePackfiles replaces the set of packfiles at the destination repository by the new set of packfiles from WAL
-// directory. Any packfile outside the input deleted files are kept intact.
-func (mgr *TransactionManager) replacePackfiles(ctx context.Context, repoPath string, walPath string, newFiles []string, deletedFiles []string) error {
-	for _, file := range newFiles {
-		if err := os.Link(
-			filepath.Join(walPath, file),
-			filepath.Join(repoPath, "objects", "pack", file),
-		); err != nil {
-			// A new resulting packfile might exist if the log entry is re-applied after a crash.
-			if !errors.Is(err, os.ErrExist) {
-				return fmt.Errorf("linking new packfile: %w", err)
-			}
-		}
-	}
-
-	for _, file := range deletedFiles {
-		if err := os.Remove(filepath.Join(repoPath, "objects", "pack", file)); err != nil {
-			// Repacking task is the only operation that touch an on-disk packfile. Other operations should
-			// only create new packfiles. However, after a crash, a pre-existing packfile might be cleaned up
-			// beforehand.
-			if !errors.Is(err, os.ErrNotExist) {
-				return fmt.Errorf("clean up repacked packfile: %w", err)
-			}
-		}
-	}
-
-	if err := safe.NewSyncer().Sync(ctx, filepath.Join(repoPath, "objects", "pack")); err != nil {
-		return fmt.Errorf("sync objects/pack dir: %w", err)
-	}
-
-	return nil
-}
-
-func (mgr *TransactionManager) replaceCommitGraphs(ctx context.Context, repoPath string, walPath string) error {
-	// Clean up and apply commit graphs.
-	walGraphsDir := filepath.Join(walPath, "commit-graphs")
-	if graphEntries, err := os.ReadDir(walGraphsDir); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("reading dir: %w", err)
-		}
-	} else {
-		if err := os.Remove(filepath.Join(repoPath, "objects", "info", "commit-graph")); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("resetting commit-graph file: %w", err)
-		}
-		commitGraphsDir := filepath.Join(repoPath, "objects", "info", "commit-graphs")
-		if err := os.RemoveAll(commitGraphsDir); err != nil {
-			return fmt.Errorf("resetting commit-graphs dir: %w", err)
-		}
-		if err := os.Mkdir(commitGraphsDir, mode.Directory); err != nil {
-			return fmt.Errorf("creating commit-graphs dir: %w", err)
-		}
-		for _, entry := range graphEntries {
-			if err := os.Link(
-				filepath.Join(walGraphsDir, entry.Name()),
-				filepath.Join(commitGraphsDir, entry.Name()),
-			); err != nil {
-				return fmt.Errorf("linking commit-graph entry: %w", err)
-			}
-		}
-		if err := safe.NewSyncer().Sync(ctx, commitGraphsDir); err != nil {
-			return fmt.Errorf("sync objects/pack dir: %w", err)
-		}
-		if err := safe.NewSyncer().SyncParent(ctx, commitGraphsDir); err != nil {
-			return fmt.Errorf("sync objects/pack dir: %w", err)
-		}
 	}
 	return nil
 }

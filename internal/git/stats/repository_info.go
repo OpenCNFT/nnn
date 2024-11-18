@@ -25,17 +25,17 @@ const (
 	// would be considered old. Currently this is set to being 10 days.
 	StaleObjectsGracePeriod = -10 * 24 * time.Hour
 
-	// fullRepackTimestampFilename is the name of the file that is used as a timestamp for the
+	// FullRepackTimestampFilename is the name of the file that is used as a timestamp for the
 	// last repack that happened in the repository. Whenever a full repack happens, Gitaly will
 	// touch this file so that its last-modified date can be used to tell how long ago the last
 	// full repack happened.
-	fullRepackTimestampFilename = ".gitaly-full-repack-timestamp"
+	FullRepackTimestampFilename = ".gitaly-full-repack-timestamp"
 )
 
 // UpdateFullRepackTimestamp updates the timestamp that indicates when a repository has last been
 // fully repacked to the current time.
 func UpdateFullRepackTimestamp(repoPath string, timestamp time.Time) (returnedErr error) {
-	timestampPath := filepath.Join(repoPath, fullRepackTimestampFilename)
+	timestampPath := filepath.Join(repoPath, FullRepackTimestampFilename)
 
 	// We first try to update an existing file so that we don't rewrite the file in case it
 	// already exists, but only update its atime and mtime.
@@ -52,7 +52,7 @@ func UpdateFullRepackTimestamp(repoPath string, timestamp time.Time) (returnedEr
 	// When the file does not yet exist we create it anew. Note that we do this via a temporary
 	// file as it wouldn't otherwise be possible to atomically set the expected timestamp on it
 	// because there is no API to create a file with a specific mtime.
-	f, err := os.CreateTemp(repoPath, fullRepackTimestampFilename+"-*")
+	f, err := os.CreateTemp(repoPath, FullRepackTimestampFilename+"-*")
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func UpdateFullRepackTimestamp(repoPath string, timestamp time.Time) (returnedEr
 // FullRepackTimestamp reads the timestamp that indicates when a repository has last been fully
 // repacked. If no such timestamp exists, the zero timestamp is returned without an error.
 func FullRepackTimestamp(repoPath string) (time.Time, error) {
-	stat, err := os.Stat(filepath.Join(repoPath, fullRepackTimestampFilename))
+	stat, err := os.Stat(filepath.Join(repoPath, FullRepackTimestampFilename))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			// It's fine if the file doesn't exist. We just leave the timestamp at the
