@@ -876,6 +876,8 @@ type snapshotLock struct {
 // committedEntry is a wrapper for a log entry. It is used to keep track of entries in which their snapshots are still
 // accessed by other transactions.
 type committedEntry struct {
+	// entry is the in-memory reflection of referenced log entry.
+	entry *gitalypb.LogEntry
 	// lsn is the associated LSN of the entry
 	lsn storage.LSN
 	// snapshotReaders accounts for the number of transaction readers of the snapshot.
@@ -3668,6 +3670,7 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	mgr.snapshotLocks[nextLSN] = &snapshotLock{applied: make(chan struct{})}
 	mgr.committedEntries.PushBack(&committedEntry{
 		lsn:                nextLSN,
+		entry:              logEntry,
 		objectDependencies: objectDependencies,
 	})
 	mgr.mutex.Unlock()
@@ -3904,17 +3907,17 @@ func (mgr *TransactionManager) walkCommittedEntries(transaction *Transaction, ca
 		if committed.lsn <= transaction.snapshotLSN {
 			continue
 		}
-		entry, err := mgr.readLogEntry(committed.lsn)
-		if err != nil {
+
+		if committed.entry == nil {
 			return errCommittedEntryGone
 		}
 		// Transaction manager works on the partition level, including a repository and all of its pool
 		// member repositories (if any). We need to filter log entries of the repository this
 		// transaction targets.
-		if entry.GetRelativePath() != transaction.relativePath {
+		if committed.entry.GetRelativePath() != transaction.relativePath {
 			continue
 		}
-		if err := callback(entry, committed.objectDependencies); err != nil {
+		if err := callback(committed.entry, committed.objectDependencies); err != nil {
 			return fmt.Errorf("callback: %w", err)
 		}
 	}
