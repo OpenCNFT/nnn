@@ -327,7 +327,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	txn := &Transaction{
 		write:        opts.Write,
 		commit:       mgr.commit,
-		snapshotLSN:  mgr.wal.appendedLSN,
+		snapshotLSN:  mgr.wal.AppendedLSN(),
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
 		metrics:      mgr.metrics,
@@ -2153,13 +2153,11 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	}
 
 	for {
-		if mgr.appliedLSN < mgr.wal.appendedLSN {
+		if mgr.appliedLSN < mgr.wal.AppendedLSN() {
 			lsn := mgr.appliedLSN + 1
-
 			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
 				return fmt.Errorf("apply log entry: %w", err)
 			}
-
 			continue
 		}
 
@@ -2325,7 +2323,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		// Commit the prepared transaction now that we've managed to commit the log entry.
-		preparedTX.Commit(ctx, mgr.wal.appendedLSN)
+		preparedTX.Commit(ctx, mgr.wal.AppendedLSN())
 
 		return nil
 	}(); err != nil {
@@ -2333,7 +2331,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		return nil
 	}
 
-	mgr.awaitingTransactions[mgr.wal.appendedLSN] = transaction.result
+	mgr.awaitingTransactions[mgr.wal.AppendedLSN()] = transaction.result
 
 	return nil
 }
@@ -2483,7 +2481,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	// Each unapplied log entry should have a snapshot lock as they are created in normal
 	// operation when committing a log entry. Recover these entries.
-	for i := mgr.appliedLSN + 1; i <= mgr.wal.appendedLSN; i++ {
+	for i := mgr.appliedLSN + 1; i <= mgr.wal.AppendedLSN(); i++ {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
@@ -3397,7 +3395,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 
 	defer prometheus.NewTimer(mgr.metrics.transactionApplicationDurationSeconds).ObserveDuration()
 
-	logEntry, err := mgr.wal.readLogEntry(lsn)
+	logEntry, err := mgr.wal.ReadLogEntry(lsn)
 	if err != nil {
 		return fmt.Errorf("read log entry: %w", err)
 	}

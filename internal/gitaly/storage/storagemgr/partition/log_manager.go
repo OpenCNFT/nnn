@@ -401,6 +401,14 @@ func (mgr *LogManager) PruneLogEntries(ctx context.Context) (storage.LSN, error)
 	return 0, nil
 }
 
+// AppendedLSN returns the index of latest appended log entry.
+func (mgr *LogManager) AppendedLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	return mgr.appendedLSN
+}
+
 // GetEntryPath returns the path of the log entry's root directory.
 func (mgr *LogManager) GetEntryPath(lsn storage.LSN) string {
 	return logEntryPath(mgr.stateDirectory, lsn)
@@ -440,8 +448,8 @@ func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) erro
 	return nil
 }
 
-// readLogEntry returns the log entry from the given position in the log.
-func (mgr *LogManager) readLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
+// ReadLogEntry returns the log entry from the given position in the log.
+func (mgr *LogManager) ReadLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
 	manifestBytes, err := os.ReadFile(manifestPath(logEntryPath(mgr.stateDirectory, lsn)))
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)

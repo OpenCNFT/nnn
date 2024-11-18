@@ -381,6 +381,7 @@ func TestLogManager_PruneLogEntries(t *testing.T) {
 		// Set the applied LSN to 2
 		logManager.AcknowledgeAppliedPos(2)
 		logManager.AcknowledgeReferencedPos(2)
+
 		// Manually set the consumer's position to the first entry, forcing low-water mark to retain it
 		logManager.AcknowledgeConsumerPos(1)
 

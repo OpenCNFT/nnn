@@ -1724,7 +1724,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			require.Equal(t, expected[i].snapshotReaders, actual.snapshotReaders)
 
 			if expected[i].entry != nil {
-				actualEntry, err := manager.wal.readLogEntry(actual.lsn)
+				actualEntry, err := manager.wal.ReadLogEntry(actual.lsn)
 				require.NoError(t, err)
 
 				expectedEntry := expected[i].entry
@@ -2141,7 +2141,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.wal.appendedLSN, storage.LSN(3))
+					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2298,7 +2298,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.wal.appendedLSN, storage.LSN(4))
+					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{
