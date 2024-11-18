@@ -1,4 +1,4 @@
-package partition
+package wal
 
 import (
 	"context"
@@ -19,88 +19,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
 )
-
-// RefChange represents a reference change operation.
-type RefChange struct {
-	Ref string
-	Oid git.ObjectID
-}
-
-// MultiplerefChangesLogEntry returns a log entry as a result of multiple reference update operations.
-func MultiplerefChangesLogEntry(relativePath string, changes []RefChange) *gitalypb.LogEntry {
-	entry := &gitalypb.LogEntry{RelativePath: relativePath}
-
-	for i, change := range changes {
-		entry.ReferenceTransactions = append(entry.ReferenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
-			Changes: []*gitalypb.LogEntry_ReferenceTransaction_Change{
-				{
-					ReferenceName: []byte(change.Ref),
-					NewOid:        []byte(change.Oid),
-				},
-			},
-		})
-		entry.Operations = append(entry.Operations, &gitalypb.LogEntry_Operation{
-			Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
-				CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
-					SourcePath:      []byte(fmt.Sprintf("%d", i+1)),
-					DestinationPath: []byte(filepath.Join(relativePath, change.Ref)),
-				},
-			},
-		})
-	}
-
-	if testhelper.IsReftableEnabled() {
-		entry.Operations = append(entry.Operations, &gitalypb.LogEntry_Operation{
-			Operation: &gitalypb.LogEntry_Operation_RemoveDirectoryEntry_{
-				RemoveDirectoryEntry: &gitalypb.LogEntry_Operation_RemoveDirectoryEntry{
-					Path: []byte(filepath.Join(relativePath, "reftable/tables.list")),
-				},
-			},
-		}, &gitalypb.LogEntry_Operation{
-			Operation: &gitalypb.LogEntry_Operation_CreateHardLink_{
-				CreateHardLink: &gitalypb.LogEntry_Operation_CreateHardLink{
-					SourcePath:      []byte("2"),
-					DestinationPath: []byte(filepath.Join(relativePath, "reftable/tables.list")),
-				},
-			},
-		})
-	}
-
-	return entry
-}
-
-// KVOperation represents a KV operation. Setting Value to nil is translated to key deletion.
-type KVOperation struct {
-	Key   []byte
-	Value []byte
-}
-
-// MultipleKVLogEntry returns a log entry as a result of multiple key-value operations.
-func MultipleKVLogEntry(relativePath string, ops []KVOperation) *gitalypb.LogEntry {
-	entry := &gitalypb.LogEntry{RelativePath: relativePath}
-
-	for _, op := range ops {
-		if op.Value == nil {
-			entry.Operations = append(entry.Operations, &gitalypb.LogEntry_Operation{
-				Operation: &gitalypb.LogEntry_Operation_DeleteKey_{
-					DeleteKey: &gitalypb.LogEntry_Operation_DeleteKey{
-						Key: op.Key,
-					},
-				},
-			})
-		} else {
-			entry.Operations = append(entry.Operations, &gitalypb.LogEntry_Operation{
-				Operation: &gitalypb.LogEntry_Operation_SetKey_{
-					SetKey: &gitalypb.LogEntry_Operation_SetKey{
-						Key:   op.Key,
-						Value: op.Value,
-					},
-				},
-			})
-		}
-	}
-	return entry
-}
 
 func appendLogEntry(t *testing.T, ctx context.Context, manager *LogManager, logEntry *gitalypb.LogEntry, files map[string][]byte) storage.LSN {
 	t.Helper()
@@ -228,10 +146,10 @@ func TestLogManager_Initialize(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(entry1),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(entry1),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 		})
 	})
@@ -263,13 +181,13 @@ func TestLogManager_Initialize(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(entries[0]),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(entries[0]),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entries[1]),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entries[1]),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000003":          {Mode: mode.Directory},
-			"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(entries[2]),
+			"/wal/0000000000003/MANIFEST": ManifestDirectoryEntry(entries[2]),
 			"/wal/0000000000003/1":        {Mode: mode.File, Content: setup.GetFileContent(2)},
 		})
 	})
@@ -300,11 +218,11 @@ func TestLogManager_Initialize(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(entries[0]),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(entries[0]),
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entries[1]),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entries[1]),
 			"/wal/0000000000003":          {Mode: mode.Directory},
-			"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(entries[2]),
+			"/wal/0000000000003/MANIFEST": ManifestDirectoryEntry(entries[2]),
 		})
 	})
 }
@@ -397,10 +315,10 @@ func TestLogManager_PruneLogEntries(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry(1)),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry(1)),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000003":          {Mode: mode.Directory},
-			"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(entry(2)),
+			"/wal/0000000000003/MANIFEST": ManifestDirectoryEntry(entry(2)),
 			"/wal/0000000000003/1":        {Mode: mode.File, Content: setup.GetFileContent(2)},
 		})
 	})
@@ -441,10 +359,10 @@ func TestLogManager_PruneLogEntries(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000004":          {Mode: mode.Directory},
-			"/wal/0000000000004/MANIFEST": manifestDirectoryEntry(entry(3)),
+			"/wal/0000000000004/MANIFEST": ManifestDirectoryEntry(entry(3)),
 			"/wal/0000000000004/1":        {Mode: mode.File, Content: setup.GetFileContent(3)},
 			"/wal/0000000000005":          {Mode: mode.Directory},
-			"/wal/0000000000005/MANIFEST": manifestDirectoryEntry(entry(4)),
+			"/wal/0000000000005/MANIFEST": ManifestDirectoryEntry(entry(4)),
 			"/wal/0000000000005/1":        {Mode: mode.File, Content: setup.GetFileContent(4)},
 		})
 	})
@@ -470,7 +388,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refEntry),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(refEntry),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 		})
 	})
@@ -496,7 +414,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refEntry),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(refEntry),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 			"/wal/0000000000001/2":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000001/3":        {Mode: mode.File, Content: setup.GetFileContent(2)},
@@ -534,14 +452,14 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refEntry1),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(refEntry1),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refEntry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(refEntry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000002/2":        {Mode: mode.File, Content: setup.GetFileContent(2)},
 			"/wal/0000000000003":          {Mode: mode.Directory},
-			"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(kvEntry1),
+			"/wal/0000000000003/MANIFEST": ManifestDirectoryEntry(kvEntry1),
 		})
 	})
 
@@ -552,7 +470,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 3)
 
-		logManager.testHooks.beforeAppendLogEntry = func(lsn storage.LSN) {
+		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {
 			if lsn == 2 {
 				panic("crash please")
 			}
@@ -590,12 +508,12 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refEntry1),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(refEntry1),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 		})
 
 		// Remove the hook and retry the last proposal.
-		logManager.testHooks.beforeAppendLogEntry = func(lsn storage.LSN) {}
+		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {}
 		appendLogEntry(t, ctx, logManager, refEntry2, setup.GetFileMappingForEntry(1, 2))
 
 		require.Equal(t, logManager.appendedLSN, storage.LSN(2))
@@ -603,10 +521,10 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refEntry1),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(refEntry1),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refEntry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(refEntry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000002/2":        {Mode: mode.File, Content: setup.GetFileContent(2)},
 		})
@@ -689,13 +607,13 @@ func TestLogManager_Positions(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000003":          {Mode: mode.Directory},
-			"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(entry3),
+			"/wal/0000000000003/MANIFEST": ManifestDirectoryEntry(entry3),
 			"/wal/0000000000003/1":        {Mode: mode.File, Content: setup.GetFileContent(2)},
 			"/wal/0000000000004":          {Mode: mode.Directory},
-			"/wal/0000000000004/MANIFEST": manifestDirectoryEntry(entry4),
+			"/wal/0000000000004/MANIFEST": ManifestDirectoryEntry(entry4),
 			"/wal/0000000000004/1":        {Mode: mode.File, Content: setup.GetFileContent(3)},
 		})
 
@@ -739,10 +657,10 @@ func TestLogManager_Positions(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(entry1),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(entry1),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(0)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 		})
 	})
@@ -767,7 +685,7 @@ func TestLogManager_Positions(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 		})
 	})
@@ -792,10 +710,10 @@ func TestLogManager_Positions(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 		})
 	})
@@ -820,10 +738,10 @@ func TestLogManager_Positions(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000001":          {Mode: mode.Directory},
-			"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000001/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000001/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 		})
 	})
@@ -904,10 +822,10 @@ func TestLogManager_Positions(t *testing.T) {
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
 			"/wal/0000000000002":          {Mode: mode.Directory},
-			"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(entry2),
+			"/wal/0000000000002/MANIFEST": ManifestDirectoryEntry(entry2),
 			"/wal/0000000000002/1":        {Mode: mode.File, Content: setup.GetFileContent(1)},
 			"/wal/0000000000003":          {Mode: mode.Directory},
-			"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(entry3),
+			"/wal/0000000000003/MANIFEST": ManifestDirectoryEntry(entry3),
 			"/wal/0000000000003/1":        {Mode: mode.File, Content: setup.GetFileContent(2)},
 		})
 

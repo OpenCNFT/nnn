@@ -30,6 +30,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -1404,7 +1405,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					//
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
-						packFilePath := packFilePath(logEntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
+						packFilePath := packFilePath(wal.LogEntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
 						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,
@@ -1772,12 +1773,10 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePaths: []string{setup.RelativePath},
 				},
 				AdhocAssertion(func(t *testing.T, ctx context.Context, tm *TransactionManager) {
-					assertCommittedEntries(t, tm, []*expectedCommittedEntry{
-						{
-							lsn:             0,
-							snapshotReaders: 1,
-						},
-					}, tm.committedEntries)
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "", testhelper.DirectoryState{
+						"/":    {Mode: mode.Directory},
+						"/wal": {Mode: mode.Directory},
+					})
 				}),
 				Commit{
 					TransactionID: 1,
@@ -2117,7 +2116,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "",
 						gittest.FilesOrReftables(testhelper.DirectoryState{
 							"/":                           {Mode: mode.Directory},
 							"/wal":                        {Mode: mode.Directory},
@@ -2275,7 +2274,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.wal.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.wal.StateDirectory(), "", testhelper.DirectoryState{
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
 						"/wal/0000000000002":          {Mode: mode.Directory},

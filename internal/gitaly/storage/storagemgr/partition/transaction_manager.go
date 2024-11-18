@@ -902,7 +902,7 @@ type TransactionManager struct {
 	// db is the handle to the key-value store used for storing the write-ahead log related state.
 	db keyvalue.Transactioner
 	// wal manages the underlying Write-Ahead Log entries.
-	wal *LogManager
+	wal *wal.LogManager
 	// admissionQueue is where the incoming writes are waiting to be admitted to the transaction
 	// manager.
 	admissionQueue chan *Transaction
@@ -984,7 +984,7 @@ func NewTransactionManager(
 		storagePath:          storagePath,
 		partitionID:          ptnID,
 		db:                   db,
-		wal:                  NewLogManager(storageName, ptnID, stagingDir, stateDir, consumer),
+		wal:                  wal.NewLogManager(storageName, ptnID, stagingDir, stateDir, consumer),
 		admissionQueue:       make(chan *Transaction),
 		completedQueue:       make(chan struct{}, 1),
 		initialized:          make(chan struct{}),
