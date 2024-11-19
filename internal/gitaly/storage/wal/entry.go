@@ -95,6 +95,11 @@ func (e *Entry) DeleteKey(key []byte) {
 	e.operations.deleteKey(key)
 }
 
+// RecordMkdir records creation of a single directory.
+func (e *Entry) RecordMkdir(relativePath string) {
+	e.operations.createDirectory(relativePath)
+}
+
 // RecordFileCreation stages the file at the source and adds an operation to link it
 // to the given destination relative path in the storage.
 func (e *Entry) RecordFileCreation(sourceAbsolutePath string, relativePath string) error {
