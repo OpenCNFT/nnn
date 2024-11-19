@@ -64,7 +64,7 @@ func (p *position) setPosition(pos storage.LSN) {
 }
 
 type testLogHooks struct {
-	BeforeAppendLogEntry func(storage.LSN)
+	BeforeCommitLogEntry func(storage.LSN)
 }
 
 // LogManager is responsible for managing the Write-Ahead Log (WAL) entries on disk. It maintains the in-memory state
@@ -74,9 +74,9 @@ type testLogHooks struct {
 // references and acknowledgements. It effectively abstracts WAL operations from the TransactionManager, contributing to
 // a cleaner separation of concerns and making the system more maintainable and extensible.
 type LogManager struct {
-	// mutex protects access to critical states, especially `oldestLSN` and `appendedLSN`, as well as the integrity
-	// of inflight log entries. Since indices are monotonic, two parallel log appending operations result in pushing
-	// files into the same directory and breaking the manifest file. Thus, Parallel log entry appending and pruning
+	// mutex protects access to critical states, especially `oldestLSN` and `committedLSN`, as well as the integrity
+	// of inflight log entries. Since indices are monotonic, two parallel log committing operations result in pushing
+	// files into the same directory and breaking the manifest file. Thus, Parallel log entry committing and pruning
 	// are not supported.
 	mutex sync.Mutex
 
@@ -91,8 +91,8 @@ type LogManager struct {
 	// stateDirectory is an absolute path to a directory where write-ahead log stores log entries
 	stateDirectory string
 
-	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
-	appendedLSN storage.LSN
+	// committedLSN holds the LSN of the last log entry committed to the partition's write-ahead log.
+	committedLSN storage.LSN
 	// oldestLSN holds the LSN of the head of log entries which is still kept in the database. The manager keeps
 	// them because they are still referred by a transaction.
 	oldestLSN storage.LSN
@@ -130,14 +130,14 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, stagingD
 		positions:      positions,
 		notifyQueue:    make(chan struct{}, 1),
 		TestHooks: testLogHooks{
-			BeforeAppendLogEntry: func(storage.LSN) {},
+			BeforeCommitLogEntry: func(storage.LSN) {},
 		},
 	}
 }
 
 // Initialize sets up the initial state of the LogManager, preparing it to manage the write-ahead log entries. It reads
 // the last applied LSN from the database to resume from where it left off, creates necessary directories, and
-// initializes in-memory tracking variables such as appendedLSN and oldestLSN based on the files present in the WAL
+// initializes in-memory tracking variables such as committedLSN and oldestLSN based on the files present in the WAL
 // directory. This method also removes any stale log files that may have been left due to interrupted operations,
 // ensuring the WAL directory only contains valid log entries. If a LogConsumer is present, it notifies it of the
 // initial log entry state, enabling consumers to start processing from the correct point. Proper initialization is
@@ -147,12 +147,12 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 		return fmt.Errorf("create state directory: %w", err)
 	}
 
-	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
+	// The LSN of the last committed log entry is determined from the LSN of the latest entry in the log and
 	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there
 	// is no transaction refers them. It's possible there are some left-over entries in the database because a
 	// transaction can hold the entry stubbornly. So, the manager could not clean them up in the last session.
 	//
-	//  ┌─ oldestLSN                    ┌─ appendedLSN
+	//  ┌─ oldestLSN                    ┌─ committedLSN
 	// ┌┴┐ ┌─┐ ┌─┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐
 	// └─┘ └─┘ └─┘ └┬┘ └─┘ └─┘ └─┘ └─┘ └─┘
 	//  ◄───────►   └─ appliedLSN
@@ -162,10 +162,10 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 	// pruned already or there has not been any log entries yet. Setting this +1 avoids trying to clean up log entries
 	// that do not exist. If there are some, we'll set oldestLSN to the head of the log below.
 	mgr.oldestLSN = appliedLSN + 1
-	// appendedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
+	// committedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
 	// all log entries have been applied and have been already pruned. If there are some in the log, we'll update this
 	// below to match.
-	mgr.appendedLSN = appliedLSN
+	mgr.committedLSN = appliedLSN
 
 	if logEntries, err := os.ReadDir(walStatePath(mgr.stateDirectory)); err != nil {
 		return fmt.Errorf("read wal directory: %w", err)
@@ -173,8 +173,8 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 		if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
 			return fmt.Errorf("parse oldest LSN: %w", err)
 		}
-		if mgr.appendedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
-			return fmt.Errorf("parse appended LSN: %w", err)
+		if mgr.committedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
+			return fmt.Errorf("parse committed LSN: %w", err)
 		}
 	}
 
@@ -182,12 +182,12 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 		return fmt.Errorf("remove stale packs: %w", err)
 	}
 
-	if mgr.consumer != nil && mgr.appendedLSN != 0 {
-		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
+	if mgr.consumer != nil && mgr.committedLSN != 0 {
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.committedLSN)
 	}
 
 	mgr.AcknowledgeAppliedPos(appliedLSN)
-	mgr.AcknowledgeReferencedPos(mgr.appendedLSN)
+	mgr.AcknowledgeReferencedPos(mgr.committedLSN)
 
 	return nil
 }
@@ -228,11 +228,11 @@ func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 	return mgr.notifyQueue
 }
 
-// AppendLogEntry appends an entry to the write-ahead log. logEntryPath is an
-// absolute path to the directory that represents the log entry. appendLogEntry
-// moves the log entry's directory to the WAL, and returns its LSN once it has
-// been committed to the log.
-func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntry *gitalypb.LogEntry, logEntryPath string) (storage.LSN, error) {
+// CommitLogEntry commits an entry to the write-ahead log. logEntryPath is an
+// absolute path to the directory that represents the log entry. It moves the
+// log entry's directory to the WAL, and returns its LSN once it has been
+// committed to the log.
+func (mgr *LogManager) CommitLogEntry(ctx context.Context, logEntry *gitalypb.LogEntry, logEntryPath string) (storage.LSN, error) {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
@@ -262,8 +262,8 @@ func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntry *gitalypb.Lo
 		return 0, fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	nextLSN := mgr.appendedLSN + 1
-	mgr.TestHooks.BeforeAppendLogEntry(nextLSN)
+	nextLSN := mgr.committedLSN + 1
+	mgr.TestHooks.BeforeCommitLogEntry(nextLSN)
 
 	// Move the log entry from the staging directory into its place in the log.
 	destinationPath := mgr.GetEntryPath(nextLSN)
@@ -289,7 +289,7 @@ func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntry *gitalypb.Lo
 
 	// After this latch block, the transaction is committed and all subsequent transactions
 	// are guaranteed to read it.
-	mgr.appendedLSN = nextLSN
+	mgr.committedLSN = nextLSN
 
 	if mgr.consumer != nil {
 		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
@@ -343,9 +343,9 @@ func (mgr *LogManager) removeStaleWALFiles(ctx context.Context) error {
 		// Log entries are pruned one by one. If a write is interrupted, the only possible stale files would be
 		// for the log entry preceding the oldest log entry.
 		LogEntryPath(mgr.stateDirectory, mgr.oldestLSN-1),
-		// Log entries are appended one by one to the log. If a write is interrupted, the only possible stale
+		// Log entries are committed one by one to the log. If a write is interrupted, the only possible stale
 		// files would be for the next LSN. Remove the files if they exist.
-		LogEntryPath(mgr.stateDirectory, mgr.appendedLSN+1),
+		LogEntryPath(mgr.stateDirectory, mgr.committedLSN+1),
 	} {
 		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -406,12 +406,12 @@ func (mgr *LogManager) PruneLogEntries(ctx context.Context) (storage.LSN, error)
 	return 0, nil
 }
 
-// AppendedLSN returns the index of latest appended log entry.
-func (mgr *LogManager) AppendedLSN() storage.LSN {
+// CommittedLSN returns the index of latest committed log entry.
+func (mgr *LogManager) CommittedLSN() storage.LSN {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	return mgr.appendedLSN
+	return mgr.committedLSN
 }
 
 // GetEntryPath returns the path of the log entry's root directory.
@@ -471,7 +471,7 @@ func (mgr *LogManager) ReadLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error)
 // lowWaterMark returns the earliest LSN of log entries which should be kept in the database. Any log entries LESS than
 // this mark are removed.
 func (mgr *LogManager) lowWaterMark() storage.LSN {
-	minAcknowledged := mgr.appendedLSN + 1
+	minAcknowledged := mgr.committedLSN + 1
 
 	// Position is the last acknowledged LSN, this is eligible for pruning.
 	// lowWaterMark returns the lowest LSN that cannot be pruned, so add one.

@@ -425,7 +425,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				steps: steps{
 					StartManager{
 						Hooks: testTransactionHooks{
-							BeforeAppendLogEntry: func(hookCtx hookContext) {
+							BeforeCommitLogEntry: func(hookCtx hookContext) {
 								// Cancel the context used in Commit
 								cancel()
 							},
@@ -494,7 +494,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 			steps: steps{
 				StartManager{
 					Hooks: testTransactionHooks{
-						BeforeAppendLogEntry: func(hookContext hookContext) { hookContext.manager.Close() },
+						BeforeCommitLogEntry: func(hookContext hookContext) { hookContext.manager.Close() },
 						// This ensures we are testing the context cancellation errors being unwrapped properly
 						// to an storage.ErrTransactionProcessingStopped instead of hitting the general case when
 						// runDone is closed.
@@ -2140,7 +2140,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(3))
+					require.Equal(t, tm.wal.CommittedLSN(), storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2267,7 +2267,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					err := tm.appendLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath)
+					err := tm.commitLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath)
 					require.NoError(t, err)
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
@@ -2297,7 +2297,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.wal.AppendedLSN(), storage.LSN(4))
+					require.Equal(t, tm.wal.CommittedLSN(), storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{

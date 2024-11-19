@@ -679,7 +679,7 @@ func appendLogEntry(t *testing.T, ctx context.Context, manager *wal.LogManager, 
 		require.NoError(t, os.WriteFile(path, value, mode.File))
 	}
 
-	nextLSN, err := manager.AppendLogEntry(ctx, logEntry, logEntryPath)
+	nextLSN, err := manager.CommitLogEntry(ctx, logEntry, logEntryPath)
 	require.NoError(t, err)
 
 	return nextLSN

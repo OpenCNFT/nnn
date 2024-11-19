@@ -29,7 +29,7 @@ func appendLogEntry(t *testing.T, ctx context.Context, manager *LogManager, logE
 		require.NoError(t, os.WriteFile(path, value, mode.File))
 	}
 
-	nextLSN, err := manager.AppendLogEntry(ctx, logEntry, logEntryPath)
+	nextLSN, err := manager.CommitLogEntry(ctx, logEntry, logEntryPath)
 	require.NoError(t, err)
 
 	return nextLSN
@@ -111,7 +111,7 @@ func TestLogManager_Initialize(t *testing.T) {
 		require.NoError(t, logManager.Initialize(ctx, 0))
 
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
-		require.Equal(t, storage.LSN(0), logManager.appendedLSN)
+		require.Equal(t, storage.LSN(0), logManager.committedLSN)
 		require.Equal(t, storage.LSN(1), logManager.lowWaterMark())
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
 			"/":    {Mode: mode.Directory},
@@ -139,7 +139,7 @@ func TestLogManager_Initialize(t *testing.T) {
 
 		require.NoError(t, logManager.Initialize(ctx, 0))
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
-		require.Equal(t, storage.LSN(2), logManager.appendedLSN)
+		require.Equal(t, storage.LSN(2), logManager.committedLSN)
 		require.Equal(t, storage.LSN(1), logManager.lowWaterMark())
 
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
@@ -174,7 +174,7 @@ func TestLogManager_Initialize(t *testing.T) {
 		require.NoError(t, logManager.Initialize(ctx, 2))
 
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
-		require.Equal(t, storage.LSN(3), logManager.appendedLSN)
+		require.Equal(t, storage.LSN(3), logManager.committedLSN)
 		require.Equal(t, storage.LSN(3), logManager.lowWaterMark())
 
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
@@ -211,7 +211,7 @@ func TestLogManager_Initialize(t *testing.T) {
 		require.NoError(t, logManager.Initialize(ctx, 3))
 
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
-		require.Equal(t, storage.LSN(3), logManager.appendedLSN)
+		require.Equal(t, storage.LSN(3), logManager.committedLSN)
 		require.Equal(t, storage.LSN(4), logManager.lowWaterMark())
 
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
@@ -378,12 +378,12 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 1)
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(0))
+		require.Equal(t, logManager.committedLSN, storage.LSN(0))
 
 		refEntry := MultiplerefChangesLogEntry(setup.relativePath, []RefChange{{Ref: "branch-1", Oid: setup.commitIDs[0]}})
 		appendLogEntry(t, ctx, logManager, refEntry, setup.GetFileMappingForEntry(0))
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(1))
+		require.Equal(t, logManager.committedLSN, storage.LSN(1))
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
@@ -400,7 +400,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 3)
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(0))
+		require.Equal(t, logManager.committedLSN, storage.LSN(0))
 
 		refEntry := MultiplerefChangesLogEntry(setup.relativePath, []RefChange{
 			{Ref: "branch-1", Oid: setup.commitIDs[0]},
@@ -409,7 +409,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		})
 		appendLogEntry(t, ctx, logManager, refEntry, setup.GetFileMappingForEntry(0, 1, 2))
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(1))
+		require.Equal(t, logManager.committedLSN, storage.LSN(1))
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
@@ -428,7 +428,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 3)
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(0))
+		require.Equal(t, logManager.committedLSN, storage.LSN(0))
 
 		refEntry1 := MultiplerefChangesLogEntry(setup.relativePath, []RefChange{
 			{Ref: "branch-1", Oid: setup.commitIDs[0]},
@@ -447,7 +447,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		})
 		appendLogEntry(t, ctx, logManager, kvEntry1, nil)
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(3))
+		require.Equal(t, logManager.committedLSN, storage.LSN(3))
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
@@ -470,7 +470,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 3)
 
-		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {
+		logManager.TestHooks.BeforeCommitLogEntry = func(lsn storage.LSN) {
 			if lsn == 2 {
 				panic("crash please")
 			}
@@ -488,7 +488,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			{Ref: "branch-3", Oid: setup.commitIDs[2]},
 		})
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(0))
+		require.Equal(t, logManager.committedLSN, storage.LSN(0))
 		func() {
 			defer func() {
 				p := recover()
@@ -503,7 +503,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 			appendLogEntry(t, ctx, logManager, refEntry2, setup.GetFileMappingForEntry(1, 2))
 		}()
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(1))
+		require.Equal(t, logManager.committedLSN, storage.LSN(1))
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
@@ -513,10 +513,10 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		})
 
 		// Remove the hook and retry the last proposal.
-		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {}
+		logManager.TestHooks.BeforeCommitLogEntry = func(lsn storage.LSN) {}
 		appendLogEntry(t, ctx, logManager, refEntry2, setup.GetFileMappingForEntry(1, 2))
 
-		require.Equal(t, logManager.appendedLSN, storage.LSN(2))
+		require.Equal(t, logManager.committedLSN, storage.LSN(2))
 		testhelper.RequireDirectoryState(t, logManager.stateDirectory, "", testhelper.DirectoryState{
 			"/":                           {Mode: mode.Directory},
 			"/wal":                        {Mode: mode.Directory},
@@ -537,14 +537,14 @@ type mockLogConsumer struct {
 	busy      atomic.Bool
 }
 
-func (c *mockLogConsumer) NotifyNewEntries(storageName string, partitionID storage.PartitionID, oldestLSN, appendedLSN storage.LSN) {
+func (c *mockLogConsumer) NotifyNewEntries(storageName string, partitionID storage.PartitionID, oldestLSN, committedLSN storage.LSN) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.busy.Load() {
 		return
 	}
-	c.positions = append(c.positions, []storage.LSN{oldestLSN, appendedLSN})
+	c.positions = append(c.positions, []storage.LSN{oldestLSN, committedLSN})
 }
 
 func TestLogManager_Positions(t *testing.T) {

@@ -327,7 +327,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	txn := &Transaction{
 		write:        opts.Write,
 		commit:       mgr.commit,
-		snapshotLSN:  mgr.wal.AppendedLSN(),
+		snapshotLSN:  mgr.wal.CommittedLSN(),
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
 		metrics:      mgr.metrics,
@@ -843,7 +843,7 @@ func (mgr *TransactionManager) GetLogManager() storage.LogManager {
 //     - The reference verification failures can be ignored instead of aborting the entire transaction.
 //     If done, the references that failed verification are dropped from the transaction but the updates
 //     that passed verification are still performed.
-//  2. The transaction is appended to the write-ahead log. Once the write has been logged, it is effectively
+//  2. The transaction is committed to the write-ahead log. Once the write has been logged, it is effectively
 //     committed and will be applied to the repository even after restarting.
 //  3. The transaction is applied from the write-ahead log to the repository by actually performing the reference
 //     changes.
@@ -915,8 +915,8 @@ type TransactionManager struct {
 	// initializationSuccessful is set if the TransactionManager initialized successfully. If it didn't,
 	// transactions will fail to begin.
 	initializationSuccessful bool
-	// mutex guards access to snapshotLocks and appendedLSN. These fields are accessed by both
-	// Run and Begin which are ran in different goroutines.
+	// mutex guards access to internal states of TransactionManager such as snapshotLocks. These fields are
+	// accessed by both Run and Begin which are ran in different goroutines.
 	mutex sync.Mutex
 
 	// snapshotLocks contains state used for synchronizing snapshotters with the log application. The
@@ -934,7 +934,7 @@ type TransactionManager struct {
 	// the partition. It's keyed by the LSN the transaction is waiting to be applied and the
 	// value is the resultChannel that is waiting the result.
 	awaitingTransactions map[storage.LSN]resultChannel
-	// committedEntries keeps some latest appended log entries around. Some types of transactions, such as
+	// committedEntries keeps some latest committed log entries around. Some types of transactions, such as
 	// housekeeping, operate on snapshot repository. There is a gap between transaction doing its work and the time
 	// when it is committed. They need to verify if concurrent operations can cause conflict. These log entries are
 	// still kept around even after they are applied. They are removed when there are no active readers accessing
@@ -2116,7 +2116,7 @@ func unwrapExpectedError(err error) error {
 	return err
 }
 
-// Run starts the transaction processing. On start up Run loads the indexes of the last appended and applied
+// Run starts the transaction processing. On start up Run loads the indexes of the last committed and applied
 // log entries from the database. It will then apply any transactions that have been logged but not applied
 // to the repository. Once the recovery is completed, Run starts processing new transactions by verifying the
 // references, logging the transaction and finally applying it to the repository. The transactions are acknowledged
@@ -2147,7 +2147,7 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	}
 
 	for {
-		if mgr.appliedLSN < mgr.wal.AppendedLSN() {
+		if mgr.appliedLSN < mgr.wal.CommittedLSN() {
 			lsn := mgr.appliedLSN + 1
 			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
 				return fmt.Errorf("apply log entry: %w", err)
@@ -2312,12 +2312,12 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		logEntry.Operations = transaction.walEntry.Operations()
 
-		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
+		if err := mgr.commitLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
 			return fmt.Errorf("append log entry: %w", err)
 		}
 
 		// Commit the prepared transaction now that we've managed to commit the log entry.
-		preparedTX.Commit(ctx, mgr.wal.AppendedLSN())
+		preparedTX.Commit(ctx, mgr.wal.CommittedLSN())
 
 		return nil
 	}(); err != nil {
@@ -2325,7 +2325,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		return nil
 	}
 
-	mgr.awaitingTransactions[mgr.wal.AppendedLSN()] = transaction.result
+	mgr.awaitingTransactions[mgr.wal.CommittedLSN()] = transaction.result
 
 	return nil
 }
@@ -2475,7 +2475,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	// Each unapplied log entry should have a snapshot lock as they are created in normal
 	// operation when committing a log entry. Recover these entries.
-	for i := mgr.appliedLSN + 1; i <= mgr.wal.AppendedLSN(); i++ {
+	for i := mgr.appliedLSN + 1; i <= mgr.wal.CommittedLSN(); i++ {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
@@ -2987,7 +2987,7 @@ func (mgr *TransactionManager) verifyHousekeeping(ctx context.Context, transacti
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
-	// Check for any concurrent housekeeping between this transaction's snapshot LSN and the latest appended LSN.
+	// Check for any concurrent housekeeping between this transaction's snapshot LSN and the latest  LSN.
 	if err := mgr.walkCommittedEntries(transaction, func(entry *gitalypb.LogEntry, objectDependencies map[git.ObjectID]struct{}) error {
 		if entry.GetHousekeeping() != nil {
 			return errHousekeepingConflictConcurrent
@@ -3361,20 +3361,20 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 	return nil
 }
 
-// appendLogEntry appends a log etnry of a transaction to the write-ahead log. After the log entry is appended to WAL,
-// the corresponding snapshot lock and in-memory reference for the latest appended LSN is created.
-func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
-	defer trace.StartRegion(ctx, "appendLogEntry").End()
+// commitLogEntry commits a log entry of a transaction to the write-ahead log. After the log entry is committed to WAL,
+// the corresponding snapshot lock for the latest committed LSN is created.
+func (mgr *TransactionManager) commitLogEntry(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
+	defer trace.StartRegion(ctx, "commitLogEntry").End()
 
-	appendedLSN, err := mgr.wal.AppendLogEntry(ctx, logEntry, logEntryPath)
+	committedLSN, err := mgr.wal.CommitLogEntry(ctx, logEntry, logEntryPath)
 	if err != nil {
 		return fmt.Errorf("propose log entry: %w", err)
 	}
 
 	mgr.mutex.Lock()
-	mgr.snapshotLocks[appendedLSN] = &snapshotLock{applied: make(chan struct{})}
+	mgr.snapshotLocks[committedLSN] = &snapshotLock{applied: make(chan struct{})}
 	mgr.committedEntries.PushBack(&committedEntry{
-		lsn:                appendedLSN,
+		lsn:                committedLSN,
 		entry:              logEntry,
 		objectDependencies: objectDependencies,
 	})
