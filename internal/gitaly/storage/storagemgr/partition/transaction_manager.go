@@ -36,6 +36,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/fsrecorder"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal/reftree"
@@ -436,6 +437,15 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 			return nil, fmt.Errorf("get snapshot: %w", err)
 		}
 
+		if txn.write {
+			// Create a directory to store all staging files.
+			if err := os.Mkdir(txn.walFilesPath(), mode.Directory); err != nil {
+				return nil, fmt.Errorf("create wal files directory: %w", err)
+			}
+
+			txn.walEntry = wal.NewEntry(txn.walFilesPath())
+		}
+
 		if txn.repositoryTarget() {
 			txn.repositoryExists, err = mgr.doesRepositoryExist(ctx, txn.snapshot.RelativePath(txn.relativePath))
 			if err != nil {
@@ -465,6 +475,17 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 						return nil, fmt.Errorf("quarantine: %w", err)
 					}
 				} else {
+					// The repository does not exist, and this is a write. This should thus create the repository. As the repository's final state
+					// is still being logged in TransactionManager, we already log here the creation of any missing parent directories of
+					// the repository. When the transaction commits, we don't know if they existed or not, so we can't record this later.
+					//
+					// If the repository is at the root of the storage, there's no parent directories to create.
+					if parentDir := filepath.Dir(txn.relativePath); parentDir != "." {
+						if err := fsrecorder.NewFS(txn.snapshot.Root(), txn.walEntry).MkdirAll(parentDir); err != nil {
+							return nil, fmt.Errorf("create parent directories: %w", err)
+						}
+					}
+
 					txn.quarantineDirectory = filepath.Join(mgr.storagePath, txn.snapshot.RelativePath(txn.relativePath), "objects")
 				}
 			}
@@ -1090,13 +1111,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 	}
 
-	// Create a directory to store all staging files.
-	if err := os.Mkdir(transaction.walFilesPath(), mode.Directory); err != nil {
-		return fmt.Errorf("create wal files directory: %w", err)
-	}
-
-	transaction.walEntry = wal.NewEntry(transaction.walFilesPath())
-
 	if err := mgr.packObjects(ctx, transaction); err != nil {
 		return fmt.Errorf("pack objects: %w", err)
 	}
@@ -1123,7 +1137,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("replace object directory: %w", err)
 		}
 
-		if err := transaction.walEntry.RecordRepositoryCreation(
+		if err := transaction.walEntry.RecordDirectoryCreation(
 			transaction.snapshot.Root(),
 			transaction.relativePath,
 		); err != nil {

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -127,34 +126,6 @@ func (e *Entry) RecordFileUpdate(storageRoot, relativePath string) error {
 // RecordDirectoryEntryRemoval records the removal of the file system object at the given path.
 func (e *Entry) RecordDirectoryEntryRemoval(relativePath string) {
 	e.operations.removeDirectoryEntry(relativePath)
-}
-
-// RecordRepositoryCreation records the creation of the repository itself and the directory
-// hierarchy above it.
-func (e *Entry) RecordRepositoryCreation(storageRoot, relativePath string) error {
-	parentDir := filepath.Dir(relativePath)
-
-	// If the repository is in the storage root, there are no parent directories to create.
-	// Ignore the "." referring to the storage root.
-	var dirComponents []string
-	if parentDir != "." {
-		dirComponents = strings.Split(parentDir, string(os.PathSeparator))
-	}
-
-	var previousParentDir string
-	for _, dirComponent := range dirComponents {
-		currentDir := filepath.Join(previousParentDir, dirComponent)
-		e.operations.createDirectory(currentDir)
-
-		previousParentDir = currentDir
-	}
-
-	// Log the repository itself.
-	if err := e.recordDirectoryCreation(storageRoot, relativePath); err != nil {
-		return fmt.Errorf("record directory creation: %w", err)
-	}
-
-	return nil
 }
 
 // RecordDirectoryCreation records the operations to create a given directory in the storage and
