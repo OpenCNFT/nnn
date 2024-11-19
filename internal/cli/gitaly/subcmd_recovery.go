@@ -10,6 +10,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"gitlab.com/gitlab-org/gitaly/v16"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/backup"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
@@ -187,6 +188,29 @@ func recoveryStatusAction(ctx *cli.Context) (returnErr error) {
 		for _, relativePath := range relativePaths {
 			fmt.Fprintf(ctx.App.Writer, " - %s\n", relativePath)
 		}
+	}
+
+	if cfg.Backup.WALGoCloudURL == "" {
+		return fmt.Errorf("write-ahead log backup is not configured")
+	}
+
+	sink, err := backup.ResolveSink(ctx.Context, cfg.Backup.WALGoCloudURL)
+	if err != nil {
+		return fmt.Errorf("resolve sink: %w", err)
+	}
+	logEntryStore := backup.NewLogEntryStore(sink)
+	entries := logEntryStore.Query(backup.PartitionInfo{
+		PartitionID: partitionID,
+		StorageName: storageName,
+	}, appliedLSN+1)
+
+	fmt.Fprintf(ctx.App.Writer, "Available backup entries:\n")
+	for entries.Next(ctx.Context) {
+		fmt.Fprintf(ctx.App.Writer, " - %s\n", entries.LSN())
+	}
+
+	if err := entries.Err(); err != nil {
+		return fmt.Errorf("query log entry store: %w", err)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -146,4 +147,57 @@ func (s Sink) SignedURL(ctx context.Context, relativePath string, expiry time.Du
 // false if it does not exist, or an error.
 func (s Sink) Exists(ctx context.Context, relativePath string) (bool, error) {
 	return s.bucket.Exists(ctx, relativePath)
+}
+
+// List all objects that have the specified prefix.
+func (s Sink) List(prefix string) *ListIterator {
+	it := s.bucket.List(&blob.ListOptions{Prefix: prefix})
+	return &ListIterator{it: it}
+}
+
+// ListIterator allows iterating over objects stored in the Sink.
+type ListIterator struct {
+	it  *blob.ListIterator
+	obj *blob.ListObject
+	err error
+}
+
+// Next retrieves the next result from the iterator. It returns true if there
+// are more objects to retrieve and false if an error occurred or there are no
+// more objects. It is the callers responsibility to check for iteration errors
+// by calling Err.
+func (li *ListIterator) Next(ctx context.Context) bool {
+	if li.err != nil {
+		return false
+	}
+
+	li.obj, li.err = li.it.Next(ctx)
+	if li.err != nil {
+		return false
+	}
+
+	for li.obj.IsDir {
+		li.obj, li.err = li.it.Next(ctx)
+		if li.err != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Err returns the iteration error if there is one.
+func (li *ListIterator) Err() error {
+	if errors.Is(li.err, io.EOF) {
+		return nil
+	}
+	return li.err
+}
+
+// Path is the path of the current object.
+func (li *ListIterator) Path() string {
+	if li.obj == nil {
+		return ""
+	}
+	return li.obj.Key
 }

@@ -4,7 +4,9 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,13 +26,13 @@ const (
 
 // logEntry is used to track the state of a backup request.
 type logEntry struct {
-	partitionInfo partitionInfo
+	partitionInfo PartitionInfo
 	lsn           storage.LSN
 	success       bool
 }
 
 // newLogEntry constructs a new logEntry.
-func newLogEntry(partitionInfo partitionInfo, lsn storage.LSN) *logEntry {
+func newLogEntry(partitionInfo PartitionInfo, lsn storage.LSN) *logEntry {
 	return &logEntry{
 		partitionInfo: partitionInfo,
 		lsn:           lsn,
@@ -41,15 +43,15 @@ func newLogEntry(partitionInfo partitionInfo, lsn storage.LSN) *logEntry {
 type partitionNotification struct {
 	lowWaterMark  storage.LSN
 	highWaterMark storage.LSN
-	partitionInfo partitionInfo
+	partitionInfo PartitionInfo
 }
 
 // newPartitionNotification constructs a new partitionNotification.
 func newPartitionNotification(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN) *partitionNotification {
 	return &partitionNotification{
-		partitionInfo: partitionInfo{
-			storageName: storageName,
-			partitionID: partitionID,
+		partitionInfo: PartitionInfo{
+			StorageName: storageName,
+			PartitionID: partitionID,
 		},
 		lowWaterMark:  lowWaterMark,
 		highWaterMark: highWaterMark,
@@ -74,10 +76,10 @@ func newPartitionState(nextLSN, highWaterMark storage.LSN) *partitionState {
 	}
 }
 
-// partitionInfo is the global identifier for a partition.
-type partitionInfo struct {
-	storageName string
-	partitionID storage.PartitionID
+// PartitionInfo is the global identifier for a partition.
+type PartitionInfo struct {
+	StorageName string
+	PartitionID storage.PartitionID
 }
 
 // LogManager is the interface used on the consumer side of the integration. The consumer
@@ -97,8 +99,8 @@ type LogManager interface {
 type LogEntryArchiver struct {
 	// logger is the logger to use to write log messages.
 	logger log.Logger
-	// archiveSink is the Sink used to backup log entries.
-	archiveSink *Sink
+	// store is where the log archives are kept.
+	store LogEntryStore
 	// node is used to access the LogManagers.
 	node *storage.Node
 
@@ -117,9 +119,9 @@ type LogEntryArchiver struct {
 	notificationsMutex sync.Mutex
 
 	// partitionStates tracks the current LSN and entry backlog of each partition in a storage.
-	partitionStates map[partitionInfo]*partitionState
+	partitionStates map[PartitionInfo]*partitionState
 	// activePartitions tracks with partitions need to be processed.
-	activePartitions map[partitionInfo]struct{}
+	activePartitions map[PartitionInfo]struct{}
 
 	// activeJobs tracks how many entries are currently being backed up.
 	activeJobs uint
@@ -150,15 +152,15 @@ func newLogEntryArchiver(logger log.Logger, archiveSink *Sink, workerCount uint,
 
 	archiver := &LogEntryArchiver{
 		logger:           logger,
-		archiveSink:      archiveSink,
+		store:            NewLogEntryStore(archiveSink),
 		node:             node,
 		notificationCh:   make(chan struct{}, 1),
 		workCh:           make(chan struct{}, 1),
 		closingCh:        make(chan struct{}),
 		closedCh:         make(chan struct{}),
 		notifications:    list.New(),
-		partitionStates:  make(map[partitionInfo]*partitionState),
-		activePartitions: make(map[partitionInfo]struct{}),
+		partitionStates:  make(map[PartitionInfo]*partitionState),
+		activePartitions: make(map[PartitionInfo]struct{}),
 		workerCount:      workerCount,
 		tickerFunc:       tickerFunc,
 		waitDur:          minRetryWait,
@@ -302,7 +304,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// We have already backed up all entries sent by the LogManager, but the manager is
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
-			if err := la.callLogManager(ctx, notification.partitionInfo.storageName, notification.partitionInfo.partitionID, func(lm LogManager) {
+			if err := la.callLogManager(ctx, notification.partitionInfo, func(lm LogManager) {
 				lm.AcknowledgeTransaction(state.nextLSN - 1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
@@ -315,8 +317,8 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		if state.nextLSN < notification.lowWaterMark {
 			la.logger.WithFields(
 				log.Fields{
-					"storage":      notification.partitionInfo.storageName,
-					"partition_id": notification.partitionInfo.partitionID,
+					"storage":      notification.partitionInfo.StorageName,
+					"partition_id": notification.partitionInfo.PartitionID,
 					"expected_lsn": state.nextLSN,
 					"actual_lsn":   notification.lowWaterMark,
 				}).Error("log entry archiver: gap in log sequence")
@@ -336,13 +338,13 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 	}
 }
 
-func (la *LogEntryArchiver) callLogManager(ctx context.Context, storageName string, partitionID storage.PartitionID, callback func(lm LogManager)) error {
-	storageHandle, err := (*la.node).GetStorage(storageName)
+func (la *LogEntryArchiver) callLogManager(ctx context.Context, partitionInfo PartitionInfo, callback func(lm LogManager)) error {
+	storageHandle, err := (*la.node).GetStorage(partitionInfo.StorageName)
 	if err != nil {
 		return fmt.Errorf("get storage: %w", err)
 	}
 
-	partition, err := storageHandle.GetPartition(ctx, partitionID)
+	partition, err := storageHandle.GetPartition(ctx, partitionInfo.PartitionID)
 	if err != nil {
 		return fmt.Errorf("get partition: %w", err)
 	}
@@ -389,13 +391,13 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 		la.waitDur = minRetryWait
 	}
 
-	if err := la.callLogManager(ctx, entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm LogManager) {
+	if err := la.callLogManager(ctx, entry.partitionInfo, func(lm LogManager) {
 		lm.AcknowledgeTransaction(entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
 			log.Fields{
-				"storage":      entry.partitionInfo.storageName,
-				"partition_id": entry.partitionInfo.partitionID,
+				"storage":      entry.partitionInfo.StorageName,
+				"partition_id": entry.partitionInfo.PartitionID,
 				"lsn":          entry.lsn,
 			}).Error("log entry archiver: failed to get LogManager for newly completed entry")
 	}
@@ -412,13 +414,13 @@ func (la *LogEntryArchiver) processEntries(ctx context.Context, inCh, outCh chan
 // processEntry checks if an existing backup exists, and performs a backup if not present.
 func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 	logger := la.logger.WithFields(log.Fields{
-		"storage":      entry.partitionInfo.storageName,
-		"partition_id": entry.partitionInfo.partitionID,
+		"storage":      entry.partitionInfo.StorageName,
+		"partition_id": entry.partitionInfo.PartitionID,
 		"lsn":          entry.lsn,
 	})
 
 	var entryPath string
-	if err := la.callLogManager(context.Background(), entry.partitionInfo.storageName, entry.partitionInfo.partitionID, func(lm LogManager) {
+	if err := la.callLogManager(context.Background(), entry.partitionInfo, func(lm LogManager) {
 		entryPath = lm.GetTransactionPath(entry.lsn)
 	}); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)
@@ -426,9 +428,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 		return
 	}
 
-	archiveRelPath := filepath.Join(entry.partitionInfo.storageName, fmt.Sprintf("%d", entry.partitionInfo.partitionID), entry.lsn.String()+".tar")
-
-	backupExists, err := la.checkForExistingBackup(ctx, archiveRelPath)
+	backupExists, err := la.store.Exists(ctx, entry.partitionInfo, entry.lsn)
 	if err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)
 		logger.WithError(err).Error("log entry archiver: checking for existing log entry backup")
@@ -440,7 +440,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 		return
 	}
 
-	if err := la.backupLogEntry(ctx, archiveRelPath, entryPath); err != nil {
+	if err := la.backupLogEntry(ctx, entry.partitionInfo, entry.lsn, entryPath); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)
 		logger.WithError(err).Error("log entry archiver: failed to backup log entry")
 		return
@@ -452,7 +452,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 }
 
 // backupLogEntry tar's the root directory of the transaction and writes it to the Sink.
-func (la *LogEntryArchiver) backupLogEntry(ctx context.Context, archiveRelPath string, entryPath string) (returnErr error) {
+func (la *LogEntryArchiver) backupLogEntry(ctx context.Context, partitionInfo PartitionInfo, lsn storage.LSN, entryPath string) (returnErr error) {
 	timer := prometheus.NewTimer(la.backupLatency)
 	defer timer.ObserveDuration()
 
@@ -460,7 +460,7 @@ func (la *LogEntryArchiver) backupLogEntry(ctx context.Context, archiveRelPath s
 	writeCtx, cancelWrite := context.WithCancel(ctx)
 	defer cancelWrite()
 
-	w, err := la.archiveSink.GetWriter(writeCtx, archiveRelPath)
+	w, err := la.store.GetWriter(writeCtx, partitionInfo, lsn)
 	if err != nil {
 		return fmt.Errorf("get backup writer: %w", err)
 	}
@@ -481,17 +481,6 @@ func (la *LogEntryArchiver) backupLogEntry(ctx context.Context, archiveRelPath s
 	}
 
 	return nil
-}
-
-// checkForExistingBackup checks if a non-zero sized file or blob exists at the archive path
-// of the log entry.
-func (la *LogEntryArchiver) checkForExistingBackup(ctx context.Context, archiveRelPath string) (exists bool, returnErr error) {
-	exists, err := la.archiveSink.Exists(ctx, archiveRelPath)
-	if err != nil {
-		return false, fmt.Errorf("get log entry backup reader: %w", err)
-	}
-
-	return exists, nil
 }
 
 // popNextNotification removes the next entry from the head of the list.
@@ -541,4 +530,109 @@ func (la *LogEntryArchiver) Describe(descs chan<- *prometheus.Desc) {
 // Collect is used to collect Prometheus metrics.
 func (la *LogEntryArchiver) Collect(metrics chan<- prometheus.Metric) {
 	la.backupCounter.Collect(metrics)
+}
+
+// LogEntryStore manages uploaded log entry archives in object storage.
+type LogEntryStore struct {
+	sink *Sink
+}
+
+// NewLogEntryStore returns a new LogEntryStore.
+func NewLogEntryStore(sink *Sink) LogEntryStore {
+	return LogEntryStore{
+		sink: sink,
+	}
+}
+
+// Exists returns true if a log entry for the specified partition and LSN exists in the store.
+func (s LogEntryStore) Exists(ctx context.Context, info PartitionInfo, lsn storage.LSN) (bool, error) {
+	exists, err := s.sink.Exists(ctx, archivePath(info, lsn))
+	if err != nil {
+		return false, fmt.Errorf("exists: %w", err)
+	}
+	return exists, nil
+}
+
+// GetWriter returns a writer in order to write a new log entry into the store.
+func (s LogEntryStore) GetWriter(ctx context.Context, info PartitionInfo, lsn storage.LSN) (io.WriteCloser, error) {
+	w, err := s.sink.GetWriter(ctx, archivePath(info, lsn))
+	if err != nil {
+		return nil, fmt.Errorf("get writer: %w", err)
+	}
+	return w, nil
+}
+
+// Query returns an iterator that finds all log entries in the store for the
+// given partition starting at the LSN specified by from.
+func (s LogEntryStore) Query(info PartitionInfo, from storage.LSN) *LogEntryIterator {
+	it := s.sink.List(partitionDir(info))
+	return &LogEntryIterator{it: it, from: from}
+}
+
+// LogEntryIterator iterates over archived log entries in object-storage.
+type LogEntryIterator struct {
+	it   *ListIterator
+	from storage.LSN
+	err  error
+	lsn  storage.LSN
+	path string
+}
+
+// Next iterates to the next item. Returns false if there are no more results.
+func (it *LogEntryIterator) Next(ctx context.Context) bool {
+	if it.err != nil {
+		return false
+	}
+
+	ok := it.it.Next(ctx)
+	if !ok {
+		return false
+	}
+
+	it.lsn, it.err = extractLSN(it.it.Path())
+	if it.err != nil {
+		return false
+	}
+
+	for it.lsn < it.from {
+		ok = it.it.Next(ctx)
+		if !ok {
+			return false
+		}
+
+		it.lsn, it.err = extractLSN(it.it.Path())
+		if it.err != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Err returns a iteration error if there were any.
+func (it *LogEntryIterator) Err() error {
+	return it.err
+}
+
+// Path of the current log entry.
+func (it *LogEntryIterator) Path() string {
+	return it.path
+}
+
+// LSN of the current log entry.
+func (it *LogEntryIterator) LSN() storage.LSN {
+	return it.lsn
+}
+
+func extractLSN(path string) (storage.LSN, error) {
+	rawLSN := strings.TrimSuffix(filepath.Base(path), ".tar")
+	return storage.ParseLSN(rawLSN)
+}
+
+func partitionDir(info PartitionInfo) string {
+	return filepath.Join(info.StorageName, fmt.Sprintf("%d", info.PartitionID))
+}
+
+func archivePath(info PartitionInfo, lsn storage.LSN) string {
+	return filepath.Join(partitionDir(info), lsn.String()+".tar")
 }
