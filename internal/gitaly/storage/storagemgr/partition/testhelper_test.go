@@ -713,7 +713,7 @@ type testTransactionSetup struct {
 	NonExistentOID    git.ObjectID
 	Commits           testTransactionCommits
 	AnnotatedTags     []testTransactionTag
-	Consumer          LogConsumer
+	Consumer          storage.LogConsumer
 }
 
 type testTransactionHooks struct {
@@ -936,7 +936,7 @@ type Prune struct {
 	ExpectedObjects []git.ObjectID
 }
 
-// ConsumerAcknowledge calls AcknowledgeTransaction for all consumers.
+// ConsumerAcknowledge calls AcknowledgeConsumerPos for all consumers.
 type ConsumerAcknowledge struct {
 	// LSN is the LSN acknowledged by the consumers.
 	LSN storage.LSN
@@ -990,7 +990,7 @@ type MockLogConsumer struct {
 	highWaterMark storage.LSN
 }
 
-func (lc *MockLogConsumer) NotifyNewTransactions(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN) {
+func (lc *MockLogConsumer) NotifyNewEntries(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN) {
 	lc.highWaterMark = highWaterMark
 }
 
@@ -1427,7 +1427,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			transaction := openTransactions[step.TransactionID]
 			transaction.WriteCommitGraphs(step.Config)
 		case ConsumerAcknowledge:
-			transactionManager.AcknowledgeTransaction(step.LSN)
+			transactionManager.wal.AcknowledgeConsumerPos(step.LSN)
 		case RepositoryAssertion:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: transaction's snapshot asserted before beginning it")
 			transaction := openTransactions[step.TransactionID]

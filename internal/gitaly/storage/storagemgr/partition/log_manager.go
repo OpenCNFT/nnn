@@ -99,8 +99,8 @@ type LogManager struct {
 
 	// consumer is an external caller that may perform read-only operations against applied log entries. Log entries
 	// are retained until the consumer has acknowledged past their LSN.
-	consumer LogConsumer
-	// positions tracks positions of log entries being used externally. Those positions are tracked so that WAL
+	consumer storage.LogConsumer
+	// positions tracks positions of log entries eing used externally. Those positions are tracked so that WAL
 	// doesn't prune a log entry accidentally.
 	positions map[positionType]*position
 
@@ -113,7 +113,7 @@ type LogManager struct {
 }
 
 // NewLogManager returns an instance of LogManager.
-func NewLogManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer LogConsumer) *LogManager {
+func NewLogManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *LogManager {
 	positions := map[positionType]*position{
 		appliedPosition:    {},
 		referencedPosition: {},
@@ -183,7 +183,7 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 	}
 
 	if mgr.consumer != nil && mgr.appendedLSN != 0 {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
 	}
 
 	mgr.AcknowledgeAppliedPos(appliedLSN)
@@ -287,7 +287,7 @@ func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntry *gitalypb.Lo
 	mgr.appendedLSN = nextLSN
 
 	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
 	}
 	return nextLSN, nil
 }

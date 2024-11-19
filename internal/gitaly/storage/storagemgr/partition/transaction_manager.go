@@ -826,16 +826,10 @@ type committedEntry struct {
 	objectDependencies map[git.ObjectID]struct{}
 }
 
-// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
-// for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
-// completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(lsn storage.LSN) {
-	mgr.wal.AcknowledgeConsumerPos(lsn)
-}
-
-// GetTransactionPath returns the path of the log entry's root directory.
-func (mgr *TransactionManager) GetTransactionPath(lsn storage.LSN) string {
-	return mgr.wal.GetEntryPath(lsn)
+// GetLogManager provides controlled access to underlying log management system for log consumption purpose. It
+// allows the consumers to access to on-disk location of a LSN and acknowledge consumed position.
+func (mgr *TransactionManager) GetLogManager() storage.LogManager {
+	return mgr.wal
 }
 
 // TransactionManager is responsible for transaction management of a single repository. Each repository has
@@ -974,7 +968,7 @@ func NewTransactionManager(
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics ManagerMetrics,
-	consumer LogConsumer,
+	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
