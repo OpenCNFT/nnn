@@ -296,9 +296,6 @@ func ContextWithoutCancel(opts ...ContextOpt) context.Context {
 	newRepoReftableEnabled := env.GetString("GIT_DEFAULT_REF_FORMAT", "files")
 	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.NewRepoReftableBackend, newRepoReftableEnabled == "reftable")
 
-	// Randomly enable either Git version 2.46 or 2.47.
-	ctx = featureflag.ContextWithFeatureFlag(ctx, featureflag.GitV247, rnd.Int()%2 == 0)
-
 	for _, opt := range opts {
 		ctx = opt(ctx)
 	}
