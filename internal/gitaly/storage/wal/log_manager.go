@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -84,6 +85,9 @@ type LogManager struct {
 	storageName string
 	// storage.PartitionID is the ID of the partition this manager is operating on. This is used to determine the database keys.
 	partitionID storage.PartitionID
+	// db stores essential WAL functional states, especially committedLSN. Those states are valuable after WAL
+	// starts.
+	db keyvalue.Transactioner
 
 	// tmpDirectory is the directory storing temporary data. One example is log entry deletion. WAL moves a log
 	// entry to this dir before removing them completely.
@@ -113,7 +117,7 @@ type LogManager struct {
 }
 
 // NewLogManager returns an instance of LogManager.
-func NewLogManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *LogManager {
+func NewLogManager(storageName string, partitionID storage.PartitionID, db keyvalue.Transactioner, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *LogManager {
 	positions := map[positionType]*position{
 		appliedPosition:    {},
 		referencedPosition: {},

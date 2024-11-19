@@ -13,6 +13,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -93,7 +94,11 @@ func (ts *testLogSetup) GetFileContent(index int) []byte {
 }
 
 func setupLogManager(t *testing.T, ctx context.Context, consumer storage.LogConsumer) *LogManager {
-	logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), testhelper.TempDir(t), consumer)
+	database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { testhelper.MustClose(t, database) })
+
+	logManager := NewLogManager("test-storage", 1, database, testhelper.TempDir(t), testhelper.TempDir(t), consumer)
 	require.NoError(t, logManager.Initialize(ctx, 0))
 
 	return logManager
@@ -107,7 +112,11 @@ func TestLogManager_Initialize(t *testing.T) {
 		ctx := testhelper.Context(t)
 		stateDir := testhelper.TempDir(t)
 
-		logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), stateDir, nil)
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
+		logManager := NewLogManager("test-storage", 1, database, testhelper.TempDir(t), stateDir, nil)
 		require.NoError(t, logManager.Initialize(ctx, 0))
 
 		require.Equal(t, storage.LSN(1), logManager.oldestLSN)
@@ -124,7 +133,11 @@ func TestLogManager_Initialize(t *testing.T) {
 		ctx := testhelper.Context(t)
 		stateDir := testhelper.TempDir(t)
 
-		logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), stateDir, nil)
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
+		logManager := NewLogManager("test-storage", 1, database, testhelper.TempDir(t), stateDir, nil)
 
 		setup := setupTestRepo(t, ctx, 2)
 		entry1 := MultiplerefChangesLogEntry(setup.relativePath, []RefChange{
@@ -159,7 +172,11 @@ func TestLogManager_Initialize(t *testing.T) {
 		ctx := testhelper.Context(t)
 		stateDir := testhelper.TempDir(t)
 
-		logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), stateDir, nil)
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
+		logManager := NewLogManager("test-storage", 1, database, testhelper.TempDir(t), stateDir, nil)
 
 		setup := setupTestRepo(t, ctx, 3)
 		var entries []*gitalypb.LogEntry
@@ -196,7 +213,12 @@ func TestLogManager_Initialize(t *testing.T) {
 		t.Parallel()
 		ctx := testhelper.Context(t)
 		stateDir := testhelper.TempDir(t)
-		logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), stateDir, nil)
+
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
+		logManager := NewLogManager("test-storage", 1, database, testhelper.TempDir(t), stateDir, nil)
 
 		setup := setupTestRepo(t, ctx, 0)
 		var entries []*gitalypb.LogEntry
@@ -579,10 +601,14 @@ func TestLogManager_Positions(t *testing.T) {
 	t.Run("notify consumer after restart", func(t *testing.T) {
 		stateDir := testhelper.TempDir(t)
 
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
 		// Before restart
 		mockConsumer := &mockLogConsumer{}
 
-		logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), stateDir, mockConsumer)
+		logManager := NewLogManager("test-storage", 1, database, testhelper.TempDir(t), stateDir, mockConsumer)
 		require.NoError(t, logManager.Initialize(ctx, 0))
 		setup := setupTestRepo(t, ctx, 4)
 
@@ -619,7 +645,7 @@ func TestLogManager_Positions(t *testing.T) {
 
 		// Restart the log consumer.
 		mockConsumer = &mockLogConsumer{}
-		logManager = NewLogManager("test-storage", 1, testhelper.TempDir(t), stateDir, mockConsumer)
+		logManager = NewLogManager("test-storage", 1, database, testhelper.TempDir(t), stateDir, mockConsumer)
 		require.NoError(t, logManager.Initialize(ctx, 2))
 
 		// Notify consumer to consume from 2 -> 4

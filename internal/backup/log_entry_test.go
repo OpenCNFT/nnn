@@ -19,6 +19,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
@@ -585,7 +586,11 @@ func TestLogEntryArchiver_WithRealLogManager(t *testing.T) {
 			partitionID: storage.PartitionID(i),
 		}
 
-		logManager := wal.NewLogManager(storageName, storage.PartitionID(i), testhelper.TempDir(t), testhelper.TempDir(t), archiver)
+		database, err := keyvalue.NewBadgerStore(testhelper.SharedLogger(t), t.TempDir())
+		require.NoError(t, err)
+		defer testhelper.MustClose(t, database)
+
+		logManager := wal.NewLogManager(storageName, storage.PartitionID(i), database, testhelper.TempDir(t), testhelper.TempDir(t), archiver)
 		require.NoError(t, logManager.Initialize(ctx, 0))
 
 		accessor.Lock()
