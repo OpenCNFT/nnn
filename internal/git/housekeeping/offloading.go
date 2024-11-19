@@ -3,8 +3,15 @@ package housekeeping
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 )
 
@@ -64,5 +71,77 @@ func ResetOffloadingGitConfig(ctx context.Context, repo *localrepo.Repo, praefec
 	if err := repo.UnsetMatchingConfig(ctx, regex, praefectTxManager); err != nil {
 		return fmt.Errorf("unset Git config: %w", err)
 	}
+	return nil
+}
+
+// PerformRepackingForOffloading performs a full repacking task using the git-repack(1) command
+// for the purpose of offloading. It also adds a .promisor file to mark the pack file
+// as a promisor pack file, which is used specifically for offloading.
+func PerformRepackingForOffloading(ctx context.Context, repo *localrepo.Repo, filter, filterToDir string) error {
+	count, err := stats.LooseObjects(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("count loose objects: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("loose objects when performing repack for offloading")
+	}
+
+	repackOpts := []gitcmd.Option{
+		// Do a full repack.
+		gitcmd.Flag{Name: "-a"},
+		// Delete loose objects made redundant by this repack.
+		gitcmd.Flag{Name: "-d"},
+		// Don't include objects part of alternate.
+		gitcmd.Flag{Name: "-l"},
+
+		// Apply the specified filter to determine which objects to include in the repack.
+		gitcmd.ValueFlag{Name: "--filter", Value: filter},
+
+		// Relocate the pack files containing objects that match the specified filter to the designated directory.
+		// The "pack" serves as a file prefix. The relocated pack files will reside in
+		// filterToDir, and their filenames will adhere to the format:
+		// pack-<hash>.[pack, idx, rev]
+		gitcmd.ValueFlag{Name: "--filter-to", Value: filepath.Join(filterToDir, "pack")},
+	}
+
+	repackCfg := config.RepackObjectsConfig{
+		WriteBitmap:         false,
+		WriteMultiPackIndex: true,
+	}
+
+	if err := PerformRepack(ctx, repo, repackCfg, repackOpts...); err != nil {
+		return fmt.Errorf("perform repack for offloading: %w", err)
+	}
+
+	// Add .promisor file. The .promisor file is used to identify pack files
+	// as promisor pack files. This file has no content and serves solely as a
+	// marker.
+	repoPath, err := repo.Path(ctx)
+	if err != nil {
+		return fmt.Errorf("getting repository path: %w", err)
+	}
+	packfilesPath := filepath.Join(repoPath, "objects", "pack")
+	entries, err := os.ReadDir(packfilesPath)
+	if err != nil {
+		return fmt.Errorf("reading packfiles directory: %w", err)
+	}
+
+	// The .promisor file should have the same name as the pack file.
+	var packFile []string
+	for _, entry := range entries {
+		entryName := entry.Name()
+		if strings.HasPrefix(entryName, "pack-") && strings.HasSuffix(entryName, ".pack") {
+			packFile = append(packFile, strings.TrimSuffix(entryName, ".pack"))
+		}
+
+	}
+	if len(packFile) != 1 {
+		return fmt.Errorf("expect just one pack file")
+	}
+	err = os.WriteFile(filepath.Join(repoPath, "objects", "pack", packFile[0]+".promisor"), []byte{}, mode.File)
+	if err != nil {
+		return fmt.Errorf("create promisor file: %w", err)
+	}
+
 	return nil
 }
