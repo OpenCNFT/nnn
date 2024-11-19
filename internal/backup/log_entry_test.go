@@ -18,6 +18,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/archive"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -572,4 +573,125 @@ func buildMetrics(t *testing.T, successCt, failCt int) string {
 	}
 
 	return builder.String()
+}
+
+// TestLogEntryArchiver_WithRealLogManager runs the log archiver with a real WAL log manager. This test aims to assert
+// the flow between the two components to avoid uncaught errors due to mocking. Test setup and verification are
+// extremely verbose. There's no reliable way to simulate more sophisticated scenarios because the test could not
+// intercept internal states of log archiver or log manager. The log manager doesn't expose the current consumer
+// position. Thus, this test verifies the most basic archiving. Unit tests using mocking will cover the rest.
+func TestLogEntryArchiver_WithRealLogManager(t *testing.T) {
+	t.Parallel()
+	ctx := testhelper.Context(t)
+
+	// Setup node
+	accessor := &mockNode{
+		partitions: make(map[PartitionInfo]*mockPartition),
+		t:          t,
+	}
+	node := storage.Node(accessor)
+
+	// Setup archiver
+	archivePath := testhelper.TempDir(t)
+	archiveSink, err := ResolveSink(ctx, archivePath)
+	require.NoError(t, err)
+
+	archiver := NewLogEntryArchiver(testhelper.NewLogger(t), archiveSink, 1, &node)
+	archiver.Run()
+
+	// Setup WAL log manager and plug it to storage
+	const storageName = "default"
+	var logManagers []*log.Manager
+	for i := 1; i <= 2; i++ {
+		info := PartitionInfo{
+			StorageName: storageName,
+			PartitionID: storage.PartitionID(i),
+		}
+
+		logManager := log.NewManager(storageName, storage.PartitionID(i), testhelper.TempDir(t), testhelper.TempDir(t), archiver)
+		require.NoError(t, logManager.Initialize(ctx, 0))
+
+		accessor.Lock()
+		accessor.partitions[info] = &mockPartition{manager: logManager}
+		accessor.Unlock()
+
+		logManagers = append(logManagers, logManager)
+	}
+
+	appendLogEntry(t, ctx, logManagers[0], map[string][]byte{
+		"1": []byte("content-1"),
+		"2": []byte("content-2"),
+		"3": []byte("content-3"),
+	})
+	<-logManagers[0].NotifyQueue()
+
+	// KV operation without any file.
+	appendLogEntry(t, ctx, logManagers[1], map[string][]byte{})
+	<-logManagers[1].NotifyQueue()
+
+	appendLogEntry(t, ctx, logManagers[1], map[string][]byte{
+		"4": []byte("content-4"),
+		"5": []byte("content-5"),
+		"6": []byte("content-6"),
+	})
+	<-logManagers[1].NotifyQueue()
+
+	archiver.Close()
+
+	cmpDir := testhelper.TempDir(t)
+	require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), mode.Directory))
+
+	lsnPrefix := storage.LSN(1).String()
+
+	// Assert manager 1
+	tarPath := filepath.Join(partitionPath(archivePath, PartitionInfo{storageName, storage.PartitionID(1)}), storage.LSN(1).String()+".tar")
+	tar, err := os.Open(tarPath)
+	require.NoError(t, err)
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsnPrefix:                     {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		filepath.Join(lsnPrefix, "1"): {Mode: archive.TarFileMode, Content: []byte("content-1")},
+		filepath.Join(lsnPrefix, "2"): {Mode: archive.TarFileMode, Content: []byte("content-2")},
+		filepath.Join(lsnPrefix, "3"): {Mode: archive.TarFileMode, Content: []byte("content-3")},
+	})
+	testhelper.MustClose(t, tar)
+
+	// Assert manager 2
+	tarPath = filepath.Join(partitionPath(archivePath, PartitionInfo{storageName, storage.PartitionID(2)}), lsnPrefix+".tar")
+	tar, err = os.Open(tarPath)
+	require.NoError(t, err)
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsnPrefix: {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+	})
+	testhelper.MustClose(t, tar)
+
+	lsnPrefix = storage.LSN(2).String()
+	tarPath = filepath.Join(partitionPath(archivePath, PartitionInfo{storageName, storage.PartitionID(2)}), lsnPrefix+".tar")
+	tar, err = os.Open(tarPath)
+	require.NoError(t, err)
+
+	testhelper.RequireTarState(t, tar, testhelper.DirectoryState{
+		lsnPrefix:                     {Mode: archive.TarFileMode | archive.ExecuteMode | fs.ModeDir},
+		filepath.Join(lsnPrefix, "4"): {Mode: archive.TarFileMode, Content: []byte("content-4")},
+		filepath.Join(lsnPrefix, "5"): {Mode: archive.TarFileMode, Content: []byte("content-5")},
+		filepath.Join(lsnPrefix, "6"): {Mode: archive.TarFileMode, Content: []byte("content-6")},
+	})
+	testhelper.MustClose(t, tar)
+
+	// Finally, assert the metrics.
+	testhelper.RequirePromMetrics(t, archiver.backupCounter, buildMetrics(t, 3, 0))
+}
+
+func appendLogEntry(t *testing.T, ctx context.Context, manager *log.Manager, files map[string][]byte) storage.LSN {
+	t.Helper()
+
+	logEntryPath := testhelper.TempDir(t)
+	for name, value := range files {
+		path := filepath.Join(logEntryPath, name)
+		require.NoError(t, os.WriteFile(path, value, mode.File))
+	}
+
+	nextLSN, err := manager.AppendLogEntry(ctx, logEntryPath)
+	require.NoError(t, err)
+
+	return nextLSN
 }
