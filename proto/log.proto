@@ -34,16 +34,12 @@ message LogEntry {
   message RepositoryDeletion {
   }
 
-  // Housekeeping models a housekeeping run. It is supposed to handle housekeeping tasks for repositories such as the
-  // cleanup of unneeded files and optimizations for the repository's data structures. It is a collection of smaller
-  // tasks.
+  // Housekeeping models a housekeeping run. All of the operations are modeled by file system
+  // operations. This message is still kept around for conflict checking concurrent housekeeping
+  // runs.
   message Housekeeping {
-    // PackRefs models a pack-refs housekeeping task. This task is to pack loose references into a singular packed-refs
-    // file to optimize ref accessing time. In other words, it's a wrapper for git-pack-refs command.
+    // PackRefs models a pack-refs housekeeping task.
     message PackRefs {
-      // pruned_refs is the list of fully qualified references to be pruned. Gitaly removes the loose reference files on
-      // the disk. They still stay intact in the packed-refs.
-      repeated bytes pruned_refs = 1;
     }
 
     // pack_refs signifies if the housekeeping run includes a pack-refs task.

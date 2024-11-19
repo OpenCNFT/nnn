@@ -53,14 +53,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 	assertPackRefsMetrics := gittest.FilesOrReftables(AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 		"housekeeping_task=total,stage=prepare":     1,
 		"housekeeping_task=total,stage=verify":      1,
-		"housekeeping_task=total,stage=apply":       1,
 		"housekeeping_task=pack-refs,stage=prepare": 1,
 		"housekeeping_task=pack-refs,stage=verify":  1,
-		"housekeeping_task=pack-refs,stage=apply":   1,
 	}}, AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 		"housekeeping_task=total,stage=prepare":     1,
 		"housekeeping_task=total,stage=verify":      1,
-		"housekeeping_task=total,stage=apply":       1,
 		"housekeeping_task=pack-refs,stage=prepare": 1,
 		"housekeeping_task=pack-refs,stage=verify":  1,
 	}})
@@ -988,7 +985,6 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				}, map[string]int{
 					"housekeeping_task=total,stage=prepare":     1,
 					"housekeeping_task=total,stage=verify":      1,
-					"housekeeping_task=total,stage=apply":       1,
 					"housekeeping_task=pack-refs,stage=prepare": 1,
 					"housekeeping_task=pack-refs,stage=verify":  1,
 				})},
@@ -1564,14 +1560,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       1,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  1,
-					"housekeeping_task=pack-refs,stage=apply":   1,
 				}, map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       1,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  1,
 				})},
@@ -1693,14 +1686,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
-					"housekeeping_task=pack-refs,stage=apply":   2,
 				}, map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
 				})},
@@ -1814,14 +1804,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
-					"housekeeping_task=pack-refs,stage=apply":   2,
 				}, map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
 				})},
@@ -2222,7 +2209,6 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
 				}},
@@ -2652,7 +2638,6 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       2,
 					"housekeeping_task=pack-refs,stage=prepare": 2,
 					"housekeeping_task=pack-refs,stage=verify":  2,
 				}},
@@ -2793,7 +2778,6 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 	assertRepackingMetrics := AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 		"housekeeping_task=total,stage=prepare":  1,
 		"housekeeping_task=total,stage=verify":   1,
-		"housekeeping_task=total,stage=apply":    1,
 		"housekeeping_task=repack,stage=prepare": 1,
 		"housekeeping_task=repack,stage=verify":  1,
 	}}
@@ -3317,7 +3301,6 @@ func generateHousekeepingRepackingStrategyTests(t *testing.T, ctx context.Contex
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 					"housekeeping_task=total,stage=prepare":  2,
 					"housekeeping_task=total,stage=verify":   2,
-					"housekeeping_task=total,stage=apply":    2,
 					"housekeeping_task=repack,stage=prepare": 2,
 					"housekeeping_task=repack,stage=verify":  2,
 				}},
@@ -3399,7 +3382,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 	assertRepackingMetrics := AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 		"housekeeping_task=total,stage=prepare":  1,
 		"housekeeping_task=total,stage=verify":   1,
-		"housekeeping_task=total,stage=apply":    1,
 		"housekeeping_task=repack,stage=prepare": 1,
 		"housekeeping_task=repack,stage=verify":  1,
 	}}
@@ -5722,7 +5704,6 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 					"housekeeping_task=total,stage=prepare":  2,
 					"housekeeping_task=total,stage=verify":   2,
-					"housekeeping_task=total,stage=apply":    1,
 					"housekeeping_task=repack,stage=prepare": 2,
 					"housekeeping_task=repack,stage=verify":  1,
 				}},
@@ -5790,15 +5771,12 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): gittest.FilesOrReftables(map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       1,
 					"housekeeping_task=pack-refs,stage=prepare": 1,
 					"housekeeping_task=pack-refs,stage=verify":  1,
-					"housekeeping_task=pack-refs,stage=apply":   1,
 					"housekeeping_task=repack,stage=prepare":    1,
 				}, map[string]int{
 					"housekeeping_task=total,stage=prepare":     2,
 					"housekeeping_task=total,stage=verify":      2,
-					"housekeeping_task=total,stage=apply":       1,
 					"housekeeping_task=pack-refs,stage=prepare": 1,
 					"housekeeping_task=pack-refs,stage=verify":  1,
 					"housekeeping_task=repack,stage=prepare":    1,
@@ -5840,7 +5818,6 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 	assertCommitGraphMetrics := AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 		"housekeeping_task=total,stage=prepare":        1,
 		"housekeeping_task=total,stage=verify":         1,
-		"housekeeping_task=total,stage=apply":          1,
 		"housekeeping_task=commit-graph,stage=prepare": 1,
 	}}
 	return []transactionTestCase{
@@ -6133,7 +6110,6 @@ func generateHousekeepingCommitGraphsTests(t *testing.T, ctx context.Context, se
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 					"housekeeping_task=total,stage=prepare":        3,
 					"housekeeping_task=total,stage=verify":         3,
-					"housekeeping_task=total,stage=apply":          3,
 					"housekeeping_task=commit-graph,stage=prepare": 2,
 					"housekeeping_task=repack,stage=prepare":       1,
 					"housekeeping_task=repack,stage=verify":        1,

@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
@@ -37,6 +38,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal/reftree"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -1782,13 +1784,25 @@ func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, tran
 // https://gitlab.com/gitlab-org/git/-/issues/222
 func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transaction *Transaction) error {
 	runPackRefs := transaction.runHousekeeping.packRefs
-	repoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
+	for _, lock := range []string{".new", ".lock"} {
+		lockRelativePath := filepath.Join(transaction.relativePath, "packed-refs"+lock)
+		lockAbsolutePath := filepath.Join(transaction.snapshot.Root(), lockRelativePath)
 
-	if err := mgr.removePackedRefsLocks(ctx, repoPath); err != nil {
-		return fmt.Errorf("remove stale packed-refs locks: %w", err)
+		if err := os.Remove(lockAbsolutePath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+
+			return fmt.Errorf("remove %v: %w", lockAbsolutePath, err)
+		}
+
+		// The lock file existed. Log its deletion.
+		transaction.walEntry.RecordDirectoryEntryRemoval(lockRelativePath)
 	}
+
 	// First walk to collect the list of loose refs.
 	looseReferences := make(map[git.ReferenceName]struct{})
+	repoPath := mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())
 	if err := filepath.WalkDir(filepath.Join(repoPath, "refs"), func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -1806,6 +1820,13 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 		return fmt.Errorf("initial walking refs directory: %w", err)
 	}
 
+	packedRefsRelativePath := filepath.Join(transaction.relativePath, "packed-refs")
+	packedRefsAbsolutePath := filepath.Join(transaction.snapshot.Root(), packedRefsRelativePath)
+	packedRefsPreImage, err := wal.GetInode(packedRefsAbsolutePath)
+	if err != nil {
+		return fmt.Errorf("get packed-refs pre-image: %w", err)
+	}
+
 	// Execute git-pack-refs command. The command runs in the scope of the snapshot repository. Thus, we can
 	// let it prune the ref references without causing any impact to other concurrent transactions.
 	var stderr bytes.Buffer
@@ -1816,12 +1837,21 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
 	}
 
-	// Copy the resulting packed-refs file to the WAL directory.
-	if err := os.Link(
-		filepath.Join(filepath.Join(repoPath, "packed-refs")),
-		filepath.Join(transaction.walFilesPath(), "packed-refs"),
-	); err != nil {
-		return fmt.Errorf("copying packed-refs file to WAL directory: %w", err)
+	packedRefsPostImage, err := wal.GetInode(packedRefsAbsolutePath)
+	if err != nil {
+		return fmt.Errorf("get packed-refs post-image: %w", err)
+	}
+
+	if packedRefsPreImage != packedRefsPostImage {
+		if packedRefsPreImage > 0 {
+			transaction.walEntry.RecordDirectoryEntryRemoval(packedRefsRelativePath)
+		}
+
+		if packedRefsPostImage > 0 {
+			if err := transaction.walEntry.RecordFileCreation(packedRefsAbsolutePath, packedRefsRelativePath); err != nil {
+				return fmt.Errorf("stage packed-refs: %w", err)
+			}
+		}
 	}
 
 	// Second walk and compare with the initial list of loose references. Any disappeared refs are pruned.
@@ -2617,27 +2647,6 @@ func (mgr *TransactionManager) getAbsolutePath(relativePath ...string) string {
 	return filepath.Join(append([]string{mgr.storagePath}, relativePath...)...)
 }
 
-// removePackedRefsLocks removes any packed-refs.lock and packed-refs.new files present in the manager's
-// repository. No grace period for the locks is given as any lockfiles present must be stale and can be
-// safely removed immediately.
-func (mgr *TransactionManager) removePackedRefsLocks(ctx context.Context, repositoryPath string) error {
-	for _, lock := range []string{".new", ".lock"} {
-		lockPath := filepath.Join(repositoryPath, "packed-refs"+lock)
-
-		// We deliberately do not fsync this deletion. Should a crash occur before this is persisted
-		// to disk, the restarted transaction manager will simply remove them again.
-		if err := os.Remove(lockPath); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-
-			return fmt.Errorf("remove %v: %w", lockPath, err)
-		}
-	}
-
-	return nil
-}
-
 // removeStaleWALFiles removes files from the log directory that have no associated log entry.
 // Such files can be left around if transaction's files were moved in place successfully
 // but the manager was interrupted before successfully persisting the log entry itself.
@@ -3320,13 +3329,53 @@ func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transact
 		return nil, fmt.Errorf("walking committed entries: %w", err)
 	}
 
-	var prunedRefs [][]byte
-	for ref := range packRefs.PrunedRefs {
-		prunedRefs = append(prunedRefs, []byte(ref))
+	// Build a tree of the loose references we need to prune.
+	prunedRefs := reftree.New()
+	for reference := range packRefs.PrunedRefs {
+		if err := prunedRefs.InsertReference(reference.String()); err != nil {
+			return nil, fmt.Errorf("insert reference: %w", err)
+		}
 	}
-	return &gitalypb.LogEntry_Housekeeping_PackRefs{
-		PrunedRefs: prunedRefs,
-	}, nil
+
+	directoriesToKeep := map[string]struct{}{
+		// Valid git directory needs to have a 'refs' directory, so we can't remove it.
+		"refs": {},
+		// Git keeps these top-level directories. We keep them as well to reduce
+		// conflicting operations on them.
+		"refs/heads": {}, "refs/tags": {},
+	}
+
+	// Walk down the deleted references from the leaves towards the root. We'll log the deletion
+	// of loose references as we walk towards the root, and remove any directories along the path
+	// that became empty as a result of removing the references.
+	if err := prunedRefs.WalkPostOrder(func(path string, isDir bool) error {
+		if _, ok := directoriesToKeep[path]; ok {
+			return nil
+		}
+
+		relativePath := filepath.Join(transaction.relativePath, path)
+
+		if err := os.Remove(filepath.Join(
+			transaction.stagingSnapshot.Root(),
+			relativePath,
+		)); err != nil {
+			if errors.Is(err, syscall.ENOTEMPTY) {
+				// This directory was not empty because someone concurrently wrote
+				// a reference into it. Keep it in place.
+				return nil
+			}
+
+			return fmt.Errorf("remove loose reference: %w", err)
+		}
+
+		transaction.walEntry.RecordDirectoryEntryRemoval(relativePath)
+
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("walk post order: %w", err)
+	}
+
+	return &gitalypb.LogEntry_Housekeeping_PackRefs{}, nil
 }
 
 // verifyPackRefs verifies if the git-pack-refs(1) can be applied without any conflicts.
@@ -3612,15 +3661,6 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 		return fmt.Errorf("update: %w", err)
 	}
 
-	// If the repository is being deleted, just delete it without any other changes given
-	// they'd all be removed anyway. Reapplying the other changes after a crash would also
-	// not work if the repository was successfully deleted before the crash.
-	if logEntry.GetRepositoryDeletion() == nil {
-		if err := mgr.applyHousekeeping(ctx, lsn, logEntry); err != nil {
-			return fmt.Errorf("apply housekeeping: %w", err)
-		}
-	}
-
 	mgr.testHooks.beforeStoreAppliedLSN()
 	if err := mgr.storeAppliedLSN(lsn); err != nil {
 		return fmt.Errorf("set applied LSN: %w", err)
@@ -3669,129 +3709,6 @@ func (mgr *TransactionManager) createRepository(ctx context.Context, repositoryP
 	}
 
 	return nil
-}
-
-// applyHousekeeping applies housekeeping results to the target repository.
-func (mgr *TransactionManager) applyHousekeeping(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	if logEntry.GetHousekeeping() == nil {
-		return nil
-	}
-
-	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyHousekeeping", nil)
-	defer span.Finish()
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("total", "apply")
-	defer finishTimer()
-
-	if err := mgr.applyPackRefs(ctx, lsn, logEntry); err != nil {
-		return fmt.Errorf("applying pack refs: %w", err)
-	}
-
-	return nil
-}
-
-func (mgr *TransactionManager) applyPackRefs(ctx context.Context, lsn storage.LSN, logEntry *gitalypb.LogEntry) error {
-	// For reftables, pack-refs is done via transaction operations, and we keep
-	// this nil. So we'd exit early too.
-	if logEntry.GetHousekeeping().GetPackRefs() == nil {
-		return nil
-	}
-
-	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.applyPackRefs", nil)
-	defer span.Finish()
-
-	finishTimer := mgr.metrics.housekeeping.ReportTaskLatency("pack-refs", "apply")
-	defer finishTimer()
-
-	repositoryPath := mgr.getAbsolutePath(logEntry.GetRelativePath())
-	// Remove packed-refs lock. While we shouldn't be producing any new stale locks, it makes sense to have
-	// this for historic state until we're certain none of the repositories contain stale locks anymore.
-	// This clean up is not needed afterward.
-	if err := mgr.removePackedRefsLocks(ctx, repositoryPath); err != nil {
-		return fmt.Errorf("applying pack-refs: %w", err)
-	}
-
-	packedRefsPath := filepath.Join(repositoryPath, "packed-refs")
-	// Replace the packed-refs file.
-	if err := os.Remove(packedRefsPath); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("removing existing pack-refs: %w", err)
-		}
-	}
-	if err := os.Link(
-		filepath.Join(walFilesPathForLSN(mgr.stateDirectory, lsn), "packed-refs"),
-		packedRefsPath,
-	); err != nil {
-		return fmt.Errorf("linking new packed-refs: %w", err)
-	}
-
-	modifiedDirs := map[string]struct{}{}
-	// Prune loose references. The log entry carries the list of fully qualified references to prune.
-	for _, ref := range logEntry.GetHousekeeping().GetPackRefs().GetPrunedRefs() {
-		path := filepath.Join(repositoryPath, string(ref))
-		if err := os.Remove(path); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				return structerr.New("pruning loose reference: %w", err).WithMetadata("ref", path)
-			}
-		}
-		modifiedDirs[filepath.Dir(path)] = struct{}{}
-	}
-
-	syncer := safe.NewSyncer()
-	// Traverse all modified dirs back to the root "refs" dir of the repository. Remove any empty directory
-	// along the way. It prevents leaving empty dirs around after a loose ref is pruned. `git-pack-refs`
-	// command does dir removal for us, but in staging repository during preparation stage. In the actual
-	// repository,  we need to do it ourselves.
-	rootRefDir := filepath.Join(repositoryPath, "refs")
-	for dir := range modifiedDirs {
-		for dir != rootRefDir {
-			if isEmpty, err := isDirEmpty(dir); err != nil {
-				// If a dir does not exist, it properly means a directory may already be deleted by a
-				// previous interrupted attempt on applying the log entry. We simply ignore the error
-				// and move up the directory hierarchy.
-				if errors.Is(err, fs.ErrNotExist) {
-					dir = filepath.Dir(dir)
-					continue
-				} else {
-					return fmt.Errorf("checking empty ref dir: %w", err)
-				}
-			} else if !isEmpty {
-				break
-			}
-
-			if err := os.Remove(dir); err != nil {
-				return fmt.Errorf("removing empty ref dir: %w", err)
-			}
-			dir = filepath.Dir(dir)
-		}
-		// If there is any empty dir along the way, it's removed and dir pointer moves up until the dir
-		// is not empty or reaching the root dir. That one should be fsynced to flush the dir removal.
-		// If there is no empty dir, it stays at the dir of pruned refs, which also needs a flush.
-		if err := syncer.Sync(ctx, dir); err != nil {
-			return fmt.Errorf("sync dir: %w", err)
-		}
-	}
-
-	// Sync the root of the repository to flush packed-refs replacement.
-	if err := syncer.SyncParent(ctx, packedRefsPath); err != nil {
-		return fmt.Errorf("sync parent: %w", err)
-	}
-	return nil
-}
-
-// isDirEmpty checks if a directory is empty.
-func isDirEmpty(dir string) (bool, error) {
-	f, err := os.Open(dir)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	// Read at most one entry from the directory. If we get EOF, the directory is empty
-	if _, err = f.Readdirnames(1); errors.Is(err, io.EOF) {
-		return true, nil
-	}
-	return false, err
 }
 
 // deleteLogEntry deletes the log entry at the given LSN from the log.
