@@ -18,7 +18,7 @@ type Transaction struct {
 }
 
 // ApplyUpdates applies the given reference changes to the transaction.
-func (tx *Transaction) ApplyUpdates(refTX git.ReferenceUpdates) ([]UnexpectedOldValueError, error) {
+func (tx *Transaction) ApplyUpdates(refTX git.ReferenceUpdates) error {
 	for ref := range refTX {
 		tx.modifiedReferences[ref] = struct{}{}
 	}

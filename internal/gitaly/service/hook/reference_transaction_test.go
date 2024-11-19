@@ -34,12 +34,12 @@ func (m mockTransactionRegistry) Get(id storage.TransactionID) (storage.Transact
 
 type mockTransaction struct {
 	storage.Transaction
-	updateReferencesFunc         func(git.ReferenceUpdates)
+	updateReferencesFunc         func(context.Context, git.ReferenceUpdates) error
 	recordInitialReferenceValues func(context.Context, map[git.ReferenceName]git.Reference) error
 }
 
-func (m mockTransaction) UpdateReferences(updates git.ReferenceUpdates) {
-	m.updateReferencesFunc(updates)
+func (m mockTransaction) UpdateReferences(ctx context.Context, updates git.ReferenceUpdates) error {
+	return m.updateReferencesFunc(ctx, updates)
 }
 
 func (m mockTransaction) RecordInitialReferenceValues(ctx context.Context, initialValues map[git.ReferenceName]git.Reference) error {
@@ -297,8 +297,9 @@ ref:refs/heads/main ref:refs/heads/branch-1 HEAD
 			txRegistry := mockTransactionRegistry{
 				getFunc: func(storage.TransactionID) (storage.Transaction, error) {
 					return mockTransaction{
-						updateReferencesFunc: func(updates git.ReferenceUpdates) {
+						updateReferencesFunc: func(ctx context.Context, updates git.ReferenceUpdates) error {
 							actualReferenceUpdates = updates
+							return nil
 						},
 						recordInitialReferenceValues: func(_ context.Context, initialValues map[git.ReferenceName]git.Reference) error {
 							actualInitialValues = initialValues

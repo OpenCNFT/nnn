@@ -16,7 +16,7 @@ type Transaction struct {
 }
 
 // ApplyUpdates updates the history. See the documentation on the implementation of History.
-func (tx *Transaction) ApplyUpdates(updates git.ReferenceUpdates) ([]refdb.UnexpectedOldValueError, error) {
+func (tx *Transaction) ApplyUpdates(updates git.ReferenceUpdates) error {
 	return tx.historyTX.ApplyUpdates(updates)
 }
 

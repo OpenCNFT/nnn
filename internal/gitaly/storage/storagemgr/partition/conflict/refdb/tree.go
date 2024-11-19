@@ -1,7 +1,6 @@
 package refdb
 
 import (
-	"errors"
 	"path/filepath"
 	"strings"
 
@@ -57,26 +56,14 @@ func (n *node) isModified() bool {
 	return n.target != ""
 }
 
-func (n *node) applyUpdates(zeroOID git.ObjectID, updates git.ReferenceUpdates) ([]UnexpectedOldValueError, error) {
-	var failedUpdates []UnexpectedOldValueError
+func (n *node) applyUpdates(zeroOID git.ObjectID, updates git.ReferenceUpdates) error {
 	for ref, update := range updates {
 		if err := n.applyUpdate(zeroOID, ref, update); err != nil {
-			// UnexpectedOldValue failures are collected separately to support the default mode of `git push` without
-			// the `--atomic` flag. Reference updates that fail are dropped from the transaction instead of aborting
-			// the entire transaction.
-			//
-			// As HEAD can't be updated through `git push`, we don't need to support it here.
-			var errUnexpectedOldValue UnexpectedOldValueError
-			if errors.As(err, &errUnexpectedOldValue) && ref != "HEAD" {
-				failedUpdates = append(failedUpdates, errUnexpectedOldValue)
-				continue
-			}
-
-			return nil, err
+			return err
 		}
 	}
 
-	return failedUpdates, nil
+	return nil
 }
 
 func (n *node) applyUpdate(zeroOID git.ObjectID, ref git.ReferenceName, update git.ReferenceUpdate) error {

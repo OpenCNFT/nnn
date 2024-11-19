@@ -39,9 +39,7 @@ func TestManager(t *testing.T) {
 		// If the transaction is not committed, the state should not change.
 		require.Equal(t, New(), mgr)
 
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(1)
 
 		// Committed transaction records the change.
@@ -62,9 +60,7 @@ func TestManager(t *testing.T) {
 		mgr := New()
 
 		tx := mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(1)
 
 		// If we start a second transaction against the same relative path, it should
@@ -72,9 +68,7 @@ func TestManager(t *testing.T) {
 		existingHistory := mgr.historyByRelativePath["relative-path-1"]
 
 		tx = mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {OldOID: "oid-1", NewOID: "oid-2"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {OldOID: "oid-1", NewOID: "oid-2"}}))
 		tx.Commit(2)
 
 		require.Same(t, existingHistory, mgr.historyByRelativePath["relative-path-1"])
@@ -98,15 +92,11 @@ func TestManager(t *testing.T) {
 		// Starting a transactions against different relative paths should target different
 		// histories.
 		tx := mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(1)
 
 		tx = mgr.Begin("relative-path-2", zeroOID)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-2"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-2"}}))
 		tx.Commit(2)
 
 		require.NotSame(t, mgr.historyByRelativePath["relative-path-1"], mgr.historyByRelativePath["relative-path-2"])
@@ -130,9 +120,7 @@ func TestManager(t *testing.T) {
 		mgr := New()
 
 		tx := mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(1)
 
 		// Evicting non-existent LSN does nothing.
@@ -154,15 +142,11 @@ func TestManager(t *testing.T) {
 		mgr := New()
 
 		tx := mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(1)
 
 		tx = mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {OldOID: "oid-1", NewOID: "oid-2"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {OldOID: "oid-1", NewOID: "oid-2"}}))
 		tx.Commit(2)
 
 		requireState(t, mgr,
@@ -198,15 +182,11 @@ func TestManager(t *testing.T) {
 		mgr := New()
 
 		tx := mgr.Begin("relative-path-1", zeroOID)
-		failedUpdates, err := tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(1)
 
 		tx = mgr.Begin("relative-path-2", zeroOID)
-		failedUpdates, err = tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}})
-		require.NoError(t, err)
-		require.Nil(t, failedUpdates)
+		require.NoError(t, tx.ApplyUpdates(git.ReferenceUpdates{"refs/heads/main": {NewOID: "oid-1"}}))
 		tx.Commit(2)
 
 		requireState(t, mgr,
