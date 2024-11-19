@@ -53,6 +53,8 @@ func injectLogEntry(t *testing.T, ctx context.Context, manager *LogManager, lsn 
 
 	manifestPath := manifestPath(logEntryPath)
 	require.NoError(t, os.WriteFile(manifestPath, manifestBytes, mode.File))
+
+	manager.storeCommittedLSN(lsn)
 }
 
 type testLogSetup struct {
@@ -492,7 +494,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		logManager := setupLogManager(t, ctx, nil)
 		setup := setupTestRepo(t, ctx, 3)
 
-		logManager.TestHooks.BeforeCommitLogEntry = func(lsn storage.LSN) {
+		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {
 			if lsn == 2 {
 				panic("crash please")
 			}
@@ -535,7 +537,7 @@ func TestLogManager_AppendLogEntry(t *testing.T) {
 		})
 
 		// Remove the hook and retry the last proposal.
-		logManager.TestHooks.BeforeCommitLogEntry = func(lsn storage.LSN) {}
+		logManager.TestHooks.BeforeAppendLogEntry = func(lsn storage.LSN) {}
 		appendLogEntry(t, ctx, logManager, refEntry2, setup.GetFileMappingForEntry(1, 2))
 
 		require.Equal(t, logManager.committedLSN, storage.LSN(2))
