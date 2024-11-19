@@ -89,10 +89,6 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 						),
 					},
 				},
-				Consumers: ConsumerState{
-					ManagerPosition: 0,
-					HighWaterMark:   1,
-				},
 			},
 		},
 		{
@@ -161,10 +157,6 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 							},
 						),
 					},
-				},
-				Consumers: ConsumerState{
-					ManagerPosition: 1,
-					HighWaterMark:   1,
 				},
 			},
 		},
@@ -256,10 +248,6 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 						),
 					},
 				},
-				Consumers: ConsumerState{
-					ManagerPosition: 2,
-					HighWaterMark:   2,
-				},
 			},
 		},
 		{
@@ -338,10 +326,6 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 							},
 						),
 					},
-				},
-				Consumers: ConsumerState{
-					ManagerPosition: 1,
-					HighWaterMark:   1,
 				},
 			},
 		},
@@ -469,10 +453,6 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 						),
 					},
 				},
-				Consumers: ConsumerState{
-					ManagerPosition: 3,
-					HighWaterMark:   3,
-				},
 			},
 		},
 		{
@@ -547,10 +527,6 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 							},
 						),
 					},
-				},
-				Consumers: ConsumerState{
-					ManagerPosition: 1,
-					HighWaterMark:   1,
 				},
 			},
 		},

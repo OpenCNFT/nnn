@@ -159,7 +159,7 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 		}
 	}
 
-	if mgr.consumer != nil {
+	if mgr.consumer != nil && mgr.appendedLSN != 0 {
 		// Set acknowledged position to oldestLSN - 1 and notify the consumer from oldestLSN -> appendedLSN.
 		// If set the position to 0, the consumer is unable to read pruned entry anyway.
 		mgr.AcknowledgeConsumerPosition(mgr.oldestLSN - 1)
