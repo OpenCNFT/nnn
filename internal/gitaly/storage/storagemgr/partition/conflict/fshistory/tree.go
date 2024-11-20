@@ -241,6 +241,12 @@ func (n *node) evict(evictedLSN storage.LSN, paths map[string]struct{}) {
 		for {
 			prefix, suffix, foundSeparator := strings.Cut(pathBase, "/")
 			if !foundSeparator {
+				if node.children[prefix] == nil {
+					// The node has been already evicted, possibly as part of eviciting another
+					// node from the same LSN.
+					return
+				}
+
 				// If there was no separator, then it means the current node
 				// is the parent node of the reference being evicted.
 				parentNodes = append(parentNodes, pathElement{node: node, child: prefix})
@@ -251,6 +257,12 @@ func (n *node) evict(evictedLSN storage.LSN, paths map[string]struct{}) {
 			// to find the parent node of the reference.
 			parentNodes = append(parentNodes, pathElement{node: node, child: prefix})
 			node = node.children[prefix]
+			if node == nil {
+				// The node has been already evicted, possibly as part of eviciting another
+				// node from the same LSN.
+				return
+			}
+
 			pathPrefix = filepath.Join(pathPrefix, prefix)
 			pathBase = suffix
 		}

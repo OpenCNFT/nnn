@@ -1138,4 +1138,55 @@ func TestHistory(t *testing.T) {
 			history,
 		)
 	})
+
+	t.Run("order of evictions doesn't matter", func(t *testing.T) {
+		history := New()
+
+		tx := history.Begin(0)
+		require.NoError(t, tx.CreateDirectory("parent"))
+		require.NoError(t, tx.CreateDirectory("parent/child-1"))
+		require.NoError(t, tx.CreateFile("parent/child-1/child-2"))
+		tx.Commit(1)
+
+		require.Equal(t,
+			&History{
+				pathsModifiedByLSN: map[storage.LSN]map[string]struct{}{
+					1: {"parent": {}, "parent/child-1": {}, "parent/child-1/child-2": {}},
+				},
+				lsnByPath: map[string]storage.LSN{
+					"parent":                 1,
+					"parent/child-1":         1,
+					"parent/child-1/child-2": 1,
+				},
+				root: &node{
+					nodeType:         directoryNode,
+					directoryEntries: 1,
+					children: children{
+						"parent": {
+							nodeType:         directoryNode,
+							writeLSN:         1,
+							directoryEntries: 1,
+							children: children{
+								"child-1": {
+									nodeType:         directoryNode,
+									writeLSN:         1,
+									directoryEntries: 1,
+									children: children{
+										"child-2": {
+											nodeType: fileNode,
+											writeLSN: 1,
+											children: children{},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			history,
+		)
+
+		history.EvictLSN(1)
+	})
 }
