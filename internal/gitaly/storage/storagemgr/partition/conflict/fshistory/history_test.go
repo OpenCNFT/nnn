@@ -515,30 +515,6 @@ func TestHistory(t *testing.T) {
 		require.NoError(t, tx.Remove("negative"))
 		tx.Commit(1)
 
-		t.Run("concurrent directory creation", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("directory", 0, 1), history.Begin(0).CreateDirectory("directory"))
-		})
-
-		t.Run("concurrent file creation", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("file", 0, 1), history.Begin(0).CreateFile("file"))
-		})
-
-		t.Run("concurrent removal", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateFile("negative"))
-		})
-
-		t.Run("concurrent removal of parent directory of directory", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateDirectory("negative/directory"))
-		})
-
-		t.Run("concurrent removal of parent directory of file", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateFile("negative/file"))
-		})
-
-		t.Run("concurrent removal of parent directory", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateFile("negative/negative"))
-		})
-
 		t.Run("directory creation conflicts with a read", func(t *testing.T) {
 			require.Equal(t, NewConflictingOperationError("directory", 0, 1), history.Begin(0).Read("directory"))
 		})

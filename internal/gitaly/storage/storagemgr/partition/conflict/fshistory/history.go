@@ -44,23 +44,17 @@ func (tx *Transaction) Commit(commitLSN storage.LSN) {
 	tx.history.pathsModifiedByLSN[commitLSN] = modifiedPaths
 }
 
-// CreateDirectory records a directory creation. The operation
-// errors if a concurrent transaction has modified any of the
-// nodes on the path.
+// CreateDirectory records a directory creation.
 func (tx *Transaction) CreateDirectory(path string) error {
 	return tx.applyUpdate(path, directoryNode)
 }
 
-// Remove records a directory entry removal. The operation
-// errors if a concurrent transaction has modified any of
-// the nodes on the path.
+// Remove records a directory entry removal.
 func (tx *Transaction) Remove(path string) error {
 	return tx.applyUpdate(path, negativeNode)
 }
 
-// CreateFile records a file creation. The operation errors if
-// a concurrent transaction has modified any of the nodes on the
-// path.
+// CreateFile records a file creation.
 func (tx *Transaction) CreateFile(path string) error {
 	return tx.applyUpdate(path, fileNode)
 }
@@ -98,13 +92,12 @@ func (tx *Transaction) Read(path string) error {
 // otherwise required to remove these nodes.
 //
 // On top of enforcing a valid directory hierarchy, the History produces
-// conflicts if a concurrent operation was performed while the transaction was
-// running. This is done by recording the LSN of the last transaction that
-// modified a node. If the nodes LSN is greater than the LSN the transaction was
-// reading at, it hasn't seen the changes and conflicts. Transactions are assumed
-// to be correct in isolation and that they only perform operations that were valid
-// in their own snapshot. Only conflicts introduced by concurrent transactions are
-// detected.
+// conflicts if a node was concurrently updated after a transaction read it.
+// This is done by recording the LSN of the last transaction that modified a node.
+// If the nodes LSN is greater than the LSN the transaction was reading at, it hasn't
+// seen the changes and conflicts. Transactions are assumed to be correct in isolation
+// and that they only perform operations that were valid in their own snapshot. Only
+// conflicts introduced by concurrent transactions are detected.
 type History struct {
 	// root is the root node of the partition's file system tree.
 	root *node
