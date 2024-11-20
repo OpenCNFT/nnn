@@ -579,6 +579,71 @@ func TestHistory(t *testing.T) {
 		)
 	})
 
+	t.Run("nodes updated by transaction don't conflict", func(t *testing.T) {
+		history := New()
+
+		tx := history.Begin(0)
+		require.NoError(t, tx.CreateDirectory("directory"))
+		require.NoError(t, tx.CreateFile("file"))
+		require.NoError(t, tx.Remove("negative"))
+		tx.Commit(1)
+
+		tx = history.Begin(0)
+		require.Equal(t, NewReadWriteConflictError("directory", 0, 1), tx.Read("directory"))
+		require.Equal(t, NewReadWriteConflictError("file", 0, 1), tx.Read("file"))
+		require.Equal(t, NewReadWriteConflictError("negative", 0, 1), tx.Read("negative"))
+
+		// Ignore the conflict and overwrite the node.
+		require.NoError(t, tx.Remove("directory"))
+		require.NoError(t, tx.Remove("file"))
+		require.NoError(t, tx.CreateFile("negative"))
+
+		// The reads should no longer conflict.
+		require.NoError(t, tx.Read("directory"))
+		require.NoError(t, tx.Read("file"))
+		require.NoError(t, tx.Read("negative"))
+		tx.Commit(2)
+
+		require.Equal(t,
+			&History{
+				pathsModifiedByLSN: map[storage.LSN]map[string]struct{}{
+					2: {
+						"directory": {},
+						"file":      {},
+						"negative":  {},
+					},
+				},
+				lsnByPath: map[string]storage.LSN{
+					"directory": 2,
+					"file":      2,
+					"negative":  2,
+				},
+				root: &node{
+					nodeType:         directoryNode,
+					directoryEntries: 1,
+					children: children{
+						"directory": {
+							nodeType: negativeNode,
+							writeLSN: 2,
+							children: children{},
+						},
+						"file": {
+							nodeType: negativeNode,
+							writeLSN: 2,
+							children: children{},
+						},
+						"negative": {
+							nodeType: fileNode,
+							writeLSN: 2,
+							children: children{},
+						},
+					},
+				},
+			},
+			history,
+		)
+	})
+
 	t.Run("invalid operations", func(t *testing.T) {
 		history := New()
 
