@@ -516,19 +516,19 @@ func TestHistory(t *testing.T) {
 		tx.Commit(1)
 
 		t.Run("directory creation conflicts with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("directory", 0, 1), history.Begin(0).Read("directory"))
+			require.Equal(t, NewReadWriteConflictError("directory", 0, 1), history.Begin(0).Read("directory"))
 		})
 
 		t.Run("file creation conflicts with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("file", 0, 1), history.Begin(0).Read("file"))
+			require.Equal(t, NewReadWriteConflictError("file", 0, 1), history.Begin(0).Read("file"))
 		})
 
 		t.Run("removal conflicts with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).Read("negative"))
+			require.Equal(t, NewReadWriteConflictError("negative", 0, 1), history.Begin(0).Read("negative"))
 		})
 
 		t.Run("removal of parent directory with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).Read("negative/negative"))
+			require.Equal(t, NewReadWriteConflictError("negative", 0, 1), history.Begin(0).Read("negative/negative"))
 		})
 
 		require.Equal(t,
@@ -711,9 +711,9 @@ func TestHistory(t *testing.T) {
 		// Reading unmodified path does not conflict.
 		require.NoError(t, tx2.Read("parent/unmodified"))
 		// Reading any of the paths modified at a later LSN conflicts.
-		require.Equal(t, NewConflictingOperationError("parent/negative", 0, 1), tx2.Read("parent/negative"))
-		require.Equal(t, NewConflictingOperationError("parent/file", 0, 1), tx2.Read("parent/file"))
-		require.Equal(t, NewConflictingOperationError("parent/directory", 0, 1), tx2.Read("parent/directory"))
+		require.Equal(t, NewReadWriteConflictError("parent/negative", 0, 1), tx2.Read("parent/negative"))
+		require.Equal(t, NewReadWriteConflictError("parent/file", 0, 1), tx2.Read("parent/file"))
+		require.Equal(t, NewReadWriteConflictError("parent/directory", 0, 1), tx2.Read("parent/directory"))
 
 		// This transaction was reading already at LSN 1 and does not conflict with its changes.
 		tx3 := history.Begin(1)

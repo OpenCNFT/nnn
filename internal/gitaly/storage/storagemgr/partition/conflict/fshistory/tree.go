@@ -201,7 +201,7 @@ func (tx *Transaction) findNode(path string) (*node, error) {
 		if tx.readLSN < child.writeLSN {
 			// If the child LSN is later than the read, it has been written after
 			// our transaction started. This is a potential conflict.
-			return nil, NewConflictingOperationError(currentPath, tx.readLSN, child.writeLSN)
+			return nil, NewReadWriteConflictError(currentPath, tx.readLSN, child.writeLSN)
 		} else if !child.isDirectory() {
 			// This node was not a directory and can't be walked down.
 			return nil, newNotDirectoryError(currentPath)

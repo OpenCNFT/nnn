@@ -68,7 +68,7 @@ func (tx *Transaction) Read(path string) error {
 	}
 
 	if node != nil && tx.readLSN < node.writeLSN {
-		return NewConflictingOperationError(path, tx.readLSN, node.writeLSN)
+		return NewReadWriteConflictError(path, tx.readLSN, node.writeLSN)
 	}
 
 	return nil
