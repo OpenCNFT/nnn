@@ -101,11 +101,7 @@ func (tx *Transaction) applyUpdate(path string, newType nodeType) error {
 		}
 
 		currentPath := filepath.Join(pathPrefix, prefix)
-		if tx.readLSN < child.writeLSN {
-			// If the child LSN is later than the read, it has been written after
-			// our transaction started. This is a potential conflict.
-			return NewConflictingOperationError(currentPath, tx.readLSN, child.writeLSN)
-		} else if !child.isDirectory() {
+		if !child.isDirectory() {
 			// This node was not a directory and can't be walked down.
 			return newNotDirectoryError(currentPath)
 		}
@@ -126,10 +122,6 @@ func (tx *Transaction) applyUpdate(path string, newType nodeType) error {
 		parentNode.children[pathBase] = node
 		tx.modifiedNodes[path] = node
 		return nil
-	}
-
-	if tx.readLSN < node.writeLSN {
-		return NewConflictingOperationError(path, tx.readLSN, node.writeLSN)
 	}
 
 	switch node.nodeType {
@@ -173,6 +165,12 @@ func (tx *Transaction) applyUpdate(path string, newType nodeType) error {
 		return fmt.Errorf("unhandled node type: %v", node.nodeType)
 	}
 
+	// Reset the nodes writeLSN. This avoids later reads being considered as conflicting
+	// since the node is now what we read. As we don't know the LSN this transaction is
+	// going to commit at, we use 0. During commit, we update the LSN to reflect the actual
+	// LSN of the committed transaction.
+	node.writeLSN = 0
+
 	tx.modifiedNodes[path] = node
 
 	return nil
@@ -209,7 +207,7 @@ func (tx *Transaction) findNode(path string) (*node, error) {
 		if tx.readLSN < child.writeLSN {
 			// If the child LSN is later than the read, it has been written after
 			// our transaction started. This is a potential conflict.
-			return nil, NewConflictingOperationError(currentPath, tx.readLSN, child.writeLSN)
+			return nil, NewReadWriteConflictError(currentPath, tx.readLSN, child.writeLSN)
 		} else if !child.isDirectory() {
 			// This node was not a directory and can't be walked down.
 			return nil, newNotDirectoryError(currentPath)

@@ -39,6 +39,55 @@ func TestManager(t *testing.T) {
 		expectedMetrics metricValues
 	}{
 		{
+			desc: "existing parent directories of non-existent repositories are snapshotted",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				fs, err := mgr.GetSnapshot(ctx, []string{"repositories/non-existent-parent/non-existent-repo"}, true)
+				require.NoError(t, err)
+				defer testhelper.MustClose(t, fs)
+
+				testhelper.RequireDirectoryState(t, fs.Root(), "", testhelper.DirectoryState{
+					// The snapshotting process does not use the existing permissions for
+					// directories in the hierarchy before the repository directories.
+					"/":             {Mode: mode.Directory},
+					"/repositories": {Mode: mode.Directory},
+				})
+			},
+			expectedMetrics: metricValues{
+				createdExclusiveSnapshotCounter:   1,
+				destroyedExclusiveSnapshotCounter: 1,
+			},
+		},
+		{
+			desc: "existing parent directories of non-existent alternates are snapshotted",
+			run: func(t *testing.T, mgr *Manager) {
+				defer testhelper.MustClose(t, mgr)
+
+				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/d"}, true)
+				require.NoError(t, err)
+				defer testhelper.MustClose(t, fs1)
+
+				testhelper.RequireDirectoryState(t, fs1.Root(), "", testhelper.DirectoryState{
+					// The snapshotting process does not use the existing permissions for
+					// directories in the hierarchy before the repository directories.
+					"/":                            {Mode: mode.Directory},
+					"/repositories":                {Mode: mode.Directory},
+					"/repositories/d":              {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/refs":         {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/objects":      {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/HEAD":         {Mode: umask.Mask(fs.ModePerm), Content: []byte("c content")},
+					"/repositories/d/objects/info": {Mode: fs.ModeDir | umask.Mask(fs.ModePerm)},
+					"/repositories/d/objects/info/alternates": {Mode: umask.Mask(fs.ModePerm), Content: []byte("../../../pools/non-existent/objects")},
+					"/pools": {Mode: mode.Directory},
+				})
+			},
+			expectedMetrics: metricValues{
+				createdExclusiveSnapshotCounter:   1,
+				destroyedExclusiveSnapshotCounter: 1,
+			},
+		},
+		{
 			desc: "exclusive snapshots are not shared",
 			run: func(t *testing.T, mgr *Manager) {
 				defer testhelper.MustClose(t, mgr)
@@ -124,12 +173,12 @@ func TestManager(t *testing.T) {
 			run: func(t *testing.T, mgr *Manager) {
 				defer testhelper.MustClose(t, mgr)
 
-				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a", "repositories/b"}, false)
+				fs1, err := mgr.GetSnapshot(ctx, []string{"repositories/a", "pools/b"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
 
 				// The order of the relative paths should not prevent sharing a snapshot.
-				fs2, err := mgr.GetSnapshot(ctx, []string{"repositories/b", "repositories/a"}, false)
+				fs2, err := mgr.GetSnapshot(ctx, []string{"pools/b", "repositories/a"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs2)
 
@@ -142,10 +191,11 @@ func TestManager(t *testing.T) {
 					"/repositories/a/refs":    {Mode: ModeReadOnlyDirectory},
 					"/repositories/a/objects": {Mode: ModeReadOnlyDirectory},
 					"/repositories/a/HEAD":    {Mode: umask.Mask(fs.ModePerm), Content: []byte("a content")},
-					"/repositories/b":         {Mode: ModeReadOnlyDirectory},
-					"/repositories/b/refs":    {Mode: ModeReadOnlyDirectory},
-					"/repositories/b/objects": {Mode: ModeReadOnlyDirectory},
-					"/repositories/b/HEAD":    {Mode: umask.Mask(fs.ModePerm), Content: []byte("b content")},
+					"/pools":                  {Mode: ModeReadOnlyDirectory},
+					"/pools/b":                {Mode: ModeReadOnlyDirectory},
+					"/pools/b/refs":           {Mode: ModeReadOnlyDirectory},
+					"/pools/b/objects":        {Mode: ModeReadOnlyDirectory},
+					"/pools/b/HEAD":           {Mode: umask.Mask(fs.ModePerm), Content: []byte("b content")},
 				}
 
 				testhelper.RequireDirectoryState(t, fs1.Root(), "", expectedDirectoryState)
@@ -167,18 +217,19 @@ func TestManager(t *testing.T) {
 				defer testhelper.MustClose(t, fs1)
 
 				testhelper.RequireDirectoryState(t, fs1.Root(), "", testhelper.DirectoryState{
-					"/":                                       {Mode: ModeReadOnlyDirectory},
-					"/repositories":                           {Mode: ModeReadOnlyDirectory},
-					"/repositories/b":                         {Mode: ModeReadOnlyDirectory},
-					"/repositories/b/refs":                    {Mode: ModeReadOnlyDirectory},
-					"/repositories/b/objects":                 {Mode: ModeReadOnlyDirectory},
-					"/repositories/b/HEAD":                    {Mode: umask.Mask(fs.ModePerm), Content: []byte("b content")},
-					"/repositories/c":                         {Mode: ModeReadOnlyDirectory},
-					"/repositories/c/refs":                    {Mode: ModeReadOnlyDirectory},
-					"/repositories/c/objects":                 {Mode: ModeReadOnlyDirectory},
-					"/repositories/c/HEAD":                    {Mode: umask.Mask(fs.ModePerm), Content: []byte("c content")},
-					"/repositories/c/objects/info":            {Mode: ModeReadOnlyDirectory},
-					"/repositories/c/objects/info/alternates": {Mode: umask.Mask(fs.ModePerm), Content: []byte("../../b/objects")},
+					"/":                            {Mode: ModeReadOnlyDirectory},
+					"/pools":                       {Mode: ModeReadOnlyDirectory},
+					"/pools/b":                     {Mode: ModeReadOnlyDirectory},
+					"/pools/b/refs":                {Mode: ModeReadOnlyDirectory},
+					"/pools/b/objects":             {Mode: ModeReadOnlyDirectory},
+					"/pools/b/HEAD":                {Mode: umask.Mask(fs.ModePerm), Content: []byte("b content")},
+					"/repositories":                {Mode: ModeReadOnlyDirectory},
+					"/repositories/c":              {Mode: ModeReadOnlyDirectory},
+					"/repositories/c/refs":         {Mode: ModeReadOnlyDirectory},
+					"/repositories/c/objects":      {Mode: ModeReadOnlyDirectory},
+					"/repositories/c/HEAD":         {Mode: umask.Mask(fs.ModePerm), Content: []byte("c content")},
+					"/repositories/c/objects/info": {Mode: ModeReadOnlyDirectory},
+					"/repositories/c/objects/info/alternates": {Mode: umask.Mask(fs.ModePerm), Content: []byte("../../../pools/b/objects")},
 				})
 			},
 			expectedMetrics: metricValues{
@@ -229,11 +280,11 @@ func TestManager(t *testing.T) {
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs1)
 
-				fs2, err := mgr.GetSnapshot(ctx, []string{"repositories/b"}, false)
+				fs2, err := mgr.GetSnapshot(ctx, []string{"pools/b"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs2)
 
-				fs3, err := mgr.GetSnapshot(ctx, []string{"repositories/a", "repositories/b"}, false)
+				fs3, err := mgr.GetSnapshot(ctx, []string{"repositories/a", "pools/b"}, false)
 				require.NoError(t, err)
 				defer testhelper.MustClose(t, fs3)
 
@@ -286,7 +337,7 @@ func TestManager(t *testing.T) {
 
 				// Open two snapshots. Both are against different data, so both lead to
 				// creating new snapshots.
-				fsB, err := mgr.GetSnapshot(ctx, []string{"repositories/b"}, false)
+				fsB, err := mgr.GetSnapshot(ctx, []string{"pools/b"}, false)
 				require.NoError(t, err)
 				require.NotEqual(t, fsB.Root(), fs4.Root())
 
@@ -328,7 +379,7 @@ func TestManager(t *testing.T) {
 				// Open two exclusive snapshots. They are not cached, and should not evict the
 				// snapshot of A in cache.
 				for i := 0; i < 2; i++ {
-					fsExclusive, err := mgr.GetSnapshot(ctx, []string{"repositories/b"}, true)
+					fsExclusive, err := mgr.GetSnapshot(ctx, []string{"pools/b"}, true)
 					require.NoError(t, err)
 					require.NotEqual(t, fsExclusive.Root(), fs1.Root())
 					testhelper.MustClose(t, fsExclusive)
@@ -436,7 +487,7 @@ func TestManager(t *testing.T) {
 				takeSnapshots("repositories/a", snapshotsA)
 
 				snapshotsB := make([]FileSystem, 20)
-				takeSnapshots("repositories/b", snapshotsB)
+				takeSnapshots("pools/b", snapshotsB)
 
 				close(startSnapshot)
 				require.NoError(t, snapshotGroup.Wait())
@@ -473,16 +524,24 @@ func TestManager(t *testing.T) {
 				"repositories/a/HEAD":                    {Mode: fs.ModePerm, Data: []byte("a content")},
 				"repositories/a/refs":                    {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/a/objects":                 {Mode: fs.ModeDir | fs.ModePerm},
-				"repositories/b":                         {Mode: fs.ModeDir | fs.ModePerm},
-				"repositories/b/HEAD":                    {Mode: fs.ModePerm, Data: []byte("b content")},
-				"repositories/b/refs":                    {Mode: fs.ModeDir | fs.ModePerm},
-				"repositories/b/objects":                 {Mode: fs.ModeDir | fs.ModePerm},
+				"pools":                                  {Mode: fs.ModeDir | fs.ModePerm},
+				"pools/b":                                {Mode: fs.ModeDir | fs.ModePerm},
+				"pools/b/HEAD":                           {Mode: fs.ModePerm, Data: []byte("b content")},
+				"pools/b/refs":                           {Mode: fs.ModeDir | fs.ModePerm},
+				"pools/b/objects":                        {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/c/HEAD":                    {Mode: fs.ModePerm, Data: []byte("c content")},
 				"repositories/c":                         {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/c/refs":                    {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/c/objects":                 {Mode: fs.ModeDir | fs.ModePerm},
 				"repositories/c/objects/info":            {Mode: fs.ModeDir | fs.ModePerm},
-				"repositories/c/objects/info/alternates": {Mode: fs.ModePerm, Data: []byte("../../b/objects")},
+				"repositories/c/objects/info/alternates": {Mode: fs.ModePerm, Data: []byte("../../../pools/b/objects")},
+				// We use the below repository just to test parent directory creation logic for alternates.
+				"repositories/d":                         {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/HEAD":                    {Mode: fs.ModePerm, Data: []byte("c content")},
+				"repositories/d/refs":                    {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/objects":                 {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/objects/info":            {Mode: fs.ModeDir | fs.ModePerm},
+				"repositories/d/objects/info/alternates": {Mode: fs.ModePerm, Data: []byte("../../../pools/non-existent/objects")},
 			})
 
 			metrics := NewMetrics()

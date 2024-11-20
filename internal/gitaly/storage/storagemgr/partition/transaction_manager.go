@@ -36,6 +36,8 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/fsrecorder"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal/reftree"
@@ -436,6 +438,15 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 			return nil, fmt.Errorf("get snapshot: %w", err)
 		}
 
+		if txn.write {
+			// Create a directory to store all staging files.
+			if err := os.Mkdir(txn.walFilesPath(), mode.Directory); err != nil {
+				return nil, fmt.Errorf("create wal files directory: %w", err)
+			}
+
+			txn.walEntry = wal.NewEntry(txn.walFilesPath())
+		}
+
 		if txn.repositoryTarget() {
 			txn.repositoryExists, err = mgr.doesRepositoryExist(ctx, txn.snapshot.RelativePath(txn.relativePath))
 			if err != nil {
@@ -465,6 +476,17 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 						return nil, fmt.Errorf("quarantine: %w", err)
 					}
 				} else {
+					// The repository does not exist, and this is a write. This should thus create the repository. As the repository's final state
+					// is still being logged in TransactionManager, we already log here the creation of any missing parent directories of
+					// the repository. When the transaction commits, we don't know if they existed or not, so we can't record this later.
+					//
+					// If the repository is at the root of the storage, there's no parent directories to create.
+					if parentDir := filepath.Dir(txn.relativePath); parentDir != "." {
+						if err := fsrecorder.NewFS(txn.snapshot.Root(), txn.walEntry).MkdirAll(parentDir); err != nil {
+							return nil, fmt.Errorf("create parent directories: %w", err)
+						}
+					}
+
 					txn.quarantineDirectory = filepath.Join(mgr.storagePath, txn.snapshot.RelativePath(txn.relativePath), "objects")
 				}
 			}
@@ -966,6 +988,8 @@ type TransactionManager struct {
 
 	// conflictMgr is responsible for checking concurrent transactions against each other for conflicts.
 	conflictMgr *conflict.Manager
+	// fsHistory stores the history of file system operations for conflict checking purposes.
+	fsHistory *fshistory.History
 
 	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
 	appendedLSN storage.LSN
@@ -1046,6 +1070,7 @@ func NewTransactionManager(
 		initialized:          make(chan struct{}),
 		snapshotLocks:        make(map[storage.LSN]*snapshotLock),
 		conflictMgr:          conflict.NewManager(),
+		fsHistory:            fshistory.New(),
 		stateDirectory:       stateDir,
 		stagingDirectory:     stagingDir,
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
@@ -1090,13 +1115,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 	}
 
-	// Create a directory to store all staging files.
-	if err := os.Mkdir(transaction.walFilesPath(), mode.Directory); err != nil {
-		return fmt.Errorf("create wal files directory: %w", err)
-	}
-
-	transaction.walEntry = wal.NewEntry(transaction.walFilesPath())
-
 	if err := mgr.packObjects(ctx, transaction); err != nil {
 		return fmt.Errorf("pack objects: %w", err)
 	}
@@ -1123,7 +1141,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("replace object directory: %w", err)
 		}
 
-		if err := transaction.walEntry.RecordRepositoryCreation(
+		if err := transaction.walEntry.RecordDirectoryCreation(
 			transaction.snapshot.Root(),
 			transaction.relativePath,
 		); err != nil {
@@ -2238,6 +2256,7 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 			// at an older snapshot. Since the changes are already in the transaction's
 			// snapshot, it would already base its changes on them.
 			mgr.conflictMgr.EvictLSN(ctx, mgr.oldestLSN)
+			mgr.fsHistory.EvictLSN(mgr.oldestLSN)
 
 			mgr.oldestLSN++
 			continue
@@ -2383,6 +2402,11 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("verify key-value operations: %w", err)
 		}
 
+		commitFS, err := mgr.verifyFileSystemOperations(ctx, transaction)
+		if err != nil {
+			return fmt.Errorf("verify file system operations: %w", err)
+		}
+
 		logEntry.Operations = transaction.walEntry.Operations()
 
 		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
@@ -2391,6 +2415,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		// Commit the prepared transaction now that we've managed to commit the log entry.
 		preparedTX.Commit(ctx, mgr.appendedLSN)
+		commitFS(mgr.appendedLSN)
 
 		return nil
 	}(); err != nil {
@@ -2401,6 +2426,85 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 	mgr.awaitingTransactions[mgr.appendedLSN] = transaction.result
 
 	return nil
+}
+
+// verifyFileSystemOperations verifies the file system operations logged by a transaction still apply and don't conflict by
+// other concurrently committed operations.
+func (mgr *TransactionManager) verifyFileSystemOperations(ctx context.Context, tx *Transaction) (func(lsn storage.LSN), error) {
+	defer trace.StartRegion(ctx, "verifyFileSystemOperations").End()
+
+	if len(tx.walEntry.Operations()) == 0 {
+		return func(storage.LSN) {}, nil
+	}
+
+	fsTX := mgr.fsHistory.Begin(tx.SnapshotLSN())
+
+	// isLooseReference returns whether this path is inside the `refs`
+	// directory of the repository.
+	isLooseReference := func(path string) bool {
+		return strings.HasPrefix(path, filepath.Join(tx.relativePath, "refs"))
+	}
+
+	// isTablesList returns true if this is the table.list file used with reftables.
+	isTablesList := func(path string) bool {
+		return path == filepath.Join(tx.relativePath, "reftable", "tables.list")
+	}
+
+	for _, op := range tx.walEntry.Operations() {
+		switch op.GetOperation().(type) {
+		case *gitalypb.LogEntry_Operation_CreateDirectory_:
+			path := string(op.GetCreateDirectory().GetPath())
+			if err := fsTX.Read(path); err != nil {
+				return nil, fmt.Errorf("read: %w", err)
+			}
+
+			if err := fsTX.CreateDirectory(path); err != nil {
+				return nil, fmt.Errorf("create directory: %w", err)
+			}
+		case *gitalypb.LogEntry_Operation_CreateHardLink_:
+			op := op.GetCreateHardLink()
+			if op.GetSourceInStorage() {
+				if err := fsTX.Read(string(op.GetSourcePath())); err != nil {
+					return nil, fmt.Errorf("destination read: %w", err)
+				}
+			}
+
+			destinationPath := string(op.GetDestinationPath())
+			// The reference changes have already gone through logical conflict
+			// checks at this point. We skip a conflict check as the loose reference
+			// we're about to create has already been conflict checked.
+			//
+			// CreateFile call below will only succeed if the loose reference file
+			// does not exist. This is mostly to handle conflicts with reference packing
+			// and loose reference creation. Other conflicts are not currently resolved.
+			if !isLooseReference(destinationPath) {
+				if err := fsTX.Read(destinationPath); err != nil {
+					return nil, fmt.Errorf("destination read: %w", err)
+				}
+			}
+
+			if err := fsTX.CreateFile(destinationPath); err != nil {
+				return nil, fmt.Errorf("create file: %w", err)
+			}
+		case *gitalypb.LogEntry_Operation_RemoveDirectoryEntry_:
+			path := string(op.GetRemoveDirectoryEntry().GetPath())
+
+			// reftable/tables.list file conflicts on every single reference write
+			// as all reference updates need to modify it. The conflicts have already
+			// been resolved at this point. Don't conflict check it.
+			if !isTablesList(path) {
+				if err := fsTX.Read(path); err != nil {
+					return nil, fmt.Errorf("read: %w", err)
+				}
+			}
+
+			if err := fsTX.Remove(path); err != nil {
+				return nil, fmt.Errorf("remove: %w", err)
+			}
+		}
+	}
+
+	return fsTX.Commit, nil
 }
 
 // verifyKeyValueOperations checks the key-value operations of the transaction for conflicts and includes
