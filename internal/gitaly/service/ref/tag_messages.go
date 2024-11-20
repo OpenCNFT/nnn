@@ -49,7 +49,7 @@ func (s *server) getAndStreamTagMessages(request *gitalypb.GetTagMessagesRequest
 			return err
 		}
 		sw := streamio.NewWriter(func(p []byte) error {
-			return stream.Send(&gitalypb.GetTagMessagesResponse{Message: p})
+			return stream.Send(&gitalypb.GetTagMessagesResponse{Message: bytes.Clone(p)})
 		})
 
 		msgReader := bytes.NewReader(tag.GetMessage())

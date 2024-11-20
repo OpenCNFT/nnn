@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -318,7 +319,7 @@ func preReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, hookClient
 	}
 
 	f := sendFunc(streamio.NewWriter(func(p []byte) error {
-		return preReceiveHookStream.Send(&gitalypb.PreReceiveHookRequest{Stdin: p})
+		return preReceiveHookStream.Send(&gitalypb.PreReceiveHookRequest{Stdin: bytes.Clone(p)})
 	}), preReceiveHookStream, os.Stdin)
 
 	if returnCode, err := stream.Handler(func() (stream.StdoutStderrResponse, error) {
@@ -347,7 +348,7 @@ func postReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, hookClien
 	}
 
 	f := sendFunc(streamio.NewWriter(func(p []byte) error {
-		return postReceiveHookStream.Send(&gitalypb.PostReceiveHookRequest{Stdin: p})
+		return postReceiveHookStream.Send(&gitalypb.PostReceiveHookRequest{Stdin: bytes.Clone(p)})
 	}), postReceiveHookStream, os.Stdin)
 
 	if returnCode, err := stream.Handler(func() (stream.StdoutStderrResponse, error) {
@@ -392,7 +393,7 @@ func referenceTransactionHook(ctx context.Context, payload gitcmd.HooksPayload, 
 	}
 
 	f := sendFunc(streamio.NewWriter(func(p []byte) error {
-		return referenceTransactionHookStream.Send(&gitalypb.ReferenceTransactionHookRequest{Stdin: p})
+		return referenceTransactionHookStream.Send(&gitalypb.ReferenceTransactionHookRequest{Stdin: bytes.Clone(p)})
 	}), referenceTransactionHookStream, os.Stdin)
 
 	if returnCode, err := stream.Handler(func() (stream.StdoutStderrResponse, error) {
@@ -424,7 +425,7 @@ func procReceiveHook(ctx context.Context, payload gitcmd.HooksPayload, hookClien
 	}
 
 	f := sendFunc(streamio.NewWriter(func(p []byte) error {
-		return hookStream.Send(&gitalypb.ProcReceiveHookRequest{Stdin: p})
+		return hookStream.Send(&gitalypb.ProcReceiveHookRequest{Stdin: bytes.Clone(p)})
 	}), hookStream, os.Stdin)
 
 	if returnCode, err := stream.Handler(func() (stream.StdoutStderrResponse, error) {

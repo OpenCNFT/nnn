@@ -1,6 +1,7 @@
 package gitalyclient
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -27,7 +28,7 @@ func UploadArchive(ctx context.Context, conn *grpc.ClientConn, stdin io.Reader, 
 	}
 
 	inWriter := streamio.NewWriter(func(p []byte) error {
-		return uploadPackStream.Send(&gitalypb.SSHUploadArchiveRequest{Stdin: p})
+		return uploadPackStream.Send(&gitalypb.SSHUploadArchiveRequest{Stdin: bytes.Clone(p)})
 	})
 
 	return stream.Handler(func() (stream.StdoutStderrResponse, error) {

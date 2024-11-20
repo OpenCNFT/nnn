@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -78,7 +79,7 @@ func (s *server) GetArchive(in *gitalypb.GetArchiveRequest, stream gitalypb.Repo
 	}
 
 	writer := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.GetArchiveResponse{Data: p})
+		return stream.Send(&gitalypb.GetArchiveResponse{Data: bytes.Clone(p)})
 	})
 
 	s.logger.WithField("request_hash", requestHash(in)).InfoContext(ctx, "request details")

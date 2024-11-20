@@ -1,6 +1,7 @@
 package gitalyclient
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -26,7 +27,7 @@ func ReceivePack(ctx context.Context, conn *grpc.ClientConn, stdin io.Reader, st
 	}
 
 	inWriter := streamio.NewWriter(func(p []byte) error {
-		return receivePackStream.Send(&gitalypb.SSHReceivePackRequest{Stdin: p})
+		return receivePackStream.Send(&gitalypb.SSHReceivePackRequest{Stdin: bytes.Clone(p)})
 	})
 
 	return stream.Handler(func() (stream.StdoutStderrResponse, error) {

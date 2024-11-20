@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"errors"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
@@ -15,7 +16,7 @@ func (s *server) GetSnapshot(in *gitalypb.GetSnapshotRequest, stream gitalypb.Re
 	}
 
 	writer := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.GetSnapshotResponse{Data: p})
+		return stream.Send(&gitalypb.GetSnapshotResponse{Data: bytes.Clone(p)})
 	})
 
 	err := s.localrepo(in.GetRepository()).CreateSnapshot(stream.Context(), writer)

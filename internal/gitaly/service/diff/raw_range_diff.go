@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -53,7 +54,7 @@ func (s *server) RawRangeDiff(in *gitalypb.RawRangeDiffRequest, stream gitalypb.
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.RawRangeDiffResponse{Data: p})
+		return stream.Send(&gitalypb.RawRangeDiffResponse{Data: bytes.Clone(p)})
 	})
 
 	return sendRawRangeDiffOutput(ctx, s.localrepo(in.GetRepository()), sw, subCmd)

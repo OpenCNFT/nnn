@@ -1,6 +1,7 @@
 package smarthttp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -74,7 +75,7 @@ func (s *server) postReceivePack(
 		return resp.GetData(), err
 	})
 	stdout := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.PostReceivePackResponse{Data: p})
+		return stream.Send(&gitalypb.PostReceivePackResponse{Data: bytes.Clone(p)})
 	})
 
 	repo := s.localrepo(req.GetRepository())

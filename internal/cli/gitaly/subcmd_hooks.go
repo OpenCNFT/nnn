@@ -1,6 +1,7 @@
 package gitaly
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -119,7 +120,7 @@ func setRepoHooks(ctx context.Context, conn *grpc.ClientConn, reader io.Reader, 
 
 	// Configure streamWriter to transmit tarball data to stream.
 	streamWriter := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.SetCustomHooksRequest{Data: p})
+		return stream.Send(&gitalypb.SetCustomHooksRequest{Data: bytes.Clone(p)})
 	})
 
 	if _, err := io.Copy(streamWriter, reader); err != nil {

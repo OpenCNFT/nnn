@@ -46,7 +46,7 @@ func (s *server) getAndStreamCommitMessages(request *gitalypb.GetCommitMessagesR
 			return err
 		}
 		sw := streamio.NewWriter(func(p []byte) error {
-			return stream.Send(&gitalypb.GetCommitMessagesResponse{Message: p})
+			return stream.Send(&gitalypb.GetCommitMessagesResponse{Message: bytes.Clone(p)})
 		})
 		_, err = io.Copy(sw, msgReader)
 		if err != nil {

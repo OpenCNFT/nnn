@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -22,7 +23,7 @@ func (s *server) RawDiff(in *gitalypb.RawDiffRequest, stream gitalypb.DiffServic
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.RawDiffResponse{Data: p})
+		return stream.Send(&gitalypb.RawDiffResponse{Data: bytes.Clone(p)})
 	})
 
 	repo := s.localrepo(in.GetRepository())
