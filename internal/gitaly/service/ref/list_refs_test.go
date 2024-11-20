@@ -52,6 +52,7 @@ func TestServer_ListRefs(t *testing.T) {
 		expectedGrpcError codes.Code
 		expectedError     string
 		expected          []*gitalypb.ListRefsResponse_Reference
+		expectedCursor    string
 	}{
 		{
 			desc: "no repo",
@@ -216,6 +217,7 @@ func TestServer_ListRefs(t *testing.T) {
 				{Name: []byte("refs/tags/lightweight-tag"), Target: newCommitID.String()},
 				{Name: []byte("refs/tags/old-commit-tag"), Target: oldCommitID.String()},
 			},
+			expectedCursor: "cmVmcy90YWdzL29sZC1jb21taXQtdGFn",
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -225,6 +227,8 @@ func TestServer_ListRefs(t *testing.T) {
 			require.NoError(t, err)
 
 			var refs []*gitalypb.ListRefsResponse_Reference
+			var cursors []string
+
 			for {
 				r, err := c.Recv()
 				if errors.Is(err, io.EOF) {
@@ -245,9 +249,14 @@ func TestServer_ListRefs(t *testing.T) {
 				}
 
 				refs = append(refs, r.GetReferences()...)
+				cursors = append(cursors, r.GetPaginationCursor().NextCursor)
 			}
 
 			testhelper.ProtoEqual(t, tc.expected, refs)
+
+			if tc.expectedCursor != "" {
+				testhelper.ProtoEqual(t, tc.expectedCursor, cursors[0])
+			}
 		})
 	}
 }

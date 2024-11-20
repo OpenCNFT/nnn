@@ -2,6 +2,7 @@ package ref
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -116,8 +117,18 @@ func newListRefsWriter(stream gitalypb.RefService_ListRefsServer, headOID git.Ob
 			}
 		}
 
-		return stream.Send(&gitalypb.ListRefsResponse{References: refNames})
+		lastRefName := refNames[len(refNames)-1].Name
+		cursor := encodePageToken(lastRefName)
+
+		return stream.Send(&gitalypb.ListRefsResponse{
+			References:       refNames,
+			PaginationCursor: &gitalypb.PaginationCursor{NextCursor: cursor},
+		})
 	}
+}
+
+func encodePageToken(ref []byte) string {
+	return base64.StdEncoding.EncodeToString(ref)
 }
 
 var sortKeyByEnum = map[gitalypb.ListRefsRequest_SortBy_Key]string{
