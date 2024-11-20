@@ -1,5 +1,16 @@
 # Gitaly changelog
 
+## 17.6.0 (2024-11-20)
+
+### Added (2 changes)
+
+- [gitaly: Add offline partition status commandline](gitlab-org/gitaly@b704e38930fa57baad4ee37bf7e08789f0ca1ff3) ([merge request](gitlab-org/gitaly!7240))
+- [Add repo_changed field in FetchRemoteResponse RPC](gitlab-org/gitaly@2fac2a038e1b5b04ae58c6186a225d0200f524c6) ([merge request](gitlab-org/gitaly!7322))
+
+### Fixed (1 change)
+
+- [Update GoCloud to a version that supports s3ForcePathStyle](gitlab-org/gitaly@6becf2026cf1ec5297829937a66c139d00c95283) ([merge request](gitlab-org/gitaly!7411))
+
 ## 17.5.2 (2024-11-12)
 
 ### Fixed (1 change)
