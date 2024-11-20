@@ -165,6 +165,12 @@ func (tx *Transaction) applyUpdate(path string, newType nodeType) error {
 		return fmt.Errorf("unhandled node type: %v", node.nodeType)
 	}
 
+	// Reset the nodes writeLSN. This avoids later reads being considered as conflicting
+	// since the node is now what we read. As we don't know the LSN this transaction is
+	// going to commit at, we use 0. During commit, we update the LSN to reflect the actual
+	// LSN of the committed transaction.
+	node.writeLSN = 0
+
 	tx.modifiedNodes[path] = node
 
 	return nil
