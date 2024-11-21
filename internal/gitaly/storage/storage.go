@@ -168,6 +168,9 @@ type Partition interface {
 	Begin(context.Context, BeginOptions) (Transaction, error)
 	// Close closes the partition handle to signal the caller is done using it.
 	Close()
+	// GetLogManager provides controlled access to underlying log management system for log consumption purpose. It
+	// allows the consumers to access to on-disk location of a LSN and acknowledge consumed position.
+	GetLogManager() LogManager
 }
 
 // TransactionOptions are used to pass transaction options into Begin.

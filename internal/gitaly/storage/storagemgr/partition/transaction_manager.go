@@ -889,15 +889,10 @@ type committedEntry struct {
 	objectDependencies map[git.ObjectID]struct{}
 }
 
-// AcknowledgeConsumerPosition acknowledges log entries up and including lsn as successfully processed for the specified
-// LogConsumer. The manager is awakened if it is currently awaiting a new or completed transaction.
-func (mgr *TransactionManager) AcknowledgeConsumerPosition(lsn storage.LSN) {
-	mgr.logManager.AcknowledgeConsumerPosition(lsn)
-}
-
-// GetEntryPath returns the path of the log entry's root directory.
-func (mgr *TransactionManager) GetEntryPath(lsn storage.LSN) string {
-	return mgr.logManager.GetEntryPath(lsn)
+// GetLogManager provides controlled access to underlying log management system for log consumption purpose. It
+// allows the consumers to access to on-disk location of a LSN and acknowledge consumed position.
+func (mgr *TransactionManager) GetLogManager() storage.LogManager {
+	return mgr.logManager
 }
 
 // TransactionManager is responsible for transaction management of a single repository. Each repository has

@@ -22,9 +22,20 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
+type mockPartition struct {
+	storage.Partition
+	manager storage.LogManager
+}
+
+func (p *mockPartition) Close() {}
+
+func (p *mockPartition) GetLogManager() storage.LogManager {
+	return p.manager
+}
+
 type mockNode struct {
-	managers map[PartitionInfo]*mockLogManager
-	t        *testing.T
+	partitions map[PartitionInfo]*mockPartition
+	t          *testing.T
 
 	sync.Mutex
 }
@@ -44,7 +55,7 @@ func (m mockStorage) GetPartition(ctx context.Context, partitionID storage.Parti
 	defer m.node.Unlock()
 
 	info := PartitionInfo{m.storageName, partitionID}
-	mgr, ok := m.node.managers[info]
+	mgr, ok := m.node.partitions[info]
 	assert.True(m.node.t, ok)
 
 	return mgr, nil
@@ -61,7 +72,6 @@ type mockLogManager struct {
 	finishCount   int
 
 	sync.Mutex
-	storage.Partition
 }
 
 func (lm *mockLogManager) Close() {}
@@ -295,8 +305,8 @@ func TestLogEntryArchiver(t *testing.T) {
 			var wg sync.WaitGroup
 
 			accessor := &mockNode{
-				managers: make(map[PartitionInfo]*mockLogManager, len(tc.partitions)),
-				t:        t,
+				partitions: make(map[PartitionInfo]*mockPartition, len(tc.partitions)),
+				t:          t,
 			}
 
 			node := storage.Node(accessor)
@@ -330,7 +340,7 @@ func TestLogEntryArchiver(t *testing.T) {
 				managers[info] = manager
 
 				accessor.Lock()
-				accessor.managers[info] = manager
+				accessor.partitions[info] = &mockPartition{manager: manager}
 				accessor.Unlock()
 
 				// Send partitions in parallel to mimic real usage.
@@ -358,7 +368,8 @@ func TestLogEntryArchiver(t *testing.T) {
 			cmpDir := testhelper.TempDir(t)
 			require.NoError(t, os.Mkdir(filepath.Join(cmpDir, storageName), mode.Directory))
 
-			for info, manager := range accessor.managers {
+			for info, partition := range accessor.partitions {
+				manager := partition.GetLogManager().(*mockLogManager)
 				lastAck := manager.acknowledged[len(manager.acknowledged)-1]
 				require.Equal(t, tc.finalLSN, lastAck)
 
@@ -417,8 +428,8 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	require.NoError(t, err)
 
 	accessor := &mockNode{
-		managers: make(map[PartitionInfo]*mockLogManager, 1),
-		t:        t,
+		partitions: make(map[PartitionInfo]*mockPartition, 1),
+		t:          t,
 	}
 
 	node := storage.Node(accessor)
@@ -447,7 +458,7 @@ func TestLogEntryArchiver_retry(t *testing.T) {
 	}
 
 	accessor.Lock()
-	accessor.managers[info] = manager
+	accessor.partitions[info] = &mockPartition{manager: manager}
 	accessor.Unlock()
 
 	wg.Add(1)

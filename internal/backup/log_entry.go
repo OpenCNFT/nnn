@@ -340,12 +340,7 @@ func (la *LogEntryArchiver) callLogManager(ctx context.Context, partitionInfo Pa
 	}
 	defer partition.Close()
 
-	logManager, ok := partition.(storage.LogManager)
-	if !ok {
-		return fmt.Errorf("expected LogManager, got %T", logManager)
-	}
-
-	callback(logManager)
+	callback(partition.GetLogManager())
 
 	return nil
 }
