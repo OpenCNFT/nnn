@@ -26,6 +26,9 @@ const TarFileMode = permission.OwnerRead | permission.OwnerWrite |
 // expanded to all.
 const ExecuteMode = permission.OwnerExecute | permission.GroupExecute | permission.OthersExecute
 
+// DirectoryMode is the mode used for directories in tar archives
+const DirectoryMode = TarFileMode | ExecuteMode | fs.ModeDir
+
 // TarBuilder writes a .tar archive to an io.Writer. The contents of the archive
 // are determined by successive calls to `File` and `RecursiveDir`.
 //
