@@ -18,6 +18,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/client"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
@@ -155,6 +156,12 @@ func (s *server) createFromSnapshot(ctx context.Context, source, target *gitalyp
 		return nil
 	}); err != nil {
 		return fmt.Errorf("creating repository: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := migration.RecordKeyCreation(tx, target.GetRelativePath()); err != nil {
+			return fmt.Errorf("recording migration key: %w", err)
+		}
 	}
 
 	return nil

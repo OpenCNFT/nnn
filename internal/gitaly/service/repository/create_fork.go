@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -113,6 +114,12 @@ func (s *server) CreateFork(ctx context.Context, req *gitalypb.CreateForkRequest
 		return nil
 	}, repoutil.WithSkipInit()); err != nil {
 		return nil, structerr.NewInternal("creating fork: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := migration.RecordKeyCreation(tx, targetRepository.GetRelativePath()); err != nil {
+			return nil, structerr.NewInternal("recording migration key: %w", err)
+		}
 	}
 
 	return &gitalypb.CreateForkResponse{}, nil

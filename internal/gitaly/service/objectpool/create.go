@@ -6,6 +6,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -58,6 +59,12 @@ func (s *server) CreateObjectPool(ctx context.Context, in *gitalypb.CreateObject
 		return nil
 	}, repoutil.WithSkipInit()); err != nil {
 		return nil, structerr.New("creating object pool: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := migration.RecordKeyCreation(tx, poolRepo.GetRelativePath()); err != nil {
+			return nil, structerr.NewInternal("recording migration key: %w", err)
+		}
 	}
 
 	return &gitalypb.CreateObjectPoolResponse{}, nil

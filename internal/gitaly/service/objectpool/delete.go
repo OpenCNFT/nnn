@@ -6,6 +6,7 @@ import (
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -28,6 +29,9 @@ func (s *server) DeleteObjectPool(ctx context.Context, in *gitalypb.DeleteObject
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		tx.DeleteRepository()
+		if err := migration.RecordKeyDeletion(tx, pool.GetRelativePath()); err != nil {
+			return nil, structerr.NewInternal("recording migration key: %w", err)
+		}
 	}
 
 	return &gitalypb.DeleteObjectPoolResponse{}, nil

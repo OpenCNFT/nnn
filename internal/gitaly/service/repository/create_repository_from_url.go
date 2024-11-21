@@ -14,6 +14,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
@@ -135,6 +136,12 @@ func (s *server) CreateRepositoryFromURL(ctx context.Context, req *gitalypb.Crea
 		return nil
 	}, repoutil.WithSkipInit()); err != nil {
 		return nil, structerr.NewInternal("creating repository: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := migration.RecordKeyCreation(tx, req.GetRepository().GetRelativePath()); err != nil {
+			return nil, structerr.NewInternal("recording migration key: %w", err)
+		}
 	}
 
 	return &gitalypb.CreateRepositoryFromURLResponse{}, nil

@@ -22,6 +22,7 @@ import (
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -122,11 +123,13 @@ func recoveryStatusAction(ctx *cli.Context) (returnErr error) {
 		storagemgr.NewFactory(
 			logger,
 			dbMgr,
-			partition.NewFactory(
-				gitCmdFactory,
-				localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-				partitionMetrics,
-				nil,
+			migration.NewFactory(
+				partition.NewFactory(
+					gitCmdFactory,
+					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+					partitionMetrics,
+					nil,
+				),
 			),
 			1,
 			storageMetrics,

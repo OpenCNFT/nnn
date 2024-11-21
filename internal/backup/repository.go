@@ -18,6 +18,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/chunk"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -709,6 +710,12 @@ func (r *localRepository) Create(ctx context.Context, hash git.ObjectHash, defau
 		repoutil.WithBranchName(defaultBranch),
 	); err != nil {
 		return fmt.Errorf("local repository: create: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := migration.RecordKeyCreation(tx, r.repo.GetRelativePath()); err != nil {
+			return fmt.Errorf("recording migration key: %w", err)
+		}
 	}
 
 	// Recreate the local repository, since the cache of object hash and ref-format needs
