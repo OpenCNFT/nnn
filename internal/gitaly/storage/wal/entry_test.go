@@ -191,13 +191,13 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
+				ops.removeDirectoryEntry("sentinel-op")
 				ops.removeDirectoryEntry("test-dir/file-1")
 				ops.removeDirectoryEntry("test-dir/subdir-private/file-2")
 				ops.removeDirectoryEntry("test-dir/subdir-private")
 				ops.removeDirectoryEntry("test-dir/subdir-shared/file-3")
 				ops.removeDirectoryEntry("test-dir/subdir-shared")
 				ops.removeDirectoryEntry("test-dir")
-				ops.removeDirectoryEntry("sentinel-op")
 				return ops
 			}(),
 			expectedFiles: testhelper.DirectoryState{
@@ -211,13 +211,13 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
+				ops.removeDirectoryEntry("sentinel-op")
 				ops.removeDirectoryEntry("second-level/test-dir/file-1")
 				ops.removeDirectoryEntry("second-level/test-dir/subdir-private/file-2")
 				ops.removeDirectoryEntry("second-level/test-dir/subdir-private")
 				ops.removeDirectoryEntry("second-level/test-dir/subdir-shared/file-3")
 				ops.removeDirectoryEntry("second-level/test-dir/subdir-shared")
 				ops.removeDirectoryEntry("second-level/test-dir")
-				ops.removeDirectoryEntry("sentinel-op")
 				return ops
 			}(),
 			expectedFiles: testhelper.DirectoryState{
