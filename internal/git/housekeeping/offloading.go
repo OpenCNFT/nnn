@@ -54,9 +54,7 @@ func SetOffloadingGitConfig(ctx context.Context, repo *localrepo.Repo, url, filt
 //
 // As a result, the logic in repo.SetConfig will be adjusted to handle this scenario.
 // This explanation will become obsolete and can be removed in the future.
-func ResetOffloadingGitConfig(ctx context.Context, repo *localrepo.Repo,
-	praefectTxManager transaction.Manager,
-) error {
+func ResetOffloadingGitConfig(ctx context.Context, repo *localrepo.Repo, praefectTxManager transaction.Manager) error {
 	// Using regex here is safe as all offloading promisor remote-related configurations
 	// are prefixed with "remote.<OffloadingPromisorRemote>". This follows the logic
 	// in `SetOffloadingGitConfig`. If any new logic is added to `SetOffloadingGitConfig`
@@ -68,4 +66,3 @@ func ResetOffloadingGitConfig(ctx context.Context, repo *localrepo.Repo,
 	}
 	return nil
 }
->>>>>>> 17840d671 (fixup! housekeeping: Add SetOffloadingGitConfig helper function)
