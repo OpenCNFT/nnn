@@ -395,7 +395,7 @@ func (r ReplMgr) processBacklog(ctx context.Context, b BackoffFactory, virtualSt
 	// We should make a graceful shutdown of the processing loop and don't want to interrupt
 	// in-flight operations. That is why we suppress cancellation on the provided context.
 	appCtx := ctx
-	ctx = helper.SuppressCancellation(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	storageNames := r.storageNamesByVirtualStorage[virtualStorage]
 	type StorageProcessing struct {

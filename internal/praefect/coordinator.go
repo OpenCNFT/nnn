@@ -13,7 +13,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/metadata"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/protoregistry"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/proxy"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/praefect/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/praefect/datastore"
@@ -1074,7 +1073,7 @@ func (c *Coordinator) newRequestFinalizer(
 		// canceled. We need to perform the database updates regardless whether the request was canceled or not as
 		// the primary replica could have been dirtied and secondaries become outdated. Otherwise we'd have no idea of
 		// the possible changes performed on the disk.
-		ctx, cancel := context.WithTimeout(helper.SuppressCancellation(originalCtx), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(originalCtx), 30*time.Second)
 		defer cancel()
 
 		logEntry := c.logger.WithFields(log.Fields{
