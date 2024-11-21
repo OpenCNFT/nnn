@@ -10,6 +10,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -1078,7 +1079,7 @@ func generateModifyReferencesTests(t *testing.T, setup testTransactionSetup) []t
 					ReferenceUpdates: git.ReferenceUpdates{
 						"refs/heads/branch-2": {OldOID: setup.Commits.First.OID, NewOID: setup.ObjectHash.ZeroOID},
 					},
-					ExpectedError: errConcurrentPackedRefsWrite,
+					ExpectedError: fshistory.NewReadWriteConflictError(filepath.Join(setup.RelativePath, "packed-refs"), 2, 3),
 				},
 			},
 			expectedState: StateAssertion{
