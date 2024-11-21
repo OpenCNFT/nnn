@@ -103,17 +103,22 @@ func (s *Server) userApplyPatch(ctx context.Context, header *gitalypb.UserApplyP
 		return fmt.Errorf("add worktree: %w", err)
 	}
 
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-		defer cancel()
+	// When transactions are not used, the worktree is added to the actual repository and needs to be removed.
+	// When transaction are used, the worktree ends up in the snapshot, and is removed with it. The snapshot
+	// is removed before this removal operations runs. Don't remove the tree here with transactions.
+	if storage.ExtractTransaction(ctx) == nil {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
 
-		worktreeName := filepath.Base(worktreePath)
-		if err := s.removeWorktree(ctx, repo, worktreeName); err != nil {
-			returnedErr = errors.Join(returnedErr,
-				structerr.NewInternal("failed to remove worktree: %w", err).WithMetadata("worktree_name", worktreeName),
-			)
-		}
-	}()
+			worktreeName := filepath.Base(worktreePath)
+			if err := s.removeWorktree(ctx, repo, worktreeName); err != nil {
+				returnedErr = errors.Join(returnedErr,
+					structerr.NewInternal("failed to remove worktree: %w", err).WithMetadata("worktree_name", worktreeName),
+				)
+			}
+		}()
+	}
 
 	var stdout, stderr bytes.Buffer
 	if err := repo.ExecAndWait(ctx,
