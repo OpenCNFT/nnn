@@ -371,9 +371,12 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 				// entries. We signal only if the transaction modifies the in-memory committed entry.
 				// This signal queue is buffered. If the queue is full, the manager hasn't woken up. The
 				// next scan will cover the work of the prior one. So, no need to let the transaction wait.
-				// ┌─ 1st signal        ┌─ The manager scans til here
-				// □ □ □ □ □ □ □ □ □ □ ■ ■ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ⧅ ⧅ ⧅ ⧅ ■
-				//        └─ 2nd signal
+				//
+				//  ┌─ 1st signal   ┌── The manager scans til here
+				// ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐
+				// └─┘ └─┘ └┬┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
+				//          └─ 2nd signal
+				//
 				if removedAnyEntry {
 					select {
 					case mgr.completedQueue <- struct{}{}:
@@ -2287,10 +2290,17 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 		// it. This condition is to prevent a "hole" in the list. A transaction referring to a log entry at the
 		// low-water mark might scan all afterward log entries. Thus, the manager needs to keep in the database.
 		//
-		// ┌─ Oldest LSN
-		// ┌─ Can be removed ─┐            ┌─ Cannot be removed
-		// □ □ □ □ □ □ □ □ □ □ ■ ■ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ⧅ ⧅ ⧅ ⧅ ■
-		//                     └─ Low-water mark, still referred by another transaction
+		//
+		//                  ┌── Consumer not acknowledged
+		//                  │       ┌─ Applied til this point
+		//    Can remove    │       │       ┌─ Free, but cannot be removed
+		//  ◄───────────►   │       │       │
+		// ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐
+		// └┬┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
+		//  └─ oldestLSN    ▲
+		//                  │
+		//            Low-water mark
+		//
 		if mgr.oldestLSN < mgr.lowWaterMark() {
 			if err := mgr.deleteLogEntry(ctx, mgr.oldestLSN); err != nil {
 				return fmt.Errorf("deleting log entry: %w", err)
@@ -2607,16 +2617,6 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("new snapshot manager: %w", err)
 	}
 
-	// The LSN of the last appended log entry is determined from the LSN of the latest entry in the log and
-	// the latest applied log entry. The manager also keeps track of committed entries and reserves them until there
-	// is no transaction refers them. It's possible there are some left-over entries in the database because a
-	// transaction can hold the entry stubbornly. So, the manager could not clean them up in the last session.
-	//
-	// ┌─ oldestLSN                    ┌─ appendedLSN
-	// ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ⧅ ■ ■ ■ ■ ■ ■ ■ ■ ■ ■
-	//                └─ appliedLSN
-	//
-	//
 	// oldestLSN is initialized to appliedLSN + 1. If there are no log entries in the log, then everything has been
 	// pruned already or there has not been any log entries yet. Setting this +1 avoids trying to clean up log entries
 	// that do not exist. If there are some, we'll set oldestLSN to the head of the log below.
