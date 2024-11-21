@@ -29,6 +29,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -1401,7 +1402,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					//
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
-						packFilePath := packFilePath(EntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
+						packFilePath := packFilePath(log.EntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
 						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,

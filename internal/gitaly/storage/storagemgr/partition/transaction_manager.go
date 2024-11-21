@@ -37,10 +37,11 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/fsrecorder"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal/reftree"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
+	logging "gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/tracing"
@@ -938,7 +939,7 @@ type TransactionManager struct {
 	// close cancels ctx and stops the transaction processing.
 	close context.CancelFunc
 	// logger is the logger to use to write log messages.
-	logger log.Logger
+	logger logging.Logger
 
 	// closing is closed when close is called. It unblock transactions that are waiting to be admitted.
 	closing <-chan struct{}
@@ -965,7 +966,7 @@ type TransactionManager struct {
 	// db is the handle to the key-value store used for storing the write-ahead log related state.
 	db keyvalue.Transactioner
 	// logManager manages the underlying Write-Ahead Log entries.
-	logManager *LogManager
+	logManager *log.LogManager
 	// admissionQueue is where the incoming writes are waiting to be admitted to the transaction
 	// manager.
 	admissionQueue chan *Transaction
@@ -1031,7 +1032,7 @@ type testHooks struct {
 // NewTransactionManager returns a new TransactionManager for the given repository.
 func NewTransactionManager(
 	ptnID storage.PartitionID,
-	logger log.Logger,
+	logger logging.Logger,
 	db keyvalue.Transactioner,
 	storageName,
 	storagePath,
@@ -1059,7 +1060,7 @@ func NewTransactionManager(
 		storagePath:          storagePath,
 		partitionID:          ptnID,
 		db:                   db,
-		logManager:           NewLogManager(storageName, ptnID, stagingDir, stateDir, consumer),
+		logManager:           log.NewLogManager(storageName, ptnID, stagingDir, stateDir, consumer),
 		admissionQueue:       make(chan *Transaction),
 		completedQueue:       make(chan struct{}, 1),
 		initialized:          make(chan struct{}),
