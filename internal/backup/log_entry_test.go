@@ -66,7 +66,7 @@ type mockLogManager struct {
 
 func (lm *mockLogManager) Close() {}
 
-func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
+func (lm *mockLogManager) AcknowledgeConsumerPosition(lsn storage.LSN) {
 	lm.Lock()
 	defer lm.Unlock()
 
@@ -103,12 +103,12 @@ func (lm *mockLogManager) AcknowledgeTransaction(lsn storage.LSN) {
 
 func (lm *mockLogManager) SendNotification() {
 	n := lm.notifications[0]
-	lm.archiver.NotifyNewTransactions(lm.partitionInfo.StorageName, lm.partitionInfo.PartitionID, n.lowWaterMark, n.highWaterMark)
+	lm.archiver.NotifyNewEntries(lm.partitionInfo.StorageName, lm.partitionInfo.PartitionID, n.lowWaterMark, n.highWaterMark)
 
 	lm.notifications = lm.notifications[1:]
 }
 
-func (lm *mockLogManager) GetTransactionPath(lsn storage.LSN) string {
+func (lm *mockLogManager) GetEntryPath(lsn storage.LSN) string {
 	return filepath.Join(partitionPath(lm.entryRootPath, lm.partitionInfo), lsn.String())
 }
 

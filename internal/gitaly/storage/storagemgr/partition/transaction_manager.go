@@ -889,15 +889,14 @@ type committedEntry struct {
 	objectDependencies map[git.ObjectID]struct{}
 }
 
-// AcknowledgeTransaction acknowledges log entries up and including lsn as successfully processed
-// for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
-// completed transaction.
-func (mgr *TransactionManager) AcknowledgeTransaction(lsn storage.LSN) {
+// AcknowledgeConsumerPosition acknowledges log entries up and including lsn as successfully processed for the specified
+// LogConsumer. The manager is awakened if it is currently awaiting a new or completed transaction.
+func (mgr *TransactionManager) AcknowledgeConsumerPosition(lsn storage.LSN) {
 	mgr.logManager.AcknowledgeConsumerPosition(lsn)
 }
 
-// GetTransactionPath returns the path of the log entry's root directory.
-func (mgr *TransactionManager) GetTransactionPath(lsn storage.LSN) string {
+// GetEntryPath returns the path of the log entry's root directory.
+func (mgr *TransactionManager) GetEntryPath(lsn storage.LSN) string {
 	return mgr.logManager.GetEntryPath(lsn)
 }
 

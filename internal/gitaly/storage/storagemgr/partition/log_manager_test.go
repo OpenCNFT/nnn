@@ -359,7 +359,7 @@ type mockLogConsumer struct {
 	positions [][]storage.LSN
 }
 
-func (c *mockLogConsumer) NotifyNewTransactions(storageName string, partitionID storage.PartitionID, oldestLSN, appendedLSN storage.LSN) {
+func (c *mockLogConsumer) NotifyNewEntries(storageName string, partitionID storage.PartitionID, oldestLSN, appendedLSN storage.LSN) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

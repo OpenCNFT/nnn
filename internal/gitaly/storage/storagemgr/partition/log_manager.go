@@ -163,7 +163,7 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 		// Set acknowledged position to oldestLSN - 1 and notify the consumer from oldestLSN -> appendedLSN.
 		// If set the position to 0, the consumer is unable to read pruned entry anyway.
 		mgr.AcknowledgeConsumerPosition(mgr.oldestLSN - 1)
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
 	}
 	mgr.AcknowledgeAppliedPosition(appliedLSN)
 
@@ -232,7 +232,7 @@ func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntryPath string) 
 	mgr.appendedLSN = nextLSN
 
 	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
+		mgr.consumer.NotifyNewEntries(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
 	}
 	return nextLSN, nil
 }

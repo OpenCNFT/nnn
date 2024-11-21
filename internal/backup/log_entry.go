@@ -39,7 +39,7 @@ func newLogEntry(partitionInfo PartitionInfo, lsn storage.LSN) *logEntry {
 	}
 }
 
-// partitionNotification is used to store the data received by NotifyNewTransactions.
+// partitionNotification is used to store the data received by NotifyNewEntries.
 type partitionNotification struct {
 	lowWaterMark  storage.LSN
 	highWaterMark storage.LSN
@@ -172,8 +172,8 @@ func newLogEntryArchiver(logger log.Logger, archiveSink *Sink, workerCount uint,
 	return archiver
 }
 
-// NotifyNewTransactions passes the transaction information to the LogEntryArchiver for processing.
-func (la *LogEntryArchiver) NotifyNewTransactions(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN) {
+// NotifyNewEntries passes the log entry information to the LogEntryArchiver for processing.
+func (la *LogEntryArchiver) NotifyNewEntries(storageName string, partitionID storage.PartitionID, lowWaterMark, highWaterMark storage.LSN) {
 	la.notificationsMutex.Lock()
 	defer la.notificationsMutex.Unlock()
 
@@ -295,7 +295,7 @@ func (la *LogEntryArchiver) ingestNotifications(ctx context.Context) {
 		// not aware of this. Acknowledge again with our last processed entry.
 		if state.nextLSN > notification.highWaterMark {
 			if err := la.callLogManager(ctx, notification.partitionInfo, func(lm storage.LogManager) {
-				lm.AcknowledgeTransaction(state.nextLSN - 1)
+				lm.AcknowledgeConsumerPosition(state.nextLSN - 1)
 			}); err != nil {
 				la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for already completed entry")
 			}
@@ -382,7 +382,7 @@ func (la *LogEntryArchiver) receiveEntry(ctx context.Context, entry *logEntry) {
 	}
 
 	if err := la.callLogManager(ctx, entry.partitionInfo, func(lm storage.LogManager) {
-		lm.AcknowledgeTransaction(entry.lsn)
+		lm.AcknowledgeConsumerPosition(entry.lsn)
 	}); err != nil {
 		la.logger.WithError(err).WithFields(
 			log.Fields{
@@ -411,7 +411,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 
 	var entryPath string
 	if err := la.callLogManager(context.Background(), entry.partitionInfo, func(lm storage.LogManager) {
-		entryPath = lm.GetTransactionPath(entry.lsn)
+		entryPath = lm.GetEntryPath(entry.lsn)
 	}); err != nil {
 		la.backupCounter.WithLabelValues("fail").Add(1)
 		la.logger.WithError(err).Error("log entry archiver: failed to get LogManager for entry path")
@@ -441,7 +441,7 @@ func (la *LogEntryArchiver) processEntry(ctx context.Context, entry *logEntry) {
 	entry.success = true
 }
 
-// backupLogEntry tar's the root directory of the transaction and writes it to the Sink.
+// backupLogEntry tar's the root directory of the log entry and writes it to the Sink.
 func (la *LogEntryArchiver) backupLogEntry(ctx context.Context, partitionInfo PartitionInfo, lsn storage.LSN, entryPath string) (returnErr error) {
 	timer := prometheus.NewTimer(la.backupLatency)
 	defer timer.ObserveDuration()
