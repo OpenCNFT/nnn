@@ -280,7 +280,7 @@ func (c *ProcessCache) getOrCreateProcess(
 		// The latter would mean that we cannot use flags in the catfile code, but more
 		// importantly we also wouldn't be able to use feature-flagged Git version upgrades
 		// for catfile processes.
-		ctx = helper.SuppressCancellation(ctx)
+		ctx = context.WithoutCancel(ctx)
 		// We have to decorrelate the process from the current context given that it
 		// may potentially be reused across different RPC calls.
 		ctx = correlation.ContextWithCorrelation(ctx, "")

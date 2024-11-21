@@ -163,7 +163,7 @@ func (s *server) runPackObjects(
 	// If the cancellation of client1 propagated into the runPackObjects
 	// goroutine this would affect client2. We don't want that. So to prevent
 	// that, we suppress the cancellation of the originating context.
-	ctx = helper.SuppressCancellation(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -182,7 +182,7 @@ func (s *server) runPackObjectsLimited(
 	stdin io.ReadCloser,
 	key string,
 ) error {
-	ctx = helper.SuppressCancellation(ctx)
+	ctx = context.WithoutCancel(ctx)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
