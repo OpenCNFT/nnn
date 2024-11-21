@@ -2655,10 +2655,6 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
-	if err := mgr.removeStaleWALFiles(ctx, mgr.oldestLSN, mgr.appendedLSN); err != nil {
-		return fmt.Errorf("remove stale packs: %w", err)
-	}
-
 	mgr.testHooks.beforeInitialization()
 	mgr.initializationSuccessful = true
 
@@ -2723,48 +2719,6 @@ func (mgr *TransactionManager) createStateDirectory(ctx context.Context) error {
 // getAbsolutePath returns the relative path's absolute path in the storage.
 func (mgr *TransactionManager) getAbsolutePath(relativePath ...string) string {
 	return filepath.Join(append([]string{mgr.storagePath}, relativePath...)...)
-}
-
-// removeStaleWALFiles removes files from the log directory that have no associated log entry.
-// Such files can be left around if transaction's files were moved in place successfully
-// but the manager was interrupted before successfully persisting the log entry itself.
-// If the manager deletes a log entry successfully from the database but is interrupted before it cleans
-// up the associated files, such a directory can also be left at the head of the log.
-func (mgr *TransactionManager) removeStaleWALFiles(ctx context.Context, oldestLSN, appendedLSN storage.LSN) error {
-	needsFsync := false
-	for _, possibleStaleFilesPath := range []string{
-		// Log entries are pruned one by one. If a write is interrupted, the only possible stale files would be
-		// for the log entry preceding the oldest log entry.
-		walFilesPathForLSN(mgr.stateDirectory, oldestLSN-1),
-		// Log entries are appended one by one to the log. If a write is interrupted, the only possible stale
-		// files would be for the next LSN. Remove the files if they exist.
-		walFilesPathForLSN(mgr.stateDirectory, appendedLSN+1),
-	} {
-
-		if _, err := os.Stat(possibleStaleFilesPath); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("stat: %w", err)
-			}
-
-			// No stale files were present.
-			continue
-		}
-
-		if err := os.RemoveAll(possibleStaleFilesPath); err != nil {
-			return fmt.Errorf("remove all: %w", err)
-		}
-
-		needsFsync = true
-	}
-
-	if needsFsync {
-		// Sync the parent directory to flush the file deletion.
-		if err := safe.NewSyncer().Sync(ctx, walFilesPath(mgr.stateDirectory)); err != nil {
-			return fmt.Errorf("sync: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // walFilesPath returns the WAL directory's path.
