@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -904,25 +905,23 @@ func (mgr *TransactionManager) GetTransactionPath(lsn storage.LSN) string {
 	return walFilesPathForLSN(mgr.stateDirectory, lsn)
 }
 
-// consumerPosition tracks the last LSN acknowledged for a consumer.
-type consumerPosition struct {
-	// position is the last LSN acknowledged as completed by the consumer.
-	position storage.LSN
-	sync.Mutex
+// position tracks the last LSN acknowledged for of a particular type.
+type position struct {
+	lsn atomic.Value
 }
 
-func (p *consumerPosition) getPosition() storage.LSN {
-	p.Lock()
-	defer p.Unlock()
-
-	return p.position
+func newPosition() *position {
+	p := position{}
+	p.setPosition(0)
+	return &p
 }
 
-func (p *consumerPosition) setPosition(pos storage.LSN) {
-	p.Lock()
-	defer p.Unlock()
+func (p *position) getPosition() storage.LSN {
+	return p.lsn.Load().(storage.LSN)
+}
 
-	p.position = pos
+func (p *position) setPosition(pos storage.LSN) {
+	p.lsn.Store(pos)
 }
 
 // TransactionManager is responsible for transaction management of a single repository. Each repository has
@@ -1054,7 +1053,7 @@ type TransactionManager struct {
 	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
 	consumer LogConsumer
 	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
-	consumerPos *consumerPosition
+	consumerPos *position
 	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
 	acknowledgedQueue chan struct{}
 
@@ -1090,7 +1089,7 @@ func NewTransactionManager(
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	consumerPos := &consumerPosition{}
+	consumerPos := newPosition()
 
 	cleanupWorkers := &errgroup.Group{}
 	cleanupWorkers.SetLimit(25)

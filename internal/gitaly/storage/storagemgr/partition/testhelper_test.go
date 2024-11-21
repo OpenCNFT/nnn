@@ -1008,8 +1008,12 @@ type ConsumerState struct {
 }
 
 // RequireConsumer asserts the consumer log position is correct.
-func RequireConsumer(t *testing.T, consumer LogConsumer, consumerPos *consumerPosition, expected ConsumerState) {
+func RequireConsumer(t *testing.T, consumer LogConsumer, consumerPos *position, expected ConsumerState) {
 	t.Helper()
+
+	if consumerPos == nil {
+		return
+	}
 
 	require.Equal(t, expected.ManagerPosition, consumerPos.getPosition(), "expected and actual manager position don't match")
 
