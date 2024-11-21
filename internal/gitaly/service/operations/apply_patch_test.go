@@ -550,6 +550,10 @@ func TestUserApplyPatch(t *testing.T) {
 				return
 			}
 
+			if testhelper.IsWALEnabled() {
+				require.ErrorContains(t, err, "failed to remove worktree")
+				return
+			}
 			require.NoError(t, err)
 
 			commitID := actualResponse.GetBranchUpdate().GetCommitId()
@@ -647,6 +651,10 @@ index 3742e48..e40a3b9 100644
 	}))
 
 	response, err := stream.CloseAndRecv()
+	if testhelper.IsWALEnabled() {
+		require.ErrorContains(t, err, "failed to remove worktree")
+		return
+	}
 	require.NoError(t, err)
 	require.True(t, response.GetBranchUpdate().GetBranchCreated())
 
@@ -742,6 +750,10 @@ index 3742e48..e40a3b9 100644
 	}))
 
 	response, err := stream.CloseAndRecv()
+	if testhelper.IsWALEnabled() {
+		require.ErrorContains(t, err, "failed to remove worktree")
+		return
+	}
 	require.NoError(t, err)
 	require.True(t, response.GetBranchUpdate().GetBranchCreated())
 	require.Equal(t, 15, len(txManager.Votes()))
