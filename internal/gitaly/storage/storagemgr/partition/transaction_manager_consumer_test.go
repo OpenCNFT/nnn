@@ -263,7 +263,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 		},
 		{
-			desc:        "dependent transaction blocks pruning acknowledged entry",
+			desc:        "dependent transaction does not block pruning acknowledged entry",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -295,15 +295,10 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
-				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
-					"/":                           {Mode: mode.Directory},
-					"/wal":                        {Mode: mode.Directory},
-					"/wal/0000000000001":          {Mode: mode.Directory},
-					"/wal/0000000000001/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/main", setup.Commits.First.OID)),
-					"/wal/0000000000001/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
-					1: {{"refs/heads/main": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
-				})),
+				Directory: testhelper.DirectoryState{
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
+				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
@@ -351,7 +346,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 			},
 		},
 		{
-			desc:        "consumer position zeroed lsn on restart",
+			desc:        "consumer position set to oldest lsn on restart",
 			customSetup: customSetup,
 			steps: steps{
 				StartManager{},
@@ -408,19 +403,10 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 				Database: DatabaseState{
 					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
-				Directory: gittest.FilesOrReftables(testhelper.DirectoryState{
-					"/":                           {Mode: mode.Directory},
-					"/wal":                        {Mode: mode.Directory},
-					"/wal/0000000000002":          {Mode: mode.Directory},
-					"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/other", setup.Commits.Second.OID)),
-					"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.Second.OID + "\n")},
-					"/wal/0000000000003":          {Mode: mode.Directory},
-					"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/third", setup.Commits.Third.OID)),
-					"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.Third.OID + "\n")},
-				}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
-					2: {{"refs/heads/other": git.ReferenceUpdate{NewOID: setup.Commits.Second.OID}}},
-					3: {{"refs/heads/third": git.ReferenceUpdate{NewOID: setup.Commits.Third.OID}}},
-				})),
+				Directory: testhelper.DirectoryState{
+					"/":    {Mode: mode.Directory},
+					"/wal": {Mode: mode.Directory},
+				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
@@ -484,7 +470,7 @@ func generateConsumerTests(t *testing.T, setup testTransactionSetup) []transacti
 					},
 				},
 				Consumers: ConsumerState{
-					ManagerPosition: 0,
+					ManagerPosition: 3,
 					HighWaterMark:   3,
 				},
 			},

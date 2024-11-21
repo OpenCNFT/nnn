@@ -2296,14 +2296,6 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 			if err := mgr.deleteLogEntry(ctx, mgr.oldestLSN); err != nil {
 				return fmt.Errorf("deleting log entry: %w", err)
 			}
-
-			// The WAL entries are deleted only after there are no transactions using an
-			// older read snapshot than the LSN. It's also safe to drop the transaction
-			// from the conflict detection history as there are no transactions reading
-			// at an older snapshot. Since the changes are already in the transaction's
-			// snapshot, it would already base its changes on them.
-			mgr.conflictMgr.EvictLSN(ctx, mgr.oldestLSN)
-
 			mgr.oldestLSN++
 			continue
 		}
@@ -2394,6 +2386,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		// Prepare the transaction to conflict check it. We'll commit it later if we
 		// succeed logging the transaction.
+		mgr.mutex.Lock()
 		preparedTX, err := mgr.conflictMgr.Prepare(ctx, &conflict.Transaction{
 			ReadLSN:            transaction.SnapshotLSN(),
 			TargetRelativePath: transaction.relativePath,
@@ -2401,6 +2394,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			ZeroOID:            zeroOID,
 			ReferenceUpdates:   transaction.referenceUpdates,
 		})
+		mgr.mutex.Unlock()
 		if err != nil {
 			return fmt.Errorf("prepare: %w", err)
 		}
@@ -2461,7 +2455,9 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		// Commit the prepared transaction now that we've managed to commit the log entry.
+		mgr.mutex.Lock()
 		preparedTX.Commit(ctx, mgr.appendedLSN)
+		mgr.mutex.Unlock()
 
 		return nil
 	}(); err != nil {
@@ -2643,6 +2639,9 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 	}
 
 	if mgr.consumer != nil {
+		// Set acknowledged position to oldestLSN - 1 and notify the consumer from oldestLSN -> appendedLSN.
+		// If set the position to 0, the consumer is unable to read pruned entry anyway.
+		mgr.consumerPos.setPosition(mgr.oldestLSN - 1)
 		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
 	}
 
@@ -3865,17 +3864,7 @@ func (mgr *TransactionManager) lowWaterMark() storage.LSN {
 		}
 	}
 
-	elm := mgr.committedEntries.Front()
-	if elm == nil {
-		return minConsumed
-	}
-
-	committed := elm.Value.(*committedEntry).lsn
-	if minConsumed < committed {
-		return minConsumed
-	}
-
-	return committed
+	return minConsumed
 }
 
 // updateCommittedEntry updates the reader counter of the committed entry of the snapshot that this transaction depends on.
@@ -3941,6 +3930,12 @@ func (mgr *TransactionManager) cleanCommittedEntry(entry *committedEntry) bool {
 		}
 
 		mgr.committedEntries.Remove(elm)
+
+		// It's safe to drop the transaction from the conflict detection history as there are no transactions
+		// reading at an older snapshot. Since the changes are already in the transaction's snapshot, it would
+		// already base its changes on them.
+		mgr.conflictMgr.EvictLSN(mgr.ctx, front.lsn)
+
 		removedAnyEntry = true
 		elm = mgr.committedEntries.Front()
 	}
