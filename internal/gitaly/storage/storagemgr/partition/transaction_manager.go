@@ -97,6 +97,8 @@ var (
 	errReadOnlyHousekeeping       = errors.New("housekeeping in a read-only transaction")
 	errReadOnlyKeyValue           = errors.New("key-value writes in a read-only transaction")
 
+	errRepositoryDeletionOtherOperations = errors.New("other operations staged with repository deletion")
+
 	// errWritableAllRepository is returned when a transaction is started with
 	// no relative path filter specified and is not read-only. Transactions do
 	// not currently support writing to multiple repositories and so a writable
@@ -2352,7 +2354,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("prepare: %w", err)
 		}
 
-		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil && !transaction.deleteRepository {
+		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil {
 			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
 			if err != nil {
 				return fmt.Errorf("verify references: %w", err)
@@ -2371,6 +2373,10 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		if transaction.deleteRepository {
+			if len(transaction.walEntry.Operations()) != 0 {
+				return errRepositoryDeletionOtherOperations
+			}
+
 			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 
 			if err := transaction.walEntry.RecordDirectoryRemoval(
