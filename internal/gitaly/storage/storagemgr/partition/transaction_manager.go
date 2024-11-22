@@ -215,7 +215,7 @@ type Transaction struct {
 	admitted bool
 	// finish cleans up the transaction releasing the resources associated with it. It must be called
 	// once the transaction is done with.
-	finish func() error
+	finish func(admitted bool) error
 	// finished is closed when the transaction has been finished. This enables waiting on transactions
 	// to finish where needed.
 	finished chan struct{}
@@ -345,7 +345,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 
 	span.SetTag("snapshotLSN", txn.snapshotLSN)
 
-	txn.finish = func() error {
+	txn.finish = func(admitted bool) error {
 		defer trace.StartRegion(ctx, "finish transaction").End()
 		defer close(txn.finished)
 		defer transactionDurationTimer.ObserveDuration()
@@ -379,31 +379,61 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 			}
 		}()
 
-		var cleanupErr error
-		if txn.snapshot != nil {
-			if err := txn.snapshot.Close(); err != nil {
-				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close snapshot: %w", err))
+		cleanTemporaryState := func() error {
+			defer trace.StartRegion(ctx, "cleanTemporaryState").End()
+
+			var cleanupErr error
+			if txn.snapshot != nil {
+				if err := txn.snapshot.Close(); err != nil {
+					cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close snapshot: %w", err))
+				}
 			}
+
+			if txn.stagingSnapshot != nil {
+				if err := txn.stagingSnapshot.Close(); err != nil {
+					cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close staging snapshot: %w", err))
+				}
+			}
+
+			if txn.stagingDirectory != "" {
+				if err := os.RemoveAll(txn.stagingDirectory); err != nil {
+					cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove staging directory: %w", err))
+				}
+			}
+
+			return cleanupErr
 		}
 
-		if txn.stagingSnapshot != nil {
-			if err := txn.stagingSnapshot.Close(); err != nil {
-				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("close staging snapshot: %w", err))
-			}
+		if admitted {
+			// If the transcation was admitted, `.Run()` is responsible for cleaning the transaction up.
+			// Cleaning up the snapshots can take a relatively long time if the snapshots are large, or if
+			// the file system is busy. To avoid blocking transaction processing, we us a pool of background
+			// workers to clean up the transaction snapshots.
+			//
+			// The number of background workers is limited to exert backpressure on write transactions if
+			// we can't clean up after them fast enough.
+			mgr.cleanupWorkers.Go(func() error {
+				if err := cleanTemporaryState(); err != nil {
+					mgr.cleanupWorkerFailedOnce.Do(func() { close(mgr.cleanupWorkerFailed) })
+					return fmt.Errorf("clean temporary state async: %w", err)
+				}
+
+				return nil
+			})
+
+			return nil
 		}
 
-		if txn.stagingDirectory != "" {
-			if err := os.RemoveAll(txn.stagingDirectory); err != nil {
-				cleanupErr = errors.Join(cleanupErr, fmt.Errorf("remove staging directory: %w", err))
-			}
+		if err := cleanTemporaryState(); err != nil {
+			return fmt.Errorf("clean temporary state sync: %w", err)
 		}
 
-		return cleanupErr
+		return nil
 	}
 
 	defer func() {
 		if returnedErr != nil {
-			if err := txn.finish(); err != nil {
+			if err := txn.finish(false); err != nil {
 				mgr.logger.WithError(err).ErrorContext(ctx, "failed finishing unsuccessful transaction begin")
 			}
 		}
@@ -607,7 +637,7 @@ func (txn *Transaction) finishUnadmitted() error {
 		return nil
 	}
 
-	return txn.finish()
+	return txn.finish(false)
 }
 
 // SnapshotLSN returns the LSN of the Transaction's read snapshot.
@@ -958,6 +988,15 @@ type TransactionManager struct {
 	// Run and Begin which are ran in different goroutines.
 	mutex sync.Mutex
 
+	// cleanupWorkers is a worker pool that TransactionManager uses to run transaction clean up in the
+	// background. This way transaction processing is not blocked on the clean up.
+	cleanupWorkers *errgroup.Group
+	// cleanupWorkerFailed is closed if one of the clean up workers failed. This signals to the manager
+	// to stop processing and exit.
+	cleanupWorkerFailed chan struct{}
+	// cleanupWorkerFailedOnce ensures cleanupWorkerFailed is closed only once.
+	cleanupWorkerFailedOnce sync.Once
+
 	// snapshotLocks contains state used for synchronizing snapshotters with the log application. The
 	// lock is released after the corresponding log entry is applied.
 	snapshotLocks map[storage.LSN]*snapshotLock
@@ -1029,6 +1068,9 @@ func NewTransactionManager(
 
 	consumerPos := &consumerPosition{}
 
+	cleanupWorkers := &errgroup.Group{}
+	cleanupWorkers.SetLimit(25)
+
 	return &TransactionManager{
 		ctx:                  ctx,
 		close:                cancel,
@@ -1048,6 +1090,8 @@ func NewTransactionManager(
 		conflictMgr:          conflict.NewManager(),
 		stateDirectory:       stateDir,
 		stagingDirectory:     stagingDir,
+		cleanupWorkers:       cleanupWorkers,
+		cleanupWorkerFailed:  make(chan struct{}),
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
 		committedEntries:     list.New(),
 		metrics:              metrics,
@@ -2199,6 +2243,11 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 		}
 	}()
 
+	defer func() {
+		if err := mgr.cleanupWorkers.Wait(); err != nil {
+			returnedErr = errors.Join(returnedErr, fmt.Errorf("clean up worker: %w", err))
+		}
+	}()
 	// Defer the Stop in order to release all on-going Commit calls in case of error.
 	defer close(mgr.closed)
 	defer mgr.Close()
@@ -2258,14 +2307,16 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		defer trace.StartRegion(ctx, "processTransaction").End()
 		defer prometheus.NewTimer(mgr.metrics.transactionProcessingDurationSeconds).ObserveDuration()
 
-		// The Transaction does not finish itself anymore once it has been admitted for
-		// processing. This avoids the Transaction concurrently removing the staged state
+		// The transaction does not finish itself anymore once it has been admitted for
+		// processing. This avoids the client concurrently removing the staged state
 		// while the manager is still operating on it. We thus need to defer its finishing.
-		defer func() {
-			if err := transaction.finish(); err != nil && returnedErr == nil {
-				returnedErr = fmt.Errorf("finish transaction: %w", err)
-			}
-		}()
+		//
+		// The error is always empty here as we run the clean up in background. If a background
+		// task fails, cleanupWorkerFailed channel is closed prompting the manager to exit and
+		// return the error from the errgroup.
+		defer func() { _ = transaction.finish(true) }()
+	case <-mgr.cleanupWorkerFailed:
+		return errors.New("cleanup worker failed")
 	case <-mgr.completedQueue:
 		return nil
 	case <-mgr.acknowledgedQueue:
