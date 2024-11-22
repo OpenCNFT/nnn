@@ -1038,7 +1038,7 @@ type transactionTestCase struct {
 }
 
 func performReferenceUpdates(tb testing.TB, ctx context.Context, tx storage.Transaction, rewrittenRepo gitcmd.RepositoryExecutor, updates git.ReferenceUpdates) error {
-	updater, err := updateref.New(ctx, rewrittenRepo)
+	updater, err := updateref.New(ctx, rewrittenRepo, updateref.WithNoDeref())
 	require.NoError(tb, err)
 
 	require.NoError(tb, updater.Start())
