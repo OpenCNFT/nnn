@@ -241,6 +241,21 @@ func TestEntry(t *testing.T) {
 				"/": {Mode: fs.ModeDir | rootDirPerm},
 			},
 		},
+		{
+			desc: "Mkdir",
+			run: func(t *testing.T, entry *Entry) {
+				entry.RecordMkdir("parent/target")
+			},
+			expectedOperations: func() operations {
+				var ops operations
+				ops.removeDirectoryEntry("sentinel-op")
+				ops.createDirectory("parent/target")
+				return ops
+			}(),
+			expectedFiles: testhelper.DirectoryState{
+				"/": {Mode: fs.ModeDir | rootDirPerm},
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
