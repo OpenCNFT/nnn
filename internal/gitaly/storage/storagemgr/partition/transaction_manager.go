@@ -1225,8 +1225,9 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	}
 
 	transaction.manifest = &gitalypb.LogEntry{
-		RelativePath: transaction.relativePath,
-		Operations:   transaction.walEntry.Operations(),
+		RelativePath:          transaction.relativePath,
+		Operations:            transaction.walEntry.Operations(),
+		ReferenceTransactions: transaction.referenceUpdatesToProto(),
 	}
 
 	if err := safe.NewSyncer().SyncRecursive(ctx, transaction.walFilesPath()); err != nil {
@@ -1261,6 +1262,34 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	case <-mgr.closed:
 		return storage.ErrTransactionProcessingStopped
 	}
+}
+
+func (txn *Transaction) referenceUpdatesToProto() []*gitalypb.LogEntry_ReferenceTransaction {
+	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
+	for _, updates := range txn.referenceUpdates {
+		changes := make([]*gitalypb.LogEntry_ReferenceTransaction_Change, 0, len(updates))
+		for reference, update := range updates {
+			changes = append(changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
+				ReferenceName: []byte(reference),
+				NewOid:        []byte(update.NewOID),
+				NewTarget:     []byte(update.NewTarget),
+			})
+		}
+
+		// Sort the reference updates so the reference changes are always logged in a deterministic order.
+		sort.Slice(changes, func(i, j int) bool {
+			return bytes.Compare(
+				changes[i].GetReferenceName(),
+				changes[j].GetReferenceName(),
+			) < 0
+		})
+
+		referenceTransactions = append(referenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
+			Changes: changes,
+		})
+	}
+
+	return referenceTransactions
 }
 
 // replaceObjectDirectory replaces the snapshot repository's object directory
@@ -2322,8 +2351,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil {
-			transaction.manifest.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
-			if err != nil {
+			if err := mgr.verifyReferences(ctx, transaction); err != nil {
 				return fmt.Errorf("verify references: %w", err)
 			}
 		}
@@ -2755,65 +2783,43 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 // verifyReferences verifies that the references in the transaction apply on top of the already accepted
 // reference changes. The old tips in the transaction are verified against the current actual tips.
 // It returns the write-ahead log entry for the reference transactions successfully verified.
-func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction *Transaction) ([]*gitalypb.LogEntry_ReferenceTransaction, error) {
+func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction *Transaction) error {
 	defer trace.StartRegion(ctx, "verifyReferences").End()
 
 	if len(transaction.referenceUpdates) == 0 {
-		return nil, nil
+		return nil
 	}
 	if !transaction.repositoryTarget() {
-		return nil, errRelativePathNotSet
+		return errRelativePathNotSet
 	}
 
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyReferences", nil)
 	defer span.Finish()
-
-	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
-	for _, updates := range transaction.referenceUpdates {
-		changes := make([]*gitalypb.LogEntry_ReferenceTransaction_Change, 0, len(updates))
-		for reference, update := range updates {
-			changes = append(changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
-				ReferenceName: []byte(reference),
-				NewOid:        []byte(update.NewOID),
-				NewTarget:     []byte(update.NewTarget),
-			})
-		}
-
-		// Sort the reference updates so the reference changes are always logged in a deterministic order.
-		sort.Slice(changes, func(i, j int) bool {
-			return bytes.Compare(
-				changes[i].GetReferenceName(),
-				changes[j].GetReferenceName(),
-			) < 0
-		})
-
-		referenceTransactions = append(referenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
-			Changes: changes,
-		})
-	}
 
 	// Apply quarantine to the staging repository in order to ensure the new objects are available when we
 	// are verifying references. Without it we'd encounter errors about missing objects as the new objects
 	// are not in the repository.
 	stagingRepositoryWithQuarantine, err := transaction.stagingRepository.Quarantine(ctx, transaction.quarantineDirectory)
 	if err != nil {
-		return nil, fmt.Errorf("quarantine: %w", err)
+		return fmt.Errorf("quarantine: %w", err)
 	}
 
 	// For the reftable backend, we also need to capture HEAD updates here.
 	// So obtain the reference backend to do the specific checks.
 	refBackend, err := stagingRepositoryWithQuarantine.ReferenceBackend(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("reference backend: %w", err)
+		return fmt.Errorf("reference backend: %w", err)
 	}
 
-	if refBackend == git.ReferenceBackendReftables {
-		if err := mgr.verifyReferencesWithGitForReftables(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
-			return nil, fmt.Errorf("verify references with git: %w", err)
-		}
+	if refBackend != git.ReferenceBackendReftables {
+		return nil
 	}
 
-	return referenceTransactions, nil
+	if err := mgr.verifyReferencesWithGitForReftables(ctx, transaction.manifest.GetReferenceTransactions(), transaction, stagingRepositoryWithQuarantine); err != nil {
+		return fmt.Errorf("verify references with git: %w", err)
+	}
+
+	return nil
 }
 
 // verifyReferencesWithGitForReftables is responsible for converting the logical reference updates
