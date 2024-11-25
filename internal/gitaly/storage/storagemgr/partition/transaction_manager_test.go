@@ -2470,6 +2470,11 @@ func BenchmarkTransactionManager(b *testing.B) {
 						RelativePaths: []string{repo.GetRelativePath()},
 					})
 					require.NoError(b, err)
+					require.NoError(b, performReferenceUpdates(b, ctx,
+						transaction,
+						localrepo.New(logger, config.NewLocator(cfg), cmdFactory, cache, transaction.RewriteRepository(repo)),
+						initialReferenceUpdates,
+					))
 					require.NoError(b, transaction.UpdateReferences(ctx, initialReferenceUpdates))
 					require.NoError(b, transaction.Commit(ctx))
 
@@ -2483,6 +2488,11 @@ func BenchmarkTransactionManager(b *testing.B) {
 								RelativePaths: []string{repo.GetRelativePath()},
 							})
 							require.NoError(b, err)
+							require.NoError(b, performReferenceUpdates(b, ctx,
+								transaction,
+								localrepo.New(logger, config.NewLocator(cfg), cmdFactory, cache, transaction.RewriteRepository(repo)),
+								updateA,
+							))
 							require.NoError(b, transaction.UpdateReferences(ctx, updateA))
 							assert.NoError(b, transaction.Commit(ctx))
 							updateA, updateB = updateB, updateA
