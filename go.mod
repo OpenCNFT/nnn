@@ -9,7 +9,7 @@ replace github.com/go-enry/go-license-detector/v4 => github.com/gl-gitaly/go-lic
 
 require (
 	cloud.google.com/go/storage v1.44.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.4.1
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0
 	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.63.1
 	github.com/beevik/ntp v1.4.3
@@ -70,8 +70,8 @@ require (
 	cloud.google.com/go/trace v1.11.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.14 // indirect
 	dario.cat/mergo v1.0.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.14.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.16.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
