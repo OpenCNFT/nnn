@@ -515,44 +515,20 @@ func TestHistory(t *testing.T) {
 		require.NoError(t, tx.Remove("negative"))
 		tx.Commit(1)
 
-		t.Run("concurrent directory creation", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("directory", 0, 1), history.Begin(0).CreateDirectory("directory"))
-		})
-
-		t.Run("concurrent file creation", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("file", 0, 1), history.Begin(0).CreateFile("file"))
-		})
-
-		t.Run("concurrent removal", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateFile("negative"))
-		})
-
-		t.Run("concurrent removal of parent directory of directory", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateDirectory("negative/directory"))
-		})
-
-		t.Run("concurrent removal of parent directory of file", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateFile("negative/file"))
-		})
-
-		t.Run("concurrent removal of parent directory", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).CreateFile("negative/negative"))
-		})
-
 		t.Run("directory creation conflicts with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("directory", 0, 1), history.Begin(0).Read("directory"))
+			require.Equal(t, NewReadWriteConflictError("directory", 0, 1), history.Begin(0).Read("directory"))
 		})
 
 		t.Run("file creation conflicts with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("file", 0, 1), history.Begin(0).Read("file"))
+			require.Equal(t, NewReadWriteConflictError("file", 0, 1), history.Begin(0).Read("file"))
 		})
 
 		t.Run("removal conflicts with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).Read("negative"))
+			require.Equal(t, NewReadWriteConflictError("negative", 0, 1), history.Begin(0).Read("negative"))
 		})
 
 		t.Run("removal of parent directory with a read", func(t *testing.T) {
-			require.Equal(t, NewConflictingOperationError("negative", 0, 1), history.Begin(0).Read("negative/negative"))
+			require.Equal(t, NewReadWriteConflictError("negative", 0, 1), history.Begin(0).Read("negative/negative"))
 		})
 
 		require.Equal(t,
@@ -595,6 +571,71 @@ func TestHistory(t *testing.T) {
 									children: children{},
 								},
 							},
+						},
+					},
+				},
+			},
+			history,
+		)
+	})
+
+	t.Run("nodes updated by transaction don't conflict", func(t *testing.T) {
+		history := New()
+
+		tx := history.Begin(0)
+		require.NoError(t, tx.CreateDirectory("directory"))
+		require.NoError(t, tx.CreateFile("file"))
+		require.NoError(t, tx.Remove("negative"))
+		tx.Commit(1)
+
+		tx = history.Begin(0)
+		require.Equal(t, NewReadWriteConflictError("directory", 0, 1), tx.Read("directory"))
+		require.Equal(t, NewReadWriteConflictError("file", 0, 1), tx.Read("file"))
+		require.Equal(t, NewReadWriteConflictError("negative", 0, 1), tx.Read("negative"))
+
+		// Ignore the conflict and overwrite the node.
+		require.NoError(t, tx.Remove("directory"))
+		require.NoError(t, tx.Remove("file"))
+		require.NoError(t, tx.CreateFile("negative"))
+
+		// The reads should no longer conflict.
+		require.NoError(t, tx.Read("directory"))
+		require.NoError(t, tx.Read("file"))
+		require.NoError(t, tx.Read("negative"))
+		tx.Commit(2)
+
+		require.Equal(t,
+			&History{
+				pathsModifiedByLSN: map[storage.LSN]map[string]struct{}{
+					2: {
+						"directory": {},
+						"file":      {},
+						"negative":  {},
+					},
+				},
+				lsnByPath: map[string]storage.LSN{
+					"directory": 2,
+					"file":      2,
+					"negative":  2,
+				},
+				root: &node{
+					nodeType:         directoryNode,
+					directoryEntries: 1,
+					children: children{
+						"directory": {
+							nodeType: negativeNode,
+							writeLSN: 2,
+							children: children{},
+						},
+						"file": {
+							nodeType: negativeNode,
+							writeLSN: 2,
+							children: children{},
+						},
+						"negative": {
+							nodeType: fileNode,
+							writeLSN: 2,
+							children: children{},
 						},
 					},
 				},
@@ -735,9 +776,9 @@ func TestHistory(t *testing.T) {
 		// Reading unmodified path does not conflict.
 		require.NoError(t, tx2.Read("parent/unmodified"))
 		// Reading any of the paths modified at a later LSN conflicts.
-		require.Equal(t, NewConflictingOperationError("parent/negative", 0, 1), tx2.Read("parent/negative"))
-		require.Equal(t, NewConflictingOperationError("parent/file", 0, 1), tx2.Read("parent/file"))
-		require.Equal(t, NewConflictingOperationError("parent/directory", 0, 1), tx2.Read("parent/directory"))
+		require.Equal(t, NewReadWriteConflictError("parent/negative", 0, 1), tx2.Read("parent/negative"))
+		require.Equal(t, NewReadWriteConflictError("parent/file", 0, 1), tx2.Read("parent/file"))
+		require.Equal(t, NewReadWriteConflictError("parent/directory", 0, 1), tx2.Read("parent/directory"))
 
 		// This transaction was reading already at LSN 1 and does not conflict with its changes.
 		tx3 := history.Begin(1)
