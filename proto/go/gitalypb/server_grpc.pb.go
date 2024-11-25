@@ -21,7 +21,6 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	ServerService_ServerInfo_FullMethodName      = "/gitaly.ServerService/ServerInfo"
 	ServerService_DiskStatistics_FullMethodName  = "/gitaly.ServerService/DiskStatistics"
-	ServerService_ClockSynced_FullMethodName     = "/gitaly.ServerService/ClockSynced"
 	ServerService_ReadinessCheck_FullMethodName  = "/gitaly.ServerService/ReadinessCheck"
 	ServerService_ServerSignature_FullMethodName = "/gitaly.ServerService/ServerSignature"
 )
@@ -36,9 +35,6 @@ type ServerServiceClient interface {
 	ServerInfo(ctx context.Context, in *ServerInfoRequest, opts ...grpc.CallOption) (*ServerInfoResponse, error)
 	// DiskStatistics ...
 	DiskStatistics(ctx context.Context, in *DiskStatisticsRequest, opts ...grpc.CallOption) (*DiskStatisticsResponse, error)
-	// ClockSynced checks if machine clock is synced
-	// (the offset is less that the one passed in the request).
-	ClockSynced(ctx context.Context, in *ClockSyncedRequest, opts ...grpc.CallOption) (*ClockSyncedResponse, error)
 	// ReadinessCheck runs the set of the checks to make sure service is in operational state.
 	ReadinessCheck(ctx context.Context, in *ReadinessCheckRequest, opts ...grpc.CallOption) (*ReadinessCheckResponse, error)
 	// ServerSignature returns the contents of the public key used to sign
@@ -76,16 +72,6 @@ func (c *serverServiceClient) DiskStatistics(ctx context.Context, in *DiskStatis
 	return out, nil
 }
 
-func (c *serverServiceClient) ClockSynced(ctx context.Context, in *ClockSyncedRequest, opts ...grpc.CallOption) (*ClockSyncedResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ClockSyncedResponse)
-	err := c.cc.Invoke(ctx, ServerService_ClockSynced_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *serverServiceClient) ReadinessCheck(ctx context.Context, in *ReadinessCheckRequest, opts ...grpc.CallOption) (*ReadinessCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ReadinessCheckResponse)
@@ -116,9 +102,6 @@ type ServerServiceServer interface {
 	ServerInfo(context.Context, *ServerInfoRequest) (*ServerInfoResponse, error)
 	// DiskStatistics ...
 	DiskStatistics(context.Context, *DiskStatisticsRequest) (*DiskStatisticsResponse, error)
-	// ClockSynced checks if machine clock is synced
-	// (the offset is less that the one passed in the request).
-	ClockSynced(context.Context, *ClockSyncedRequest) (*ClockSyncedResponse, error)
 	// ReadinessCheck runs the set of the checks to make sure service is in operational state.
 	ReadinessCheck(context.Context, *ReadinessCheckRequest) (*ReadinessCheckResponse, error)
 	// ServerSignature returns the contents of the public key used to sign
@@ -141,9 +124,6 @@ func (UnimplementedServerServiceServer) ServerInfo(context.Context, *ServerInfoR
 }
 func (UnimplementedServerServiceServer) DiskStatistics(context.Context, *DiskStatisticsRequest) (*DiskStatisticsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DiskStatistics not implemented")
-}
-func (UnimplementedServerServiceServer) ClockSynced(context.Context, *ClockSyncedRequest) (*ClockSyncedResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ClockSynced not implemented")
 }
 func (UnimplementedServerServiceServer) ReadinessCheck(context.Context, *ReadinessCheckRequest) (*ReadinessCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadinessCheck not implemented")
@@ -208,24 +188,6 @@ func _ServerService_DiskStatistics_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ServerService_ClockSynced_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ClockSyncedRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ServerServiceServer).ClockSynced(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ServerService_ClockSynced_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServiceServer).ClockSynced(ctx, req.(*ClockSyncedRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _ServerService_ReadinessCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReadinessCheckRequest)
 	if err := dec(in); err != nil {
@@ -276,10 +238,6 @@ var ServerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DiskStatistics",
 			Handler:    _ServerService_DiskStatistics_Handler,
-		},
-		{
-			MethodName: "ClockSynced",
-			Handler:    _ServerService_ClockSynced_Handler,
 		},
 		{
 			MethodName: "ReadinessCheck",
