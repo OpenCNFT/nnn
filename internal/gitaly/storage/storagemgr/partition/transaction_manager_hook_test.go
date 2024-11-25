@@ -28,7 +28,7 @@ func installHooks(mgr *TransactionManager, inflightTransactions *sync.WaitGroup,
 		&mgr.testHooks.beforeInitialization:            hooks.BeforeReadAppliedLSN,
 		&mgr.testHooks.beforeApplyLogEntry:             hooks.BeforeApplyLogEntry,
 		&mgr.testHooks.beforeStoreAppliedLSN:           hooks.BeforeStoreAppliedLSN,
-		&mgr.logManager.testHooks.beforeAppendLogEntry: hooks.BeforeAppendLogEntry,
+		&mgr.logManager.TestHooks.BeforeAppendLogEntry: hooks.BeforeAppendLogEntry,
 		&mgr.testHooks.beforeRunExiting: func(hookContext) {
 			if hooks.WaitForTransactionsWhenClosing {
 				inflightTransactions.Wait()

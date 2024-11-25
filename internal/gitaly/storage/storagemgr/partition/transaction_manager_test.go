@@ -1401,7 +1401,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					//
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
-						packFilePath := packFilePath(walFilesPathForLSN(filepath.Join(storagePath, setup.RelativePath), 1))
+						packFilePath := packFilePath(EntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
 						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,
@@ -2113,7 +2113,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.logManager.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.logManager.StateDirectory(), "",
 						testhelper.DirectoryState{
 							"/":    {Mode: mode.Directory},
 							"/wal": {Mode: mode.Directory},
@@ -2129,7 +2129,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.logManager.appendedLSN, storage.LSN(3))
+					require.Equal(t, tm.logManager.AppendedLSN(), storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2263,7 +2263,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.logManager.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.logManager.StateDirectory(), "", testhelper.DirectoryState{
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
 						"/wal/0000000000004":          {Mode: mode.Directory},
@@ -2280,7 +2280,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.logManager.appendedLSN, storage.LSN(4))
+					require.Equal(t, tm.logManager.AppendedLSN(), storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{

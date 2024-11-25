@@ -329,7 +329,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	txn := &Transaction{
 		write:        opts.Write,
 		commit:       mgr.commit,
-		snapshotLSN:  mgr.logManager.appendedLSN,
+		snapshotLSN:  mgr.logManager.AppendedLSN(),
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
 		metrics:      mgr.metrics,
@@ -2228,13 +2228,11 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	}
 
 	for {
-		if mgr.appliedLSN < mgr.logManager.appendedLSN {
+		if mgr.appliedLSN < mgr.logManager.AppendedLSN() {
 			lsn := mgr.appliedLSN + 1
-
 			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
 				return fmt.Errorf("apply log entry: %w", err)
 			}
-
 			continue
 		}
 
@@ -2398,7 +2396,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		// Commit the prepared transaction now that we've managed to commit the log entry.
 		mgr.mutex.Lock()
-		preparedTX.Commit(ctx, mgr.logManager.appendedLSN)
+		preparedTX.Commit(ctx, mgr.logManager.AppendedLSN())
 		mgr.mutex.Unlock()
 
 		return nil
@@ -2407,7 +2405,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		return nil
 	}
 
-	mgr.awaitingTransactions[mgr.logManager.appendedLSN] = transaction.result
+	mgr.awaitingTransactions[mgr.logManager.AppendedLSN()] = transaction.result
 
 	return nil
 }
@@ -2558,7 +2556,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	// Each unapplied log entry should have a snapshot lock as they are created in normal
 	// operation when committing a log entry. Recover these entries.
-	for i := mgr.appliedLSN + 1; i <= mgr.logManager.appendedLSN; i++ {
+	for i := mgr.appliedLSN + 1; i <= mgr.logManager.AppendedLSN(); i++ {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
@@ -3453,7 +3451,7 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 
 	// Pre-setup an snapshot lock entry for the assumed appended LSN location.
 	mgr.mutex.Lock()
-	mgr.snapshotLocks[mgr.logManager.appendedLSN+1] = &snapshotLock{applied: make(chan struct{})}
+	mgr.snapshotLocks[mgr.logManager.AppendedLSN()+1] = &snapshotLock{applied: make(chan struct{})}
 	mgr.mutex.Unlock()
 
 	// After this latch block, the transaction is committed and all subsequent transactions
@@ -3461,7 +3459,7 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 	appendedLSN, err := mgr.logManager.AppendLogEntry(ctx, logEntryPath)
 	if err != nil {
 		mgr.mutex.Lock()
-		delete(mgr.snapshotLocks, mgr.logManager.appendedLSN+1)
+		delete(mgr.snapshotLocks, mgr.logManager.AppendedLSN()+1)
 		mgr.mutex.Unlock()
 		return fmt.Errorf("append log entry: %w", err)
 	}

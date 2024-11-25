@@ -16,14 +16,14 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 )
 
-// walStatePath returns the WAL directory's path.
-func walStatePath(stateDir string) string {
+// StatePath returns the WAL directory's path.
+func StatePath(stateDir string) string {
 	return filepath.Join(stateDir, "wal")
 }
 
-// walFilesPathForLSN returns an absolute path to a given log entry's WAL files.
-func walFilesPathForLSN(stateDir string, lsn storage.LSN) string {
-	return filepath.Join(walStatePath(stateDir), lsn.String())
+// EntryPath returns an absolute path to a given log entry's WAL files.
+func EntryPath(stateDir string, lsn storage.LSN) string {
+	return filepath.Join(StatePath(stateDir), lsn.String())
 }
 
 type positionType int
@@ -55,7 +55,7 @@ func (p *position) setPosition(pos storage.LSN) {
 }
 
 type testLogHooks struct {
-	beforeAppendLogEntry func()
+	BeforeAppendLogEntry func()
 }
 
 // LogManager is responsible for managing the Write-Ahead Log (WAL) entries on disk. It maintains the in-memory state
@@ -97,9 +97,9 @@ type LogManager struct {
 	// notifyQueue is a queue notifying when there is a new change.
 	notifyQueue chan struct{}
 
-	// testHooks are used in the tests to trigger logic at certain points in the execution.
+	// TestHooks are used in the tests to trigger logic at certain points in the execution.
 	// They are used to synchronize more complex test scenarios. Not used in production.
-	testHooks testLogHooks
+	TestHooks testLogHooks
 }
 
 // NewLogManager returns an instance of LogManager.
@@ -118,8 +118,8 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, stagingD
 		consumer:       consumer,
 		positions:      positions,
 		notifyQueue:    make(chan struct{}, 1),
-		testHooks: testLogHooks{
-			beforeAppendLogEntry: func() {},
+		TestHooks: testLogHooks{
+			BeforeAppendLogEntry: func() {},
 		},
 	}
 }
@@ -148,7 +148,7 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 	// below to match.
 	mgr.appendedLSN = appliedLSN
 
-	if logEntries, err := os.ReadDir(walStatePath(mgr.stateDirectory)); err != nil {
+	if logEntries, err := os.ReadDir(StatePath(mgr.stateDirectory)); err != nil {
 		return fmt.Errorf("read wal directory: %w", err)
 	} else if len(logEntries) > 0 {
 		if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
@@ -190,6 +190,11 @@ func (mgr *LogManager) AcknowledgeConsumerPosition(lsn storage.LSN) {
 	}
 }
 
+// StateDirectory returns the state directory under the management of this manager.
+func (mgr *LogManager) StateDirectory() string {
+	return mgr.stateDirectory
+}
+
 // NotifyQueue returns a notify channel so that caller can poll new changes.
 func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 	return mgr.notifyQueue
@@ -204,7 +209,7 @@ func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntryPath string) 
 	defer mgr.mutex.Unlock()
 
 	nextLSN := mgr.appendedLSN + 1
-	mgr.testHooks.beforeAppendLogEntry()
+	mgr.TestHooks.BeforeAppendLogEntry()
 
 	// Move the log entry from the staging directory into its place in the log.
 	destinationPath := mgr.GetEntryPath(nextLSN)
@@ -298,9 +303,17 @@ func (mgr *LogManager) PruneLogEntries(ctx context.Context) error {
 	return nil
 }
 
+// AppendedLSN returns the index of latest appended log entry.
+func (mgr *LogManager) AppendedLSN() storage.LSN {
+	mgr.mutex.Lock()
+	defer mgr.mutex.Unlock()
+
+	return mgr.appendedLSN
+}
+
 // GetEntryPath returns the path of the log entry's root directory.
 func (mgr *LogManager) GetEntryPath(lsn storage.LSN) string {
-	return walFilesPathForLSN(mgr.stateDirectory, lsn)
+	return EntryPath(mgr.stateDirectory, lsn)
 }
 
 // deleteLogEntry deletes the log entry at the given LSN from the log.
@@ -312,7 +325,7 @@ func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) erro
 		return fmt.Errorf("mkdir temp: %w", err)
 	}
 
-	logEntryPath := walFilesPathForLSN(mgr.stateDirectory, lsn)
+	logEntryPath := EntryPath(mgr.stateDirectory, lsn)
 	// We can't delete a directory atomically as we have to first delete all of its content.
 	// If the deletion was interrupted, we'd be left with a corrupted log entry on the disk.
 	// To perform the deletion atomically, we move the to be deleted log entry out from the
