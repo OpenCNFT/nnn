@@ -63,7 +63,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				return ops
 			}(),
 			expectedFiles: testhelper.DirectoryState{
@@ -80,7 +79,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.createHardLink("1", "test-dir/file-1", false)
 				return ops
 			}(),
@@ -96,7 +94,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.removeDirectoryEntry("test-dir/file-1")
 				return ops
 			}(),
@@ -111,7 +108,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.removeDirectoryEntry("root-file")
 				ops.createHardLink("1", "root-file", false)
 				return ops
@@ -128,7 +124,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.removeDirectoryEntry("test-dir/file-1")
 				ops.createHardLink("1", "test-dir/file-1", false)
 				return ops
@@ -145,7 +140,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.createDirectory("test-dir")
 				ops.createHardLink("1", "test-dir/file-1", false)
 				ops.createDirectory("test-dir/subdir-private")
@@ -168,7 +162,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.createDirectory("second-level/test-dir")
 				ops.createHardLink("1", "second-level/test-dir/file-1", false)
 				ops.createDirectory("second-level/test-dir/subdir-private")
@@ -197,7 +190,6 @@ func TestEntry(t *testing.T) {
 				ops.removeDirectoryEntry("test-dir/subdir-shared/file-3")
 				ops.removeDirectoryEntry("test-dir/subdir-shared")
 				ops.removeDirectoryEntry("test-dir")
-				ops.removeDirectoryEntry("sentinel-op")
 				return ops
 			}(),
 			expectedFiles: testhelper.DirectoryState{
@@ -217,7 +209,6 @@ func TestEntry(t *testing.T) {
 				ops.removeDirectoryEntry("second-level/test-dir/subdir-shared/file-3")
 				ops.removeDirectoryEntry("second-level/test-dir/subdir-shared")
 				ops.removeDirectoryEntry("second-level/test-dir")
-				ops.removeDirectoryEntry("sentinel-op")
 				return ops
 			}(),
 			expectedFiles: testhelper.DirectoryState{
@@ -232,7 +223,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.setKey([]byte("set-key"), []byte("value"))
 				ops.deleteKey([]byte("deleted-key"))
 				return ops
@@ -248,7 +238,6 @@ func TestEntry(t *testing.T) {
 			},
 			expectedOperations: func() operations {
 				var ops operations
-				ops.removeDirectoryEntry("sentinel-op")
 				ops.createDirectory("parent/target")
 				return ops
 			}(),
@@ -262,7 +251,6 @@ func TestEntry(t *testing.T) {
 
 			stateDir := t.TempDir()
 			entry := NewEntry(stateDir)
-			entry.operations.removeDirectoryEntry("sentinel-op")
 
 			tc.run(t, entry)
 
