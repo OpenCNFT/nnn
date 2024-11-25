@@ -1107,12 +1107,14 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	// began in a test case.
 	openTransactions := map[int]*Transaction{}
 
-	// Close the manager if it is running at the end of the test.
-	defer func() {
+	closeManagerIfRunning := func() {
 		if managerRunning {
 			closeManager()
 		}
-	}()
+	}
+
+	// Close the manager if it is running at the end of the test.
+	defer closeManagerIfRunning()
 	for _, step := range tc.steps {
 		switch step := step.(type) {
 		case StartManager:
@@ -1550,9 +1552,15 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 		expectedRepositories[relativePath] = state
 	}
 
+	// Close the manager if it is still running to finish all of the background tasks. They may affect the state being
+	// asserted.
+	closeManagerIfRunning()
 	// Close snapshots before asserting the repositories in the storage. Otherwise the repositories in the shared snapshots
 	// will be considered to be repositories in the storage.
 	require.NoError(t, transactionManager.CloseSnapshots())
+	// The temporary state of transaction is cleaned in the background by the transaction manager.
+	// Wait for these tasks to complete before asserting the storage directory's state as they would
+	// still be visible there otherwise.
 	RequireRepositories(t, ctx, setup.Config, setup.Config.Storages[0].Path, storageScopedFactory.Build, expectedRepositories)
 
 	expectedDirectory := tc.expectedState.Directory
@@ -1590,7 +1598,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 	testTransaction := &Transaction{
 		referenceUpdates: []git.ReferenceUpdates{{"sentinel": {}}},
 		result:           make(chan error, 1),
-		finish:           func() error { return nil },
+		finish:           func(bool) error { return nil },
 	}
 
 	var (
