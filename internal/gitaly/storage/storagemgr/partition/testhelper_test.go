@@ -1562,6 +1562,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 		referenceUpdates: []git.ReferenceUpdates{{"sentinel": {}}},
 		result:           make(chan error, 1),
 		finish:           func(bool) error { return nil },
+		manifest:         &gitalypb.LogEntry{},
 	}
 
 	var (

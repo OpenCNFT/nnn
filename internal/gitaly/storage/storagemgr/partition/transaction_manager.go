@@ -261,6 +261,9 @@ type Transaction struct {
 	// exists.
 	stagingSnapshot snapshot.FileSystem
 
+	// manifest is the manifest of the log entry. It's stored the log entry as some of the operations may
+	// need to still modify it after admission.
+	manifest *gitalypb.LogEntry
 	// walEntry is the log entry where the transaction stages its state for committing.
 	walEntry               *wal.Entry
 	initialReferenceValues map[git.ReferenceName]git.Reference
@@ -1219,6 +1222,11 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 				return fmt.Errorf("stage packed refs: %w", err)
 			}
 		}
+	}
+
+	transaction.manifest = &gitalypb.LogEntry{
+		RelativePath: transaction.relativePath,
+		Operations:   transaction.walEntry.Operations(),
 	}
 
 	if err := safe.NewSyncer().SyncRecursive(ctx, transaction.walFilesPath()); err != nil {
@@ -2265,10 +2273,6 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("does repository exist: %w", err)
 		}
 
-		logEntry := &gitalypb.LogEntry{
-			RelativePath: transaction.relativePath,
-		}
-
 		if transaction.repositoryCreation != nil && repositoryExists {
 			return ErrRepositoryAlreadyExists
 		} else if transaction.repositoryCreation == nil && !repositoryExists {
@@ -2318,7 +2322,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil {
-			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
+			transaction.manifest.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
 			if err != nil {
 				return fmt.Errorf("verify references: %w", err)
 			}
@@ -2341,7 +2345,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 				return errRepositoryDeletionOtherOperations
 			}
 
-			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
+			transaction.manifest.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 
 			if err := storage.RecordDirectoryRemoval(
 				transaction.FS(),
@@ -2361,7 +2365,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			if err != nil {
 				return fmt.Errorf("verifying pack refs: %w", err)
 			}
-			logEntry.Housekeeping = housekeepingEntry
+			transaction.manifest.Housekeeping = housekeepingEntry
 		}
 
 		if err := mgr.verifyKeyValueOperations(ctx, transaction); err != nil {
@@ -2373,9 +2377,9 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("verify file system operations: %w", err)
 		}
 
-		logEntry.Operations = transaction.walEntry.Operations()
+		transaction.manifest.Operations = transaction.walEntry.Operations()
 
-		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
+		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, transaction.manifest, transaction.walFilesPath()); err != nil {
 			return fmt.Errorf("append log entry: %w", err)
 		}
 
