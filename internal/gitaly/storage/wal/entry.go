@@ -164,26 +164,21 @@ func (e *Entry) recordDirectoryCreation(storageRoot, directoryRelativePath strin
 	return nil
 }
 
-// RecordDirectoryRemoval records a directory to be removed with all of its children. The deletion
-// is recorded at the head of the log entry to perform it before any of the newly created state
-// from the snapshot is applied.
+// RecordDirectoryRemoval records a directory to be removed with all of its children.
 func (e *Entry) RecordDirectoryRemoval(storageRoot, directoryRelativePath string) error {
-	var ops operations
 	if err := walkDirectory(storageRoot, directoryRelativePath,
 		func(string, fs.DirEntry) error { return nil },
 		func(relativePath string, dirEntry fs.DirEntry) error {
-			ops.removeDirectoryEntry(relativePath)
+			e.operations.removeDirectoryEntry(relativePath)
 			return nil
 		},
 		func(relativePath string, dirEntry fs.DirEntry) error {
-			ops.removeDirectoryEntry(relativePath)
+			e.operations.removeDirectoryEntry(relativePath)
 			return nil
 		},
 	); err != nil {
 		return fmt.Errorf("walk directory: %w", err)
 	}
-
-	e.operations = append(ops, e.operations...)
 
 	return nil
 }
