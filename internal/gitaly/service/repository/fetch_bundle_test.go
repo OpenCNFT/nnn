@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -112,11 +113,28 @@ func TestServer_FetchBundle_transaction(t *testing.T) {
 	_, err = stream.CloseAndRecv()
 	require.NoError(t, err)
 
+	// TODO: commit b886db48c6 (refs: don't invoke reference-transaction hook for reflogs, 2024-11-14) in Git
+	//       started to omit symref updates from the reference transaction hook. To allow this test to pass
+	//	 for all versions of Git we test against, we split into two assertions. This avoids the need to
+	//	 keep updating this test when the commit progresses from "next" to "master" and finally to a
+	//	 release version.
 	expectedVote := voting.VoteFromData([]byte(fmt.Sprintf("%[1]s %[2]s refs/heads/main\n%[1]s %[2]s HEAD\n", gittest.DefaultObjectHash.ZeroOID, sourceCommitID)))
-	require.Equal(t, []transaction.PhasedVote{
-		{Vote: expectedVote, Phase: voting.Prepared},
-		{Vote: expectedVote, Phase: voting.Committed},
-	}, txManager.Votes())
+	if !cmp.Equal(
+		[]transaction.PhasedVote{
+			{Vote: expectedVote, Phase: voting.Prepared},
+			{Vote: expectedVote, Phase: voting.Committed},
+		},
+		txManager.Votes(),
+	) {
+		expectedVote = voting.VoteFromData([]byte(fmt.Sprintf("%[1]s %[2]s refs/heads/main\n", gittest.DefaultObjectHash.ZeroOID, sourceCommitID)))
+		require.Equal(t,
+			[]transaction.PhasedVote{
+				{Vote: expectedVote, Phase: voting.Prepared},
+				{Vote: expectedVote, Phase: voting.Committed},
+			},
+			txManager.Votes(),
+		)
+	}
 }
 
 func TestServer_FetchBundle_validation(t *testing.T) {
