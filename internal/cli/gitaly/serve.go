@@ -39,7 +39,6 @@ import (
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
@@ -410,13 +409,11 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 			storagemgr.NewFactory(
 				logger,
 				dbMgr,
-				migration.NewFactory(
-					partition.NewFactory(
-						gitCmdFactory,
-						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-						partitionMetrics,
-						logConsumer,
-					),
+				partition.NewFactory(
+					gitCmdFactory,
+					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+					partitionMetrics,
+					logConsumer,
 				),
 				2,
 				storageMetrics,
@@ -458,13 +455,11 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				storagemgr.NewFactory(
 					logger,
 					dbMgr,
-					migration.NewFactory(
-						partition.NewFactory(
-							gitCmdFactory,
-							localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-							partitionMetrics,
-							nil,
-						),
+					partition.NewFactory(
+						gitCmdFactory,
+						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+						partitionMetrics,
+						nil,
 					),
 					// In recovery mode we don't want to keep inactive partitions active. The cache
 					// however can't be disabled so simply set it to one.

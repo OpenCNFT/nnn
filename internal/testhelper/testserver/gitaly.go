@@ -32,7 +32,6 @@ import (
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
@@ -355,16 +354,14 @@ func (gsd *gitalyServerDeps) createDependencies(tb testing.TB, ctx context.Conte
 			storagemgr.NewFactory(
 				gsd.logger,
 				dbMgr,
-				migration.NewFactory(
-					partition.NewFactory(
-						gsd.gitCmdFactory,
-						localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
-						partition.NewMetrics(
-							housekeeping.NewMetrics(cfg.Prometheus),
-							snapshot.NewMetrics(),
-						),
-						nil,
+				partition.NewFactory(
+					gsd.gitCmdFactory,
+					localrepo.NewFactory(gsd.logger, gsd.locator, gsd.gitCmdFactory, gsd.catfileCache),
+					partition.NewMetrics(
+						housekeeping.NewMetrics(cfg.Prometheus),
+						snapshot.NewMetrics(),
 					),
+					nil,
 				),
 				storagemgr.DefaultMaxInactivePartitions,
 				storagemgr.NewMetrics(cfg.Prometheus),
