@@ -1,5 +1,9 @@
 # Gitaly changelog
 
+## 17.6.1 (2024-11-26)
+
+No changes.
+
 ## 17.6.0 (2024-11-20)
 
 ### Added (2 changes)
@@ -10,6 +14,10 @@
 ### Fixed (1 change)
 
 - [Update GoCloud to a version that supports s3ForcePathStyle](gitlab-org/gitaly@6becf2026cf1ec5297829937a66c139d00c95283) ([merge request](gitlab-org/gitaly!7411))
+
+## 17.5.3 (2024-11-26)
+
+No changes.
 
 ## 17.5.2 (2024-11-12)
 
@@ -34,6 +42,10 @@ No changes.
 ### Deprecated (1 change)
 
 - [protobuf: Mark SSHUploadPack RPC as deprecated](gitlab-org/gitaly@b4e224d975fb33e1fa91efe3e61d92b426a37560) ([merge request](gitlab-org/gitaly!7324))
+
+## 17.4.5 (2024-11-26)
+
+No changes.
 
 ## 17.4.4 (2024-11-12)
 
