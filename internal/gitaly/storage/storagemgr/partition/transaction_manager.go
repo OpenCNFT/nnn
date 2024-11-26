@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -330,7 +329,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 	txn := &Transaction{
 		write:        opts.Write,
 		commit:       mgr.commit,
-		snapshotLSN:  mgr.appendedLSN,
+		snapshotLSN:  mgr.logManager.appendedLSN,
 		finished:     make(chan struct{}),
 		relativePath: relativePath,
 		metrics:      mgr.metrics,
@@ -412,7 +411,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 		}
 
 		if admitted {
-			// If the transcation was admitted, `.Run()` is responsible for cleaning the transaction up.
+			// If the transaction was admitted, `.Run()` is responsible for cleaning the transaction up.
 			// Cleaning up the snapshots can take a relatively long time if the snapshots are large, or if
 			// the file system is busy. To avoid blocking transaction processing, we us a pool of background
 			// workers to clean up the transaction snapshots.
@@ -894,37 +893,12 @@ type committedEntry struct {
 // for the specified LogConsumer. The manager is awakened if it is currently awaiting a new or
 // completed transaction.
 func (mgr *TransactionManager) AcknowledgeTransaction(lsn storage.LSN) {
-	mgr.consumerPos.setPosition(lsn)
-
-	// Alert the manager. If it has a pending acknowledgement already no action is required.
-	select {
-	case mgr.acknowledgedQueue <- struct{}{}:
-	default:
-	}
+	mgr.logManager.AcknowledgeConsumerPosition(lsn)
 }
 
 // GetTransactionPath returns the path of the log entry's root directory.
 func (mgr *TransactionManager) GetTransactionPath(lsn storage.LSN) string {
-	return walFilesPathForLSN(mgr.stateDirectory, lsn)
-}
-
-// position tracks the last LSN acknowledged for of a particular type.
-type position struct {
-	lsn atomic.Value
-}
-
-func newPosition() *position {
-	p := position{}
-	p.setPosition(0)
-	return &p
-}
-
-func (p *position) getPosition() storage.LSN {
-	return p.lsn.Load().(storage.LSN)
-}
-
-func (p *position) setPosition(pos storage.LSN) {
-	p.lsn.Store(pos)
+	return mgr.logManager.GetEntryPath(lsn)
 }
 
 // TransactionManager is responsible for transaction management of a single repository. Each repository has
@@ -978,9 +952,6 @@ type TransactionManager struct {
 	// being admitted. This is differentiated from ctx.Done in order to enable testing that Run correctly
 	// releases awaiters when the transactions processing is stopped.
 	closed chan struct{}
-	// stateDirectory is an absolute path to a directory where the TransactionManager stores the state related to its
-	// write-ahead log.
-	stateDirectory string
 	// stagingDirectory is a path to a directory where this TransactionManager should stage the files of the transactions
 	// before it logs them. The TransactionManager cleans up the files during runtime but stale files may be
 	// left around after crashes. The files are temporary and any leftover files are expected to be cleaned up when
@@ -999,6 +970,8 @@ type TransactionManager struct {
 	partitionID storage.PartitionID
 	// db is the handle to the key-value store used for storing the write-ahead log related state.
 	db keyvalue.Transactioner
+	// logManager manages the underlying Write-Ahead Log entries.
+	logManager *LogManager
 	// admissionQueue is where the incoming writes are waiting to be admitted to the transaction
 	// manager.
 	admissionQueue chan *Transaction
@@ -1033,14 +1006,8 @@ type TransactionManager struct {
 	// conflictMgr is responsible for checking concurrent transactions against each other for conflicts.
 	conflictMgr *conflict.Manager
 
-	// appendedLSN holds the LSN of the last log entry appended to the partition's write-ahead log.
-	appendedLSN storage.LSN
 	// appliedLSN holds the LSN of the last log entry applied to the partition.
 	appliedLSN storage.LSN
-	// oldestLSN holds the LSN of the head of log entries which is still kept in the database. The manager keeps
-	// them because they are still referred by a transaction.
-	oldestLSN storage.LSN
-
 	// awaitingTransactions contains transactions waiting for their log entry to be applied to
 	// the partition. It's keyed by the LSN the transaction is waiting to be applied and the
 	// value is the resultChannel that is waiting the result.
@@ -1052,14 +1019,6 @@ type TransactionManager struct {
 	// the corresponding snapshots.
 	committedEntries *list.List
 
-	// consumer is an the external caller that may perform read-only operations against applied
-	// log entries. Log entries are retained until the consumer has acknowledged past their LSN.
-	consumer LogConsumer
-	// consumerPos tracks the largest LSN that has been acknowledged by consumer.
-	consumerPos *position
-	// acknowledgedQueue is a queue notifying when a transaction has been acknowledged.
-	acknowledgedQueue chan struct{}
-
 	// testHooks are used in the tests to trigger logic at certain points in the execution.
 	// They are used to synchronize more complex test scenarios. Not used in production.
 	testHooks testHooks
@@ -1070,7 +1029,6 @@ type TransactionManager struct {
 
 type testHooks struct {
 	beforeInitialization  func()
-	beforeAppendLogEntry  func()
 	beforeApplyLogEntry   func()
 	beforeStoreAppliedLSN func()
 	beforeRunExiting      func()
@@ -1092,8 +1050,6 @@ func NewTransactionManager(
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	consumerPos := newPosition()
-
 	cleanupWorkers := &errgroup.Group{}
 	cleanupWorkers.SetLimit(25)
 
@@ -1109,25 +1065,21 @@ func NewTransactionManager(
 		storagePath:          storagePath,
 		partitionID:          ptnID,
 		db:                   db,
+		logManager:           NewLogManager(storageName, ptnID, stagingDir, stateDir, consumer),
 		admissionQueue:       make(chan *Transaction),
 		completedQueue:       make(chan struct{}, 1),
 		initialized:          make(chan struct{}),
 		snapshotLocks:        make(map[storage.LSN]*snapshotLock),
 		conflictMgr:          conflict.NewManager(),
-		stateDirectory:       stateDir,
 		stagingDirectory:     stagingDir,
 		cleanupWorkers:       cleanupWorkers,
 		cleanupWorkerFailed:  make(chan struct{}),
 		awaitingTransactions: make(map[storage.LSN]resultChannel),
 		committedEntries:     list.New(),
 		metrics:              metrics,
-		consumer:             consumer,
-		consumerPos:          consumerPos,
-		acknowledgedQueue:    make(chan struct{}, 1),
 
 		testHooks: testHooks{
 			beforeInitialization:  func() {},
-			beforeAppendLogEntry:  func() {},
 			beforeApplyLogEntry:   func() {},
 			beforeStoreAppliedLSN: func() {},
 			beforeRunExiting:      func() {},
@@ -2276,7 +2228,7 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 	}
 
 	for {
-		if mgr.appliedLSN < mgr.appendedLSN {
+		if mgr.appliedLSN < mgr.logManager.appendedLSN {
 			lsn := mgr.appliedLSN + 1
 
 			if err := mgr.applyLogEntry(ctx, lsn); err != nil {
@@ -2286,27 +2238,8 @@ func (mgr *TransactionManager) run(ctx context.Context) (returnedErr error) {
 			continue
 		}
 
-		// When a log entry is applied, if there is any log in front of it which are still referred, we cannot delete
-		// it. This condition is to prevent a "hole" in the list. A transaction referring to a log entry at the
-		// low-water mark might scan all afterward log entries. Thus, the manager needs to keep in the database.
-		//
-		//
-		//                  ┌── Consumer not acknowledged
-		//                  │       ┌─ Applied til this point
-		//    Can remove    │       │       ┌─ Free, but cannot be removed
-		//  ◄───────────►   │       │       │
-		// ┌─┐ ┌─┐ ┌─┐ ┌─┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐ ┌▼┐
-		// └┬┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘ └─┘
-		//  └─ oldestLSN    ▲
-		//                  │
-		//            Low-water mark
-		//
-		if mgr.oldestLSN < mgr.lowWaterMark() {
-			if err := mgr.deleteLogEntry(ctx, mgr.oldestLSN); err != nil {
-				return fmt.Errorf("deleting log entry: %w", err)
-			}
-			mgr.oldestLSN++
-			continue
+		if err := mgr.logManager.PruneLogEntries(mgr.ctx); err != nil {
+			return fmt.Errorf("pruning log entries: %w", err)
 		}
 
 		if err := mgr.processTransaction(ctx); err != nil {
@@ -2336,7 +2269,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		return errors.New("cleanup worker failed")
 	case <-mgr.completedQueue:
 		return nil
-	case <-mgr.acknowledgedQueue:
+	case <-mgr.logManager.NotifyQueue():
 		return nil
 	case <-ctx.Done():
 	}
@@ -2465,7 +2398,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 		// Commit the prepared transaction now that we've managed to commit the log entry.
 		mgr.mutex.Lock()
-		preparedTX.Commit(ctx, mgr.appendedLSN)
+		preparedTX.Commit(ctx, mgr.logManager.appendedLSN)
 		mgr.mutex.Unlock()
 
 		return nil
@@ -2474,7 +2407,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		return nil
 	}
 
-	mgr.awaitingTransactions[mgr.appendedLSN] = transaction.result
+	mgr.awaitingTransactions[mgr.logManager.appendedLSN] = transaction.result
 
 	return nil
 }
@@ -2590,8 +2523,9 @@ func (mgr *TransactionManager) snapshotsDir() string {
 	return filepath.Join(mgr.stagingDirectory, "snapshots")
 }
 
-// initialize initializes the TransactionManager's state from the database. It loads the appended and the applied
-// LSNs and initializes the notification channels that synchronize transaction beginning with log entry applying.
+// initialize initializes the TransactionManager's state from the database. It initializes WAL log manager and the
+// applied LSNs and initializes the notification channels that synchronize transaction beginning with log entry
+// applying.
 func (mgr *TransactionManager) initialize(ctx context.Context) error {
 	defer trace.StartRegion(ctx, "initialize").End()
 
@@ -2604,8 +2538,8 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	mgr.appliedLSN = storage.LSN(appliedLSN.GetValue())
 
-	if err := mgr.createStateDirectory(ctx); err != nil {
-		return fmt.Errorf("create state directory: %w", err)
+	if err := mgr.logManager.Initialize(ctx, mgr.appliedLSN); err != nil {
+		return fmt.Errorf("initialize log management: %w", err)
 	}
 
 	if err := os.Mkdir(mgr.snapshotsDir(), mode.Directory); err != nil {
@@ -2617,33 +2551,6 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 		return fmt.Errorf("new snapshot manager: %w", err)
 	}
 
-	// oldestLSN is initialized to appliedLSN + 1. If there are no log entries in the log, then everything has been
-	// pruned already or there has not been any log entries yet. Setting this +1 avoids trying to clean up log entries
-	// that do not exist. If there are some, we'll set oldestLSN to the head of the log below.
-	mgr.oldestLSN = mgr.appliedLSN + 1
-	// appendedLSN is initialized to appliedLSN. If there are no log entries, then there has been no transaction yet, or
-	// all log entries have been applied and have been already pruned. If there are some in the log, we'll update this
-	// below to match.
-	mgr.appendedLSN = mgr.appliedLSN
-
-	if logEntries, err := os.ReadDir(walFilesPath(mgr.stateDirectory)); err != nil {
-		return fmt.Errorf("read wal directory: %w", err)
-	} else if len(logEntries) > 0 {
-		if mgr.oldestLSN, err = storage.ParseLSN(logEntries[0].Name()); err != nil {
-			return fmt.Errorf("parse oldest LSN: %w", err)
-		}
-		if mgr.appendedLSN, err = storage.ParseLSN(logEntries[len(logEntries)-1].Name()); err != nil {
-			return fmt.Errorf("parse appended LSN: %w", err)
-		}
-	}
-
-	if mgr.consumer != nil {
-		// Set acknowledged position to oldestLSN - 1 and notify the consumer from oldestLSN -> appendedLSN.
-		// If set the position to 0, the consumer is unable to read pruned entry anyway.
-		mgr.consumerPos.setPosition(mgr.oldestLSN - 1)
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.oldestLSN, mgr.appendedLSN)
-	}
-
 	// Create a snapshot lock for the applied LSN as it is used for synchronizing
 	// the snapshotters with the log application.
 	mgr.snapshotLocks[mgr.appliedLSN] = &snapshotLock{applied: make(chan struct{})}
@@ -2651,7 +2558,7 @@ func (mgr *TransactionManager) initialize(ctx context.Context) error {
 
 	// Each unapplied log entry should have a snapshot lock as they are created in normal
 	// operation when committing a log entry. Recover these entries.
-	for i := mgr.appliedLSN + 1; i <= mgr.appendedLSN; i++ {
+	for i := mgr.appliedLSN + 1; i <= mgr.logManager.appendedLSN; i++ {
 		mgr.snapshotLocks[i] = &snapshotLock{applied: make(chan struct{})}
 	}
 
@@ -2681,54 +2588,9 @@ func (mgr *TransactionManager) doesRepositoryExist(ctx context.Context, relative
 	return true, nil
 }
 
-func (mgr *TransactionManager) createStateDirectory(ctx context.Context) error {
-	needsFsync := false
-	for _, path := range []string{
-		mgr.stateDirectory,
-		filepath.Join(mgr.stateDirectory, "wal"),
-	} {
-		if err := os.Mkdir(path, mode.Directory); err != nil {
-			if !errors.Is(err, fs.ErrExist) {
-				return fmt.Errorf("mkdir: %w", err)
-			}
-
-			continue
-		}
-
-		// The directory was created so we need to fsync.
-		needsFsync = true
-	}
-
-	// If the directories already existed and we didn't create them, don't fsync.
-	if !needsFsync {
-		return nil
-	}
-
-	syncer := safe.NewSyncer()
-	if err := syncer.SyncRecursive(ctx, mgr.stateDirectory); err != nil {
-		return fmt.Errorf("sync: %w", err)
-	}
-
-	if err := syncer.SyncParent(ctx, mgr.stateDirectory); err != nil {
-		return fmt.Errorf("sync parent: %w", err)
-	}
-
-	return nil
-}
-
 // getAbsolutePath returns the relative path's absolute path in the storage.
 func (mgr *TransactionManager) getAbsolutePath(relativePath ...string) string {
 	return filepath.Join(append([]string{mgr.storagePath}, relativePath...)...)
-}
-
-// walFilesPath returns the WAL directory's path.
-func walFilesPath(stateDir string) string {
-	return filepath.Join(stateDir, "wal")
-}
-
-// walFilesPathForLSN returns an absolute path to a given log entry's WAL files.
-func walFilesPathForLSN(stateDir string, lsn storage.LSN) string {
-	return filepath.Join(walFilesPath(stateDir), lsn.String())
 }
 
 // manifestPath returns the manifest file's path in the log entry.
@@ -3558,9 +3420,8 @@ func (mgr *TransactionManager) applyReferenceTransaction(ctx context.Context, ch
 	return nil
 }
 
-// appendLogEntry appends the transaction to the write-ahead log. It first writes the transaction's manifest file
-// into the log entry's directory. Afterwards it moves the log entry's directory from the staging area to its final
-// place in the write-ahead log.
+// appendLogEntry appends a log etnry of a transaction to the write-ahead log. After the log entry is appended to WAL,
+// the corresponding snapshot lock and in-memory reference for the latest appended LSN is created.
 func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDependencies map[git.ObjectID]struct{}, logEntry *gitalypb.LogEntry, logEntryPath string) error {
 	defer trace.StartRegion(ctx, "appendLogEntry").End()
 
@@ -3590,46 +3451,29 @@ func (mgr *TransactionManager) appendLogEntry(ctx context.Context, objectDepende
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
 	}
 
-	mgr.testHooks.beforeAppendLogEntry()
-
-	nextLSN := mgr.appendedLSN + 1
-	// Move the log entry from the staging directory into its place in the log.
-	destinationPath := walFilesPathForLSN(mgr.stateDirectory, nextLSN)
-	if err := os.Rename(logEntryPath, destinationPath); err != nil {
-		return fmt.Errorf("move wal files: %w", err)
-	}
-
-	// Sync the WAL directory. The manifest has been synced above, and all of the other files
-	// have been synced before queuing for commit. At this point we just have to sync the
-	// directory entry of the new log entry in the WAL directory to finalize the commit.
-	//
-	// After this sync, the log entry has been persisted and will be recovered on failure.
-	if err := safe.NewSyncer().SyncParent(ctx, destinationPath); err != nil {
-		// If this fails, the log entry will be left in the write-ahead log but it is not
-		// properly persisted. If the fsync fails, something is seriously wrong and there's no
-		// point trying to delete the files. The right thing to do is to terminate Gitaly
-		// immediately as going further could cause data loss and corruption. This error check
-		// will later be replaced with a panic that terminates Gitaly.
-		//
-		// For more details, see: https://gitlab.com/gitlab-org/gitaly/-/issues/5774
-		return fmt.Errorf("sync log entry: %w", err)
-	}
+	// Pre-setup an snapshot lock entry for the assumed appended LSN location.
+	mgr.mutex.Lock()
+	mgr.snapshotLocks[mgr.logManager.appendedLSN+1] = &snapshotLock{applied: make(chan struct{})}
+	mgr.mutex.Unlock()
 
 	// After this latch block, the transaction is committed and all subsequent transactions
 	// are guaranteed to read it.
+	appendedLSN, err := mgr.logManager.AppendLogEntry(ctx, logEntryPath)
+	if err != nil {
+		mgr.mutex.Lock()
+		delete(mgr.snapshotLocks, mgr.logManager.appendedLSN+1)
+		mgr.mutex.Unlock()
+		return fmt.Errorf("append log entry: %w", err)
+	}
+
 	mgr.mutex.Lock()
-	mgr.appendedLSN = nextLSN
-	mgr.snapshotLocks[nextLSN] = &snapshotLock{applied: make(chan struct{})}
 	mgr.committedEntries.PushBack(&committedEntry{
-		lsn:                nextLSN,
+		lsn:                appendedLSN,
 		entry:              logEntry,
 		objectDependencies: objectDependencies,
 	})
 	mgr.mutex.Unlock()
 
-	if mgr.consumer != nil {
-		mgr.consumer.NotifyNewTransactions(mgr.storageName, mgr.partitionID, mgr.lowWaterMark(), nextLSN)
-	}
 	return nil
 }
 
@@ -3656,7 +3500,7 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 	mgr.testHooks.beforeApplyLogEntry()
 
 	if err := mgr.db.Update(func(tx keyvalue.ReadWriter) error {
-		if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, walFilesPathForLSN(mgr.stateDirectory, lsn), logEntry.GetOperations(), tx); err != nil {
+		if err := applyOperations(ctx, safe.NewSyncer().Sync, mgr.storagePath, mgr.logManager.GetEntryPath(lsn), logEntry.GetOperations(), tx); err != nil {
 			return fmt.Errorf("apply operations: %w", err)
 		}
 
@@ -3665,12 +3509,9 @@ func (mgr *TransactionManager) applyLogEntry(ctx context.Context, lsn storage.LS
 		return fmt.Errorf("update: %w", err)
 	}
 
-	mgr.testHooks.beforeStoreAppliedLSN()
 	if err := mgr.storeAppliedLSN(lsn); err != nil {
 		return fmt.Errorf("set applied LSN: %w", err)
 	}
-
-	mgr.appliedLSN = lsn
 	mgr.snapshotManager.SetLSN(lsn)
 
 	// There is no awaiter for a transaction if the transaction manager is recovering
@@ -3715,43 +3556,9 @@ func (mgr *TransactionManager) createRepository(ctx context.Context, repositoryP
 	return nil
 }
 
-// deleteLogEntry deletes the log entry at the given LSN from the log.
-func (mgr *TransactionManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) error {
-	defer trace.StartRegion(ctx, "deleteLogEntry").End()
-
-	tmpDir, err := os.MkdirTemp(mgr.stagingDirectory, "")
-	if err != nil {
-		return fmt.Errorf("mkdir temp: %w", err)
-	}
-
-	logEntryPath := walFilesPathForLSN(mgr.stateDirectory, lsn)
-	// We can't delete a directory atomically as we have to first delete all of its content.
-	// If the deletion was interrupted, we'd be left with a corrupted log entry on the disk.
-	// To perform the deletion atomically, we move the to be deleted log entry out from the
-	// log into a temporary directory and sync the move. After that, the log entry is no longer
-	// in the log, and we can delete the files without having to worry about the deletion being
-	// interrupted and being left with a corrupted log entry.
-	if err := os.Rename(logEntryPath, filepath.Join(tmpDir, "to_delete")); err != nil {
-		return fmt.Errorf("rename: %w", err)
-	}
-
-	if err := safe.NewSyncer().SyncParent(ctx, logEntryPath); err != nil {
-		return fmt.Errorf("sync file deletion: %w", err)
-	}
-
-	// With the log entry removed from the log, we can now delete the files. There's no need
-	// to sync the deletions as the log entry is a temporary directory that will be removed
-	// on start up if they are left around from a crash.
-	if err := os.RemoveAll(tmpDir); err != nil {
-		return fmt.Errorf("remove files: %w", err)
-	}
-
-	return nil
-}
-
 // readLogEntry returns the log entry from the given position in the log.
 func (mgr *TransactionManager) readLogEntry(lsn storage.LSN) (*gitalypb.LogEntry, error) {
-	manifestBytes, err := os.ReadFile(manifestPath(walFilesPathForLSN(mgr.stateDirectory, lsn)))
+	manifestBytes, err := os.ReadFile(manifestPath(mgr.logManager.GetEntryPath(lsn)))
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
 	}
@@ -3766,7 +3573,14 @@ func (mgr *TransactionManager) readLogEntry(lsn storage.LSN) (*gitalypb.LogEntry
 
 // storeAppliedLSN stores the partition's applied LSN in the database.
 func (mgr *TransactionManager) storeAppliedLSN(lsn storage.LSN) error {
-	return mgr.setKey(keyAppliedLSN, lsn.ToProto())
+	mgr.testHooks.beforeStoreAppliedLSN()
+
+	if err := mgr.setKey(keyAppliedLSN, lsn.ToProto()); err != nil {
+		return err
+	}
+	mgr.logManager.AcknowledgeAppliedPosition(lsn)
+	mgr.appliedLSN = lsn
+	return nil
 }
 
 // setKey marshals and stores a given protocol buffer message into the database under the given key.
@@ -3797,27 +3611,6 @@ func (mgr *TransactionManager) readKey(key []byte, destination proto.Message) er
 
 		return item.Value(func(value []byte) error { return proto.Unmarshal(value, destination) })
 	})
-}
-
-// lowWaterMark returns the earliest LSN of log entries which should be kept in the database. Any log entries LESS than
-// this mark are removed.
-func (mgr *TransactionManager) lowWaterMark() storage.LSN {
-	mgr.mutex.Lock()
-	defer mgr.mutex.Unlock()
-
-	// Greater than the maximum position of any consumer.
-	minConsumed := mgr.appliedLSN + 1
-
-	if mgr.consumer != nil {
-		// Position is the last acknowledged LSN, this is eligible for pruning.
-		// lowWaterMark returns the lowest LSN that cannot be pruned, so add one.
-		pos := mgr.consumerPos.getPosition() + 1
-		if pos < minConsumed {
-			minConsumed = pos
-		}
-	}
-
-	return minConsumed
 }
 
 // updateCommittedEntry updates the reader counter of the committed entry of the snapshot that this transaction depends on.

@@ -2113,7 +2113,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.stateDirectory, "",
+					testhelper.RequireDirectoryState(t, tm.logManager.stateDirectory, "",
 						testhelper.DirectoryState{
 							"/":    {Mode: mode.Directory},
 							"/wal": {Mode: mode.Directory},
@@ -2129,7 +2129,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.appendedLSN, storage.LSN(3))
+					require.Equal(t, tm.logManager.appendedLSN, storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2263,7 +2263,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.logManager.stateDirectory, "", testhelper.DirectoryState{
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
 						"/wal/0000000000004":          {Mode: mode.Directory},
@@ -2280,7 +2280,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.appendedLSN, storage.LSN(4))
+					require.Equal(t, tm.logManager.appendedLSN, storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{
