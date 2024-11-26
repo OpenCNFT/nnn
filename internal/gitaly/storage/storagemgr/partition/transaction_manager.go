@@ -250,6 +250,8 @@ type Transaction struct {
 	// discarded when the transaction finishes. The recorded writes are write-ahead logged and applied
 	// to the partition from the WAL.
 	db keyvalue.Transaction
+	// fs is the transaction's file system handle. Operations through it are recorded in the transaction.
+	fs fsrecorder.FS
 	// recordingReadWriter is a ReadWriter operating on db that also records operations performed. This
 	// is used to record the operations performed so they can be conflict checked and write-ahead logged.
 	recordingReadWriter keyvalue.RecordingReadWriter
@@ -483,6 +485,8 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 			txn.walEntry = wal.NewEntry(txn.walFilesPath())
 		}
 
+		txn.fs = fsrecorder.NewFS(txn.snapshot.Root(), txn.walEntry)
+
 		if txn.repositoryTarget() {
 			txn.repositoryExists, err = mgr.doesRepositoryExist(ctx, txn.snapshot.RelativePath(txn.relativePath))
 			if err != nil {
@@ -518,7 +522,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 					//
 					// If the repository is at the root of the storage, there's no parent directories to create.
 					if parentDir := filepath.Dir(txn.relativePath); parentDir != "." {
-						if err := fsrecorder.NewFS(txn.snapshot.Root(), txn.walEntry).MkdirAll(parentDir); err != nil {
+						if err := txn.fs.MkdirAll(parentDir); err != nil {
 							return nil, fmt.Errorf("create parent directories: %w", err)
 						}
 					}
@@ -854,7 +858,7 @@ func (txn *Transaction) KV() keyvalue.ReadWriter {
 
 // FS returns a handle to the transaction's file system snapshot.
 func (txn *Transaction) FS() storage.FS {
-	return txn.snapshot
+	return txn.fs
 }
 
 // MarkAlternateUpdated hints to the transaction manager that  'objects/info/alternates' file has been updated or
