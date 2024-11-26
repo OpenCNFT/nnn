@@ -17,10 +17,6 @@ service ServerService {
   // DiskStatistics ...
   rpc DiskStatistics(DiskStatisticsRequest) returns (DiskStatisticsResponse);
 
-  // ClockSynced checks if machine clock is synced
-  // (the offset is less that the one passed in the request).
-  rpc ClockSynced(ClockSyncedRequest) returns (ClockSyncedResponse);
-
   // ReadinessCheck runs the set of the checks to make sure service is in operational state.
   rpc ReadinessCheck(ReadinessCheckRequest) returns (ReadinessCheckResponse);
 
@@ -81,23 +77,6 @@ message DiskStatisticsResponse {
 
   // storage_statuses ...
   repeated StorageStatus storage_statuses = 1;
-}
-
-// ClockSyncedRequest contains settings to be used for the system clock synchronisation check.
-message ClockSyncedRequest {
-  // ntp_host is a URL to the external NTP service that should be used for clock sync check.
-  // Default is "pool.ntp.org"
-  string ntp_host = 1;
-  reserved "drift_threshold_millis";
-  reserved 2;
-  // drift_threshold is an allowed drift from the NTP service.
-  google.protobuf.Duration drift_threshold = 3;
-}
-
-// ClockSyncedResponse represents result of the system clock synchronisation check.
-message ClockSyncedResponse {
-  // synced is set to true if system clock has an affordable drift compared to NTP service.
-  bool synced = 1;
 }
 
 // ReadinessCheckRequest is used to verify if the service is in operational state.

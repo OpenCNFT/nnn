@@ -43,7 +43,6 @@ var NonTransactionalRPCs = map[string]struct{}{
 	// so mark these as non-transactional here.
 	gitalypb.ServerService_DiskStatistics_FullMethodName:  {},
 	gitalypb.ServerService_ServerInfo_FullMethodName:      {},
-	gitalypb.ServerService_ClockSynced_FullMethodName:     {},
 	gitalypb.ServerService_ReadinessCheck_FullMethodName:  {},
 	gitalypb.ServerService_ServerSignature_FullMethodName: {},
 }
