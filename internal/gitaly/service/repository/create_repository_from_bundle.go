@@ -46,7 +46,7 @@ func (s *server) CreateRepositoryFromBundle(stream gitalypb.RepositoryService_Cr
 	}
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		if err := migration.RecordKeyCreation(tx, repo.GetRelativePath()); err != nil {
+		if err := migration.RecordKeyCreation(tx, tx.OriginalRepository(repo).GetRelativePath()); err != nil {
 			return structerr.NewInternal("recording migration key: %w", err)
 		}
 	}

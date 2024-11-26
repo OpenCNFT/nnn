@@ -458,13 +458,11 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 				storagemgr.NewFactory(
 					logger,
 					dbMgr,
-					migration.NewFactory(
-						partition.NewFactory(
-							gitCmdFactory,
-							localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-							partitionMetrics,
-							nil,
-						),
+					partition.NewFactory(
+						gitCmdFactory,
+						localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
+						partitionMetrics,
+						nil,
 					),
 					// In recovery mode we don't want to keep inactive partitions active. The cache
 					// however can't be disabled so simply set it to one.
