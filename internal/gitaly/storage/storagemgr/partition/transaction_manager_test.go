@@ -29,6 +29,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/refdb"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
@@ -1401,7 +1402,7 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 					//
 					// The Manager starts up and we expect the pack file to be gone at the end of the test.
 					ModifyStorage: func(_ testing.TB, _ config.Cfg, storagePath string) {
-						packFilePath := packFilePath(walFilesPathForLSN(filepath.Join(storagePath, setup.RelativePath), 1))
+						packFilePath := packFilePath(log.EntryPath(filepath.Join(storagePath, setup.RelativePath), 1))
 						require.NoError(t, os.MkdirAll(filepath.Dir(packFilePath), mode.Directory))
 						require.NoError(t, os.WriteFile(
 							packFilePath,
@@ -1723,15 +1724,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 			require.Equal(t, expected[i].snapshotReaders, actual.snapshotReaders)
 
 			if expected[i].entry != nil {
-				actualEntry, err := manager.readLogEntry(actual.lsn)
-				require.NoError(t, err)
-
 				expectedEntry := expected[i].entry
 
 				if testhelper.IsReftableEnabled() {
 					for idx, op := range expectedEntry.GetOperations() {
 						if chl := op.GetCreateHardLink(); chl != nil {
-							actualCHL := actualEntry.GetOperations()[idx].GetCreateHardLink()
+							actualCHL := actual.entry.GetOperations()[idx].GetCreateHardLink()
 							require.NotNil(t, actualCHL)
 
 							if filepath.Base(string(actualCHL.GetDestinationPath())) == "tables.list" {
@@ -1746,7 +1744,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					}
 				}
 
-				testhelper.ProtoEqual(t, expectedEntry, actualEntry)
+				testhelper.ProtoEqual(t, expectedEntry, actual.entry)
 			}
 			i++
 		}
@@ -2116,20 +2114,12 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.stateDirectory, "",
-						gittest.FilesOrReftables(testhelper.DirectoryState{
-							"/":                           {Mode: mode.Directory},
-							"/wal":                        {Mode: mode.Directory},
-							"/wal/0000000000002":          {Mode: mode.Directory},
-							"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
-							"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-							"/wal/0000000000003":          {Mode: mode.Directory},
-							"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
-							"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						}, buildReftableDirectory(map[int][]git.ReferenceUpdates{
-							2: {{"refs/heads/branch-1": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
-							3: {{"refs/heads/branch-2": git.ReferenceUpdate{NewOID: setup.Commits.First.OID}}},
-						})))
+					testhelper.RequireDirectoryState(t, tm.logManager.StateDirectory(), "",
+						testhelper.DirectoryState{
+							"/":    {Mode: mode.Directory},
+							"/wal": {Mode: mode.Directory},
+						},
+					)
 				}),
 				StartManager{},
 				AssertManager{},
@@ -2140,7 +2130,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(3))
-					require.Equal(t, tm.appendedLSN, storage.LSN(3))
+					require.Equal(t, tm.logManager.AppendedLSN(), storage.LSN(3))
 				}),
 			},
 			expectedState: StateAssertion{
@@ -2267,21 +2257,16 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 					logEntryPath := filepath.Join(t.TempDir(), "log_entry")
 					require.NoError(t, os.Mkdir(logEntryPath, mode.Directory))
 					require.NoError(t, os.WriteFile(filepath.Join(logEntryPath, "1"), []byte(setup.Commits.First.OID+"\n"), mode.File))
-					require.NoError(t, tm.appendLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath))
+					err := tm.appendLogEntry(ctx, map[git.ObjectID]struct{}{setup.Commits.First.OID: {}}, refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID), logEntryPath)
+					require.NoError(t, err)
 
 					RequireDatabase(t, ctx, tm.db, DatabaseState{
 						string(keyAppliedLSN): storage.LSN(3).ToProto(),
 					})
 					// Transaction 2 and 3 are left-over.
-					testhelper.RequireDirectoryState(t, tm.stateDirectory, "", testhelper.DirectoryState{
+					testhelper.RequireDirectoryState(t, tm.logManager.StateDirectory(), "", testhelper.DirectoryState{
 						"/":                           {Mode: mode.Directory},
 						"/wal":                        {Mode: mode.Directory},
-						"/wal/0000000000002":          {Mode: mode.Directory},
-						"/wal/0000000000002/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-1", setup.Commits.First.OID)),
-						"/wal/0000000000002/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
-						"/wal/0000000000003":          {Mode: mode.Directory},
-						"/wal/0000000000003/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-2", setup.Commits.First.OID)),
-						"/wal/0000000000003/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
 						"/wal/0000000000004":          {Mode: mode.Directory},
 						"/wal/0000000000004/MANIFEST": manifestDirectoryEntry(refChangeLogEntry(setup, "refs/heads/branch-3", setup.Commits.First.OID)),
 						"/wal/0000000000004/1":        {Mode: mode.File, Content: []byte(setup.Commits.First.OID + "\n")},
@@ -2296,7 +2281,7 @@ func generateCommittedEntriesTests(t *testing.T, setup testTransactionSetup) []t
 						string(keyAppliedLSN): storage.LSN(4).ToProto(),
 					})
 					require.Equal(t, tm.appliedLSN, storage.LSN(4))
-					require.Equal(t, tm.appendedLSN, storage.LSN(4))
+					require.Equal(t, tm.logManager.AppendedLSN(), storage.LSN(4))
 				}),
 			},
 			expectedState: StateAssertion{
