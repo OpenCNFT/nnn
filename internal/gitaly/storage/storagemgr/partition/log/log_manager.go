@@ -58,20 +58,20 @@ type testLogHooks struct {
 	BeforeAppendLogEntry func()
 }
 
-// LogManager is responsible for managing the Write-Ahead Log (WAL) entries on disk. It maintains the in-memory state
-// and indexing system that reflect the functional state of the WAL. The LogManager ensures safe and consistent
+// Manager is responsible for managing the Write-Ahead Log (WAL) entries on disk. It maintains the in-memory state
+// and indexing system that reflect the functional state of the WAL. The Manager ensures safe and consistent
 // proposals, applications, and prunings of log entries, acting as the interface for transactional log operations. It
 // coordinates with LogConsumer to allow safe consumption of log entries while handling retention and cleanup based on
 // references and acknowledgements. It effectively abstracts WAL operations from the TransactionManager, contributing to
 // a cleaner separation of concerns and making the system more maintainable and extensible.
-type LogManager struct {
+type Manager struct {
 	// mutex protects access to critical states, especially `oldestLSN` and `appendedLSN`, as well as the integrity
 	// of inflight log entries. Since indices are monotonic, two parallel log appending operations result in pushing
 	// files into the same directory and breaking the manifest file. Thus, Parallel log entry appending and pruning
 	// are not supported.
 	mutex sync.Mutex
 
-	// storageName is the name of the storage the LogManager's partition is a member of.
+	// storageName is the name of the storage the Manager's partition is a member of.
 	storageName string
 	// storage.PartitionID is the ID of the partition this manager is operating on.
 	partitionID storage.PartitionID
@@ -102,15 +102,15 @@ type LogManager struct {
 	TestHooks testLogHooks
 }
 
-// NewLogManager returns an instance of LogManager.
-func NewLogManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *LogManager {
+// NewManager returns an instance of Manager.
+func NewManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *Manager {
 	positions := map[positionType]*position{
 		appliedPosition: newPosition(),
 	}
 	if consumer != nil {
 		positions[consumerPosition] = newPosition()
 	}
-	return &LogManager{
+	return &Manager{
 		storageName:    storageName,
 		partitionID:    partitionID,
 		tmpDirectory:   stagingDirectory,
@@ -124,14 +124,14 @@ func NewLogManager(storageName string, partitionID storage.PartitionID, stagingD
 	}
 }
 
-// Initialize sets up the initial state of the LogManager, preparing it to manage the write-ahead log entries. It reads
+// Initialize sets up the initial state of the Manager, preparing it to manage the write-ahead log entries. It reads
 // the last applied LSN from the database to resume from where it left off, creates necessary directories, and
 // initializes in-memory tracking variables such as appendedLSN and oldestLSN based on the files present in the WAL
 // directory. This method also removes any stale log files that may have been left due to interrupted operations,
 // ensuring the WAL directory only contains valid log entries. If a LogConsumer is present, it notifies it of the
 // initial log entry state, enabling consumers to start processing from the correct point. Proper initialization is
 // crucial for maintaining data consistency and ensuring that log entries are managed accurately upon system startup.
-func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) error {
+func (mgr *Manager) Initialize(ctx context.Context, appliedLSN storage.LSN) error {
 	if err := mgr.createStateDirectory(ctx); err != nil {
 		return fmt.Errorf("create state directory: %w", err)
 	}
@@ -171,13 +171,13 @@ func (mgr *LogManager) Initialize(ctx context.Context, appliedLSN storage.LSN) e
 }
 
 // AcknowledgeAppliedPosition acknowledges the position of latest applied log entry.
-func (mgr *LogManager) AcknowledgeAppliedPosition(lsn storage.LSN) {
+func (mgr *Manager) AcknowledgeAppliedPosition(lsn storage.LSN) {
 	mgr.positions[appliedPosition].setPosition(lsn)
 }
 
 // AcknowledgeConsumerPosition acknowledges log entries up and including LSN as successfully processed for the specified
 // LogConsumer. The manager is awakened if it is currently awaiting a new or completed transaction.
-func (mgr *LogManager) AcknowledgeConsumerPosition(lsn storage.LSN) {
+func (mgr *Manager) AcknowledgeConsumerPosition(lsn storage.LSN) {
 	if mgr.consumer == nil {
 		panic("log manager's consumer must be present prior to AcknowledgeConsumerPos call")
 	}
@@ -191,12 +191,12 @@ func (mgr *LogManager) AcknowledgeConsumerPosition(lsn storage.LSN) {
 }
 
 // StateDirectory returns the state directory under the management of this manager.
-func (mgr *LogManager) StateDirectory() string {
+func (mgr *Manager) StateDirectory() string {
 	return mgr.stateDirectory
 }
 
 // NotifyQueue returns a notify channel so that caller can poll new changes.
-func (mgr *LogManager) NotifyQueue() <-chan struct{} {
+func (mgr *Manager) NotifyQueue() <-chan struct{} {
 	return mgr.notifyQueue
 }
 
@@ -204,7 +204,7 @@ func (mgr *LogManager) NotifyQueue() <-chan struct{} {
 // absolute path to the directory that represents the log entry. appendLogEntry
 // moves the log entry's directory to the WAL, and returns its LSN once it has
 // been committed to the log.
-func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntryPath string) (storage.LSN, error) {
+func (mgr *Manager) AppendLogEntry(ctx context.Context, logEntryPath string) (storage.LSN, error) {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
@@ -237,7 +237,7 @@ func (mgr *LogManager) AppendLogEntry(ctx context.Context, logEntryPath string) 
 	return nextLSN, nil
 }
 
-func (mgr *LogManager) createStateDirectory(ctx context.Context) error {
+func (mgr *Manager) createStateDirectory(ctx context.Context) error {
 	needsFsync := false
 	for _, path := range []string{
 		mgr.stateDirectory,
@@ -276,7 +276,7 @@ func (mgr *LogManager) createStateDirectory(ctx context.Context) error {
 // needed. It ensures efficient storage management by removing redundant entries while maintaining the integrity of the
 // log sequence. The method respects the established low-water mark, ensuring no entries that might still be required
 // for transaction consistency are deleted.
-func (mgr *LogManager) PruneLogEntries(ctx context.Context) error {
+func (mgr *Manager) PruneLogEntries(ctx context.Context) error {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
@@ -304,7 +304,7 @@ func (mgr *LogManager) PruneLogEntries(ctx context.Context) error {
 }
 
 // AppendedLSN returns the index of latest appended log entry.
-func (mgr *LogManager) AppendedLSN() storage.LSN {
+func (mgr *Manager) AppendedLSN() storage.LSN {
 	mgr.mutex.Lock()
 	defer mgr.mutex.Unlock()
 
@@ -312,12 +312,12 @@ func (mgr *LogManager) AppendedLSN() storage.LSN {
 }
 
 // GetEntryPath returns the path of the log entry's root directory.
-func (mgr *LogManager) GetEntryPath(lsn storage.LSN) string {
+func (mgr *Manager) GetEntryPath(lsn storage.LSN) string {
 	return EntryPath(mgr.stateDirectory, lsn)
 }
 
 // deleteLogEntry deletes the log entry at the given LSN from the log.
-func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) error {
+func (mgr *Manager) deleteLogEntry(ctx context.Context, lsn storage.LSN) error {
 	defer trace.StartRegion(ctx, "deleteLogEntry").End()
 
 	tmpDir, err := os.MkdirTemp(mgr.tmpDirectory, "")
@@ -352,7 +352,7 @@ func (mgr *LogManager) deleteLogEntry(ctx context.Context, lsn storage.LSN) erro
 
 // lowWaterMark returns the earliest LSN of log entries which should be kept in the database. Any log entries LESS than
 // this mark are removed.
-func (mgr *LogManager) lowWaterMark() storage.LSN {
+func (mgr *Manager) lowWaterMark() storage.LSN {
 	minAcknowledged := mgr.appendedLSN + 1
 
 	// Position is the last acknowledged LSN, this is eligible for pruning.
