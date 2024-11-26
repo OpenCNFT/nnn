@@ -20,7 +20,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
@@ -161,10 +160,7 @@ func TestMigrationManager_Begin(t *testing.T) {
 			).ScopeByStorage(ctx, cfg.Storages[0].Name)
 			require.NoError(t, err)
 
-			m := partition.NewMetrics(
-				housekeeping.NewMetrics(cfg.Prometheus),
-				snapshot.NewMetrics(),
-			).Scope(storageName)
+			m := partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus)).Scope(storageName)
 
 			tm := partition.NewTransactionManager(
 				testPartitionID,

@@ -21,7 +21,7 @@ type Metrics struct {
 }
 
 // NewMetrics returns a new Metrics instance.
-func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) Metrics {
+func NewMetrics(housekeeping *housekeeping.Metrics) Metrics {
 	storage := []string{"storage"}
 	storageAccessMode := append(storage, "access_mode")
 
@@ -29,7 +29,7 @@ func NewMetrics(housekeeping *housekeeping.Metrics, snapshot snapshot.Metrics) M
 
 	return Metrics{
 		housekeeping: housekeeping,
-		snapshot:     snapshot,
+		snapshot:     snapshot.NewMetrics(),
 		commitQueueDepth: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "gitaly_transaction_commit_queue_depth",
 			Help: "Records the number transactions waiting in the commit queue.",
@@ -64,6 +64,7 @@ func (m Metrics) Describe(out chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector.
 func (m Metrics) Collect(out chan<- prometheus.Metric) {
+	m.snapshot.Collect(out)
 	m.commitQueueDepth.Collect(out)
 	m.commitQueueWaitSeconds.Collect(out)
 	m.transactionControlStatementDurationSeconds.Collect(out)
