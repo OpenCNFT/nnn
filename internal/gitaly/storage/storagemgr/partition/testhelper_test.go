@@ -713,7 +713,7 @@ type testTransactionSetup struct {
 	NonExistentOID    git.ObjectID
 	Commits           testTransactionCommits
 	AnnotatedTags     []testTransactionTag
-	Consumer          LogConsumer
+	Consumer          storage.LogConsumer
 }
 
 type testTransactionHooks struct {

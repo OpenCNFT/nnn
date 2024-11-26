@@ -90,7 +90,7 @@ type LogManager struct {
 
 	// consumer is an external caller that may perform read-only operations against applied log entries. Log entries
 	// are retained until the consumer has acknowledged past their LSN.
-	consumer LogConsumer
+	consumer storage.LogConsumer
 	// positions tracks positions of log entries being used externally. Those positions are tracked so that WAL
 	positions map[positionType]*position
 
@@ -103,7 +103,7 @@ type LogManager struct {
 }
 
 // NewLogManager returns an instance of LogManager.
-func NewLogManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer LogConsumer) *LogManager {
+func NewLogManager(storageName string, partitionID storage.PartitionID, stagingDirectory string, stateDirectory string, consumer storage.LogConsumer) *LogManager {
 	positions := map[positionType]*position{
 		appliedPosition: newPosition(),
 	}

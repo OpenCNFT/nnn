@@ -1046,7 +1046,7 @@ func NewTransactionManager(
 	cmdFactory gitcmd.CommandFactory,
 	repositoryFactory localrepo.StorageScopedFactory,
 	metrics ManagerMetrics,
-	consumer LogConsumer,
+	consumer storage.LogConsumer,
 ) *TransactionManager {
 	ctx, cancel := context.WithCancel(context.Background())
 

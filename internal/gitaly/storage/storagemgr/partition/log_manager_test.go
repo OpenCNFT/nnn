@@ -29,7 +29,7 @@ func appendLogEntry(t *testing.T, ctx context.Context, manager *LogManager, file
 	return nextLSN
 }
 
-func setupLogManager(t *testing.T, ctx context.Context, consumer LogConsumer) *LogManager {
+func setupLogManager(t *testing.T, ctx context.Context, consumer storage.LogConsumer) *LogManager {
 	logManager := NewLogManager("test-storage", 1, testhelper.TempDir(t), testhelper.TempDir(t), consumer)
 	require.NoError(t, logManager.Initialize(ctx, 0))
 
