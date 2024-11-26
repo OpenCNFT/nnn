@@ -107,3 +107,8 @@ func (f FS) mkdirAll(path string) error {
 
 	return nil
 }
+
+// Root is the absolute path to the root of the transaction's file system snapshot.
+func (f FS) Root() string {
+	return f.root
+}

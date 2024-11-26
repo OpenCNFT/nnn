@@ -14,6 +14,11 @@ import (
 )
 
 func TestFS(t *testing.T) {
+	t.Run("Root", func(t *testing.T) {
+		root := t.TempDir()
+		require.Equal(t, root, NewFS(root, wal.NewEntry(t.TempDir())).Root())
+	})
+
 	t.Run("Mkdir", func(t *testing.T) {
 		t.Run("targeting root fails", func(t *testing.T) {
 			f := NewFS(t.TempDir(), wal.NewEntry(t.TempDir()))
