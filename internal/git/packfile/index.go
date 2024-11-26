@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"io"
 	"math"
 	"os"
@@ -22,13 +23,6 @@ import (
 )
 
 const sumSize = sha1.Size
-
-const regexCore = `(.*/pack-)([0-9a-f]{40}|[0-9a-f]{64})`
-
-var (
-	idxFileRegex  = regexp.MustCompile(`\A` + regexCore + `\.idx\z`)
-	packFileRegex = regexp.MustCompile(`\A` + regexCore + `\.pack\z`)
-)
 
 // Index is an in-memory representation of a packfile .idx file.
 type Index struct {
@@ -46,6 +40,8 @@ type Index struct {
 // memory. In doing so it will also open and read small amounts of data
 // from the .pack file itself.
 func ReadIndex(logger log.Logger, idxPath string) (*Index, error) {
+	idxFileRegex := regexp.MustCompile(`\A` + git.PackFileRegexCore + `\.idx\z`)
+
 	reMatches := idxFileRegex.FindStringSubmatch(idxPath)
 	if len(reMatches) == 0 {
 		return nil, fmt.Errorf("invalid idx filename: %q", idxPath)
