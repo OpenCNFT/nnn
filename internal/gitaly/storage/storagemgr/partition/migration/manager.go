@@ -219,7 +219,7 @@ func (m *migrationManager) readMigrationKey(ctx context.Context, relativePath st
 	case errors.Is(err, badger.ErrKeyNotFound):
 		// If no migration key is found, it means either the repository is being created or the
 		// repository has never performed a migration before.
-		repoExists, err = checkRepoExists(filepath.Join(txn.Root(), relativePath))
+		repoExists, err = checkRepoExists(filepath.Join(txn.FS().Root(), relativePath))
 		if err != nil {
 			return nil, false, fmt.Errorf("check repo exists: %w", err)
 		}

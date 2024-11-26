@@ -852,6 +852,11 @@ func (txn *Transaction) KV() keyvalue.ReadWriter {
 	return keyvalue.NewPrefixedReadWriter(txn.recordingReadWriter, []byte("kv/"))
 }
 
+// FS returns a handle to the transaction's file system snapshot.
+func (txn *Transaction) FS() storage.FS {
+	return txn.snapshot
+}
+
 // MarkAlternateUpdated hints to the transaction manager that  'objects/info/alternates' file has been updated or
 // removed. The file's modification will then be included in the transaction.
 func (txn *Transaction) MarkAlternateUpdated() {
