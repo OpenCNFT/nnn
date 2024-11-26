@@ -713,7 +713,12 @@ func (r *localRepository) Create(ctx context.Context, hash git.ObjectHash, defau
 	}
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		if err := migration.RecordKeyCreation(tx, r.repo.GetRelativePath()); err != nil {
+		repo := &gitalypb.Repository{
+			StorageName:  r.repo.GetStorageName(),
+			RelativePath: r.repo.GetRelativePath(),
+		}
+
+		if err := migration.RecordKeyCreation(tx, tx.OriginalRepository(repo).GetRelativePath()); err != nil {
 			return fmt.Errorf("recording migration key: %w", err)
 		}
 	}
