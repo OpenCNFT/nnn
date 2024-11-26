@@ -159,7 +159,7 @@ func (s *server) createFromSnapshot(ctx context.Context, source, target *gitalyp
 	}
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		if err := migration.RecordKeyCreation(tx, target.GetRelativePath()); err != nil {
+		if err := migration.RecordKeyCreation(tx, tx.OriginalRepository(target).GetRelativePath()); err != nil {
 			return fmt.Errorf("recording migration key: %w", err)
 		}
 	}

@@ -22,7 +22,7 @@ func (s *server) RemoveRepository(ctx context.Context, in *gitalypb.RemoveReposi
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		tx.DeleteRepository()
-		if err := migration.RecordKeyDeletion(tx, repository.GetRelativePath()); err != nil {
+		if err := migration.RecordKeyDeletion(tx, tx.OriginalRepository(repository).GetRelativePath()); err != nil {
 			return nil, structerr.NewInternal("recording migration key: %w", err)
 		}
 	}
