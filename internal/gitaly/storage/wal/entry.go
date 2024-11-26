@@ -111,6 +111,11 @@ func (e *Entry) RecordFileCreation(sourceAbsolutePath string, relativePath strin
 	return nil
 }
 
+// CreateLink records a creation of a hard link to an exisiting file in the partition.
+func (e *Entry) CreateLink(sourceRelativePath, destinationRelativePath string) {
+	e.operations.createHardLink(sourceRelativePath, destinationRelativePath, true)
+}
+
 // RecordFileUpdate records a file being updated. It stages operations to remove the old file,
 // to place the new file in its place.
 func (e *Entry) RecordFileUpdate(storageRoot, relativePath string) error {

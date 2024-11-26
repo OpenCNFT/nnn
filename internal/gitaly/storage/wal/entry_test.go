@@ -245,6 +245,20 @@ func TestEntry(t *testing.T) {
 				"/": {Mode: fs.ModeDir | rootDirPerm},
 			},
 		},
+		{
+			desc: "CreateLink",
+			run: func(t *testing.T, entry *Entry) {
+				entry.CreateLink("parent/source", "target")
+			},
+			expectedOperations: func() operations {
+				var ops operations
+				ops.createHardLink("parent/source", "target", true)
+				return ops
+			}(),
+			expectedFiles: testhelper.DirectoryState{
+				"/": {Mode: fs.ModeDir | rootDirPerm},
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
