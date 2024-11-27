@@ -1,13 +1,16 @@
 package partition
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -978,9 +981,7 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 		},
 		{
-			// This is a serialization violation as the outcome would be different
-			// if the transactions were applied in different order.
-			desc: "deletion succeeds with concurrent writes to repository",
+			desc: "deletion fails with concurrent write to an existing file in repository",
 			steps: steps{
 				StartManager{},
 				Begin{
@@ -996,23 +997,126 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					DefaultBranchUpdate: &DefaultBranchUpdate{
 						Reference: "refs/heads/branch",
 					},
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/branch": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+				},
+				Commit{
+					TransactionID:    2,
+					DeleteRepository: true,
+					ExpectedError: gittest.FilesOrReftables(
+						func(tb testing.TB, actual error) {
+							require.ErrorIs(t, actual, fshistory.NewReadWriteConflictError(
+								// The deletion fails on the new file only because the deletions are currently
+								filepath.Join(setup.RelativePath, "HEAD"), 0, 1,
+							))
+						},
+						func(tb testing.TB, actual error) {
+							var rwConflictErr fshistory.ReadWriteConflictError
+							require.ErrorAs(t, actual, &rwConflictErr)
+							require.Equal(t, storage.LSN(0), rwConflictErr.ReadLSN)
+							require.Equal(t, storage.LSN(1), rwConflictErr.WriteLSN)
+							// Reftable file's suffix is random, ignore it.
+							require.Contains(t, rwConflictErr.Path, filepath.Join(setup.RelativePath, "reftable", "0x000000000002-0x000000000002-"))
+						},
+					),
+				},
+			},
+			expectedState: StateAssertion{
+				Database: DatabaseState{
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						DefaultBranch: "refs/heads/branch",
 					},
-					CustomHooksUpdate: &CustomHooksUpdate{
-						CustomHooksTAR: validCustomHooks(t),
+				},
+			},
+		},
+		{
+			desc: "deletion fails with concurrent write introducing files in repository",
+			steps: steps{
+				StartManager{},
+				Begin{
+					TransactionID: 1,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Begin{
+					TransactionID: 2,
+					RelativePaths: []string{setup.RelativePath},
+				},
+				Commit{
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/branch": {NewOID: setup.Commits.First.OID},
 					},
 				},
 				Commit{
 					TransactionID:    2,
 					DeleteRepository: true,
+					ExpectedError: gittest.FilesOrReftables(
+						func(tb testing.TB, actual error) {
+							require.ErrorIs(t, actual, fshistory.NewReadWriteConflictError(
+								// The deletion fails on the new file only because the deletions are currently
+								// staged in the critical section on the latest state of the repository. If the
+								// deletion was staged from the transaction snapshot, the new file would not yet
+								// be visible. The physical conflict checks will allow us to later move the
+								// deletions to be also staged outside of the critical section, and we then expect
+								// this to fail on the repository directory itself.
+								filepath.Join(setup.RelativePath, "refs", "heads", "branch"), 0, 1,
+							))
+						},
+						func(tb testing.TB, actual error) {
+							var rwConflictErr fshistory.ReadWriteConflictError
+							require.ErrorAs(t, actual, &rwConflictErr)
+							require.Equal(t, storage.LSN(0), rwConflictErr.ReadLSN)
+							require.Equal(t, storage.LSN(1), rwConflictErr.WriteLSN)
+							// Reftable file's suffix is random, ignore it.
+							require.Contains(t, rwConflictErr.Path, filepath.Join(setup.RelativePath, "reftable", "0x000000000002-0x000000000002-"))
+						},
+					),
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
-				Repositories: RepositoryStates{},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						References: gittest.FilesOrReftables(
+							&ReferencesState{
+								FilesBackend: &FilesBackendState{
+									LooseReferences: map[git.ReferenceName]git.ObjectID{
+										"refs/heads/branch": setup.Commits.First.OID,
+									},
+								},
+							}, &ReferencesState{
+								ReftableBackend: &ReftableBackendState{
+									Tables: []ReftableTable{
+										{
+											MinIndex: 1,
+											MaxIndex: 1,
+											References: []git.Reference{
+												{
+													Name:       "HEAD",
+													Target:     "refs/heads/main",
+													IsSymbolic: true,
+												},
+											},
+										},
+										{
+											MinIndex: 2,
+											MaxIndex: 2,
+											References: []git.Reference{
+												{
+													Name:   "refs/heads/branch",
+													Target: setup.Commits.First.OID.String(),
+												},
+											},
+										},
+									},
+								},
+							},
+						),
+					},
+				},
 			},
 		},
 		{
