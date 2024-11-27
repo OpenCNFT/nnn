@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
@@ -21,20 +20,26 @@ func newPathEscapesRootError(path string) error {
 	return structerr.NewInvalidArgument("path escapes root").WithMetadata("path", path)
 }
 
+// WALBuilder is the interface of a WAL entry builder.
+type WALBuilder interface {
+	// RecordMkdir records creation of a single directory.
+	RecordMkdir(relativePath string)
+}
+
 // FS performs file system operations and records them into
 // WAL entry as they are performed. The paths provided to
 // the methods should be relative to the transaction's
 // file system snapshot's root.
 type FS struct {
-	root  string
-	entry *wal.Entry
+	root string
+	wal  WALBuilder
 }
 
 // NewFS returns a new FS.
-func NewFS(root string, entry *wal.Entry) FS {
+func NewFS(root string, wal WALBuilder) FS {
 	return FS{
-		root:  root,
-		entry: entry,
+		root: root,
+		wal:  wal,
 	}
 }
 
@@ -62,7 +67,7 @@ func (f FS) mkdir(path string) error {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	f.entry.RecordMkdir(path)
+	f.wal.RecordMkdir(path)
 
 	return nil
 }
