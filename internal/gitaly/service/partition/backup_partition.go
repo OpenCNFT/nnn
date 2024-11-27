@@ -114,7 +114,7 @@ func writeTarball(partitionRoot string, kvFile *os.File, w io.Writer) error {
 		return fmt.Errorf("tar builder: virtual file: %w", err)
 	}
 
-	if err := builder.RecursiveDir(".", true); err != nil {
+	if err := builder.RecursiveDir(".", "fs", true); err != nil {
 		return fmt.Errorf("tar builder: recursive dir: %w", err)
 	}
 

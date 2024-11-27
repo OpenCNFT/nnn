@@ -138,7 +138,6 @@ func TestBackupPartition(t *testing.T) {
 				{Key: []byte(fmt.Sprintf("m/%s", repo.GetRelativePath())), Value: []byte{0, 0, 0, 0, 0, 0, 0, 0}},
 				{Key: []byte(fmt.Sprintf("r/%s", repo.GetRelativePath())), Value: nil},
 			}
-
 			for _, entry := range expectedEntries {
 				_, err = protodelim.MarshalTo(
 					expectedKV,
@@ -148,9 +147,9 @@ func TestBackupPartition(t *testing.T) {
 			}
 
 			testhelper.ContainsTarState(t, tar, testhelper.DirectoryState{
-				".":                    {Mode: archive.DirectoryMode},
-				repo.GetRelativePath(): {Mode: archive.DirectoryMode},
-				"kv-state":             {Mode: archive.TarFileMode, Content: expectedKV.Bytes()},
+				"fs": {Mode: archive.DirectoryMode},
+				filepath.Join("fs", repo.GetRelativePath()): {Mode: archive.DirectoryMode},
+				"kv-state": {Mode: archive.TarFileMode, Content: expectedKV.Bytes()},
 			})
 
 			manifestPath := filepath.Join(backupRoot, "partition-manifests", data.storageName, data.partitionID) + ".json"
@@ -219,10 +218,10 @@ func TestBackupPartition(t *testing.T) {
 			}
 
 			testhelper.ContainsTarState(t, tar2, testhelper.DirectoryState{
-				".":                              {Mode: archive.DirectoryMode},
-				repo.GetRelativePath():           {Mode: archive.DirectoryMode},
-				forkRepository.GetRelativePath(): {Mode: archive.DirectoryMode},
-				"kv-state":                       {Mode: archive.TarFileMode, Content: expectedKV.Bytes()},
+				"fs": {Mode: archive.DirectoryMode},
+				filepath.Join("fs", repo.GetRelativePath()):           {Mode: archive.DirectoryMode},
+				filepath.Join("fs", forkRepository.GetRelativePath()): {Mode: archive.DirectoryMode},
+				"kv-state": {Mode: archive.TarFileMode, Content: expectedKV.Bytes()},
 			})
 
 			manifestFile, err = os.Open(manifestPath)
