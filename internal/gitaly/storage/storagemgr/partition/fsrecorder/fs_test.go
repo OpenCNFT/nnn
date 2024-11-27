@@ -21,6 +21,25 @@ func (r *recordingWALBuilder) RecordMkdir(path string) {
 	r.append(recordMkdir{path: path})
 }
 
+type directoryEntryRemoval struct{ path string }
+
+func (r *recordingWALBuilder) RecordDirectoryEntryRemoval(path string) {
+	r.append(directoryEntryRemoval{path: path})
+}
+
+type fileCreation struct{ sourceAbsolutePath, path string }
+
+func (r *recordingWALBuilder) RecordFileCreation(sourceAbsolutePath, path string) error {
+	r.append(fileCreation{sourceAbsolutePath: sourceAbsolutePath, path: path})
+	return nil
+}
+
+type createLink struct{ sourcePath, destinationPath string }
+
+func (r *recordingWALBuilder) CreateLink(sourcePath, destinationPath string) {
+	r.append(createLink{sourcePath: sourcePath, destinationPath: destinationPath})
+}
+
 func (r *recordingWALBuilder) append(op any) {
 	r.operations = append(r.operations, op)
 }
@@ -126,5 +145,83 @@ func TestFS(t *testing.T) {
 				f.wal,
 			)
 		})
+	})
+
+	t.Run("RecordRead", func(t *testing.T) {
+		testPathValidation(t, func(f FS, path string) error { return f.RecordRead(path) })
+
+		f := NewFS(t.TempDir(), &recordingWALBuilder{})
+
+		require.Equal(t, ReadSet{}, f.ReadSet())
+
+		require.NoError(t, f.RecordRead("parent"))
+		require.NoError(t, f.RecordRead("parent/not-read/child"))
+
+		require.Equal(t, ReadSet{
+			"parent":                {},
+			"parent/not-read/child": {},
+		}, f.ReadSet())
+	})
+
+	t.Run("RecordRemoval", func(t *testing.T) {
+		testPathValidation(t, func(f FS, path string) error { return f.RecordRemoval(path) })
+
+		f := NewFS(t.TempDir(), &recordingWALBuilder{})
+
+		require.NoError(t, f.RecordRemoval("parent/target"))
+		require.Equal(t,
+			&recordingWALBuilder{operations: []any{
+				directoryEntryRemoval{path: "parent/target"},
+			}},
+			f.wal,
+		)
+	})
+
+	t.Run("RecordFile", func(t *testing.T) {
+		testPathValidation(t, func(f FS, path string) error { return f.RecordFile(path) })
+
+		f := NewFS(t.TempDir(), &recordingWALBuilder{})
+
+		require.NoError(t, f.RecordFile("parent/target"))
+		require.Equal(t,
+			&recordingWALBuilder{operations: []any{
+				fileCreation{sourceAbsolutePath: filepath.Join(f.Root(), "parent/target"), path: "parent/target"},
+			}},
+			f.wal,
+		)
+	})
+
+	t.Run("RecordLink", func(t *testing.T) {
+		t.Run("source path", func(t *testing.T) {
+			testPathValidation(t, func(f FS, path string) error { return f.RecordLink(path, "valid") })
+		})
+
+		t.Run("destination path", func(t *testing.T) {
+			testPathValidation(t, func(f FS, path string) error { return f.RecordLink("valid", path) })
+		})
+
+		f := NewFS(t.TempDir(), &recordingWALBuilder{})
+
+		require.NoError(t, f.RecordLink("source", "parent/target"))
+		require.Equal(t,
+			&recordingWALBuilder{operations: []any{
+				createLink{sourcePath: "source", destinationPath: "parent/target"},
+			}},
+			f.wal,
+		)
+	})
+
+	t.Run("RecordDirectory", func(t *testing.T) {
+		testPathValidation(t, func(f FS, path string) error { return f.RecordDirectory(path) })
+
+		f := NewFS(t.TempDir(), &recordingWALBuilder{})
+
+		require.NoError(t, f.RecordDirectory("parent/target"))
+		require.Equal(t,
+			&recordingWALBuilder{operations: []any{
+				recordMkdir{path: "parent/target"},
+			}},
+			f.wal,
+		)
 	})
 }

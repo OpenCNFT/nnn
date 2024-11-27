@@ -52,9 +52,21 @@ type PartitionIterator interface {
 }
 
 // FS is the transaction's file system snapshot.
+//
+// All of the input paths must be relative to Root().
 type FS interface {
 	// Root is the absolute path to the root of the transaction's file system snapshot.
 	Root() string
+	// RecordRead records the given path as read by the transaction.
+	RecordRead(path string) error
+	// RecordFile records a file creation into the transaction.
+	RecordFile(path string) error
+	// RecordLink records a hard link creation into the transaction.
+	RecordLink(sourcePath, destinationPath string) error
+	// RecordDirectory records a directory creation into the transaction.
+	RecordDirectory(path string) error
+	// RecordRemoval records a directory entry removal into the transaction.
+	RecordRemoval(path string) error
 }
 
 // Transaction is a single unit-of-work that executes as a whole.
