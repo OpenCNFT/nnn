@@ -1145,8 +1145,8 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("replace object directory: %w", err)
 		}
 
-		if err := transaction.walEntry.RecordDirectoryCreation(
-			transaction.snapshot.Root(),
+		if err := storage.RecordDirectoryCreation(
+			transaction.FS(),
 			transaction.relativePath,
 		); err != nil {
 			return fmt.Errorf("record directory creation: %w", err)
@@ -1181,8 +1181,8 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			//
 			// If the transaction removed the custom hooks, we won't have anything to log. We'll ignore the
 			// ErrNotExist and stage the deletion later.
-			if err := transaction.walEntry.RecordDirectoryCreation(
-				transaction.snapshot.Root(),
+			if err := storage.RecordDirectoryCreation(
+				transaction.FS(),
 				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
 			); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return fmt.Errorf("record custom hook directory: %w", err)
@@ -1976,7 +1976,7 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 
 	for _, entry := range objectsDirEntries {
 		if entry.IsDir() && regexpLooseObjectDir.MatchString(entry.Name()) {
-			if err := transaction.walEntry.RecordDirectoryRemoval(transaction.snapshot.Root(), filepath.Join(objectsDirRelativePath, entry.Name())); err != nil {
+			if err := storage.RecordDirectoryRemoval(transaction.FS(), transaction.FS().Root(), filepath.Join(objectsDirRelativePath, entry.Name())); err != nil {
 				return fmt.Errorf("record loose object dir removal: %w", err)
 			}
 		}
@@ -2130,7 +2130,7 @@ func (mgr *TransactionManager) prepareCommitGraphs(ctx context.Context, transact
 	if info, err := os.Stat(commitGraphsAbsolutePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("stat commit-graphs pre-image: %w", err)
 	} else if info != nil {
-		if err := transaction.walEntry.RecordDirectoryRemoval(transaction.snapshot.Root(), commitGraphsRelativePath); err != nil {
+		if err := storage.RecordDirectoryRemoval(transaction.FS(), transaction.FS().Root(), commitGraphsRelativePath); err != nil {
 			return fmt.Errorf("record commit-graphs removal: %w", err)
 		}
 	}
@@ -2146,7 +2146,7 @@ func (mgr *TransactionManager) prepareCommitGraphs(ctx context.Context, transact
 	if info, err := os.Stat(commitGraphsAbsolutePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("stat commit-graphs post-image: %w", err)
 	} else if info != nil {
-		if err := transaction.walEntry.RecordDirectoryCreation(transaction.snapshot.Root(), commitGraphsRelativePath); err != nil {
+		if err := storage.RecordDirectoryCreation(transaction.FS(), commitGraphsRelativePath); err != nil {
 			return fmt.Errorf("record commit-graphs creation: %w", err)
 		}
 	}
@@ -2357,7 +2357,8 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		if transaction.customHooksUpdated {
 			// Log a deletion of the existing custom hooks so they are removed before the
 			// new ones are put in place.
-			if err := transaction.walEntry.RecordDirectoryRemoval(
+			if err := storage.RecordDirectoryRemoval(
+				transaction.FS(),
 				mgr.storagePath,
 				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
 			); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -2372,7 +2373,8 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 
 			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 
-			if err := transaction.walEntry.RecordDirectoryRemoval(
+			if err := storage.RecordDirectoryRemoval(
+				transaction.FS(),
 				mgr.storagePath,
 				transaction.relativePath,
 			); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -2733,7 +2735,7 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 			return "", gitstorage.ErrNoAlternate
 		}
 
-		if err := transaction.walEntry.RecordAlternateUnlink(mgr.storagePath, transaction.relativePath, existingAlternate); err != nil {
+		if err := storage.RecordAlternateUnlink(transaction.FS(), mgr.storagePath, transaction.relativePath, existingAlternate); err != nil {
 			return "", fmt.Errorf("record alternate unlink: %w", err)
 		}
 
