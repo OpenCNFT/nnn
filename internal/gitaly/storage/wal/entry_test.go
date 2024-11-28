@@ -69,9 +69,9 @@ func TestEntry(t *testing.T) {
 			},
 		},
 		{
-			desc: "RecordFileCreation",
+			desc: "CreateFile",
 			run: func(t *testing.T, entry *Entry) {
-				require.NoError(t, entry.RecordFileCreation(
+				require.NoError(t, entry.CreateFile(
 					filepath.Join(storageRoot, "root-file"),
 					"test-dir/file-1",
 				))
@@ -87,9 +87,9 @@ func TestEntry(t *testing.T) {
 			},
 		},
 		{
-			desc: "RecordDirectoryEntryRemoval",
+			desc: "RemoveDirectoryEntry",
 			run: func(t *testing.T, entry *Entry) {
-				entry.RecordDirectoryEntryRemoval("test-dir/file-1")
+				entry.RemoveDirectoryEntry("test-dir/file-1")
 			},
 			expectedOperations: func() operations {
 				var ops operations
@@ -117,9 +117,9 @@ func TestEntry(t *testing.T) {
 			},
 		},
 		{
-			desc: "Mkdir",
+			desc: "CreateDirectory",
 			run: func(t *testing.T, entry *Entry) {
-				entry.RecordMkdir("parent/target")
+				entry.CreateDirectory("parent/target")
 			},
 			expectedOperations: func() operations {
 				var ops operations

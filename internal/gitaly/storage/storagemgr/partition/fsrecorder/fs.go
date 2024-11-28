@@ -22,14 +22,14 @@ func newPathEscapesRootError(path string) error {
 
 // WALBuilder is the interface of a WAL entry builder.
 type WALBuilder interface {
-	// RecordMkdir records creation of a single directory.
-	RecordMkdir(relativePath string)
-	// RecordDirectoryEntryRemoval records the removal of the file system object at the given path.
-	RecordDirectoryEntryRemoval(relativePath string)
-	// RecordFileCreation stages the file at the source and adds an operation to link it
+	// CreateDirectory records creation of a single directory.
+	CreateDirectory(relativePath string)
+	// RemoveDirectoryEntry records the removal of the directory entry at the given path.
+	RemoveDirectoryEntry(relativePath string)
+	// CreateFile stages the file at the source and adds an operation to link it
 	// to the given destination relative path in the storage.
-	RecordFileCreation(sourceAbsolutePath string, relativePath string) error
-	// CreateLink records a creation of a hard link to an existing file in the partition.
+	CreateFile(sourceAbsolutePath string, relativePath string) error
+	// CreateLink records a creation of a hard link to an exisiting file in the partition.
 	CreateLink(sourcePath, destinationPath string)
 }
 
@@ -79,7 +79,7 @@ func (f FS) mkdir(path string) error {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 
-	f.wal.RecordMkdir(path)
+	f.wal.CreateDirectory(path)
 
 	return nil
 }
@@ -154,7 +154,7 @@ func (f FS) RecordFile(path string) error {
 		return fmt.Errorf("validate path: %w", err)
 	}
 
-	if err := f.wal.RecordFileCreation(filepath.Join(f.root, path), path); err != nil {
+	if err := f.wal.CreateFile(filepath.Join(f.root, path), path); err != nil {
 		return fmt.Errorf("record file creation: %w", err)
 	}
 
@@ -185,7 +185,7 @@ func (f FS) RecordDirectory(path string) error {
 		return fmt.Errorf("validate path: %w", err)
 	}
 
-	f.wal.RecordMkdir(path)
+	f.wal.CreateDirectory(path)
 
 	return nil
 }
@@ -197,7 +197,7 @@ func (f FS) RecordRemoval(path string) error {
 		return fmt.Errorf("validate path: %w", err)
 	}
 
-	f.wal.RecordDirectoryEntryRemoval(path)
+	f.wal.RemoveDirectoryEntry(path)
 
 	return nil
 }

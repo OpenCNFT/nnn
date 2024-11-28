@@ -46,10 +46,10 @@ func TestApplyOperations(t *testing.T) {
 
 	walEntryDirectory := t.TempDir()
 	walEntry := wal.NewEntry(walEntryDirectory)
-	walEntry.RecordMkdir("parent")
+	walEntry.CreateDirectory("parent")
 	require.NoError(t, storage.RecordDirectoryCreation(fsrecorder.NewFS(snapshotRoot, walEntry), "parent/relative-path"))
-	walEntry.RecordDirectoryEntryRemoval("parent/relative-path/dir-with-removed-file/removed-file")
-	walEntry.RecordDirectoryEntryRemoval("parent/relative-path/removed-dir")
+	walEntry.RemoveDirectoryEntry("parent/relative-path/dir-with-removed-file/removed-file")
+	walEntry.RemoveDirectoryEntry("parent/relative-path/removed-dir")
 	walEntry.DeleteKey([]byte("key-2"))
 	walEntry.SetKey([]byte("key-3"), []byte("value-3-updated"))
 	walEntry.SetKey([]byte("key-4"), []byte("value-4"))

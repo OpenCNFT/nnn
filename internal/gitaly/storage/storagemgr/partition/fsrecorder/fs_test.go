@@ -15,22 +15,22 @@ type recordingWALBuilder struct {
 	operations []any
 }
 
-type recordMkdir struct{ path string }
+type createDirectory struct{ path string }
 
-func (r *recordingWALBuilder) RecordMkdir(path string) {
-	r.append(recordMkdir{path: path})
+func (r *recordingWALBuilder) CreateDirectory(path string) {
+	r.append(createDirectory{path: path})
 }
 
-type directoryEntryRemoval struct{ path string }
+type removeDirectoryEntry struct{ path string }
 
-func (r *recordingWALBuilder) RecordDirectoryEntryRemoval(path string) {
-	r.append(directoryEntryRemoval{path: path})
+func (r *recordingWALBuilder) RemoveDirectoryEntry(path string) {
+	r.append(removeDirectoryEntry{path: path})
 }
 
-type fileCreation struct{ sourceAbsolutePath, path string }
+type createFile struct{ sourceAbsolutePath, path string }
 
-func (r *recordingWALBuilder) RecordFileCreation(sourceAbsolutePath, path string) error {
-	r.append(fileCreation{sourceAbsolutePath: sourceAbsolutePath, path: path})
+func (r *recordingWALBuilder) CreateFile(sourceAbsolutePath, path string) error {
+	r.append(createFile{sourceAbsolutePath: sourceAbsolutePath, path: path})
 	return nil
 }
 
@@ -93,8 +93,8 @@ func TestFS(t *testing.T) {
 			require.NoError(t, f.Mkdir("parent/child"))
 			require.Equal(t,
 				&recordingWALBuilder{operations: []any{
-					recordMkdir{path: "parent"},
-					recordMkdir{path: "parent/child"},
+					createDirectory{path: "parent"},
+					createDirectory{path: "parent/child"},
 				}},
 				f.wal,
 			)
@@ -139,8 +139,8 @@ func TestFS(t *testing.T) {
 			require.NoError(t, f.MkdirAll("parent/child/target"))
 			require.Equal(t,
 				&recordingWALBuilder{operations: []any{
-					recordMkdir{path: "parent/child"},
-					recordMkdir{path: "parent/child/target"},
+					createDirectory{path: "parent/child"},
+					createDirectory{path: "parent/child/target"},
 				}},
 				f.wal,
 			)
@@ -171,7 +171,7 @@ func TestFS(t *testing.T) {
 		require.NoError(t, f.RecordRemoval("parent/target"))
 		require.Equal(t,
 			&recordingWALBuilder{operations: []any{
-				directoryEntryRemoval{path: "parent/target"},
+				removeDirectoryEntry{path: "parent/target"},
 			}},
 			f.wal,
 		)
@@ -185,7 +185,7 @@ func TestFS(t *testing.T) {
 		require.NoError(t, f.RecordFile("parent/target"))
 		require.Equal(t,
 			&recordingWALBuilder{operations: []any{
-				fileCreation{sourceAbsolutePath: filepath.Join(f.Root(), "parent/target"), path: "parent/target"},
+				createFile{sourceAbsolutePath: filepath.Join(f.Root(), "parent/target"), path: "parent/target"},
 			}},
 			f.wal,
 		)
@@ -219,7 +219,7 @@ func TestFS(t *testing.T) {
 		require.NoError(t, f.RecordDirectory("parent/target"))
 		require.Equal(t,
 			&recordingWALBuilder{operations: []any{
-				recordMkdir{path: "parent/target"},
+				createDirectory{path: "parent/target"},
 			}},
 			f.wal,
 		)

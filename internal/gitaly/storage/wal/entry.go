@@ -93,14 +93,14 @@ func (e *Entry) DeleteKey(key []byte) {
 	e.operations.deleteKey(key)
 }
 
-// RecordMkdir records creation of a single directory.
-func (e *Entry) RecordMkdir(relativePath string) {
+// CreateDirectory records creation of a single directory.
+func (e *Entry) CreateDirectory(relativePath string) {
 	e.operations.createDirectory(relativePath)
 }
 
-// RecordFileCreation stages the file at the source and adds an operation to link it
+// CreateFile stages the file at the source and adds an operation to link it
 // to the given destination relative path in the storage.
-func (e *Entry) RecordFileCreation(sourceAbsolutePath string, relativePath string) error {
+func (e *Entry) CreateFile(sourceAbsolutePath string, relativePath string) error {
 	stagedFile, err := e.stageFile(sourceAbsolutePath)
 	if err != nil {
 		return fmt.Errorf("stage file: %w", err)
@@ -115,7 +115,7 @@ func (e *Entry) CreateLink(sourceRelativePath, destinationRelativePath string) {
 	e.operations.createHardLink(sourceRelativePath, destinationRelativePath, true)
 }
 
-// RecordDirectoryEntryRemoval records the removal of the file system object at the given path.
-func (e *Entry) RecordDirectoryEntryRemoval(relativePath string) {
+// RemoveDirectoryEntry records the removal of the directory entry at the given path.
+func (e *Entry) RemoveDirectoryEntry(relativePath string) {
 	e.operations.removeDirectoryEntry(relativePath)
 }

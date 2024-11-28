@@ -1166,7 +1166,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 
 				// Alternates file did not exist, nothing to stage. This was an unlink operation.
 			} else {
-				if err := transaction.walEntry.RecordFileCreation(
+				if err := transaction.walEntry.CreateFile(
 					stagedAlternatesAbsolutePath,
 					stagedAlternatesRelativePath,
 				); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -1193,7 +1193,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		if transaction.packPrefix != "" {
 			packDir := filepath.Join(transaction.relativePath, "objects", "pack")
 			for _, fileExtension := range []string{".pack", ".idx", ".rev"} {
-				if err := transaction.walEntry.RecordFileCreation(
+				if err := transaction.walEntry.CreateFile(
 					filepath.Join(transaction.stagingDirectory, "objects"+fileExtension),
 					filepath.Join(packDir, transaction.packPrefix+fileExtension),
 				); err != nil {
@@ -1780,7 +1780,7 @@ func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, tran
 	for _, table := range tablesListPre {
 		if _, ok := tablesPostMap[table]; !ok {
 			// If the table no longer exists, we remove it.
-			transaction.walEntry.RecordDirectoryEntryRemoval(
+			transaction.walEntry.RemoveDirectoryEntry(
 				filepath.Join(transaction.relativePath, "reftable", table),
 			)
 		} else {
@@ -1793,7 +1793,7 @@ func (mgr *TransactionManager) preparePackRefsReftable(ctx context.Context, tran
 	for file := range tablesPostMap {
 		// The remaining tables in tableListPost are new tables
 		// which need to be recorded.
-		if err := transaction.walEntry.RecordFileCreation(
+		if err := transaction.walEntry.CreateFile(
 			filepath.Join(repoPath, "reftable", file),
 			filepath.Join(transaction.relativePath, "reftable", file),
 		); err != nil {
@@ -1829,7 +1829,7 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 		}
 
 		// The lock file existed. Log its deletion.
-		transaction.walEntry.RecordDirectoryEntryRemoval(lockRelativePath)
+		transaction.walEntry.RemoveDirectoryEntry(lockRelativePath)
 	}
 
 	// First walk to collect the list of loose refs.
@@ -1876,11 +1876,11 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 
 	if packedRefsPreImage != packedRefsPostImage {
 		if packedRefsPreImage > 0 {
-			transaction.walEntry.RecordDirectoryEntryRemoval(packedRefsRelativePath)
+			transaction.walEntry.RemoveDirectoryEntry(packedRefsRelativePath)
 		}
 
 		if packedRefsPostImage > 0 {
-			if err := transaction.walEntry.RecordFileCreation(packedRefsAbsolutePath, packedRefsRelativePath); err != nil {
+			if err := transaction.walEntry.CreateFile(packedRefsAbsolutePath, packedRefsRelativePath); err != nil {
 				return fmt.Errorf("stage packed-refs: %w", err)
 			}
 		}
@@ -2047,7 +2047,7 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 	for file := range beforeFiles {
 		// We delete the files only if it's missing from the before set.
 		if _, exist := afterFiles[file]; !exist {
-			transaction.walEntry.RecordDirectoryEntryRemoval(filepath.Join(
+			transaction.walEntry.RemoveDirectoryEntry(filepath.Join(
 				objectsDirRelativePath, "pack", file,
 			))
 		}
@@ -2058,7 +2058,7 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 		if _, exist := beforeFiles[file]; !exist {
 			fileRelativePath := filepath.Join(objectsDirRelativePath, "pack", file)
 
-			if err := transaction.walEntry.RecordFileCreation(
+			if err := transaction.walEntry.CreateFile(
 				filepath.Join(transaction.snapshot.Root(), fileRelativePath),
 				fileRelativePath,
 			); err != nil {
@@ -2082,10 +2082,10 @@ func (mgr *TransactionManager) prepareRepacking(ctx context.Context, transaction
 
 		if info != nil {
 			// The file existed and needs to be removed first.
-			transaction.walEntry.RecordDirectoryEntryRemoval(timestampRelativePath)
+			transaction.walEntry.RemoveDirectoryEntry(timestampRelativePath)
 		}
 
-		if err := transaction.walEntry.RecordFileCreation(timestampAbsolutePath, timestampRelativePath); err != nil {
+		if err := transaction.walEntry.CreateFile(timestampAbsolutePath, timestampRelativePath); err != nil {
 			return fmt.Errorf("stage repacking timestamp: %w", err)
 		}
 	}
@@ -2120,7 +2120,7 @@ func (mgr *TransactionManager) prepareCommitGraphs(ctx context.Context, transact
 	)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("stat commit-graph: %w", err)
 	} else if info != nil {
-		transaction.walEntry.RecordDirectoryEntryRemoval(commitGraphRelativePath)
+		transaction.walEntry.RemoveDirectoryEntry(commitGraphRelativePath)
 	}
 
 	// Check for an existing commit-graphs directory. If so, delete it as
@@ -2935,9 +2935,9 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 			base := filepath.Base(path)
 
 			if base == "tables.list" {
-				tx.walEntry.RecordDirectoryEntryRemoval(filepath.Join(tx.relativePath, "reftable", base))
+				tx.walEntry.RemoveDirectoryEntry(filepath.Join(tx.relativePath, "reftable", base))
 			}
-			return tx.walEntry.RecordFileCreation(path, filepath.Join(tx.relativePath, "reftable", base))
+			return tx.walEntry.CreateFile(path, filepath.Join(tx.relativePath, "reftable", base))
 		}),
 	); err != nil {
 		return fmt.Errorf("finding reftables: %w", err)
@@ -3042,7 +3042,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 	packedRefsRelativePath := filepath.Join(tx.relativePath, "packed-refs")
 	if currentPackedRefsInode > 0 {
 		// If the repository has a packed-refs file already, remove it.
-		tx.walEntry.RecordDirectoryEntryRemoval(packedRefsRelativePath)
+		tx.walEntry.RemoveDirectoryEntry(packedRefsRelativePath)
 
 		// Remove the current packed-refs file from the staging repository if the transaction
 		// changed the packed-refs file. If the packed-refs file was removed, this applies
@@ -3054,7 +3054,7 @@ func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transact
 
 	if postImagePackedRefsInode > 0 {
 		// If there is a new packed refs file, stage it.
-		if err := tx.walEntry.RecordFileCreation(
+		if err := tx.walEntry.CreateFile(
 			postImagePackedRefsPath,
 			packedRefsRelativePath,
 		); err != nil {
@@ -3330,7 +3330,7 @@ func (mgr *TransactionManager) verifyPackRefsFiles(ctx context.Context, transact
 			return fmt.Errorf("remove loose reference: %w", err)
 		}
 
-		transaction.walEntry.RecordDirectoryEntryRemoval(relativePath)
+		transaction.walEntry.RemoveDirectoryEntry(relativePath)
 
 		return nil
 	}); err != nil {
