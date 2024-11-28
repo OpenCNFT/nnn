@@ -435,6 +435,18 @@ message RepositoryInfoRequest {
 message RepositoryInfoResponse {
   // ReferencesInfo hosts information about references.
   message ReferencesInfo {
+    // ReferenceBackend denotes the type of backend used to store references.
+    enum ReferenceBackend {
+      // REFERENCE_BACKEND_UNSPECIFIED is the default value for a reference backend if there
+      // is an error during detection. This state should ideally never occur, and if set
+      // it indicates that something has gone wrong.
+      REFERENCE_BACKEND_UNSPECIFIED = 0;
+      // REFERENCE_BACKEND_FILES is the traditional backend built using files/directories.
+      REFERENCE_BACKEND_FILES = 1;
+      // REFERENCE_BACKEND_REFTABLE is the new backend using customized binary file format.
+      REFERENCE_BACKEND_REFTABLE = 2;
+    };
+
     // loose_count is the number of loose references that exist in the repository. These references
     // are written whenever any reference either gets updated or created. Loose references have not
     // yet been compressed into a packed format, which is an action that Gitaly performs regularly
@@ -448,6 +460,8 @@ message RepositoryInfoResponse {
     // in packed format would require us to process the complete contents we don't provide the size
     // here. A very rough estimate would be: `$size / 100`.
     uint64 packed_size = 2;
+    // reference_backend is the backend used for storing references in the repository.
+    ReferenceBackend reference_backend = 3;
   }
 
   // ObjectsInfo hosts info about objects contained in a repository. It tries to bridge the gap

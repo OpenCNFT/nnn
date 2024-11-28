@@ -2,6 +2,7 @@ package repository
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,9 +87,14 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
-						Objects:    &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
+						Size: emptyRepoSize,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
+						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
 					},
 				}
 			},
@@ -109,6 +115,10 @@ func TestRepositoryInfo(t *testing.T) {
 						Size: emptyRepoSize + 123,
 						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
 							LooseCount: 1,
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
 						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
 					},
@@ -131,6 +141,10 @@ func TestRepositoryInfo(t *testing.T) {
 						Size: emptyRepoSize + 123,
 						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
 							PackedSize: 123,
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
 						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
 					},
@@ -150,8 +164,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 123,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 123,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:       123,
 							RecentSize: 123,
@@ -175,8 +194,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 123,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 123,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:      123,
 							StaleSize: 123,
@@ -204,8 +228,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 70 + 700,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 70 + 700,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:       770,
 							RecentSize: 70,
@@ -227,8 +256,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 123,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 123,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:       123,
 							RecentSize: 123,
@@ -250,8 +284,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 123 + 7,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 123 + 7,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:      123,
 							StaleSize: 123,
@@ -273,8 +312,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 123 + 7,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 123 + 7,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:       123,
 							RecentSize: 123,
@@ -302,8 +346,13 @@ func TestRepositoryInfo(t *testing.T) {
 						Repository: repo,
 					},
 					expectedResponse: &gitalypb.RepositoryInfoResponse{
-						Size:       emptyRepoSize + 8000 + 800 + 70,
-						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+						Size: emptyRepoSize + 8000 + 800 + 70,
+						References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+							ReferenceBackend: gittest.FilesOrReftables(
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+								gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+							),
+						},
 						Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 							Size:       7770,
 							RecentSize: 770,
@@ -335,21 +384,29 @@ func TestConvertRepositoryInfo(t *testing.T) {
 		repoSize         uint64
 		repoInfo         stats.RepositoryInfo
 		expectedResponse *gitalypb.RepositoryInfoResponse
+		expectedErr      error
 	}{
 		{
-			desc: "all-zero",
-			expectedResponse: &gitalypb.RepositoryInfoResponse{
-				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
-				Objects:    &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
-			},
+			desc:        "all-zero",
+			expectedErr: fmt.Errorf("invalid reference backend"),
 		},
 		{
 			desc:     "size",
 			repoSize: 123,
+			repoInfo: stats.RepositoryInfo{
+				References: stats.ReferencesInfo{
+					ReferenceBackendName: gittest.DefaultReferenceBackend.Name,
+				},
+			},
 			expectedResponse: &gitalypb.RepositoryInfoResponse{
-				Size:       123,
-				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
-				Objects:    &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
+				Size: 123,
+				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+					ReferenceBackend: gittest.FilesOrReftables(
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+					),
+				},
+				Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
 			},
 		},
 		{
@@ -365,6 +422,10 @@ func TestConvertRepositoryInfo(t *testing.T) {
 				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
 					LooseCount: 123,
 					PackedSize: 456,
+					ReferenceBackend: gittest.FilesOrReftables(
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+					),
 				},
 				Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{},
 			},
@@ -376,9 +437,17 @@ func TestConvertRepositoryInfo(t *testing.T) {
 					Size:      123,
 					StaleSize: 3,
 				},
+				References: stats.ReferencesInfo{
+					ReferenceBackendName: gittest.DefaultReferenceBackend.Name,
+				},
 			},
 			expectedResponse: &gitalypb.RepositoryInfoResponse{
-				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+					ReferenceBackend: gittest.FilesOrReftables(
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+					),
+				},
 				Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 					Size:       123,
 					RecentSize: 120,
@@ -394,9 +463,17 @@ func TestConvertRepositoryInfo(t *testing.T) {
 					CruftSize: 3,
 					KeepSize:  7,
 				},
+				References: stats.ReferencesInfo{
+					ReferenceBackendName: gittest.DefaultReferenceBackend.Name,
+				},
 			},
 			expectedResponse: &gitalypb.RepositoryInfoResponse{
-				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+					ReferenceBackend: gittest.FilesOrReftables(
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+					),
+				},
 				Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 					Size:       123,
 					RecentSize: 120,
@@ -417,9 +494,17 @@ func TestConvertRepositoryInfo(t *testing.T) {
 					CruftSize: 300,
 					KeepSize:  500,
 				},
+				References: stats.ReferencesInfo{
+					ReferenceBackendName: gittest.DefaultReferenceBackend.Name,
+				},
 			},
 			expectedResponse: &gitalypb.RepositoryInfoResponse{
-				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{},
+				References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
+					ReferenceBackend: gittest.FilesOrReftables(
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES,
+						gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE,
+					),
+				},
 				Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 					Size:       707,
 					RecentSize: 404,
@@ -432,7 +517,8 @@ func TestConvertRepositoryInfo(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
 
-			response := convertRepositoryInfo(tc.repoSize, tc.repoInfo)
+			response, err := convertRepositoryInfo(tc.repoSize, tc.repoInfo)
+			require.Equal(t, tc.expectedErr, err)
 			require.Equal(t, tc.expectedResponse, response)
 		})
 	}

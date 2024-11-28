@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -34,10 +35,10 @@ func (s *server) RepositoryInfo(
 		return nil, fmt.Errorf("deriving repository info: %w", err)
 	}
 
-	return convertRepositoryInfo(uint64(repoSize), repoInfo), nil
+	return convertRepositoryInfo(uint64(repoSize), repoInfo)
 }
 
-func convertRepositoryInfo(repoSize uint64, repoInfo stats.RepositoryInfo) *gitalypb.RepositoryInfoResponse {
+func convertRepositoryInfo(repoSize uint64, repoInfo stats.RepositoryInfo) (*gitalypb.RepositoryInfoResponse, error) {
 	// The loose objects size includes objects which are older than the grace period and thus
 	// stale, so we need to subtract the size of stale objects from the overall size.
 	recentLooseObjectsSize := repoInfo.LooseObjects.Size - repoInfo.LooseObjects.StaleSize
@@ -45,11 +46,22 @@ func convertRepositoryInfo(repoSize uint64, repoInfo stats.RepositoryInfo) *gita
 	// we need to subtract the size of cruft packs from the overall size.
 	recentPackfilesSize := repoInfo.Packfiles.Size - repoInfo.Packfiles.CruftSize
 
+	var referenceBackend gitalypb.RepositoryInfoResponse_ReferencesInfo_ReferenceBackend
+	switch repoInfo.References.ReferenceBackendName {
+	case git.ReferenceBackendReftables.Name:
+		referenceBackend = gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_REFTABLE
+	case git.ReferenceBackendFiles.Name:
+		referenceBackend = gitalypb.RepositoryInfoResponse_ReferencesInfo_REFERENCE_BACKEND_FILES
+	default:
+		return nil, fmt.Errorf("invalid reference backend")
+	}
+
 	return &gitalypb.RepositoryInfoResponse{
 		Size: repoSize,
 		References: &gitalypb.RepositoryInfoResponse_ReferencesInfo{
-			LooseCount: repoInfo.References.LooseReferencesCount,
-			PackedSize: repoInfo.References.PackedReferencesSize,
+			LooseCount:       repoInfo.References.LooseReferencesCount,
+			PackedSize:       repoInfo.References.PackedReferencesSize,
+			ReferenceBackend: referenceBackend,
 		},
 		Objects: &gitalypb.RepositoryInfoResponse_ObjectsInfo{
 			Size:       repoInfo.LooseObjects.Size + repoInfo.Packfiles.Size,
@@ -57,5 +69,5 @@ func convertRepositoryInfo(repoSize uint64, repoInfo stats.RepositoryInfo) *gita
 			StaleSize:  repoInfo.LooseObjects.StaleSize + repoInfo.Packfiles.CruftSize,
 			KeepSize:   repoInfo.Packfiles.KeepSize,
 		},
-	}
+	}, nil
 }
