@@ -23,7 +23,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 )
@@ -114,8 +113,7 @@ func recoveryStatusAction(ctx *cli.Context) (returnErr error) {
 	defer catfileCache.Stop()
 
 	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
-	snapshotMetrics := snapshot.NewMetrics()
-	partitionMetrics := partition.NewMetrics(housekeepingMetrics, snapshotMetrics)
+	partitionMetrics := partition.NewMetrics(housekeepingMetrics)
 	storageMetrics := storagemgr.NewMetrics(cfg.Prometheus)
 
 	node, err := nodeimpl.NewManager(

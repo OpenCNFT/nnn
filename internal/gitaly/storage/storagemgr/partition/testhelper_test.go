@@ -35,7 +35,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/counter"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 	"google.golang.org/protobuf/proto"
@@ -1043,10 +1042,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 	require.NoError(t, os.Mkdir(stagingDir, mode.Directory))
 
 	newMetrics := func() ManagerMetrics {
-		return NewMetrics(
-			housekeeping.NewMetrics(setup.Config.Prometheus),
-			snapshot.NewMetrics(),
-		).Scope(storageName)
+		return NewMetrics(housekeeping.NewMetrics(setup.Config.Prometheus)).Scope(storageName)
 	}
 
 	var (
