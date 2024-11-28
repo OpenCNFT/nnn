@@ -2935,7 +2935,7 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 			base := filepath.Base(path)
 
 			if base == "tables.list" {
-				return tx.walEntry.RecordFileUpdate(tx.stagingSnapshot.Root(), filepath.Join(tx.relativePath, "reftable", base))
+				tx.walEntry.RecordDirectoryEntryRemoval(filepath.Join(tx.relativePath, "reftable", base))
 			}
 			return tx.walEntry.RecordFileCreation(path, filepath.Join(tx.relativePath, "reftable", base))
 		}),
@@ -3230,12 +3230,14 @@ func (mgr *TransactionManager) verifyPackRefsReftable(transaction *Transaction) 
 		return nil, fmt.Errorf("writing tables.list: %w", err)
 	}
 
+	tablesListRelativePath := filepath.Join(transaction.relativePath, "reftable", "tables.list")
+	if err := transaction.FS().RecordRemoval(tablesListRelativePath); err != nil {
+		return nil, fmt.Errorf("record old tables.list removal: %w", err)
+	}
+
 	// Add operation to update the tables.list.
-	if err := transaction.walEntry.RecordFileUpdate(
-		transaction.snapshot.Root(),
-		filepath.Join(transaction.relativePath, "reftable", "tables.list"),
-	); err != nil {
-		return nil, fmt.Errorf("updating tables.list: %w", err)
+	if err := transaction.FS().RecordFile(tablesListRelativePath); err != nil {
+		return nil, fmt.Errorf("record new tables.list: %w", err)
 	}
 
 	return nil, nil

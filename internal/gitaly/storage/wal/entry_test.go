@@ -101,38 +101,6 @@ func TestEntry(t *testing.T) {
 			},
 		},
 		{
-			desc: "RecordFileUpdate on root level file",
-			run: func(t *testing.T, entry *Entry) {
-				require.NoError(t, entry.RecordFileUpdate(storageRoot, "root-file"))
-			},
-			expectedOperations: func() operations {
-				var ops operations
-				ops.removeDirectoryEntry("root-file")
-				ops.createHardLink("1", "root-file", false)
-				return ops
-			}(),
-			expectedFiles: testhelper.DirectoryState{
-				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: mode.File, Content: []byte("root file")},
-			},
-		},
-		{
-			desc: "RecordFileUpdate on first level file",
-			run: func(t *testing.T, entry *Entry) {
-				require.NoError(t, entry.RecordFileUpdate(storageRoot, filepath.Join(firstLevelDir, "file-1")))
-			},
-			expectedOperations: func() operations {
-				var ops operations
-				ops.removeDirectoryEntry("test-dir/file-1")
-				ops.createHardLink("1", "test-dir/file-1", false)
-				return ops
-			}(),
-			expectedFiles: testhelper.DirectoryState{
-				"/":  {Mode: fs.ModeDir | rootDirPerm},
-				"/1": {Mode: mode.Executable, Content: []byte("file-1")},
-			},
-		},
-		{
 			desc: "key value operations",
 			run: func(t *testing.T, entry *Entry) {
 				entry.SetKey([]byte("set-key"), []byte("value"))
