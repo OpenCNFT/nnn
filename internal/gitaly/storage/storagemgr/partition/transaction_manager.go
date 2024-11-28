@@ -2424,7 +2424,9 @@ func (mgr *TransactionManager) verifyFileSystemOperations(ctx context.Context, t
 		return func(storage.LSN) {}, nil
 	}
 
+	mgr.mutex.Lock()
 	fsTX := mgr.fsHistory.Begin(tx.SnapshotLSN())
+	mgr.mutex.Unlock()
 
 	// isLooseReference returns whether this path is inside the `refs`
 	// directory of the repository.
