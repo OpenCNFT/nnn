@@ -40,7 +40,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitlab"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/grpc/backchannel"
@@ -369,9 +368,8 @@ func run(appCtx *cli.Context, cfg config.Cfg, logger log.Logger) error {
 
 	storageMetrics := storagemgr.NewMetrics(cfg.Prometheus)
 	housekeepingMetrics := housekeeping.NewMetrics(cfg.Prometheus)
-	snapshotMetrics := snapshot.NewMetrics()
-	partitionMetrics := partition.NewMetrics(housekeepingMetrics, snapshotMetrics)
-	prometheus.MustRegister(housekeepingMetrics, snapshotMetrics, storageMetrics, partitionMetrics)
+	partitionMetrics := partition.NewMetrics(housekeepingMetrics)
+	prometheus.MustRegister(housekeepingMetrics, storageMetrics, partitionMetrics)
 
 	var txMiddleware server.TransactionMiddleware
 	var node storage.Node

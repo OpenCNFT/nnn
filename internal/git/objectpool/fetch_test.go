@@ -21,7 +21,6 @@ import (
 	nodeimpl "gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
@@ -429,7 +428,7 @@ func testWithAndWithoutTransaction(t *testing.T, ctx context.Context, testFunc f
 				partition.NewFactory(
 					cmdFactory,
 					localRepoFactory,
-					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus)),
 					nil,
 				),
 				storagemgr.DefaultMaxInactivePartitions,

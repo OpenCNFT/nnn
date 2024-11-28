@@ -23,7 +23,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/node"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/snapshot"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
@@ -229,7 +228,7 @@ Available backup entries:
 				partition.NewFactory(
 					gitCmdFactory,
 					localrepo.NewFactory(logger, locator, gitCmdFactory, catfileCache),
-					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus), snapshot.NewMetrics()),
+					partition.NewMetrics(housekeeping.NewMetrics(cfg.Prometheus)),
 					nil,
 				),
 				1,
