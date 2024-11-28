@@ -51,10 +51,9 @@ func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffServ
 }
 
 func sendRawOutput(ctx context.Context, repo gitcmd.RepositoryExecutor, sender io.Writer, subCmd gitcmd.Command) error {
-	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithStdout(sender))
-	if err != nil {
+	if err := repo.ExecAndWait(ctx, subCmd, gitcmd.WithStdout(sender)); err != nil {
 		return structerr.NewInternal("cmd: %w", err)
 	}
 
-	return cmd.Wait()
+	return nil
 }
