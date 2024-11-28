@@ -31,21 +31,25 @@ func TestFS(t *testing.T) {
 		require.Equal(t, root, NewFS(root, &recordingWALBuilder{}).Root())
 	})
 
+	testPathValidation := func(t *testing.T, run func(FS, string) error) {
+		t.Run("path validation", func(t *testing.T) {
+			f := NewFS(t.TempDir(), &recordingWALBuilder{})
+
+			t.Run("targeting root fails", func(t *testing.T) {
+				require.ErrorIs(t, run(f, ""), newPathEscapesRootError(""))
+			})
+
+			t.Run("escaping root fails", func(t *testing.T) {
+				const path = "../non-root-path"
+				require.ErrorIs(t, run(f, path), newPathEscapesRootError(path))
+			})
+
+			require.Equal(t, &recordingWALBuilder{}, f.wal)
+		})
+	}
+
 	t.Run("Mkdir", func(t *testing.T) {
-		t.Run("targeting root fails", func(t *testing.T) {
-			f := NewFS(t.TempDir(), &recordingWALBuilder{})
-
-			require.Equal(t, newPathEscapesRootError(""), f.Mkdir(""))
-			require.Equal(t, &recordingWALBuilder{}, f.wal)
-		})
-
-		t.Run("escaping root fails", func(t *testing.T) {
-			f := NewFS(t.TempDir(), &recordingWALBuilder{})
-
-			const path = "../non-root-path"
-			require.Equal(t, newPathEscapesRootError(path), f.Mkdir(path))
-			require.Equal(t, &recordingWALBuilder{}, f.wal)
-		})
+		testPathValidation(t, func(f FS, path string) error { return f.Mkdir(path) })
 
 		t.Run("fails if parent does not exist", func(t *testing.T) {
 			f := NewFS(t.TempDir(), &recordingWALBuilder{})
@@ -79,20 +83,7 @@ func TestFS(t *testing.T) {
 	})
 
 	t.Run("MkdirAll", func(t *testing.T) {
-		t.Run("targeting root fails", func(t *testing.T) {
-			f := NewFS(t.TempDir(), &recordingWALBuilder{})
-
-			require.Equal(t, newPathEscapesRootError(""), f.MkdirAll(""))
-			require.Equal(t, &recordingWALBuilder{}, f.wal)
-		})
-
-		t.Run("escaping root fails", func(t *testing.T) {
-			f := NewFS(t.TempDir(), &recordingWALBuilder{})
-
-			const path = "../non-root-path"
-			require.Equal(t, newPathEscapesRootError(path), f.Mkdir(path))
-			require.Equal(t, &recordingWALBuilder{}, f.wal)
-		})
+		testPathValidation(t, func(f FS, path string) error { return f.MkdirAll(path) })
 
 		t.Run("target under a file", func(t *testing.T) {
 			f := NewFS(t.TempDir(), &recordingWALBuilder{})
