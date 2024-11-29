@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -342,6 +343,9 @@ func testUserRevert(t *testing.T, ctx context.Context) {
 				firstCommit, err := repo.ReadCommit(ctx, firstCommitID.Revision())
 				require.NoError(t, err)
 
+				unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+				require.NoError(t, err)
+
 				return setupData{
 					request: &gitalypb.UserRevertRequest{
 						Repository:     repoProto,
@@ -349,11 +353,35 @@ func testUserRevert(t *testing.T, ctx context.Context) {
 						Commit:         firstCommit,
 						BranchName:     []byte(branchName),
 						Message:        []byte("Reverting " + firstCommitID),
-						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
+						ExpectedOldOid: unavailableOID.String(),
 					},
 					expectedError: testhelper.WithInterceptedMetadata(
 						structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
-						"old_object_id", gittest.DefaultObjectHash.ZeroOID),
+						"old_object_id", unavailableOID),
+				}
+			},
+		},
+		{
+			desc: "expectedOldOID set to ZeroOID",
+			setup: func(t *testing.T, repoPath string, repoProto *gitalypb.Repository, repo *localrepo.Repo) setupData {
+				firstCommitID := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch(branchName), gittest.WithTreeEntries(
+					gittest.TreeEntry{Path: "blob", Mode: "100644", Content: "foobar"},
+				))
+				firstCommit, err := repo.ReadCommit(ctx, firstCommitID.Revision())
+				require.NoError(t, err)
+
+				zeroOID := gittest.DefaultObjectHash.ZeroOID.String()
+
+				return setupData{
+					request: &gitalypb.UserRevertRequest{
+						Repository:     repoProto,
+						User:           gittest.TestUser,
+						Commit:         firstCommit,
+						BranchName:     []byte(branchName),
+						Message:        []byte("Reverting " + firstCommitID),
+						ExpectedOldOid: zeroOID,
+					},
+					expectedError: structerr.NewInternal("checking for ancestry: invalid commit: \"%s\"", zeroOID),
 				}
 			},
 		},

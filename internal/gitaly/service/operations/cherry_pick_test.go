@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -244,18 +245,41 @@ func testUserCherryPick(t *testing.T, ctx context.Context) {
 			setup: func(data setupData) (*gitalypb.UserCherryPickRequest, *gitalypb.UserCherryPickResponse, error) {
 				gittest.Exec(t, data.cfg, "-C", data.repoPath, "branch", destinationBranch, git.DefaultBranch)
 
+				unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+				require.NoError(t, err)
+
 				return &gitalypb.UserCherryPickRequest{
 						Repository:     data.repoProto,
 						User:           gittest.TestUser,
 						Commit:         data.cherryPickedCommit,
 						BranchName:     []byte(destinationBranch),
 						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
-						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
+						ExpectedOldOid: unavailableOID.String(),
 					},
 					&gitalypb.UserCherryPickResponse{},
 					testhelper.WithInterceptedMetadata(
 						structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
-						"old_object_id", gittest.DefaultObjectHash.ZeroOID)
+						"old_object_id", unavailableOID)
+			},
+		},
+		{
+			desc: "zero ExpectedOldOId",
+			setup: func(data setupData) (*gitalypb.UserCherryPickRequest, *gitalypb.UserCherryPickResponse, error) {
+				gittest.Exec(t, data.cfg, "-C", data.repoPath, "branch", destinationBranch, git.DefaultBranch)
+				zeroOID := gittest.DefaultObjectHash.ZeroOID.String()
+
+				return &gitalypb.UserCherryPickRequest{
+						Repository:     data.repoProto,
+						User:           gittest.TestUser,
+						Commit:         data.cherryPickedCommit,
+						BranchName:     []byte(destinationBranch),
+						Message:        []byte("Cherry-picking " + data.cherryPickedCommit.GetId()),
+						ExpectedOldOid: zeroOID,
+					},
+					&gitalypb.UserCherryPickResponse{
+						BranchUpdate: &gitalypb.OperationBranchUpdate{},
+					},
+					structerr.NewInternal("checking for ancestry: invalid commit: \"%s\"", zeroOID)
 			},
 		},
 		{

@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -102,6 +103,9 @@ func testUserRebaseToRefFailure(t *testing.T, ctx context.Context) {
 	validFirstParentRef := []byte("refs/heads/main")
 	gittest.WriteCommit(t, cfg, repoPath, gittest.WithMessage("first parent ref commit"), gittest.WithReference(string(validFirstParentRef)), gittest.WithParents(mergeBaseOID))
 
+	unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+	require.NoError(t, err)
+
 	testCases := []struct {
 		desc           string
 		repo           *gitalypb.Repository
@@ -180,6 +184,30 @@ func testUserRebaseToRefFailure(t *testing.T, ctx context.Context) {
 			firstParentRef: validFirstParentRef,
 			expectedOldOID: validSourceSha, // arbitrary valid SHA
 			expectedError:  structerr.NewFailedPrecondition("could not update %s. Please refresh and try again", validTargetRef),
+		},
+		{
+			desc:           "non-existing expected_old_oid",
+			repo:           repo,
+			user:           gittest.TestUser,
+			targetRef:      validTargetRef,
+			sourceSha:      validSourceSha,
+			firstParentRef: validFirstParentRef,
+			expectedOldOID: unavailableOID.String(),
+			expectedError: testhelper.WithInterceptedMetadata(
+				structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
+				"old_object_id",
+				unavailableOID,
+			),
+		},
+		{
+			desc:           "zero target reference",
+			repo:           repo,
+			user:           gittest.TestUser,
+			targetRef:      validTargetRef,
+			sourceSha:      validSourceSha,
+			firstParentRef: validFirstParentRef,
+			expectedOldOID: gittest.DefaultObjectHash.ZeroOID.String(),
+			expectedError:  structerr.NewFailedPrecondition("could not update refs/merge-requests/x/merge. Please refresh and try again"),
 		},
 		{
 			desc:           "ambiguous target reference",
