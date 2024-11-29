@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -51,14 +52,10 @@ func (s *server) RawPatch(in *gitalypb.RawPatchRequest, stream gitalypb.DiffServ
 }
 
 func sendRawOutput(ctx context.Context, repo gitcmd.RepositoryExecutor, sender io.Writer, subCmd gitcmd.Command) error {
-	cmd, err := repo.Exec(ctx, subCmd, gitcmd.WithSetupStdout())
-	if err != nil {
-		return structerr.NewInternal("cmd: %w", err)
+	stderr := &bytes.Buffer{}
+	if err := repo.ExecAndWait(ctx, subCmd, gitcmd.WithStdout(sender), gitcmd.WithStderr(stderr)); err != nil {
+		return structerr.NewInternal("cmd: %w", err).WithMetadata("stderr", stderr.String())
 	}
 
-	if _, err := io.Copy(sender, cmd); err != nil {
-		return structerr.NewAborted("send: %w", err)
-	}
-
-	return cmd.Wait()
+	return nil
 }
