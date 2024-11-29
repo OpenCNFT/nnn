@@ -30,7 +30,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
@@ -261,7 +260,6 @@ type Transaction struct {
 	walEntry               *wal.Entry
 	initialReferenceValues map[git.ReferenceName]git.Reference
 	referenceUpdates       []git.ReferenceUpdates
-	customHooksUpdated     bool
 	repositoryCreation     *repositoryCreation
 	deleteRepository       bool
 	includedObjects        map[git.ObjectID]struct{}
@@ -636,7 +634,6 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 	}
 
 	if txn.runHousekeeping != nil && (txn.referenceUpdates != nil ||
-		txn.customHooksUpdated ||
 		txn.deleteRepository ||
 		txn.includedObjects != nil) {
 		return errHousekeepingConflictOtherUpdates
@@ -806,12 +803,6 @@ func (txn *Transaction) UpdateReferences(ctx context.Context, updates git.Refere
 // DeleteRepository deletes the repository when the transaction is committed.
 func (txn *Transaction) DeleteRepository() {
 	txn.deleteRepository = true
-}
-
-// MarkCustomHooksUpdated sets a hint to the transaction manager that custom hooks have been updated as part
-// of the transaction. This leads to the manager identifying changes and staging them for commit.
-func (txn *Transaction) MarkCustomHooksUpdated() {
-	txn.customHooksUpdated = true
 }
 
 // PackRefs sets pack-refs housekeeping task as a part of the transaction. The transaction can only runs other
@@ -1151,20 +1142,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			}
 		}
 
-		if transaction.customHooksUpdated {
-			// Log the custom hook creation. The deletion of the previous hooks is logged after admission to
-			// ensure we log the latest state for deletion in case someone else modified the hooks.
-			//
-			// If the transaction removed the custom hooks, we won't have anything to log. We'll ignore the
-			// ErrNotExist and stage the deletion later.
-			if err := storage.RecordDirectoryCreation(
-				transaction.FS(),
-				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record custom hook directory: %w", err)
-			}
-		}
-
 		// If there were objects packed that should be committed, record the packfile's creation.
 		if transaction.packPrefix != "" {
 			packDir := filepath.Join(transaction.relativePath, "objects", "pack")
@@ -1294,16 +1271,6 @@ func (mgr *TransactionManager) stageRepositoryCreation(ctx context.Context, tran
 	}
 
 	transaction.referenceUpdates = []git.ReferenceUpdates{referenceUpdates}
-
-	var customHooks bytes.Buffer
-	if err := repoutil.GetCustomHooks(ctx, mgr.logger,
-		filepath.Join(mgr.storagePath, transaction.snapshotRepository.GetRelativePath()), &customHooks); err != nil {
-		return fmt.Errorf("get custom hooks: %w", err)
-	}
-
-	if customHooks.Len() > 0 {
-		transaction.MarkCustomHooksUpdated()
-	}
 
 	if _, err := gitstorage.ReadAlternatesFile(mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())); err != nil {
 		if !errors.Is(err, gitstorage.ErrNoAlternate) {
@@ -2214,18 +2181,6 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil {
 			if err := mgr.verifyReferences(ctx, transaction); err != nil {
 				return fmt.Errorf("verify references: %w", err)
-			}
-		}
-
-		if transaction.customHooksUpdated {
-			// Log a deletion of the existing custom hooks so they are removed before the
-			// new ones are put in place.
-			if err := storage.RecordDirectoryRemoval(
-				transaction.FS(),
-				mgr.storagePath,
-				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record custom hook removal: %w", err)
 			}
 		}
 

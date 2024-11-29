@@ -1222,21 +1222,14 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.CustomHooksUpdate != nil {
-					transaction.MarkCustomHooksUpdated()
-					if step.CustomHooksUpdate.CustomHooksTAR != nil {
-						require.NoError(t, repoutil.SetCustomHooks(
-							ctx,
-							logger,
-							config.NewLocator(setup.Config),
-							nil,
-							bytes.NewReader(step.CustomHooksUpdate.CustomHooksTAR),
-							rewrittenRepo,
-						))
-					} else {
-						rewrittenPath, err := rewrittenRepo.Path(ctx)
-						require.NoError(t, err)
-						require.NoError(t, os.RemoveAll(filepath.Join(rewrittenPath, repoutil.CustomHooksDir)))
-					}
+					require.NoError(t, repoutil.SetCustomHooks(
+						storage.ContextWithTransaction(ctx, transaction),
+						logger,
+						config.NewLocator(setup.Config),
+						nil,
+						bytes.NewReader(step.CustomHooksUpdate.CustomHooksTAR),
+						rewrittenRepo,
+					))
 				}
 
 				if step.DeleteRepository {

@@ -108,7 +108,7 @@ Applied LSN: %s
 				require.NoError(t, err)
 
 				err = repoutil.Create(
-					ctx,
+					storage.ContextWithTransaction(ctx, txn),
 					logger,
 					opts.locator,
 					opts.gitCmdFactory,
@@ -155,7 +155,7 @@ Relative paths:
 				require.NoError(t, err)
 
 				err = repoutil.Create(
-					ctx,
+					storage.ContextWithTransaction(ctx, txn),
 					logger,
 					opts.locator,
 					opts.gitCmdFactory,
