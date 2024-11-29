@@ -39,7 +39,7 @@ type migrationManager struct {
 }
 
 // NewPartition creates a migration manager that wraps the provided partition.
-func NewPartition(partition storagemgr.Partition, logger log.Logger) storagemgr.Partition {
+func NewPartition(partition storagemgr.Partition, logger log.Logger, migrations []migration) storagemgr.Partition {
 	return &migrationManager{
 		Partition:       partition,
 		logger:          logger,
