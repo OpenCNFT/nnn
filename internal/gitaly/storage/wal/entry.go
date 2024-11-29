@@ -1,7 +1,6 @@
 package wal
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -94,14 +93,14 @@ func (e *Entry) DeleteKey(key []byte) {
 	e.operations.deleteKey(key)
 }
 
-// RecordMkdir records creation of a single directory.
-func (e *Entry) RecordMkdir(relativePath string) {
+// CreateDirectory records creation of a single directory.
+func (e *Entry) CreateDirectory(relativePath string) {
 	e.operations.createDirectory(relativePath)
 }
 
-// RecordFileCreation stages the file at the source and adds an operation to link it
+// CreateFile stages the file at the source and adds an operation to link it
 // to the given destination relative path in the storage.
-func (e *Entry) RecordFileCreation(sourceAbsolutePath string, relativePath string) error {
+func (e *Entry) CreateFile(sourceAbsolutePath string, relativePath string) error {
 	stagedFile, err := e.stageFile(sourceAbsolutePath)
 	if err != nil {
 		return fmt.Errorf("stage file: %w", err)
@@ -111,143 +110,12 @@ func (e *Entry) RecordFileCreation(sourceAbsolutePath string, relativePath strin
 	return nil
 }
 
-// RecordFileUpdate records a file being updated. It stages operations to remove the old file,
-// to place the new file in its place.
-func (e *Entry) RecordFileUpdate(storageRoot, relativePath string) error {
-	e.RecordDirectoryEntryRemoval(relativePath)
-
-	if err := e.RecordFileCreation(filepath.Join(storageRoot, relativePath), relativePath); err != nil {
-		return fmt.Errorf("create file: %w", err)
-	}
-
-	return nil
+// CreateLink records a creation of a hard link to an exisiting file in the partition.
+func (e *Entry) CreateLink(sourceRelativePath, destinationRelativePath string) {
+	e.operations.createHardLink(sourceRelativePath, destinationRelativePath, true)
 }
 
-// RecordDirectoryEntryRemoval records the removal of the file system object at the given path.
-func (e *Entry) RecordDirectoryEntryRemoval(relativePath string) {
+// RemoveDirectoryEntry records the removal of the directory entry at the given path.
+func (e *Entry) RemoveDirectoryEntry(relativePath string) {
 	e.operations.removeDirectoryEntry(relativePath)
-}
-
-// RecordDirectoryCreation records the operations to create a given directory in the storage and
-// all of its children in to the storage.
-func (e *Entry) RecordDirectoryCreation(storageRoot, directoryRelativePath string) error {
-	if err := e.recordDirectoryCreation(storageRoot, directoryRelativePath); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (e *Entry) recordDirectoryCreation(storageRoot, directoryRelativePath string) error {
-	if err := walkDirectory(storageRoot, directoryRelativePath,
-		func(relativePath string, dirEntry fs.DirEntry) error {
-			// Create the directories before descending in them so they exist when
-			// we try to create the children.
-			e.operations.createDirectory(relativePath)
-			return nil
-		},
-		func(relativePath string, dirEntry fs.DirEntry) error {
-			// The parent directory has already been created so we can immediately create
-			// the file.
-			if err := e.RecordFileCreation(filepath.Join(storageRoot, relativePath), relativePath); err != nil {
-				return fmt.Errorf("create file: %w", err)
-			}
-			return nil
-		},
-		func(relativePath string, dirEntry fs.DirEntry) error {
-			return nil
-		},
-	); err != nil {
-		return fmt.Errorf("walk directory: %w", err)
-	}
-
-	return nil
-}
-
-// RecordDirectoryRemoval records a directory to be removed with all of its children.
-func (e *Entry) RecordDirectoryRemoval(storageRoot, directoryRelativePath string) error {
-	if err := walkDirectory(storageRoot, directoryRelativePath,
-		func(string, fs.DirEntry) error { return nil },
-		func(relativePath string, dirEntry fs.DirEntry) error {
-			e.operations.removeDirectoryEntry(relativePath)
-			return nil
-		},
-		func(relativePath string, dirEntry fs.DirEntry) error {
-			e.operations.removeDirectoryEntry(relativePath)
-			return nil
-		},
-	); err != nil {
-		return fmt.Errorf("walk directory: %w", err)
-	}
-
-	return nil
-}
-
-// RecordAlternateUnlink records the operations to unlink the repository at the relative path
-// from its alternate. All loose objects and packs are hard linked from the alternate to the
-// repository and the `objects/info/alternate` file is removed.
-func (e *Entry) RecordAlternateUnlink(storageRoot, relativePath, alternatePath string) error {
-	destinationObjectsDir := filepath.Join(relativePath, "objects")
-	sourceObjectsDir := filepath.Join(destinationObjectsDir, alternatePath)
-
-	entries, err := os.ReadDir(filepath.Join(storageRoot, sourceObjectsDir))
-	if err != nil {
-		return fmt.Errorf("read alternate objects dir: %w", err)
-	}
-
-	for _, subDir := range entries {
-		if !subDir.IsDir() || !(len(subDir.Name()) == 2 || subDir.Name() == "pack") {
-			// Only look in objects/<xx> and objects/pack for files.
-			continue
-		}
-
-		sourceDir := filepath.Join(sourceObjectsDir, subDir.Name())
-
-		objects, err := os.ReadDir(filepath.Join(storageRoot, sourceDir))
-		if err != nil {
-			return fmt.Errorf("read subdirectory: %w", err)
-		}
-
-		if len(objects) == 0 {
-			// Don't create empty directories
-			continue
-		}
-
-		destinationDir := filepath.Join(destinationObjectsDir, subDir.Name())
-
-		// Create the destination directory if it doesn't yet exist.
-		if _, err := os.Stat(filepath.Join(storageRoot, destinationDir)); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("stat: %w", err)
-			}
-
-			e.operations.createDirectory(destinationDir)
-		}
-
-		// Create all of the objects in the directory if they don't yet exist.
-		for _, objectFile := range objects {
-			if !objectFile.Type().IsRegular() {
-				continue
-			}
-
-			objectDestination := filepath.Join(destinationDir, objectFile.Name())
-			if _, err := os.Stat(filepath.Join(storageRoot, objectDestination)); err != nil {
-				if !errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("stat: %w", err)
-				}
-
-				// The object doesn't yet exist, log the linking.
-				e.operations.createHardLink(
-					filepath.Join(sourceDir, objectFile.Name()),
-					objectDestination,
-					true,
-				)
-			}
-		}
-	}
-
-	destinationAlternatesPath := filepath.Join(destinationObjectsDir, "info", "alternates")
-	e.RecordDirectoryEntryRemoval(destinationAlternatesPath)
-
-	return nil
 }
