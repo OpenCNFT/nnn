@@ -53,12 +53,6 @@ import (
 )
 
 var (
-	// errConcurrentPackedRefsWrite is returned when a transaction conflicts due to a concurrent
-	// write into packed-refs file.
-	errConcurrentPackedRefsWrite = structerr.NewAborted("concurrent packed-refs write")
-	// errConcurrentReferencePacking is returned when attempting to commit reference deletions but
-	// references have been concurrently packed.
-	errConcurrentReferencePacking = structerr.NewAborted("references packed concurrently")
 	// ErrRepositoryAlreadyExists is attempting to create a repository that already exists.
 	ErrRepositoryAlreadyExists = structerr.NewAlreadyExists("repository already exists")
 	// errInitializationFailed is returned when the TransactionManager failed to initialize successfully.
@@ -252,6 +246,8 @@ type Transaction struct {
 	db keyvalue.Transaction
 	// fs is the transaction's file system handle. Operations through it are recorded in the transaction.
 	fs fsrecorder.FS
+	// referenceRecorder records the file system operations performed by reference transactions.
+	referenceRecorder *wal.ReferenceRecorder
 	// recordingReadWriter is a ReadWriter operating on db that also records operations performed. This
 	// is used to record the operations performed so they can be conflict checked and write-ahead logged.
 	recordingReadWriter keyvalue.RecordingReadWriter
@@ -496,16 +492,6 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 			txn.snapshotRepository = mgr.repositoryFactory.Build(txn.snapshot.RelativePath(txn.relativePath))
 			if txn.write {
 				if txn.repositoryExists {
-					// Record the original packed-refs file. We'll use the inode number of the file in the conflict checks to determine
-					// whether the transaction modified the packed-refs file. We record the file by hard linking it to prevent its inode from
-					// being recycled should it be deleted while the transactions is running.
-					if err := os.Link(
-						mgr.getAbsolutePath(txn.snapshot.RelativePath(txn.relativePath), "packed-refs"),
-						txn.originalPackedRefsFilePath(),
-					); err != nil && !errors.Is(err, fs.ErrNotExist) {
-						return nil, fmt.Errorf("record original packed-refs: %w", err)
-					}
-
 					txn.quarantineDirectory = filepath.Join(txn.stagingDirectory, "quarantine")
 					if err := os.MkdirAll(filepath.Join(txn.quarantineDirectory, "pack"), mode.Directory); err != nil {
 						return nil, fmt.Errorf("create quarantine directory: %w", err)
@@ -514,6 +500,27 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 					txn.snapshotRepository, err = txn.snapshotRepository.Quarantine(ctx, txn.quarantineDirectory)
 					if err != nil {
 						return nil, fmt.Errorf("quarantine: %w", err)
+					}
+
+					refRecorderTmpDir := filepath.Join(txn.stagingDirectory, "ref-recorder")
+					if err := os.Mkdir(refRecorderTmpDir, os.ModePerm); err != nil {
+						return nil, fmt.Errorf("create reference recorder tmp dir: %w", err)
+					}
+
+					refBackend, err := txn.snapshotRepository.ReferenceBackend(ctx)
+					if err != nil {
+						return nil, fmt.Errorf("reference backend: %w", err)
+					}
+
+					if refBackend == git.ReferenceBackendFiles {
+						objectHash, err := txn.snapshotRepository.ObjectHash(ctx)
+						if err != nil {
+							return nil, fmt.Errorf("object hash: %w", err)
+						}
+
+						if txn.referenceRecorder, err = wal.NewReferenceRecorder(refRecorderTmpDir, txn.walEntry, txn.snapshot.Root(), txn.relativePath, objectHash.ZeroOID); err != nil {
+							return nil, fmt.Errorf("new reference recorder: %w", err)
+						}
 					}
 				} else {
 					// The repository does not exist, and this is a write. This should thus create the repository. As the repository's final state
@@ -557,12 +564,6 @@ func (txn *Transaction) PartitionRelativePaths() []string {
 	}
 
 	return relativePaths
-}
-
-// originalPackedRefsFilePath returns the path of the original `packed-refs` file that records the state of the
-// `packed-refs` file as it was when the transaction started.
-func (txn *Transaction) originalPackedRefsFilePath() string {
-	return filepath.Join(txn.stagingDirectory, "packed-refs.original")
 }
 
 // RewriteRepository returns a copy of the repository that has been set up to correctly access
@@ -792,6 +793,13 @@ func (txn *Transaction) UpdateReferences(ctx context.Context, updates git.Refere
 
 	if len(u) == 0 {
 		return nil
+	}
+
+	// ReferenceRecorder is not used with reftables.
+	if txn.referenceRecorder != nil {
+		if err := txn.referenceRecorder.RecordReferenceUpdates(ctx, updates); err != nil {
+			return fmt.Errorf("record reference updates: %w", err)
+		}
 	}
 
 	txn.referenceUpdates = append(txn.referenceUpdates, u)
@@ -1201,36 +1209,20 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 				}
 			}
 		}
+
+		// Reference changes are only recorded if the repository exists when the transaction
+		// began. Repository creations record the entire state of the repository at the end
+		// of the transaction so ReferenceRecorder is not used. ReferenceRecorder is not used
+		// with reftables.
+		if transaction.referenceRecorder != nil {
+			if err := transaction.referenceRecorder.StagePackedRefs(); err != nil {
+				return fmt.Errorf("stage packed refs: %w", err)
+			}
+		}
 	}
 
 	if err := safe.NewSyncer().SyncRecursive(ctx, transaction.walFilesPath()); err != nil {
 		return fmt.Errorf("synchronizing WAL directory: %w", err)
-	}
-
-	// The reference updates are staged into the transaction when they are verified, including
-	// the packed-refs. While the reference files would generally be small, the packed-refs file
-	// may be large. Sync the contents of the file before entering the critical section to ensure
-	// we don't end up syncing the potentially very large file to disk when we're appending the
-	// log entry.
-	preImagePackedRefsInode, err := wal.GetInode(transaction.originalPackedRefsFilePath())
-	if err != nil {
-		return fmt.Errorf("get pre-image packed-refs inode: %w", err)
-	}
-
-	postImagePackedRefsPath := mgr.getAbsolutePath(
-		transaction.snapshot.RelativePath(transaction.relativePath), "packed-refs",
-	)
-	postImagePackedRefsInode, err := wal.GetInode(postImagePackedRefsPath)
-	if err != nil {
-		return fmt.Errorf("get post-image packed-refs inode: %w", err)
-	}
-
-	// We check for modifications before syncing so we don't unnecessarily sync the changes to the
-	// metadata of the original file if it hasn't been changed.
-	if preImagePackedRefsInode != postImagePackedRefsInode && postImagePackedRefsInode > 0 {
-		if err := safe.NewSyncer().Sync(ctx, postImagePackedRefsPath); err != nil {
-			return fmt.Errorf("sync packed-refs: %w", err)
-		}
 	}
 
 	if err := func() error {
@@ -1852,13 +1844,6 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 		return fmt.Errorf("initial walking refs directory: %w", err)
 	}
 
-	packedRefsRelativePath := filepath.Join(transaction.relativePath, "packed-refs")
-	packedRefsAbsolutePath := filepath.Join(transaction.snapshot.Root(), packedRefsRelativePath)
-	packedRefsPreImage, err := wal.GetInode(packedRefsAbsolutePath)
-	if err != nil {
-		return fmt.Errorf("get packed-refs pre-image: %w", err)
-	}
-
 	// Execute git-pack-refs command. The command runs in the scope of the snapshot repository. Thus, we can
 	// let it prune the ref references without causing any impact to other concurrent transactions.
 	var stderr bytes.Buffer
@@ -1869,24 +1854,9 @@ func (mgr *TransactionManager) preparePackRefsFiles(ctx context.Context, transac
 		return structerr.New("exec pack-refs: %w", err).WithMetadata("stderr", stderr.String())
 	}
 
-	packedRefsPostImage, err := wal.GetInode(packedRefsAbsolutePath)
-	if err != nil {
-		return fmt.Errorf("get packed-refs post-image: %w", err)
-	}
-
-	if packedRefsPreImage != packedRefsPostImage {
-		if packedRefsPreImage > 0 {
-			transaction.walEntry.RemoveDirectoryEntry(packedRefsRelativePath)
-		}
-
-		if packedRefsPostImage > 0 {
-			if err := transaction.walEntry.CreateFile(packedRefsAbsolutePath, packedRefsRelativePath); err != nil {
-				return fmt.Errorf("stage packed-refs: %w", err)
-			}
-		}
-	}
-
 	// Second walk and compare with the initial list of loose references. Any disappeared refs are pruned.
+	//
+	// The transaction's reference recorder handles staging the modified packed-refs file.
 	for ref := range looseReferences {
 		_, err := os.Stat(filepath.Join(repoPath, ref.String()))
 		if err != nil {
@@ -2837,10 +2807,6 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 		if err := mgr.verifyReferencesWithGitForReftables(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
 			return nil, fmt.Errorf("verify references with git: %w", err)
 		}
-	} else {
-		if err := mgr.verifyReferencesWithGit(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
-			return nil, fmt.Errorf("verify references with git: %w", err)
-		}
 	}
 
 	return referenceTransactions, nil
@@ -2948,179 +2914,6 @@ func (mgr *TransactionManager) verifyReferencesWithGitForReftables(
 		if err := os.Remove(lockedTable); err != nil {
 			return fmt.Errorf("deleting locked file: %w", err)
 		}
-	}
-
-	return nil
-}
-
-func (txn *Transaction) containsReferenceDeletions(ctx context.Context, stagingRepository *localrepo.Repo) (bool, error) {
-	objectHash, err := stagingRepository.ObjectHash(ctx)
-	if err != nil {
-		return false, fmt.Errorf("object hash: %w", err)
-	}
-
-	for _, refTX := range txn.referenceUpdates {
-		for _, update := range refTX {
-			if update.NewOID == objectHash.ZeroOID {
-				return true, nil
-			}
-		}
-	}
-
-	return false, nil
-}
-
-func (mgr *TransactionManager) stagePackedRefs(ctx context.Context, tx *Transaction, stagingRepository *localrepo.Repo) error {
-	// Get the inode of the `packed-refs` file as it was before the transaction. This was
-	// recorded when the transaction began.
-	preImagePackedRefsInode, err := wal.GetInode(tx.originalPackedRefsFilePath())
-	if err != nil {
-		return fmt.Errorf("get pre-image packed-refs inode: %w", err)
-	}
-
-	// Get the inode of the `packed-refs` file as it is in the snapshot after the transaction. This contains
-	// all of the modifications the transaction has performed on it.
-	postImagePackedRefsPath := mgr.getAbsolutePath(tx.snapshot.RelativePath(tx.relativePath), "packed-refs")
-	postImagePackedRefsInode, err := wal.GetInode(postImagePackedRefsPath)
-	if err != nil {
-		return fmt.Errorf("get post-image packed-refs inode: %w", err)
-	}
-
-	if preImagePackedRefsInode == postImagePackedRefsInode {
-		// The transaction itself didn't modify the packed-refs file. However, if there was
-		// a concurrent reference packing operation, it would have moved the loose references
-		// into packed-refs. As they were loose references in our snapshot, we would have deleted
-		// just the loose references. The concurrently committed packed-refs file would now contain
-		// the deleted references. This would require us to rewrite the pack as part of applying the
-		// reference updates. Abort the transaction due to the conflict as we can't just replace the
-		// packed-refs file with our own anymore as it would also lose the other references that were
-		// packed.
-		//
-		// If our transaction includes any reference deletions, ensure there hasn't been a concurrent
-		// reference packing operation.
-		//
-		// We allow modifications to packed-refs other than repacking. This would only be reference
-		// deletions. If our transaction didn't modify the packed-refs file, the references we are
-		// deleting were not packed. They don't conflict with removal of other references that were
-		// removed from the packed-refs file by a concurrent transaction.
-		containsReferenceDeletions, err := tx.containsReferenceDeletions(ctx, stagingRepository)
-		if err != nil {
-			return fmt.Errorf("contains reference deletions: %w", err)
-		}
-
-		if containsReferenceDeletions {
-			if err := mgr.walkCommittedEntries(tx, func(entry *gitalypb.LogEntry, dependencies map[git.ObjectID]struct{}) error {
-				if entry.GetHousekeeping().GetPackRefs() != nil {
-					return errConcurrentReferencePacking
-				}
-				return nil
-			}); err != nil {
-				return fmt.Errorf("check for concurrent reference packing: %w", err)
-			}
-		}
-
-		return nil
-	}
-
-	// Get the inode of the `packed-refs` file as it is currently in the repository.
-	stagingRepoPath, err := stagingRepository.Path(ctx)
-	if err != nil {
-		return fmt.Errorf("staging repo path: %w", err)
-	}
-
-	currentPackedRefsPath := filepath.Join(stagingRepoPath, "packed-refs")
-	currentPackedRefsInode, err := wal.GetInode(currentPackedRefsPath)
-	if err != nil {
-		return fmt.Errorf("get current packed-refs inode: %w", err)
-	}
-
-	if preImagePackedRefsInode != currentPackedRefsInode {
-		// There's a conflict, the packed-refs file has been concurrently changed.
-		return errConcurrentPackedRefsWrite
-	}
-
-	packedRefsRelativePath := filepath.Join(tx.relativePath, "packed-refs")
-	if currentPackedRefsInode > 0 {
-		// If the repository has a packed-refs file already, remove it.
-		tx.walEntry.RemoveDirectoryEntry(packedRefsRelativePath)
-
-		// Remove the current packed-refs file from the staging repository if the transaction
-		// changed the packed-refs file. If the packed-refs file was removed, this applies
-		// the removal. If it was updated, we'll link the new one in place below.
-		if err := os.Remove(currentPackedRefsPath); err != nil {
-			return fmt.Errorf("remove packed-refs: %w", err)
-		}
-	}
-
-	if postImagePackedRefsInode > 0 {
-		// If there is a new packed refs file, stage it.
-		if err := tx.walEntry.CreateFile(
-			postImagePackedRefsPath,
-			packedRefsRelativePath,
-		); err != nil {
-			return fmt.Errorf("record new packed-refs: %w", err)
-		}
-
-		// If the transaction created or modified the packed-refs file, link the new one into
-		// the staging repository.
-		if err := os.Link(
-			postImagePackedRefsPath,
-			currentPackedRefsPath,
-		); err != nil {
-			return fmt.Errorf("link post-image packed-refs: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// verifyReferencesWithGit verifies the reference updates with git by committing them against a snapshot of the target
-// repository. This ensures the updates will go through when they are being applied from the log. This also catches any
-// invalid reference names and file/directory conflicts with Git's loose reference storage which can occur with references
-// like 'refs/heads/parent' and 'refs/heads/parent/child'.
-func (mgr *TransactionManager) verifyReferencesWithGit(ctx context.Context, referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction, tx *Transaction, repo *localrepo.Repo) error {
-	// We don't want to delete references from the packed-refs in `RecordReferenceUpdates` below as it can be very
-	// slow and blocks all other transaction processing. We avoid this by staging the packed-refs file from
-	// transaction's post-image into the staging repository. All references the transaction would have deleted
-	// from the packed-refs file thus no longer exist there so `applyReferenceUpdates` below does not have to
-	// remove them. Any loose references we must delete are still in the repository, and will be recorded
-	// as we apply the deletions.
-	//
-	// As we're staging the transaction's modified packed-refs file as is, we must ensure no other transaction
-	// has modified the file. We do this by checking whether the packed-refs file's inode is the same as it was
-	// when our transaction began. If not, someone has modified the packed-refs file and us overriding the changes
-	// there could lead to lost updates.
-	if err := mgr.stagePackedRefs(ctx, tx, repo); err != nil {
-		return fmt.Errorf("stage packed-refs: %w", err)
-	}
-
-	objectHash, err := repo.ObjectHash(ctx)
-	if err != nil {
-		return fmt.Errorf("object hash: %w", err)
-	}
-
-	tmpDir := filepath.Join(tx.stagingDirectory, "ref-recorder")
-	if err := os.Mkdir(tmpDir, mode.Directory); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
-	}
-
-	recorder, err := wal.NewReferenceRecorder(tmpDir, tx.walEntry, tx.stagingSnapshot.Root(), tx.relativePath, objectHash.ZeroOID)
-	if err != nil {
-		return fmt.Errorf("new recorder: %w", err)
-	}
-
-	for i, updates := range tx.referenceUpdates {
-		if err := mgr.applyReferenceTransaction(ctx, referenceTransactions[i].GetChanges(), repo); err != nil {
-			return fmt.Errorf("apply reference transaction: %w", err)
-		}
-
-		if err := recorder.RecordReferenceUpdates(ctx, updates); err != nil {
-			return fmt.Errorf("record reference updates: %w", err)
-		}
-	}
-
-	if err := recorder.StagePackedRefs(); err != nil {
-		return fmt.Errorf("stage packed-refs: %w", err)
 	}
 
 	return nil
