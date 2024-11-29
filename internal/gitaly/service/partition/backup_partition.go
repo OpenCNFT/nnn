@@ -25,7 +25,7 @@ func (s *server) BackupPartition(ctx context.Context, in *gitalypb.BackupPartiti
 	var root string
 	var lsn string
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
-		root = tx.Root()
+		root = tx.FS().Root()
 		lsn = tx.SnapshotLSN().String()
 	}
 	if root == "" {

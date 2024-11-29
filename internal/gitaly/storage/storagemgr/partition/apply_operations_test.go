@@ -8,8 +8,10 @@ import (
 	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/fsrecorder"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/wal"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -44,10 +46,10 @@ func TestApplyOperations(t *testing.T) {
 
 	walEntryDirectory := t.TempDir()
 	walEntry := wal.NewEntry(walEntryDirectory)
-	walEntry.RecordMkdir("parent")
-	require.NoError(t, walEntry.RecordDirectoryCreation(snapshotRoot, "parent/relative-path"))
-	walEntry.RecordDirectoryEntryRemoval("parent/relative-path/dir-with-removed-file/removed-file")
-	walEntry.RecordDirectoryEntryRemoval("parent/relative-path/removed-dir")
+	walEntry.CreateDirectory("parent")
+	require.NoError(t, storage.RecordDirectoryCreation(fsrecorder.NewFS(snapshotRoot, walEntry), "parent/relative-path"))
+	walEntry.RemoveDirectoryEntry("parent/relative-path/dir-with-removed-file/removed-file")
+	walEntry.RemoveDirectoryEntry("parent/relative-path/removed-dir")
 	walEntry.DeleteKey([]byte("key-2"))
 	walEntry.SetKey([]byte("key-3"), []byte("value-3-updated"))
 	walEntry.SetKey([]byte("key-4"), []byte("value-4"))
