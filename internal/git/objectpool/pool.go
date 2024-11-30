@@ -16,7 +16,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/transaction"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/safe"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
@@ -119,29 +118,6 @@ func (o *ObjectPool) Exists(ctx context.Context) bool {
 // IsValid checks if a repository exists, and if its valid.
 func (o *ObjectPool) IsValid(ctx context.Context) bool {
 	return o.locator.ValidateRepository(ctx, o.Repo) == nil
-}
-
-// Remove will remove the pool, and all its contents without preparing and/or
-// updating the repositories depending on this object pool
-// Subdirectories will remain to exist, and will never be cleaned up, even when
-// these are empty.
-func (o *ObjectPool) Remove(ctx context.Context) (err error) {
-	path, err := o.Path(ctx)
-	if err != nil {
-		return nil
-	}
-
-	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("remove all: %w", err)
-	}
-
-	if storage.NeedsSync(ctx) {
-		if err := safe.NewSyncer().SyncParent(ctx, path); err != nil {
-			return fmt.Errorf("sync parent: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // FromRepo returns an instance of ObjectPool that the repository points to

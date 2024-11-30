@@ -3,8 +3,10 @@ package objectpool
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/migration"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
@@ -23,8 +25,8 @@ func (s *server) DeleteObjectPool(ctx context.Context, in *gitalypb.DeleteObject
 		return nil, err
 	}
 
-	if err := pool.Remove(ctx); err != nil {
-		return nil, structerr.NewInternal("%w", err)
+	if err := repoutil.Remove(ctx, s.logger, s.locator, nil, s.repositoryCounter, pool); err != nil {
+		return nil, fmt.Errorf("remove: %w", err)
 	}
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {

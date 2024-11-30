@@ -3,6 +3,7 @@ package objectpool
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -257,9 +258,12 @@ func TestFetchFromOrigin_missingPool(t *testing.T) {
 	testWithAndWithoutTransaction(t, ctx, func(t *testing.T, cfg config.Cfg, newLocalRepo LocalRepoFactory) {
 		pool, repo := setupObjectPoolWithCfg(t, ctx, cfg)
 
+		poolPath, err := pool.Repo.Path(ctx)
+		require.NoError(t, err)
+
 		// Remove the object pool to assert that we raise an error when fetching into a non-existent
 		// object pool.
-		require.NoError(t, pool.Remove(ctx))
+		require.NoError(t, os.RemoveAll(poolPath))
 
 		require.Equal(t, structerr.NewInvalidArgument("object pool does not exist"), pool.FetchFromOrigin(ctx, repo, newLocalRepo))
 		require.False(t, pool.Exists(ctx))
