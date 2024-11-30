@@ -88,11 +88,8 @@ var (
 	errConcurrentAlternateUnlink = errors.New("concurrent alternate unlinking with repack")
 
 	// Below errors are used to error out in cases when updates have been staged in a read-only transaction.
-	errReadOnlyRepositoryDeletion = errors.New("repository deletion staged in a read-only transaction")
-	errReadOnlyHousekeeping       = errors.New("housekeeping in a read-only transaction")
-	errReadOnlyKeyValue           = errors.New("key-value writes in a read-only transaction")
-
-	errRepositoryDeletionOtherOperations = errors.New("other operations staged with repository deletion")
+	errReadOnlyHousekeeping = errors.New("housekeeping in a read-only transaction")
+	errReadOnlyKeyValue     = errors.New("key-value writes in a read-only transaction")
 
 	// errWritableAllRepository is returned when a transaction is started with
 	// no relative path filter specified and is not read-only. Transactions do
@@ -622,8 +619,6 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 		// accidentally staged in a read-only transaction. The changes would not be anyway
 		// performed as read-only transactions are not committed through the manager.
 		switch {
-		case txn.deleteRepository:
-			return errReadOnlyRepositoryDeletion
 		case txn.runHousekeeping != nil:
 			return errReadOnlyHousekeeping
 		case len(txn.recordingReadWriter.WriteSet()) > 0:
@@ -1170,6 +1165,10 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		RelativePath:          transaction.relativePath,
 		Operations:            transaction.walEntry.Operations(),
 		ReferenceTransactions: transaction.referenceUpdatesToProto(),
+	}
+
+	if transaction.deleteRepository {
+		transaction.manifest.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 	}
 
 	if err := safe.NewSyncer().SyncRecursive(ctx, transaction.walFilesPath()); err != nil {
@@ -2181,26 +2180,6 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil {
 			if err := mgr.verifyReferences(ctx, transaction); err != nil {
 				return fmt.Errorf("verify references: %w", err)
-			}
-		}
-
-		if transaction.deleteRepository {
-			if len(transaction.walEntry.Operations()) != 0 {
-				return errRepositoryDeletionOtherOperations
-			}
-
-			transaction.manifest.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
-
-			if err := storage.RecordDirectoryRemoval(
-				transaction.FS(),
-				mgr.storagePath,
-				transaction.relativePath,
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record repository removal: %w", err)
-			}
-
-			if err := transaction.KV().Delete(storage.RepositoryKey(transaction.relativePath)); err != nil {
-				return fmt.Errorf("delete relative path: %w", err)
 			}
 		}
 

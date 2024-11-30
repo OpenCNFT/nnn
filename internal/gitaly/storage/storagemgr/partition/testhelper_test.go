@@ -1233,6 +1233,15 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.DeleteRepository {
+					require.NoError(t, repoutil.Remove(
+						storage.ContextWithTransaction(ctx, transaction),
+						logger,
+						config.NewLocator(setup.Config),
+						nil,
+						counter.NewRepositoryCounter(setup.Config.Storages),
+						rewrittenRepo,
+					))
+
 					transaction.DeleteRepository()
 				}
 

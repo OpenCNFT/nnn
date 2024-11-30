@@ -49,6 +49,21 @@ func remove(
 		return structerr.NewInternal("%w", err)
 	}
 
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		originalRelativePath, err := filepath.Rel(tx.FS().Root(), path)
+		if err != nil {
+			return fmt.Errorf("original relative path: %w", err)
+		}
+
+		if err := storage.RecordDirectoryRemoval(tx.FS(), tx.FS().Root(), originalRelativePath); err != nil {
+			return fmt.Errorf("record directory removal: %w", err)
+		}
+
+		if err := tx.KV().Delete(storage.RepositoryKey(originalRelativePath)); err != nil {
+			return fmt.Errorf("delete repository key: %w", err)
+		}
+	}
+
 	tempDir, err := locator.TempDir(repository.GetStorageName())
 	if err != nil {
 		return structerr.NewInternal("temporary directory: %w", err)

@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -755,24 +754,6 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 		},
 		{
-			desc: "repository deletion including a reference modification succeeds",
-			steps: steps{
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{setup.RelativePath},
-				},
-				Commit{
-					TransactionID: 1,
-					ReferenceUpdates: git.ReferenceUpdates{
-						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
-					},
-					DeleteRepository: true,
-					ExpectedError:    errRepositoryDeletionOtherOperations,
-				},
-			},
-		},
-		{
 			desc: "repository deletion fails if repository is deleted",
 			steps: steps{
 				StartManager{},
@@ -1001,20 +982,16 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID:    2,
 					DeleteRepository: true,
-					ExpectedError: gittest.FilesOrReftables(
-						func(tb testing.TB, actual error) {
-							require.ErrorIs(t, actual, fshistory.NewReadWriteConflictError(
-								// The deletion fails on the new file only because the deletions are currently
-								filepath.Join(setup.RelativePath, "HEAD"), 0, 1,
-							))
-						},
-						func(tb testing.TB, actual error) {
-							var rwConflictErr fshistory.ReadWriteConflictError
-							require.ErrorAs(t, actual, &rwConflictErr)
-							require.Equal(t, storage.LSN(0), rwConflictErr.ReadLSN)
-							require.Equal(t, storage.LSN(1), rwConflictErr.WriteLSN)
-							// Reftable file's suffix is random, ignore it.
-							require.Contains(t, rwConflictErr.Path, filepath.Join(setup.RelativePath, "reftable", "0x000000000002-0x000000000002-"))
+					ExpectedError: gittest.FilesOrReftables[error](
+						fshistory.NewReadWriteConflictError(
+							// The deletion fails on the new file only because the deletions are currently
+							filepath.Join(setup.RelativePath, "HEAD"), 0, 1,
+						),
+						fshistory.DirectoryNotEmptyError{
+							// Conflicts on the `tables.list` file are ignored with reftables as reference
+							// write conflicts with it. We see the conflict here as reftable directory not
+							// being empty due to the new table written into it.
+							Path: filepath.Join(setup.RelativePath, "reftable"),
 						},
 					),
 				},
@@ -1052,24 +1029,16 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					TransactionID:    2,
 					DeleteRepository: true,
 					ExpectedError: gittest.FilesOrReftables(
-						func(tb testing.TB, actual error) {
-							require.ErrorIs(t, actual, fshistory.NewReadWriteConflictError(
-								// The deletion fails on the new file only because the deletions are currently
-								// staged in the critical section on the latest state of the repository. If the
-								// deletion was staged from the transaction snapshot, the new file would not yet
-								// be visible. The physical conflict checks will allow us to later move the
-								// deletions to be also staged outside of the critical section, and we then expect
-								// this to fail on the repository directory itself.
-								filepath.Join(setup.RelativePath, "refs", "heads", "branch"), 0, 1,
-							))
+						fshistory.DirectoryNotEmptyError{
+							// The deletion fails on `refs/heads` directory as it is no longer empty
+							// due to the concurrent branch write.
+							Path: filepath.Join(setup.RelativePath, "refs", "heads"),
 						},
-						func(tb testing.TB, actual error) {
-							var rwConflictErr fshistory.ReadWriteConflictError
-							require.ErrorAs(t, actual, &rwConflictErr)
-							require.Equal(t, storage.LSN(0), rwConflictErr.ReadLSN)
-							require.Equal(t, storage.LSN(1), rwConflictErr.WriteLSN)
-							// Reftable file's suffix is random, ignore it.
-							require.Contains(t, rwConflictErr.Path, filepath.Join(setup.RelativePath, "reftable", "0x000000000002-0x000000000002-"))
+						fshistory.DirectoryNotEmptyError{
+							// Conflicts on the `tables.list` file are ignored with reftables as reference
+							// write conflicts with it. We see the conflict here as reftable directory not
+							// being empty due to the new table written into it.
+							Path: filepath.Join(setup.RelativePath, "reftable"),
 						},
 					),
 				},
@@ -1161,20 +1130,6 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					string(keyAppliedLSN): storage.LSN(1).ToProto(),
 				},
 				Repositories: RepositoryStates{},
-			},
-		},
-		{
-			desc: "read-only transaction fails with repository deletion staged",
-			steps: steps{
-				StartManager{},
-				Begin{
-					RelativePaths: []string{setup.RelativePath},
-					ReadOnly:      true,
-				},
-				Commit{
-					DeleteRepository: true,
-					ExpectedError:    errReadOnlyRepositoryDeletion,
-				},
 			},
 		},
 		{
