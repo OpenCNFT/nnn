@@ -50,6 +50,8 @@ func remove(
 	}
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		tx.DeleteRepository()
+
 		originalRelativePath, err := filepath.Rel(tx.FS().Root(), path)
 		if err != nil {
 			return fmt.Errorf("original relative path: %w", err)
