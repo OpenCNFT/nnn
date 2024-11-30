@@ -1138,9 +1138,9 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(5).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                   storage.LSN(5).ToProto(),
+					"kv/" + string(RepositoryKey("pool")):   string(""),
+					"kv/" + string(RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1700,9 +1700,9 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(4).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                   storage.LSN(4).ToProto(),
+					"kv/" + string(RepositoryKey("pool")):   string(""),
+					"kv/" + string(RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1924,8 +1924,8 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                               storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN):                             storage.LSN(2).ToProto(),
+					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					relativePath: {
@@ -4938,9 +4938,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(6).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                   storage.LSN(6).ToProto(),
+					"kv/" + string(RepositoryKey("pool")):   string(""),
+					"kv/" + string(RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -5147,9 +5147,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(5).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                   storage.LSN(5).ToProto(),
+					"kv/" + string(RepositoryKey("pool")):   string(""),
+					"kv/" + string(RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -5332,9 +5332,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(6).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                   storage.LSN(6).ToProto(),
+					"kv/" + string(RepositoryKey("pool")):   string(""),
+					"kv/" + string(RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -5546,9 +5546,9 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(5).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                   storage.LSN(5).ToProto(),
+					"kv/" + string(RepositoryKey("pool")):   string(""),
+					"kv/" + string(RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {

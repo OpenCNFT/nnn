@@ -105,11 +105,13 @@ var (
 	keyAppliedLSN = []byte("applied_lsn")
 )
 
-const relativePathKeyPrefix = "r/"
+// RepositoryKeyPrefix is the prefix used for storing keys recording repository
+// existence in a partition.
+const RepositoryKeyPrefix = "r/"
 
-// relativePathKey generates the database key for storing relative paths in a partition.
-func relativePathKey(relativePath string) []byte {
-	return []byte(relativePathKeyPrefix + relativePath)
+// RepositoryKey generates the database key for recording repository existence in a partition.
+func RepositoryKey(relativePath string) []byte {
+	return []byte(RepositoryKeyPrefix + relativePath)
 }
 
 // InvalidReferenceFormatError is returned when a reference name was invalid.
@@ -555,14 +557,14 @@ func (txn *Transaction) repositoryTarget() bool {
 // transactions partition.
 func (txn *Transaction) PartitionRelativePaths() []string {
 	it := txn.KV().NewIterator(keyvalue.IteratorOptions{
-		Prefix: []byte(relativePathKeyPrefix),
+		Prefix: []byte(RepositoryKeyPrefix),
 	})
 	defer it.Close()
 
 	var relativePaths []string
 	for it.Rewind(); it.Valid(); it.Next() {
 		key := it.Item().Key()
-		relativePath := bytes.TrimPrefix(key, []byte(relativePathKeyPrefix))
+		relativePath := bytes.TrimPrefix(key, []byte(RepositoryKeyPrefix))
 		relativePaths = append(relativePaths, string(relativePath))
 	}
 
@@ -1163,7 +1165,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("record directory creation: %w", err)
 		}
 
-		if err := transaction.KV().Set(relativePathKey(transaction.relativePath), nil); err != nil {
+		if err := transaction.KV().Set(RepositoryKey(transaction.relativePath), nil); err != nil {
 			return fmt.Errorf("add relative path: %w", err)
 		}
 	} else {
@@ -2383,7 +2385,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 				return fmt.Errorf("record repository removal: %w", err)
 			}
 
-			if err := transaction.KV().Delete(relativePathKey(transaction.relativePath)); err != nil {
+			if err := transaction.KV().Delete(RepositoryKey(transaction.relativePath)); err != nil {
 				return fmt.Errorf("delete relative path: %w", err)
 			}
 		}
