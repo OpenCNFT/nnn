@@ -105,15 +105,6 @@ var (
 	keyAppliedLSN = []byte("applied_lsn")
 )
 
-// RepositoryKeyPrefix is the prefix used for storing keys recording repository
-// existence in a partition.
-const RepositoryKeyPrefix = "r/"
-
-// RepositoryKey generates the database key for recording repository existence in a partition.
-func RepositoryKey(relativePath string) []byte {
-	return []byte(RepositoryKeyPrefix + relativePath)
-}
-
 // InvalidReferenceFormatError is returned when a reference name was invalid.
 type InvalidReferenceFormatError struct {
 	// ReferenceName is the reference with invalid format.
@@ -557,14 +548,14 @@ func (txn *Transaction) repositoryTarget() bool {
 // transactions partition.
 func (txn *Transaction) PartitionRelativePaths() []string {
 	it := txn.KV().NewIterator(keyvalue.IteratorOptions{
-		Prefix: []byte(RepositoryKeyPrefix),
+		Prefix: []byte(storage.RepositoryKeyPrefix),
 	})
 	defer it.Close()
 
 	var relativePaths []string
 	for it.Rewind(); it.Valid(); it.Next() {
 		key := it.Item().Key()
-		relativePath := bytes.TrimPrefix(key, []byte(RepositoryKeyPrefix))
+		relativePath := bytes.TrimPrefix(key, []byte(storage.RepositoryKeyPrefix))
 		relativePaths = append(relativePaths, string(relativePath))
 	}
 
@@ -1165,7 +1156,7 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("record directory creation: %w", err)
 		}
 
-		if err := transaction.KV().Set(RepositoryKey(transaction.relativePath), nil); err != nil {
+		if err := transaction.KV().Set(storage.RepositoryKey(transaction.relativePath), nil); err != nil {
 			return fmt.Errorf("add relative path: %w", err)
 		}
 	} else {
@@ -2385,7 +2376,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 				return fmt.Errorf("record repository removal: %w", err)
 			}
 
-			if err := transaction.KV().Delete(RepositoryKey(transaction.relativePath)); err != nil {
+			if err := transaction.KV().Delete(storage.RepositoryKey(transaction.relativePath)); err != nil {
 				return fmt.Errorf("delete relative path: %w", err)
 			}
 		}

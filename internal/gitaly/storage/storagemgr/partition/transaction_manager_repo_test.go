@@ -30,8 +30,8 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(1).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -69,8 +69,8 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(1).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -100,8 +100,8 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(1).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -318,8 +318,8 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(3).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -442,8 +442,8 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(1).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -550,9 +550,9 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                         storage.LSN(2).ToProto(),
-					"kv/" + string(RepositoryKey("repository-1")): string(""),
-					"kv/" + string(RepositoryKey("repository-2")): string(""),
+					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("repository-1")): string(""),
+					"kv/" + string(storage.RepositoryKey("repository-2")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"repository-1": {
@@ -689,9 +689,9 @@ func generateCreateRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                         storage.LSN(2).ToProto(),
-					"kv/" + string(RepositoryKey("repository-1")): string(""),
-					"kv/" + string(RepositoryKey("repository-2")): string(""),
+					string(keyAppliedLSN): storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("repository-1")): string(""),
+					"kv/" + string(storage.RepositoryKey("repository-2")): string(""),
 				},
 				Repositories: RepositoryStates{
 					// The setup repository does not have its relative path in the partition KV.
@@ -1352,8 +1352,8 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(4).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(4).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -1426,8 +1426,8 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                             storage.LSN(3).ToProto(),
-					"kv/" + string(RepositoryKey(setup.RelativePath)): string(""),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey(setup.RelativePath)): string(""),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
