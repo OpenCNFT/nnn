@@ -1,17 +1,17 @@
-package packfile_test
+package git_test
 
 import (
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gittest"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/git/packfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper/testcfg"
 )
 
-func TestList(t *testing.T) {
+func TestListPackfiles(t *testing.T) {
 	t.Parallel()
 
 	ctx := testhelper.Context(t)
@@ -52,7 +52,7 @@ func TestList(t *testing.T) {
 
 			repoPath := tc.setup(t)
 
-			packs, err := packfile.List(filepath.Join(repoPath, "objects"))
+			packs, err := git.ListPackfiles(filepath.Join(repoPath, "objects"))
 			require.NoError(t, err)
 			require.Len(t, packs, tc.expectedPacks)
 		})

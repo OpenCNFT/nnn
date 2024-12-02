@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -17,24 +16,19 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/command"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
-)
-
-const sumSize = sha1.Size
-
-const regexCore = `(.*/pack-)([0-9a-f]{40}|[0-9a-f]{64})`
-
-var (
-	idxFileRegex  = regexp.MustCompile(`\A` + regexCore + `\.idx\z`)
-	packFileRegex = regexp.MustCompile(`\A` + regexCore + `\.pack\z`)
 )
 
 // Index is an in-memory representation of a packfile .idx file.
 type Index struct {
 	// ID is the packfile ID. For pack-123abc.idx, this would be 123abc.
-	ID       string
-	packBase string
+	ID           string
+	packBase     string
+	checksumSize int
 	// Objects holds the list of objects in the packfile in index order, i.e. sorted by OID
 	Objects []*Object
 	// Objects holds the list of objects in the packfile in packfile order, i.e. sorted by packfile offset
@@ -42,18 +36,45 @@ type Index struct {
 	*IndexBitmap
 }
 
-// ReadIndex opens a packfile .idx file and loads its contents into
+// ReadIndex is a wrapper for ReadIndexWithGitCmdFactory with a nil CommandFactory.
+// It uses Git binary in the system PATH.
+func ReadIndex(logger log.Logger, idxPath string) (*Index, error) {
+	idx, err := ReadIndexWithGitCmdFactory(nil, nil, logger, idxPath)
+	return idx, err
+}
+
+// ReadIndexWithGitCmdFactory opens a packfile .idx file and loads its contents into
 // memory. In doing so it will also open and read small amounts of data
 // from the .pack file itself.
-func ReadIndex(logger log.Logger, idxPath string) (*Index, error) {
+func ReadIndexWithGitCmdFactory(cmdFactory gitcmd.CommandFactory, repo *localrepo.Repo, logger log.Logger, idxPath string) (*Index, error) {
+	// When using the Git command factory for git-show-index, a repository must be provided .
+	// Failure to do so can result in a segmentation fault.
+	if cmdFactory != nil && repo == nil {
+		return nil, fmt.Errorf("must use Git command factory without repo")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	objectHash, err := repo.ObjectHash(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// checksumSize is checksum size in bytes
+	checksumSize := objectHash.EncodedLen() / 2
+
+	idxFileRegex := regexp.MustCompile(`\A` + git.PackFileRegexCore + `\.idx\z`)
+
 	reMatches := idxFileRegex.FindStringSubmatch(idxPath)
 	if len(reMatches) == 0 {
 		return nil, fmt.Errorf("invalid idx filename: %q", idxPath)
 	}
 
 	idx := &Index{
-		packBase: reMatches[1] + reMatches[2],
-		ID:       reMatches[2],
+		packBase:     reMatches[1] + reMatches[2],
+		ID:           reMatches[2],
+		checksumSize: checksumSize,
 	}
 
 	f, err := os.Open(idx.packBase + ".idx")
@@ -62,11 +83,11 @@ func ReadIndex(logger log.Logger, idxPath string) (*Index, error) {
 	}
 	defer f.Close()
 
-	if _, err := f.Seek(-2*sumSize, io.SeekEnd); err != nil {
+	if _, err := f.Seek(int64(-2*checksumSize), io.SeekEnd); err != nil {
 		return nil, err
 	}
 
-	packID, err := readN(f, sumSize)
+	packID, err := readN(f, checksumSize)
 	if err != nil {
 		return nil, err
 	}
@@ -88,19 +109,27 @@ func ReadIndex(logger log.Logger, idxPath string) (*Index, error) {
 	}
 	idx.Objects = make([]*Object, count)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
 
 	var stderr bytes.Buffer
-	showIndex, err := command.New(
-		ctx, logger,
-		[]string{"git", "show-index"},
-		command.WithStdin(f), command.WithSetupStdout(), command.WithStderr(&stderr),
-	)
+	var showIndex *command.Command
+
+	if cmdFactory == nil {
+		showIndex, err = command.New(
+			ctx, logger,
+			[]string{"git", "show-index"},
+			command.WithStdin(f), command.WithSetupStdout(), command.WithStderr(&stderr),
+		)
+	} else {
+		showIndex, err = cmdFactory.New(ctx, repo, gitcmd.Command{
+			Name: "show-index",
+		},
+			gitcmd.WithStdin(f), gitcmd.WithSetupStdout(), gitcmd.WithStderr(&stderr),
+		)
+	}
+
 	if err != nil {
 		return nil, structerr.New("spawning git-show-index: %w: %s", err, stderr.String())
 	}
@@ -186,11 +215,11 @@ func (idx *Index) openPack() (f *os.File, err error) {
 		return nil, fmt.Errorf("unexpected pack signature %q", s)
 	}
 
-	if _, err := f.Seek(-sumSize, io.SeekEnd); err != nil {
+	if _, err := f.Seek(int64(-idx.checksumSize), io.SeekEnd); err != nil {
 		return nil, err
 	}
 
-	sum, err := readN(f, sumSize)
+	sum, err := readN(f, idx.checksumSize)
 	if err != nil {
 		return nil, err
 	}
