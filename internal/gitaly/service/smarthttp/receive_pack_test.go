@@ -141,7 +141,11 @@ func TestPostReceivePack_successful(t *testing.T) {
 
 	// The fact that this command succeeds means that we got the commit correctly, no further
 	// checks should be needed.
-	gittest.Exec(t, cfg, "-C", repoPath, "show", push.refUpdates[0].to.String())
+	conn := gittest.DialService(t, ctx, cfg)
+	commitClient := gitalypb.NewCommitServiceClient(conn)
+	commit, err := gittest.ResolveRevisionAPI(t, ctx, commitClient, repo, push.refUpdates[0].to.String())
+	require.NoError(t, err)
+	require.NotEqual(t, git.ObjectID(""), commit, "commit should exist")
 
 	payload, err := gitcmd.HooksPayloadFromEnv(capturedHookEnv)
 	require.NoError(t, err)
