@@ -10,7 +10,7 @@ replace github.com/go-enry/go-license-detector/v4 => github.com/gl-gitaly/go-lic
 require (
 	cloud.google.com/go/storage v1.44.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.5.0
-	github.com/ProtonMail/go-crypto v1.0.0
+	github.com/ProtonMail/go-crypto v1.1.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.63.1
 	github.com/cloudflare/tableflip v1.2.3
 	github.com/containerd/cgroups/v3 v3.0.3
