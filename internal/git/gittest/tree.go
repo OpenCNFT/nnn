@@ -2,14 +2,19 @@ package gittest
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 // TreeEntry represents an entry of a git tree object.
@@ -54,14 +59,7 @@ func RequireTree(tb testing.TB, cfg config.Cfg, repoPath, treeish string, expect
 		if entry.OID != "" {
 			continue
 		}
-
-		blob := fmt.Sprintf("blob %d\000%s", len(entry.Content), entry.Content)
-
-		hasher := requireTreeCfg.hash.Hash()
-		_, err := hasher.Write([]byte(blob))
-		require.NoError(tb, err)
-
-		expectedEntries[i].OID = git.ObjectID(hex.EncodeToString(hasher.Sum(nil)))
+		expectedEntries[i].OID = computeBlobOID(tb, entry.Content, requireTreeCfg.hash)
 	}
 
 	var actualEntries []TreeEntry
@@ -87,6 +85,55 @@ func RequireTree(tb testing.TB, cfg config.Cfg, repoPath, treeish string, expect
 				Mode:    string(spaceSplit[0]),
 				Path:    path,
 				Content: string(Exec(tb, cfg, "-C", repoPath, "show", treeish+":"+path)),
+			})
+		}
+	}
+
+	require.Equal(tb, expectedEntries, actualEntries)
+}
+
+// RequireTreeAPI looks up the given treeish and asserts that its entries match
+// the given expected entries using the GetTreeEntries RPC.
+func RequireTreeAPI(tb testing.TB, ctx context.Context, client gitalypb.CommitServiceClient, cfg config.Cfg, repo *gitalypb.Repository, treeish string, expectedEntries []TreeEntry, options ...requireTreeOption) {
+	tb.Helper()
+	requireTreeCfg := requireTreeConfig{
+		hash: DefaultObjectHash,
+	}
+
+	for _, option := range options {
+		option(&requireTreeCfg)
+	}
+
+	for i, entry := range expectedEntries {
+		if entry.OID != "" {
+			continue
+		}
+		expectedEntries[i].OID = computeBlobOID(tb, entry.Content, requireTreeCfg.hash)
+	}
+
+	repoPath := filepath.Join(cfg.Storages[0].Path, GetReplicaPath(tb, ctx, cfg, repo))
+	stream, err := client.GetTreeEntries(ctx, &gitalypb.GetTreeEntriesRequest{
+		Repository: repo,
+		Revision:   []byte(treeish),
+		Path:       []byte("."),
+		Recursive:  true,
+	})
+	require.NoError(tb, err)
+
+	var actualEntries []TreeEntry
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(tb, err)
+
+		for _, entry := range resp.GetEntries() {
+			actualEntries = append(actualEntries, TreeEntry{
+				OID:     git.ObjectID(entry.GetOid()),
+				Mode:    fmt.Sprintf("%o", entry.GetMode()),
+				Path:    string(entry.GetPath()),
+				Content: string(Exec(tb, cfg, "-C", repoPath, "show", treeish+":"+string(entry.GetPath()))),
 			})
 		}
 	}
@@ -137,4 +184,15 @@ func WriteTree(tb testing.TB, cfg config.Cfg, repoPath string, entries []TreeEnt
 	require.NoError(tb, err)
 
 	return treeOID
+}
+
+func computeBlobOID(tb testing.TB, content string, hash git.ObjectHash) git.ObjectID {
+	tb.Helper()
+	blob := fmt.Sprintf("blob %d\000%s", len(content), content)
+
+	hasher := hash.Hash()
+	_, err := hasher.Write([]byte(blob))
+	require.NoError(tb, err)
+
+	return git.ObjectID(hex.EncodeToString(hasher.Sum(nil)))
 }

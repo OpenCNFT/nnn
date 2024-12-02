@@ -2,6 +2,8 @@ package gittest
 
 import (
 	"context"
+	"errors"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,4 +75,31 @@ func ResolveRevisionAPI(t *testing.T, ctx context.Context, commitClient gitalypb
 		return git.ObjectID(""), err
 	}
 	return git.ObjectID(resp.GetCommit().GetId()), nil
+}
+
+// GetReferencesAPI returns references in the Git repository using the RefService.
+func GetReferencesAPI(t *testing.T, ctx context.Context, client gitalypb.RefServiceClient, repo *gitalypb.Repository, patterns [][]byte) []git.Reference {
+	t.Helper()
+
+	stream, err := client.ListRefs(ctx, &gitalypb.ListRefsRequest{
+		Repository: repo,
+		Patterns:   patterns,
+	})
+	require.NoError(t, err)
+
+	var refs []git.Reference
+	for {
+		r, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		for _, ref := range r.GetReferences() {
+			refs = append(refs, git.Reference{
+				Name:   git.ReferenceName(ref.GetName()),
+				Target: ref.GetTarget(),
+			})
+		}
+	}
+	return refs
 }
