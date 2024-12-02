@@ -33,7 +33,7 @@ import (
 // until after the connectivity check completes. If Gitaly crashes before the backup is restored,
 // the repository may be in a broken state until an administrator intervenes and restores the backed
 // up copy of objects/info/alternates.
-func Disconnect(ctx context.Context, repo *localrepo.Repo, logger log.Logger, txManager transaction.Manager) error {
+func Disconnect(ctx context.Context, storageRoot string, repo *localrepo.Repo, logger log.Logger, txManager transaction.Manager) error {
 	repoPath, err := repo.Path(ctx)
 	if err != nil {
 		return err
