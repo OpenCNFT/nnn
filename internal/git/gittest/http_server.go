@@ -38,7 +38,12 @@ func HTTPServer(tb testing.TB, ctx context.Context, gitCmdFactory gitcmd.Command
 		}, gitExecEnv.EnvironmentVariables...),
 	}
 
-	s := &http.Server{Handler: gitHTTPBackend}
+	s := &http.Server{
+		Handler:      gitHTTPBackend,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
 	tb.Cleanup(func() {
 		testhelper.MustClose(tb, s)
 	})
@@ -53,3 +58,4 @@ func HTTPServer(tb testing.TB, ctx context.Context, gitCmdFactory gitcmd.Command
 
 	return listener.Addr().(*net.TCPAddr).Port
 }
+
