@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"testing/fstest"
 
@@ -59,6 +61,82 @@ type recordDirectory struct{ path string }
 func (m *mockFS) RecordDirectory(path string) error {
 	m.append(recordDirectory{path: path})
 	return nil
+}
+
+func TestMkdir(t *testing.T) {
+	t.Run("fails if parent does not exist", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.ErrorIs(t, Mkdir(f, "non-existent/target"), fs.ErrNotExist)
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("fails if target exists", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.NoError(t, os.Mkdir(filepath.Join(f.root, "target"), mode.Directory))
+
+		require.ErrorIs(t, Mkdir(f, "target"), fs.ErrExist)
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("successfully creates directories", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.NoError(t, Mkdir(f, "parent"))
+		require.NoError(t, Mkdir(f, "parent/child"))
+		require.Equal(t,
+			operations{
+				recordDirectory{path: "parent"},
+				recordDirectory{path: "parent/child"},
+			},
+			f.operations,
+		)
+	})
+}
+
+func TestMkdirall(t *testing.T) {
+	t.Run("target under a file", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.NoError(t, os.WriteFile(filepath.Join(f.root, "file"), nil, mode.File))
+
+		require.ErrorIs(t, MkdirAll(f, "file/target"), syscall.ENOTDIR)
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("target is a file", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.NoError(t, os.WriteFile(filepath.Join(f.root, "file"), nil, mode.File))
+
+		require.Equal(t, newTargetIsFileError("file"), MkdirAll(f, "file"))
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("target exists", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.NoError(t, os.MkdirAll(filepath.Join(f.root, "parent/target"), mode.Directory))
+
+		require.NoError(t, MkdirAll(f, "parent/target"))
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("successfully creates missing directories", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.NoError(t, os.MkdirAll(filepath.Join(f.root, "parent"), mode.Directory))
+
+		require.NoError(t, MkdirAll(f, "parent/child/target"))
+		require.Equal(t,
+			operations{
+				recordDirectory{path: "parent/child"},
+				recordDirectory{path: "parent/child/target"},
+			},
+			f.operations,
+		)
+	})
 }
 
 func TestFS_recordingHelpers(t *testing.T) {
