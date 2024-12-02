@@ -1356,7 +1356,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			locator := config.NewLocator(setup.Config)
 
 			require.NoError(t, repoutil.Create(
-				ctx,
+				storage.ContextWithTransaction(ctx, transaction),
 				logger,
 				locator,
 				setup.CommandFactory,
@@ -1385,17 +1385,22 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						)
 					}
 
+					if step.Alternate != "" {
+						repoPath, err := repo.Path(ctx)
+						require.NoError(t, err)
+
+						alternatesPath := stats.AlternatesFilePath(repoPath)
+						require.NoError(t, os.WriteFile(alternatesPath, []byte(step.Alternate), fs.ModePerm))
+					}
+
 					return nil
 				},
 				repoutil.WithObjectHash(setup.ObjectHash),
 			))
 
 			if step.Alternate != "" {
-				repoPath, err := locator.GetRepoPath(ctx, rewrittenRepository)
+				repoPath, err := setup.RepositoryFactory.Build(rewrittenRepository).Path(ctx)
 				require.NoError(t, err)
-
-				alternatesPath := stats.AlternatesFilePath(repoPath)
-				require.NoError(t, os.WriteFile(alternatesPath, []byte(step.Alternate), fs.ModePerm))
 
 				alternates, err := stats.ReadAlternatesFile(repoPath)
 				require.NoError(t, err)

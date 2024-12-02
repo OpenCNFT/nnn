@@ -94,7 +94,28 @@ func (s *server) ReplicateRepository(ctx context.Context, in *gitalypb.Replicate
 }
 
 func (s *server) replicateRepository(ctx context.Context, source, target *gitalypb.Repository) error {
-	if err := s.syncGitconfig(ctx, source, target); err != nil {
+	if err := s.syncGitconfig(ctx, source, target, func(ctx context.Context, path string, content io.Reader) error {
+		if err := s.writeFile(ctx, path, content); err != nil {
+			return err
+		}
+
+		if tx := storage.ExtractTransaction(ctx); tx != nil {
+			originalConfigRelativePath, err := filepath.Rel(tx.FS().Root(), path)
+			if err != nil {
+				return fmt.Errorf("original config relative path: %w", err)
+			}
+
+			if err := tx.FS().RecordRemoval(originalConfigRelativePath); err != nil {
+				return fmt.Errorf("record old config removal: %w", err)
+			}
+
+			if err := tx.FS().RecordFile(originalConfigRelativePath); err != nil {
+				return fmt.Errorf("record new config creation: %w", err)
+			}
+		}
+
+		return nil
+	}); err != nil {
 		return fmt.Errorf("synchronizing gitconfig: %w", err)
 	}
 
@@ -151,6 +172,38 @@ func (s *server) createFromSnapshot(ctx context.Context, source, target *gitalyp
 	if err := repoutil.Create(ctx, s.logger, s.locator, s.gitCmdFactory, s.catfileCache, s.txManager, s.repositoryCounter, target, func(repo *gitalypb.Repository) error {
 		if err := s.extractSnapshot(ctx, source, repo); err != nil {
 			return fmt.Errorf("extracting snapshot: %w", err)
+		}
+
+		// The archive extracted above does not contain the configuration file. If SHA256 is used, this
+		// would lead to an invalid repository as the object format configuration is not present. This
+		// leads to failures with transactions as we need to pack the object directory after the repository
+		// is created. Sync the config here to ensure the correct object format is configured before
+		// returning. We write it directly to disk without voting as the voting is handled by the voting
+		// round of the repository creation. We also don't want to record the config creating operation
+		// separately as it is already recorded by `repoutil.Create` when it records the entire repository.
+		//
+		// We only run this with transactions as the file update is not atomic without transactions.
+		if tx := storage.ExtractTransaction(ctx); tx != nil {
+			if err := s.syncGitconfig(ctx, source, repo, func(ctx context.Context, path string, content io.Reader) (returnedErr error) {
+				file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.File)
+				if err != nil {
+					return fmt.Errorf("open: %w", err)
+				}
+
+				defer func() {
+					if err := file.Close(); err != nil {
+						returnedErr = errors.Join(returnedErr, fmt.Errorf("close: %w", err))
+					}
+				}()
+
+				if _, err := io.Copy(file, content); err != nil {
+					return fmt.Errorf("copy: %w", err)
+				}
+
+				return nil
+			}); err != nil {
+				return fmt.Errorf("sync gitconfig: %w", err)
+			}
 		}
 
 		return nil
@@ -325,7 +378,7 @@ func (s *server) syncCustomHooks(ctx context.Context, source, target *gitalypb.R
 	return nil
 }
 
-func (s *server) syncGitconfig(ctx context.Context, source, target *gitalypb.Repository) error {
+func (s *server) syncGitconfig(ctx context.Context, source, target *gitalypb.Repository, writeConfig func(ctx context.Context, path string, content io.Reader) error) error {
 	repoClient, err := s.newRepoClient(ctx, source.GetStorageName())
 	if err != nil {
 		return err
@@ -344,14 +397,10 @@ func (s *server) syncGitconfig(ctx context.Context, source, target *gitalypb.Rep
 	}
 
 	configPath := filepath.Join(repoPath, "config")
-	if err := s.writeFile(ctx, configPath, streamio.NewReader(func() ([]byte, error) {
+	return writeConfig(ctx, configPath, streamio.NewReader(func() ([]byte, error) {
 		resp, err := stream.Recv()
 		return resp.GetData(), err
-	})); err != nil {
-		return err
-	}
-
-	return nil
+	}))
 }
 
 func (s *server) writeFile(ctx context.Context, path string, reader io.Reader) (returnedErr error) {

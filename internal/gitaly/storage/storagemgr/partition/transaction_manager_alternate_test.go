@@ -218,12 +218,12 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 						),
 						Packfiles: &PackfilesState{
 							PooledObjects: []git.ObjectID{
+								setup.ObjectHash.EmptyTreeOID,
 								setup.Commits.First.OID,
 							},
 							Packfiles: []*PackfileState{
 								{
 									Objects: []git.ObjectID{
-										setup.ObjectHash.EmptyTreeOID,
 										setup.Commits.Second.OID,
 									},
 									HasReverseIndex: true,
