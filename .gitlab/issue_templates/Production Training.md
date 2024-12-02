@@ -1,6 +1,6 @@
 # Gitaly Team production training
 
-This is a collection of items that should prepare new team members to be effective in understanding production issues and thus join the [on-call rotation](https://about.gitlab.com/handbook/engineering/development/enablement/systems/gitaly#gitaly-oncall-rotation).
+This is a collection of items that should prepare new team members to be effective in understanding production issues and thus join the [on-call rotation](https://about.gitlab.com/handbook/engineering/infrastructure-platforms/data-access/gitaly#gitaly-oncall-rotation).
 
 While this can be started at any time, team members should complete their onboarding first, and have some experience in the codebase before completing this process.
 
@@ -14,7 +14,7 @@ While this can be started at any time, team members should complete their onboar
 
 Skim/read through these, and use them as references.
 
-- [Debugging Gitaly](https://handbook.gitlab.com/handbook/engineering/infrastructure/core-platform/systems/gitaly/debug/)
+- [Debugging Gitaly](https://handbook.gitlab.com/handbook/engineering/infrastructure-platforms/data-access/gitaly/debug/)
 - [Managing monorepos](https://docs.gitlab.com/ee/user/project/repository/monorepos/)
 - [GCP project layout for Gitaly VMs](https://gitlab.com/gitlab-com/gl-infra/readiness/-/blob/master/library/gitaly-multi-project/README.md)
 
@@ -24,7 +24,7 @@ Please help correct, clarify, or otherwise improve any documentation you find la
 
 Please edit this section like a workbook, adding not just the answer but also how you got there.
 
-- [ ] Find a [senior team member](https://handbook.gitlab.com/handbook/engineering/infrastructure/core-platform/systems/gitaly/) to review and discuss this work, and assign them here.
+- [ ] Find a [senior team member](https://handbook.gitlab.com/handbook/engineering/infrastructure-platforms/data-access/gitaly/) to review and discuss this work, and assign them here.
 
 ### Statistics
 
@@ -73,7 +73,7 @@ Link: [Gitaly Customer Issues](https://gitlab.com/gitlab-org/gitaly/-/issues/?so
 - [ ] [Set up a local ELK and import log files into it](../../doc/setup_local_elk_for_downloaded_logs.md)
 - [ ] Read through some recently closed customer issues and the investigation. Follow the reasoning and understand the fix.
 - [ ] Join an ongoing investigation, or pick up a new incoming issue. (Add the current milestone and ~"workflow::in dev" while assignign the issue to yourself.) Ask for help and guidance shamelessly. :slight_smile:
-- [ ] Monitor `#g_gitaly` for incoming questions, direct them to our [intake flow](https://handbook.gitlab.com/handbook/engineering/infrastructure/core-platform/systems/gitaly/#customer-issues)
+- [ ] Monitor `#g_gitaly` for incoming questions, direct them to our [intake flow](https://handbook.gitlab.com/handbook/engineering/infrastructure-platforms/data-access/gitaly#customer-issues)
 
 ## Finally
 
