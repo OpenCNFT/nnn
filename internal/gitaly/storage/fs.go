@@ -16,6 +16,19 @@ func newTargetIsFileError(path string) error {
 	return structerr.NewFailedPrecondition("target is a file").WithMetadata("path", path)
 }
 
+// Link creats a hard link from source to destination and records it.
+func Link(f FS, source, destination string) error {
+	if err := os.Link(filepath.Join(f.Root(), source), filepath.Join(f.Root(), destination)); err != nil {
+		return fmt.Errorf("link: %w", err)
+	}
+
+	if err := f.RecordLink(source, destination); err != nil {
+		return fmt.Errorf("record link: %w", err)
+	}
+
+	return nil
+}
+
 // Mkdir creates a directory and records the directory creation.
 func Mkdir(f FS, path string) error {
 	if err := os.Mkdir(filepath.Join(f.Root(), path), mode.Directory); err != nil {

@@ -63,6 +63,53 @@ func (m *mockFS) RecordDirectory(path string) error {
 	return nil
 }
 
+func TestLink(t *testing.T) {
+	t.Run("fails source not exist", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		require.ErrorIs(t, Link(f, "source", "destination"), fs.ErrNotExist)
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("fails if target exists", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		sourcePath := filepath.Join(f.Root(), "source")
+		require.NoError(t, os.WriteFile(sourcePath, nil, mode.File))
+
+		targetPath := filepath.Join(f.Root(), "target")
+		require.NoError(t, os.WriteFile(targetPath, nil, mode.File))
+
+		require.ErrorIs(t, Link(f, "source", "target"), fs.ErrExist)
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("fails if destination directory does not exist", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		sourcePath := filepath.Join(f.Root(), "source")
+		require.NoError(t, os.WriteFile(sourcePath, nil, mode.File))
+
+		require.ErrorIs(t, Link(f, "source", "parent/target"), fs.ErrNotExist)
+		require.Empty(t, f.operations)
+	})
+
+	t.Run("successfully creates directories", func(t *testing.T) {
+		f := newMockFS(t.TempDir())
+
+		sourcePath := filepath.Join(f.Root(), "source")
+		require.NoError(t, os.WriteFile(sourcePath, nil, mode.File))
+
+		require.NoError(t, Link(f, "source", "destination"))
+		require.Equal(t,
+			operations{
+				recordLink{sourcePath: "source", destinationPath: "destination"},
+			},
+			f.operations,
+		)
+	})
+}
+
 func TestMkdir(t *testing.T) {
 	t.Run("fails if parent does not exist", func(t *testing.T) {
 		f := newMockFS(t.TempDir())
