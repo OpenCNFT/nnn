@@ -694,6 +694,13 @@ func testUploadPackSuccessful(t *testing.T, ctx context.Context, sidechannel boo
 func TestUploadPack_packObjectsHook(t *testing.T) {
 	t.Parallel()
 
+	if testhelper.IsWALEnabled() {
+		// When WAL is enabled, we use ForceWALSyncWriteRef to ensure that any pending changes are applied.
+		// The workaround writes a reference into the repository, but since we are using a custom
+		// pack-objects hook, it would abort the ref updates.
+		t.Skip("Skipping test as we are using a custom pack-objects hook, which would abort refs updates.")
+	}
+
 	ctx := testhelper.Context(t)
 
 	filterDir := testhelper.TempDir(t)

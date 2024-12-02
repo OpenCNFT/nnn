@@ -75,15 +75,16 @@ func TestVerifier(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		desc                 string
-		dontPerformDeletions bool
-		erroringGitalys      map[string]bool
-		replicas             replicas
-		healthyStorages      StaticHealthChecker
-		batchSize            int
-		steps                []step
-		dequeuedJobsTotal    map[string]map[string]int
-		completedJobsTotal   map[string]map[string]map[string]int
+		desc                      string
+		dontPerformDeletions      bool
+		erroringGitalys           map[string]bool
+		shouldNotRunInTransaction bool
+		replicas                  replicas
+		healthyStorages           StaticHealthChecker
+		batchSize                 int
+		steps                     []step
+		dequeuedJobsTotal         map[string]map[string]int
+		completedJobsTotal        map[string]map[string]map[string]int
 	}{
 		{
 			desc: "all replicas exist",
@@ -123,7 +124,15 @@ func TestVerifier(t *testing.T) {
 			replicas: replicas{
 				"virtual-storage": {
 					"repository-1": {
-						gitaly1: {exists: false, lastVerified: recentlyVerified},
+						// In this test after calling RemoveRepository RPC, the gitaly-0 (primary node) is getting
+						// prematurely deleted from the storage_repositories table. While Praefect invoke ReplicateRepository
+						// RPC it checks for invalid source. Since the repository has been directly deleted from gitaly-0,
+						// it no longer exists, causing the RPC to fail with an ErrInvalidSourceRepository error. Subsequently,
+						// Praefect calls DeleteInvalidRepository, which removes the repository record from the storage_repositories
+						// table. The invocation of ReplicateRepository RPC seems to be triggered by the ForceWALSyncWriteRef
+						// workaround in gittest.CreateRepository. Setting exists to true is helping in avoiding the situation
+						// as the repository removal is skipped.
+						gitaly1: {exists: true, lastVerified: recentlyVerified},
 						gitaly2: {exists: false, lastVerified: recentlyVerified},
 						gitaly3: {exists: false, lastVerified: recentlyVerified},
 					},
@@ -403,6 +412,14 @@ func TestVerifier(t *testing.T) {
 				},
 			},
 			batchSize: 1,
+			// In this test after calling RemoveRepository RPC, the gitaly-0 (primary node) is getting
+			// prematurely deleted from the storage_repositories table. While Praefect invoke ReplicateRepository
+			// RPC it checks for invalid source. Since the repository has been directly deleted from gitaly-0,
+			// it no longer exists, causing the RPC to fail with an ErrInvalidSourceRepository error. Subsequently,
+			// Praefect calls DeleteInvalidRepository, which removes the repository record from the storage_repositories
+			// table. The invocation of ReplicateRepository RPC seems to be triggered by the ForceWALSyncWriteRef
+			// workaround in gittest.CreateRepository.
+			shouldNotRunInTransaction: true,
 			steps: []step{
 				{
 					expectedRemovals: logRecord{
@@ -455,6 +472,12 @@ func TestVerifier(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
+
+			if tc.shouldNotRunInTransaction {
+				if testhelper.IsWALEnabled() {
+					t.Skip("skipping test that should not run in transaction")
+				}
+			}
 
 			ctx := testhelper.Context(t)
 

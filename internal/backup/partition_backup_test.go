@@ -111,7 +111,9 @@ func TestPartitionBackup_CreateSuccess(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, expectedArchive := range tc.expectedArchives {
-				tarPath := filepath.Join(backupRoot, "partition-backups", cfg.Storages[0].Name, expectedArchive, storage.LSN(1).String()) + ".tar"
+				// In gittest.CreateRepository, if WAL is enabled we use ForceWALSyncWriteRef workaround to ensure
+				// that any pending changes are applied. Since the workaround is a write request the LSN will be 2.
+				tarPath := filepath.Join(backupRoot, "partition-backups", cfg.Storages[0].Name, expectedArchive, storage.LSN(2).String()) + ".tar"
 				tar, err := os.Open(tarPath)
 				require.NoError(t, err)
 				testhelper.MustClose(t, tar)
