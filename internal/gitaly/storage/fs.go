@@ -6,7 +6,60 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
+
+func newTargetIsFileError(path string) error {
+	return structerr.NewFailedPrecondition("target is a file").WithMetadata("path", path)
+}
+
+// Mkdir creates a directory and records the directory creation.
+func Mkdir(f FS, path string) error {
+	if err := os.Mkdir(filepath.Join(f.Root(), path), mode.Directory); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+
+	if err := f.RecordDirectory(path); err != nil {
+		return fmt.Errorf("record directory: %w", err)
+	}
+
+	return nil
+}
+
+// MkdirAll creates all missing directories along the path and logs the creations.
+func MkdirAll(f FS, path string) error {
+	if info, err := os.Lstat(filepath.Join(f.Root(), path)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("stat: %w", err)
+	} else if info != nil && !info.IsDir() {
+		return newTargetIsFileError(path)
+	}
+
+	var (
+		currentRelativePath string
+		currentSuffix       = path
+		hasMore             = true
+	)
+
+	for hasMore {
+		var prefix string
+		prefix, currentSuffix, hasMore = strings.Cut(currentSuffix, "/")
+		currentRelativePath = filepath.Join(currentRelativePath, prefix)
+
+		if err := Mkdir(f, currentRelativePath); err != nil {
+			if errors.Is(err, fs.ErrExist) {
+				// The directory already existed. Continue to the child directory.
+				continue
+			}
+
+			return fmt.Errorf("create parent directory: %w", err)
+		}
+	}
+
+	return nil
+}
 
 // RecordDirectoryCreation records the operations to create a given directory all of its children.
 func RecordDirectoryCreation(f FS, relativePath string) error {

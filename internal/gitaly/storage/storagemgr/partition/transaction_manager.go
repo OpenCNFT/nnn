@@ -520,7 +520,7 @@ func (mgr *TransactionManager) Begin(ctx context.Context, opts storage.BeginOpti
 					//
 					// If the repository is at the root of the storage, there's no parent directories to create.
 					if parentDir := filepath.Dir(txn.relativePath); parentDir != "." {
-						if err := txn.fs.MkdirAll(parentDir); err != nil {
+						if err := storage.MkdirAll(txn.fs, parentDir); err != nil {
 							return nil, fmt.Errorf("create parent directories: %w", err)
 						}
 					}
