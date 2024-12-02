@@ -12,6 +12,28 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 )
 
+type noopFS struct {
+	root string
+}
+
+// NewNoopFS returns an FS implementation that is not tied to a transaction
+// and operates directly on the storage root.
+func NewNoopFS(root string) FS {
+	return noopFS{root: root}
+}
+
+func (f noopFS) Root() string { return f.root }
+
+func (f noopFS) RecordRead(path string) error { return nil }
+
+func (f noopFS) RecordFile(path string) error { return nil }
+
+func (f noopFS) RecordLink(sourcePath, destinationPath string) error { return nil }
+
+func (f noopFS) RecordDirectory(path string) error { return nil }
+
+func (f noopFS) RecordRemoval(path string) error { return nil }
+
 func newTargetIsFileError(path string) error {
 	return structerr.NewFailedPrecondition("target is a file").WithMetadata("path", path)
 }
