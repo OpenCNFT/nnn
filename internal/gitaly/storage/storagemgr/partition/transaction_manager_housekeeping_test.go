@@ -16,6 +16,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -838,12 +839,16 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						"refs/heads/branch-2": {OldOID: setup.Commits.Third.OID, NewOID: setup.Commits.Diverging.OID},
 						"refs/tags/v1.0.0":    {OldOID: setup.Commits.Diverging.OID, NewOID: setup.Commits.First.OID},
 					},
+					ExpectedError: gittest.FilesOrReftables[error](
+						fshistory.NewReadWriteConflictError(filepath.Join(setup.RelativePath, "refs", "heads", "branch-1"), 1, 2),
+						nil,
+					),
 				},
 				assertPackRefsMetrics,
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(3).ToProto(),
+					string(keyAppliedLSN): storage.LSN(gittest.FilesOrReftables(2, 3)).ToProto(),
 				},
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
@@ -851,19 +856,14 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						References: gittest.FilesOrReftables(&ReferencesState{
 							FilesBackend: &FilesBackendState{
 								PackedReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/branch-1":   setup.Commits.Second.OID, // Outdated
-									"refs/heads/branch-2":   setup.Commits.Third.OID,  // Outdated
-									"refs/heads/main":       setup.Commits.First.OID,  // Outdated
-									"refs/heads/new-branch": setup.Commits.First.OID,  // Still up-to-date
-									"refs/tags/v1.0.0":      lightweightTag,           // Outdated
-									"refs/tags/v2.0.0":      annotatedTag.OID,         // Still up-to-date
+									"refs/heads/branch-1":   setup.Commits.Second.OID,
+									"refs/heads/branch-2":   setup.Commits.Third.OID,
+									"refs/heads/main":       setup.Commits.First.OID,
+									"refs/heads/new-branch": setup.Commits.First.OID,
+									"refs/tags/v1.0.0":      lightweightTag,
+									"refs/tags/v2.0.0":      annotatedTag.OID,
 								},
-								LooseReferences: map[git.ReferenceName]git.ObjectID{
-									"refs/heads/main":     setup.Commits.Second.OID,
-									"refs/heads/branch-1": setup.Commits.Third.OID,
-									"refs/heads/branch-2": setup.Commits.Diverging.OID,
-									"refs/tags/v1.0.0":    setup.Commits.First.OID,
-								},
+								LooseReferences: map[git.ReferenceName]git.ObjectID{},
 							},
 						}, &ReferencesState{
 							ReftableBackend: &ReftableBackendState{
@@ -1228,7 +1228,10 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 						"refs/heads/branch-1": {OldOID: setup.Commits.Second.OID, NewOID: gittest.DefaultObjectHash.ZeroOID},
 						"refs/tags/v1.0.0":    {OldOID: lightweightTag, NewOID: gittest.DefaultObjectHash.ZeroOID},
 					},
-					ExpectedError: gittest.FilesOrReftables[error](errConcurrentReferencePacking, nil),
+					ExpectedError: gittest.FilesOrReftables[error](
+						fshistory.NewReadWriteConflictError(filepath.Join(setup.RelativePath, "refs", "heads", "branch-1"), 1, 2),
+						nil,
+					),
 				},
 				assertPackRefsMetrics,
 			},
