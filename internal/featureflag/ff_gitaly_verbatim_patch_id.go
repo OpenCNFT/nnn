@@ -4,6 +4,6 @@ package featureflag
 var VerbatimPatchId = NewFeatureFlag(
 	"verbatim_patch_id",
 	"v17.7.0",
-	"<ROLLOUT ISSUE>",
+	"https://gitlab.com/gitlab-org/gitaly/-/issues/6537",
 	true,
 )
