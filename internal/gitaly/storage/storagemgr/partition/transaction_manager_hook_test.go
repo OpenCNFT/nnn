@@ -82,6 +82,13 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 					"/":    {Mode: mode.Directory},
 					"/wal": {Mode: mode.Directory},
 				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						CustomHooks: testhelper.DirectoryState{
+							"/": {Mode: mode.Directory},
+						},
+					},
+				},
 			},
 		},
 		{
@@ -192,6 +199,13 @@ func generateCustomHooksTests(t *testing.T, setup testTransactionSetup) []transa
 				Directory: testhelper.DirectoryState{
 					"/":    {Mode: mode.Directory},
 					"/wal": {Mode: mode.Directory},
+				},
+				Repositories: RepositoryStates{
+					setup.RelativePath: {
+						CustomHooks: testhelper.DirectoryState{
+							"/": {Mode: mode.Directory},
+						},
+					},
 				},
 			},
 		},

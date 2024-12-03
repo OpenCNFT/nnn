@@ -743,6 +743,9 @@ func generateCommonTests(t *testing.T, ctx context.Context, setup testTransactio
 				Repositories: RepositoryStates{
 					setup.RelativePath: {
 						DefaultBranch: "refs/heads/main",
+						CustomHooks: testhelper.DirectoryState{
+							"/": {Mode: mode.Directory},
+						},
 						References: gittest.FilesOrReftables(
 							&ReferencesState{
 								FilesBackend: &FilesBackendState{
