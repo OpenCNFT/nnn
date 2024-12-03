@@ -30,7 +30,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
@@ -89,11 +88,8 @@ var (
 	errConcurrentAlternateUnlink = errors.New("concurrent alternate unlinking with repack")
 
 	// Below errors are used to error out in cases when updates have been staged in a read-only transaction.
-	errReadOnlyRepositoryDeletion = errors.New("repository deletion staged in a read-only transaction")
-	errReadOnlyHousekeeping       = errors.New("housekeeping in a read-only transaction")
-	errReadOnlyKeyValue           = errors.New("key-value writes in a read-only transaction")
-
-	errRepositoryDeletionOtherOperations = errors.New("other operations staged with repository deletion")
+	errReadOnlyHousekeeping = errors.New("housekeeping in a read-only transaction")
+	errReadOnlyKeyValue     = errors.New("key-value writes in a read-only transaction")
 
 	// errWritableAllRepository is returned when a transaction is started with
 	// no relative path filter specified and is not read-only. Transactions do
@@ -104,13 +100,6 @@ var (
 	// keyAppliedLSN is the database key storing a partition's last applied log entry's LSN.
 	keyAppliedLSN = []byte("applied_lsn")
 )
-
-const relativePathKeyPrefix = "r/"
-
-// relativePathKey generates the database key for storing relative paths in a partition.
-func relativePathKey(relativePath string) []byte {
-	return []byte(relativePathKeyPrefix + relativePath)
-}
 
 // InvalidReferenceFormatError is returned when a reference name was invalid.
 type InvalidReferenceFormatError struct {
@@ -261,11 +250,13 @@ type Transaction struct {
 	// exists.
 	stagingSnapshot snapshot.FileSystem
 
+	// manifest is the manifest of the log entry. It's stored the log entry as some of the operations may
+	// need to still modify it after admission.
+	manifest *gitalypb.LogEntry
 	// walEntry is the log entry where the transaction stages its state for committing.
 	walEntry               *wal.Entry
 	initialReferenceValues map[git.ReferenceName]git.Reference
 	referenceUpdates       []git.ReferenceUpdates
-	customHooksUpdated     bool
 	repositoryCreation     *repositoryCreation
 	deleteRepository       bool
 	includedObjects        map[git.ObjectID]struct{}
@@ -552,14 +543,14 @@ func (txn *Transaction) repositoryTarget() bool {
 // transactions partition.
 func (txn *Transaction) PartitionRelativePaths() []string {
 	it := txn.KV().NewIterator(keyvalue.IteratorOptions{
-		Prefix: []byte(relativePathKeyPrefix),
+		Prefix: []byte(storage.RepositoryKeyPrefix),
 	})
 	defer it.Close()
 
 	var relativePaths []string
 	for it.Rewind(); it.Valid(); it.Next() {
 		key := it.Item().Key()
-		relativePath := bytes.TrimPrefix(key, []byte(relativePathKeyPrefix))
+		relativePath := bytes.TrimPrefix(key, []byte(storage.RepositoryKeyPrefix))
 		relativePaths = append(relativePaths, string(relativePath))
 	}
 
@@ -628,8 +619,6 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 		// accidentally staged in a read-only transaction. The changes would not be anyway
 		// performed as read-only transactions are not committed through the manager.
 		switch {
-		case txn.deleteRepository:
-			return errReadOnlyRepositoryDeletion
 		case txn.runHousekeeping != nil:
 			return errReadOnlyHousekeeping
 		case len(txn.recordingReadWriter.WriteSet()) > 0:
@@ -640,7 +629,6 @@ func (txn *Transaction) Commit(ctx context.Context) (returnedErr error) {
 	}
 
 	if txn.runHousekeeping != nil && (txn.referenceUpdates != nil ||
-		txn.customHooksUpdated ||
 		txn.deleteRepository ||
 		txn.includedObjects != nil) {
 		return errHousekeepingConflictOtherUpdates
@@ -810,12 +798,6 @@ func (txn *Transaction) UpdateReferences(ctx context.Context, updates git.Refere
 // DeleteRepository deletes the repository when the transaction is committed.
 func (txn *Transaction) DeleteRepository() {
 	txn.deleteRepository = true
-}
-
-// MarkCustomHooksUpdated sets a hint to the transaction manager that custom hooks have been updated as part
-// of the transaction. This leads to the manager identifying changes and staging them for commit.
-func (txn *Transaction) MarkCustomHooksUpdated() {
-	txn.customHooksUpdated = true
 }
 
 // PackRefs sets pack-refs housekeeping task as a part of the transaction. The transaction can only runs other
@@ -1127,43 +1109,15 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		}
 	}
 
-	if err := mgr.packObjects(ctx, transaction); err != nil {
-		return fmt.Errorf("pack objects: %w", err)
-	}
-
-	if err := mgr.prepareHousekeeping(ctx, transaction); err != nil {
-		return fmt.Errorf("preparing housekeeping: %w", err)
-	}
-
-	if transaction.repositoryCreation != nil {
-		// Below we'll log the repository exactly as it was created by the transaction. While
-		// we can expect the transaction leaves the repository in a good state, we'll override
-		// the object directory of the repository so it only contains:
-		// - The packfiles we generated above that contain only the reachable objects.
-		// - The alternate link if set.
-		//
-		// This ensures the object state of the repository is exactly as the TransactionManager
-		// expects it to be. There should be no objects missing dependencies or else the repository
-		// could be corrupted if these objects are used. All objects in the generated pack
-		// are verified to have all their dependencies present. Replacing the object directory thus
-		// ensures we only log the packfile with the verified objects, and that no loose objects make
-		// it into the repository, or anything else that breaks our assumption about the object
-		// database contents.
-		if err := mgr.replaceObjectDirectory(ctx, transaction); err != nil {
-			return fmt.Errorf("replace object directory: %w", err)
+	if transaction.repositoryCreation == nil {
+		if err := mgr.packObjects(ctx, transaction); err != nil {
+			return fmt.Errorf("pack objects: %w", err)
 		}
 
-		if err := storage.RecordDirectoryCreation(
-			transaction.FS(),
-			transaction.relativePath,
-		); err != nil {
-			return fmt.Errorf("record directory creation: %w", err)
+		if err := mgr.prepareHousekeeping(ctx, transaction); err != nil {
+			return fmt.Errorf("preparing housekeeping: %w", err)
 		}
 
-		if err := transaction.KV().Set(relativePathKey(transaction.relativePath), nil); err != nil {
-			return fmt.Errorf("add relative path: %w", err)
-		}
-	} else {
 		if transaction.alternateUpdated {
 			stagedAlternatesRelativePath := stats.AlternatesFilePath(transaction.relativePath)
 			stagedAlternatesAbsolutePath := mgr.getAbsolutePath(transaction.snapshot.RelativePath(stagedAlternatesRelativePath))
@@ -1180,20 +1134,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 				); err != nil && !errors.Is(err, fs.ErrNotExist) {
 					return fmt.Errorf("record alternates update: %w", err)
 				}
-			}
-		}
-
-		if transaction.customHooksUpdated {
-			// Log the custom hook creation. The deletion of the previous hooks is logged after admission to
-			// ensure we log the latest state for deletion in case someone else modified the hooks.
-			//
-			// If the transaction removed the custom hooks, we won't have anything to log. We'll ignore the
-			// ErrNotExist and stage the deletion later.
-			if err := storage.RecordDirectoryCreation(
-				transaction.FS(),
-				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record custom hook directory: %w", err)
 			}
 		}
 
@@ -1219,6 +1159,16 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 				return fmt.Errorf("stage packed refs: %w", err)
 			}
 		}
+	}
+
+	transaction.manifest = &gitalypb.LogEntry{
+		RelativePath:          transaction.relativePath,
+		Operations:            transaction.walEntry.Operations(),
+		ReferenceTransactions: transaction.referenceUpdatesToProto(),
+	}
+
+	if transaction.deleteRepository {
+		transaction.manifest.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
 	}
 
 	if err := safe.NewSyncer().SyncRecursive(ctx, transaction.walFilesPath()); err != nil {
@@ -1255,73 +1205,32 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 	}
 }
 
-// replaceObjectDirectory replaces the snapshot repository's object directory
-// to only contain the packs generated by TransactionManager and the possible
-// alternate link if present.
-func (mgr *TransactionManager) replaceObjectDirectory(ctx context.Context, tx *Transaction) (returnedErr error) {
-	repoPath, err := tx.snapshotRepository.Path(ctx)
-	if err != nil {
-		return fmt.Errorf("snapshot repository path: %w", err)
-	}
-
-	objectsDir := filepath.Join(repoPath, "objects")
-	objectsInfo, err := os.Stat(objectsDir)
-	if err != nil {
-		return fmt.Errorf("stat: %w", err)
-	}
-
-	// Create the standard object directory structure.
-	newObjectsDir := filepath.Join(tx.stagingDirectory, "objects_tmp")
-	if err := os.Mkdir(newObjectsDir, objectsInfo.Mode().Perm()); err != nil {
-		return fmt.Errorf("create new objects dir: %w", err)
-	}
-
-	for _, dir := range []string{"info", "pack"} {
-		info, err := os.Stat(filepath.Join(objectsDir, dir))
-		if err != nil {
-			return fmt.Errorf("stat: %w", err)
+func (txn *Transaction) referenceUpdatesToProto() []*gitalypb.LogEntry_ReferenceTransaction {
+	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
+	for _, updates := range txn.referenceUpdates {
+		changes := make([]*gitalypb.LogEntry_ReferenceTransaction_Change, 0, len(updates))
+		for reference, update := range updates {
+			changes = append(changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
+				ReferenceName: []byte(reference),
+				NewOid:        []byte(update.NewOID),
+				NewTarget:     []byte(update.NewTarget),
+			})
 		}
 
-		if err := os.Mkdir(filepath.Join(newObjectsDir, dir), info.Mode().Perm()); err != nil {
-			return fmt.Errorf("mkdir: %w", err)
-		}
+		// Sort the reference updates so the reference changes are always logged in a deterministic order.
+		sort.Slice(changes, func(i, j int) bool {
+			return bytes.Compare(
+				changes[i].GetReferenceName(),
+				changes[j].GetReferenceName(),
+			) < 0
+		})
+
+		referenceTransactions = append(referenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
+			Changes: changes,
+		})
 	}
 
-	// If there were objects packed that should be committed, link the pack to the new
-	// replacement object directory.
-	if tx.packPrefix != "" {
-		for _, fileExtension := range []string{".pack", ".idx", ".rev"} {
-			if err := os.Link(
-				filepath.Join(tx.stagingDirectory, "objects"+fileExtension),
-				filepath.Join(newObjectsDir, "pack", tx.packPrefix+fileExtension),
-			); err != nil {
-				return fmt.Errorf("link to synthesized object directory: %w", err)
-			}
-		}
-	}
-
-	// If there was an alternate link set by the transaction, place it also in the replacement
-	// object directory.
-	if tx.alternateUpdated {
-		if err := os.Link(
-			filepath.Join(objectsDir, "info", "alternates"),
-			filepath.Join(newObjectsDir, "info", "alternates"),
-		); err != nil {
-			return fmt.Errorf("link alternate: %w", err)
-		}
-	}
-
-	// Remove the old object directory from the snapshot repository and replace it with the
-	// object directory that only contains verified data.
-	if err := os.RemoveAll(objectsDir); err != nil {
-		return fmt.Errorf("remove objects directory: %w", err)
-	}
-
-	if err := os.Rename(newObjectsDir, objectsDir); err != nil {
-		return fmt.Errorf("rename replacement directory in place: %w", err)
-	}
-
-	return nil
+	return referenceTransactions
 }
 
 // stageRepositoryCreation determines the repository's state following a creation. It reads the repository's
@@ -1361,16 +1270,6 @@ func (mgr *TransactionManager) stageRepositoryCreation(ctx context.Context, tran
 	}
 
 	transaction.referenceUpdates = []git.ReferenceUpdates{referenceUpdates}
-
-	var customHooks bytes.Buffer
-	if err := repoutil.GetCustomHooks(ctx, mgr.logger,
-		filepath.Join(mgr.storagePath, transaction.snapshotRepository.GetRelativePath()), &customHooks); err != nil {
-		return fmt.Errorf("get custom hooks: %w", err)
-	}
-
-	if customHooks.Len() > 0 {
-		transaction.MarkCustomHooksUpdated()
-	}
 
 	if _, err := gitstorage.ReadAlternatesFile(mgr.getAbsolutePath(transaction.snapshotRepository.GetRelativePath())); err != nil {
 		if !errors.Is(err, gitstorage.ErrNoAlternate) {
@@ -1483,47 +1382,12 @@ func (mgr *TransactionManager) packObjects(ctx context.Context, transaction *Tra
 	span, ctx := tracing.StartSpanIfHasParent(ctx, "transaction.packObjects", nil)
 	defer span.Finish()
 
-	quarantineOnlySnapshotRepository := transaction.snapshotRepository
-	if transaction.snapshotRepository.GetGitObjectDirectory() != "" {
-		// We want to only pack the objects that are present in the quarantine as they are potentially
-		// new. Disable the alternate, which is the repository's original object directory, so that we'll
-		// only walk the objects in the quarantine directory below.
-		var err error
-		quarantineOnlySnapshotRepository, err = transaction.snapshotRepository.QuarantineOnly()
-		if err != nil {
-			return fmt.Errorf("quarantine only: %w", err)
-		}
-	} else {
-		// If this transaction is creating a repository, the repository is not configured with a quarantine.
-		// The objects in the repository's object directory are the new objects. The repository's actual
-		// object directory may contain an `objects/info/alternates` file pointing to an alternate. We don't
-		// want to include the objects in the alternate in the packfile given they should already be present
-		// in the alternate. In order to only walk the new objects, we disable the alternate by renaming
-		// the alternates file so Git doesn't recognize the file, and restore it after we're done walking the
-		// objects. We have an issue tracking an option to disasble the alternate through configuration in Git.
-		//
-		// Issue: https://gitlab.com/gitlab-org/git/-/issues/177
-		repoPath, err := quarantineOnlySnapshotRepository.Path(ctx)
-		if err != nil {
-			return fmt.Errorf("repo path: %w", err)
-		}
-
-		originalAlternatesPath := stats.AlternatesFilePath(repoPath)
-		disabledAlternatesPath := originalAlternatesPath + ".disabled"
-		if err := os.Rename(originalAlternatesPath, disabledAlternatesPath); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("disable alternates: %w", err)
-			}
-
-			// There was no alternates file.
-		} else {
-			// If the alternates file existed, we'll restore it back in its place after packing the objects.
-			defer func() {
-				if err := os.Rename(disabledAlternatesPath, originalAlternatesPath); err != nil && returnedErr == nil {
-					returnedErr = fmt.Errorf("restore alternates: %w", err)
-				}
-			}()
-		}
+	// We want to only pack the objects that are present in the quarantine as they are potentially
+	// new. Disable the alternate, which is the repository's original object directory, so that we'll
+	// only walk the objects in the quarantine directory below.
+	quarantineOnlySnapshotRepository, err := transaction.snapshotRepository.QuarantineOnly()
+	if err != nil {
+		return fmt.Errorf("quarantine only: %w", err)
 	}
 
 	objectHash, err := quarantineOnlySnapshotRepository.ObjectHash(ctx)
@@ -2265,10 +2129,6 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("does repository exist: %w", err)
 		}
 
-		logEntry := &gitalypb.LogEntry{
-			RelativePath: transaction.relativePath,
-		}
-
 		if transaction.repositoryCreation != nil && repositoryExists {
 			return ErrRepositoryAlreadyExists
 		} else if transaction.repositoryCreation == nil && !repositoryExists {
@@ -2318,41 +2178,8 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 		}
 
 		if transaction.repositoryCreation == nil && transaction.runHousekeeping == nil {
-			logEntry.ReferenceTransactions, err = mgr.verifyReferences(ctx, transaction)
-			if err != nil {
+			if err := mgr.verifyReferences(ctx, transaction); err != nil {
 				return fmt.Errorf("verify references: %w", err)
-			}
-		}
-
-		if transaction.customHooksUpdated {
-			// Log a deletion of the existing custom hooks so they are removed before the
-			// new ones are put in place.
-			if err := storage.RecordDirectoryRemoval(
-				transaction.FS(),
-				mgr.storagePath,
-				filepath.Join(transaction.relativePath, repoutil.CustomHooksDir),
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record custom hook removal: %w", err)
-			}
-		}
-
-		if transaction.deleteRepository {
-			if len(transaction.walEntry.Operations()) != 0 {
-				return errRepositoryDeletionOtherOperations
-			}
-
-			logEntry.RepositoryDeletion = &gitalypb.LogEntry_RepositoryDeletion{}
-
-			if err := storage.RecordDirectoryRemoval(
-				transaction.FS(),
-				mgr.storagePath,
-				transaction.relativePath,
-			); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("record repository removal: %w", err)
-			}
-
-			if err := transaction.KV().Delete(relativePathKey(transaction.relativePath)); err != nil {
-				return fmt.Errorf("delete relative path: %w", err)
 			}
 		}
 
@@ -2361,7 +2188,7 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			if err != nil {
 				return fmt.Errorf("verifying pack refs: %w", err)
 			}
-			logEntry.Housekeeping = housekeepingEntry
+			transaction.manifest.Housekeeping = housekeepingEntry
 		}
 
 		if err := mgr.verifyKeyValueOperations(ctx, transaction); err != nil {
@@ -2373,9 +2200,9 @@ func (mgr *TransactionManager) processTransaction(ctx context.Context) (returned
 			return fmt.Errorf("verify file system operations: %w", err)
 		}
 
-		logEntry.Operations = transaction.walEntry.Operations()
+		transaction.manifest.Operations = transaction.walEntry.Operations()
 
-		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, logEntry, transaction.walFilesPath()); err != nil {
+		if err := mgr.appendLogEntry(ctx, transaction.objectDependencies, transaction.manifest, transaction.walFilesPath()); err != nil {
 			return fmt.Errorf("append log entry: %w", err)
 		}
 
@@ -2751,65 +2578,43 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 // verifyReferences verifies that the references in the transaction apply on top of the already accepted
 // reference changes. The old tips in the transaction are verified against the current actual tips.
 // It returns the write-ahead log entry for the reference transactions successfully verified.
-func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction *Transaction) ([]*gitalypb.LogEntry_ReferenceTransaction, error) {
+func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction *Transaction) error {
 	defer trace.StartRegion(ctx, "verifyReferences").End()
 
 	if len(transaction.referenceUpdates) == 0 {
-		return nil, nil
+		return nil
 	}
 	if !transaction.repositoryTarget() {
-		return nil, errRelativePathNotSet
+		return errRelativePathNotSet
 	}
 
 	span, _ := tracing.StartSpanIfHasParent(ctx, "transaction.verifyReferences", nil)
 	defer span.Finish()
-
-	var referenceTransactions []*gitalypb.LogEntry_ReferenceTransaction
-	for _, updates := range transaction.referenceUpdates {
-		changes := make([]*gitalypb.LogEntry_ReferenceTransaction_Change, 0, len(updates))
-		for reference, update := range updates {
-			changes = append(changes, &gitalypb.LogEntry_ReferenceTransaction_Change{
-				ReferenceName: []byte(reference),
-				NewOid:        []byte(update.NewOID),
-				NewTarget:     []byte(update.NewTarget),
-			})
-		}
-
-		// Sort the reference updates so the reference changes are always logged in a deterministic order.
-		sort.Slice(changes, func(i, j int) bool {
-			return bytes.Compare(
-				changes[i].GetReferenceName(),
-				changes[j].GetReferenceName(),
-			) == -1
-		})
-
-		referenceTransactions = append(referenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
-			Changes: changes,
-		})
-	}
 
 	// Apply quarantine to the staging repository in order to ensure the new objects are available when we
 	// are verifying references. Without it we'd encounter errors about missing objects as the new objects
 	// are not in the repository.
 	stagingRepositoryWithQuarantine, err := transaction.stagingRepository.Quarantine(ctx, transaction.quarantineDirectory)
 	if err != nil {
-		return nil, fmt.Errorf("quarantine: %w", err)
+		return fmt.Errorf("quarantine: %w", err)
 	}
 
 	// For the reftable backend, we also need to capture HEAD updates here.
 	// So obtain the reference backend to do the specific checks.
 	refBackend, err := stagingRepositoryWithQuarantine.ReferenceBackend(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("reference backend: %w", err)
+		return fmt.Errorf("reference backend: %w", err)
 	}
 
-	if refBackend == git.ReferenceBackendReftables {
-		if err := mgr.verifyReferencesWithGitForReftables(ctx, referenceTransactions, transaction, stagingRepositoryWithQuarantine); err != nil {
-			return nil, fmt.Errorf("verify references with git: %w", err)
-		}
+	if refBackend != git.ReferenceBackendReftables {
+		return nil
 	}
 
-	return referenceTransactions, nil
+	if err := mgr.verifyReferencesWithGitForReftables(ctx, transaction.manifest.GetReferenceTransactions(), transaction, stagingRepositoryWithQuarantine); err != nil {
+		return fmt.Errorf("verify references with git: %w", err)
+	}
+
+	return nil
 }
 
 // verifyReferencesWithGitForReftables is responsible for converting the logical reference updates

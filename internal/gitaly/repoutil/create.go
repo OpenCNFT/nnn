@@ -9,12 +9,15 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/trace"
 	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/featureflag"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/catfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
+	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
@@ -297,7 +300,59 @@ func Create(
 
 	repoCounter.Increment(repository)
 
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		// Git allows writing unreachable objects into the repository that are missing their dependencies. The reachable
+		// ones are checked through connectivity checks but unreachable ones are not.
+		//
+		// Transactions rely on a property that all objects in the repository have all of their dependencies met. This allows
+		// us to skip full connectivity checks, and simply check that the immediate dependencies of the newly written objects
+		// are satisfied. Repository creations are used in various contexts and not all of them guarantee this property. Perform
+		// a full repack to drop all unreachable objects. This way we're certain all of the objects committed through a repository
+		// creation have their dependencies satisified. Ideally we would only perform a connectivity check of the new objects,
+		// and record the dependencies that must exist in the repository already. Repository creations should generally include
+		// all objects so the rewriting should not be needed. Issue: https://gitlab.com/gitlab-org/gitaly/-/issues/5969
+		if err := performFullRepack(ctx, localrepo.New(logger, locator, gitCmdFactory, catfileCache, &gitalypb.Repository{
+			StorageName:  repository.GetStorageName(),
+			RelativePath: repository.GetRelativePath(),
+		})); err != nil {
+			return fmt.Errorf("perform full repack: %w", err)
+		}
+
+		originalRelativePath, err := filepath.Rel(tx.FS().Root(), targetPath)
+		if err != nil {
+			return fmt.Errorf("original relative path: %w", err)
+		}
+
+		if err := storage.RecordDirectoryCreation(tx.FS(), originalRelativePath); err != nil {
+			return fmt.Errorf("record directory creation: %w", err)
+		}
+
+		if err := tx.KV().Set(storage.RepositoryKey(originalRelativePath), nil); err != nil {
+			return fmt.Errorf("store repository key: %w", err)
+		}
+	}
+
 	// We unlock the repository implicitly via the deferred `Close()` call.
+	return nil
+}
+
+// performFullRepack performs a full repack and drops all unreachable objects.
+func performFullRepack(ctx context.Context, repo *localrepo.Repo) (returnedErr error) {
+	defer trace.StartRegion(ctx, "packObjects").End()
+
+	if err := housekeeping.PerformRepack(ctx, repo,
+		housekeepingcfg.RepackObjectsConfig{},
+		// Do a full repack. By using `-a` instead of `-A` we will immediately discard unreachable
+		// objects instead of exploding them into loose objects.
+		gitcmd.Flag{Name: "-a"},
+		// Don't include objects part of alternate.
+		gitcmd.Flag{Name: "-l"},
+		// Delete loose objects made redundant by this repack and redundant packfiles.
+		gitcmd.Flag{Name: "-d"},
+	); err != nil {
+		return fmt.Errorf("perform repack: %w", err)
+	}
+
 	return nil
 }
 

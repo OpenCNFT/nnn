@@ -110,6 +110,24 @@ func SetCustomHooks(
 		return fmt.Errorf("getting repo path: %w", err)
 	}
 
+	var originalCustomHooksRelativePath string
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		originalRelativePath, err := filepath.Rel(tx.FS().Root(), repoPath)
+		if err != nil {
+			return fmt.Errorf("original relative path: %w", err)
+		}
+
+		originalCustomHooksRelativePath = filepath.Join(originalRelativePath, CustomHooksDir)
+
+		// Log a deletion of the existing custom hooks so they are removed before the
+		// new ones are put in place.
+		if err := storage.RecordDirectoryRemoval(
+			tx.FS(), tx.FS().Root(), originalCustomHooksRelativePath,
+		); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("record custom hook removal: %w", err)
+		}
+	}
+
 	// The `custom_hooks` directory in the repository is locked to prevent
 	// concurrent modification of hooks.
 	hooksLock, err := safe.NewLockingDirectory(repoPath, CustomHooksDir)
@@ -212,6 +230,14 @@ func SetCustomHooks(
 	// `custom_hooks` directory.
 	if err := voteCustomHooks(ctx, txManager, committedVote, voting.Committed); err != nil {
 		return fmt.Errorf("casting committed vote: %w", err)
+	}
+
+	if tx := storage.ExtractTransaction(ctx); tx != nil {
+		if err := storage.RecordDirectoryCreation(
+			tx.FS(), originalCustomHooksRelativePath,
+		); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("record custom hook creation: %w", err)
+		}
 	}
 
 	return nil

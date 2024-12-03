@@ -1222,24 +1222,26 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				}
 
 				if step.CustomHooksUpdate != nil {
-					transaction.MarkCustomHooksUpdated()
-					if step.CustomHooksUpdate.CustomHooksTAR != nil {
-						require.NoError(t, repoutil.SetCustomHooks(
-							ctx,
-							logger,
-							config.NewLocator(setup.Config),
-							nil,
-							bytes.NewReader(step.CustomHooksUpdate.CustomHooksTAR),
-							rewrittenRepo,
-						))
-					} else {
-						rewrittenPath, err := rewrittenRepo.Path(ctx)
-						require.NoError(t, err)
-						require.NoError(t, os.RemoveAll(filepath.Join(rewrittenPath, repoutil.CustomHooksDir)))
-					}
+					require.NoError(t, repoutil.SetCustomHooks(
+						storage.ContextWithTransaction(ctx, transaction),
+						logger,
+						config.NewLocator(setup.Config),
+						nil,
+						bytes.NewReader(step.CustomHooksUpdate.CustomHooksTAR),
+						rewrittenRepo,
+					))
 				}
 
 				if step.DeleteRepository {
+					require.NoError(t, repoutil.Remove(
+						storage.ContextWithTransaction(ctx, transaction),
+						logger,
+						config.NewLocator(setup.Config),
+						nil,
+						counter.NewRepositoryCounter(setup.Config.Storages),
+						rewrittenRepo,
+					))
+
 					transaction.DeleteRepository()
 				}
 
@@ -1356,7 +1358,7 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 			locator := config.NewLocator(setup.Config)
 
 			require.NoError(t, repoutil.Create(
-				ctx,
+				storage.ContextWithTransaction(ctx, transaction),
 				logger,
 				locator,
 				setup.CommandFactory,
@@ -1385,17 +1387,22 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						)
 					}
 
+					if step.Alternate != "" {
+						repoPath, err := repo.Path(ctx)
+						require.NoError(t, err)
+
+						alternatesPath := stats.AlternatesFilePath(repoPath)
+						require.NoError(t, os.WriteFile(alternatesPath, []byte(step.Alternate), fs.ModePerm))
+					}
+
 					return nil
 				},
 				repoutil.WithObjectHash(setup.ObjectHash),
 			))
 
 			if step.Alternate != "" {
-				repoPath, err := locator.GetRepoPath(ctx, rewrittenRepository)
+				repoPath, err := setup.RepositoryFactory.Build(rewrittenRepository).Path(ctx)
 				require.NoError(t, err)
-
-				alternatesPath := stats.AlternatesFilePath(repoPath)
-				require.NoError(t, os.WriteFile(alternatesPath, []byte(step.Alternate), fs.ModePerm))
 
 				alternates, err := stats.ReadAlternatesFile(repoPath)
 				require.NoError(t, err)
@@ -1562,6 +1569,7 @@ func checkManagerError(t *testing.T, ctx context.Context, managerErrChannel chan
 		referenceUpdates: []git.ReferenceUpdates{{"sentinel": {}}},
 		result:           make(chan error, 1),
 		finish:           func(bool) error { return nil },
+		manifest:         &gitalypb.LogEntry{},
 	}
 
 	var (

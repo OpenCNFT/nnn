@@ -123,15 +123,3 @@ func TestFromRepo_failures(t *testing.T) {
 		})
 	}
 }
-
-func TestRemove(t *testing.T) {
-	t.Parallel()
-
-	ctx := testhelper.Context(t)
-
-	_, pool, _ := setupObjectPool(t, ctx)
-
-	require.True(t, pool.Exists(ctx))
-	require.NoError(t, pool.Remove(ctx))
-	require.False(t, pool.Exists(ctx))
-}

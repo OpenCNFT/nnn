@@ -51,9 +51,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -139,9 +139,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -218,12 +218,12 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 						),
 						Packfiles: &PackfilesState{
 							PooledObjects: []git.ObjectID{
+								setup.ObjectHash.EmptyTreeOID,
 								setup.Commits.First.OID,
 							},
 							Packfiles: []*PackfileState{
 								{
 									Objects: []git.ObjectID{
-										setup.ObjectHash.EmptyTreeOID,
 										setup.Commits.Second.OID,
 									},
 									HasReverseIndex: true,
@@ -277,9 +277,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -382,9 +382,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -534,9 +534,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(4).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(4).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -704,9 +704,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                          storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("alternate-1")): string(""),
-					"kv/" + string(relativePathKey("alternate-2")): string(""),
+					string(keyAppliedLSN):                                storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("alternate-1")): string(""),
+					"kv/" + string(storage.RepositoryKey("alternate-2")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"alternate-1": {
@@ -770,10 +770,10 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                          storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("member")):      string(""),
-					"kv/" + string(relativePathKey("alternate-1")): string(""),
-					"kv/" + string(relativePathKey("alternate-2")): string(""),
+					string(keyAppliedLSN):                                storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("member")):      string(""),
+					"kv/" + string(storage.RepositoryKey("alternate-1")): string(""),
+					"kv/" + string(storage.RepositoryKey("alternate-2")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"member": {
@@ -853,9 +853,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -916,9 +916,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -979,9 +979,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1022,8 +1022,8 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                         storage.LSN(1).ToProto(),
-					"kv/" + string(relativePathKey("repository")): string(""),
+					string(keyAppliedLSN):                               storage.LSN(1).ToProto(),
+					"kv/" + string(storage.RepositoryKey("repository")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"repository": {
@@ -1081,9 +1081,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1158,9 +1158,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1238,9 +1238,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1297,9 +1297,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1428,9 +1428,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(3).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1605,9 +1605,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -1831,11 +1831,11 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                           storage.LSN(4).ToProto(),
-					"kv/" + string(relativePathKey("repository-1")): string(""),
-					"kv/" + string(relativePathKey("repository-2")): string(""),
-					"kv/" + string(relativePathKey("repository-3")): string(""),
-					"kv/" + string(relativePathKey("repository-4")): string(""),
+					string(keyAppliedLSN): storage.LSN(4).ToProto(),
+					"kv/" + string(storage.RepositoryKey("repository-1")): string(""),
+					"kv/" + string(storage.RepositoryKey("repository-2")): string(""),
+					"kv/" + string(storage.RepositoryKey("repository-3")): string(""),
+					"kv/" + string(storage.RepositoryKey("repository-4")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"repository-1": {
@@ -2066,9 +2066,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {
@@ -2278,9 +2278,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                     storage.LSN(2).ToProto(),
-					"kv/" + string(relativePathKey("pool")):   string(""),
-					"kv/" + string(relativePathKey("member")): string(""),
+					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
+					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
+					"kv/" + string(storage.RepositoryKey("member")): string(""),
 				},
 				Repositories: RepositoryStates{
 					"pool": {

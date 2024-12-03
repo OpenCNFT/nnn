@@ -110,9 +110,6 @@ type Transaction interface {
 	IncludeObject(git.ObjectID)
 	// DeleteRepository deletes the repository when the transaction is committed.
 	DeleteRepository()
-	// MarkCustomHooksUpdated marks that the custom hooks have been updated. This is
-	// necessary for the changes to custom hooks to be committed.
-	MarkCustomHooksUpdated()
 	// MarkAlternateUpdated marks that the 'objects/info/alternates' file has been updated or removed.
 	// This is necessary for changes to be committed.
 	MarkAlternateUpdated()
