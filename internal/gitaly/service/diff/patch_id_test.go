@@ -18,7 +18,7 @@ import (
 func TestGetPatchID(t *testing.T) {
 	t.Parallel()
 
-	testhelper.NewFeatureSets(featureflag.VerbatimPatchId).Run(t, testGetPatchID)
+	testhelper.NewFeatureSets(featureflag.VerbatimPatchID).Run(t, testGetPatchID)
 }
 
 func testGetPatchID(t *testing.T, ctx context.Context) {
@@ -658,7 +658,7 @@ func testGetPatchID(t *testing.T, ctx context.Context) {
 		},
 	}
 
-	if featureflag.VerbatimPatchId.IsEnabled(ctx) {
+	if featureflag.VerbatimPatchID.IsEnabled(ctx) {
 		for _, tc := range testCases {
 			t.Run(tc.desc, func(t *testing.T) {
 				t.Parallel()

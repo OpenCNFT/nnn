@@ -49,7 +49,7 @@ func (s *server) GetPatchID(ctx context.Context, in *gitalypb.GetPatchIDRequest)
 	var patchIDStderr strings.Builder
 
 	var patchIDType string
-	if featureflag.VerbatimPatchId.IsEnabled(ctx) {
+	if featureflag.VerbatimPatchID.IsEnabled(ctx) {
 		patchIDType = "--verbatim"
 	} else {
 		patchIDType = "--stable"
