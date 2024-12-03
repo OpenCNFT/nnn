@@ -2784,7 +2784,7 @@ func (mgr *TransactionManager) verifyReferences(ctx context.Context, transaction
 			return bytes.Compare(
 				changes[i].GetReferenceName(),
 				changes[j].GetReferenceName(),
-			) == -1
+			) < 0
 		})
 
 		referenceTransactions = append(referenceTransactions, &gitalypb.LogEntry_ReferenceTransaction{
