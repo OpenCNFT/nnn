@@ -400,8 +400,15 @@ func TestMigrationManager_Concurrent(t *testing.T) {
 type mockPartition struct {
 	storagemgr.Partition
 	beginFn func(context.Context, storage.BeginOptions) (storage.Transaction, error)
+	closeFn func()
 }
 
 func (m mockPartition) Begin(ctx context.Context, opts storage.BeginOptions) (storage.Transaction, error) {
 	return m.beginFn(ctx, opts)
+}
+
+func (m mockPartition) Close() {
+	if m.closeFn != nil {
+		m.closeFn()
+	}
 }
