@@ -191,7 +191,7 @@ func testGetPatchID(t *testing.T, ctx context.Context) {
 							case "sha1":
 								return "f0cecc652860f8dd490cefad3c6e5ab451192acf"
 							case "sha256":
-								return "32f6beb9a210ac89a3e15e44dcd174c87c904e9d"
+								return "860a2112006def90fbb900226d2424bc6e004a61"
 							default:
 								require.FailNow(t, "unsupported object hash")
 								return ""
@@ -232,7 +232,7 @@ func testGetPatchID(t *testing.T, ctx context.Context) {
 							case "sha1":
 								return "77171d407829b8297287a7252916269e19573bbb"
 							case "sha256":
-								return "10443cf318b577ea41526825ba034aaaedfeaa4b"
+								return "722dd7c167e4e96c3ff109f7bb52f4436acc544a"
 							default:
 								require.FailNow(t, "unsupported object hash")
 								return ""
