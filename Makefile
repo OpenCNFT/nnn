@@ -136,7 +136,7 @@ GIT_VERSION ?=
 # GIT_VERSION_x_xx defines versions for each instance of bundled Git we ship. When a new
 # major version is added, be sure to update GIT_PACKED_EXECUTABLES, the *-bundled-git targets,
 # and add new targets under the "# These targets build specific releases of Git." section.
-GIT_VERSION_2_47 ?= v2.47.0
+GIT_VERSION_2_47 ?= v2.47.1
 #
 # OVERRIDE_GIT_VERSION allows you to specify a custom semver value to be reported by the
 # `git --version` command. This affects bundled and non-bundled Git, and can be used whenever
