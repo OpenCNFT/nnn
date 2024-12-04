@@ -754,28 +754,14 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 				Commit{
 					TransactionID:    3,
 					DeleteRepository: true,
-					ExpectedError:    gittest.FilesOrReftables[error](fshistory.NotDirectoryError{Path: setup.RelativePath}, nil),
+					ExpectedError:    nil,
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(gittest.FilesOrReftables(2, 3)).ToProto(),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
-				Repositories: gittest.FilesOrReftables[RepositoryStates](
-					RepositoryStates{
-						setup.RelativePath: {
-							References: &ReferencesState{
-								FilesBackend: &FilesBackendState{
-									LooseReferences: map[git.ReferenceName]git.ObjectID{},
-									PackedReferences: map[git.ReferenceName]git.ObjectID{
-										"refs/heads/main": setup.Commits.First.OID,
-									},
-								},
-							},
-						},
-					},
-					RepositoryStates{},
-				),
+				Repositories: RepositoryStates{},
 			},
 		},
 		{
