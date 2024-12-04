@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
-	"testing/fstest"
 
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
@@ -277,91 +276,6 @@ func TestFS_recordingHelpers(t *testing.T) {
 			f := newMockFS(storageRoot)
 			tc.run(t, f)
 			require.Equal(t, tc.expectedOperations, f.operations)
-		})
-	}
-}
-
-func TestRecordAlternateUnlink(t *testing.T) {
-	t.Parallel()
-
-	createSourceHierarchy := func(tb testing.TB, path string) {
-		testhelper.CreateFS(tb, path, fstest.MapFS{
-			".":                      {Mode: mode.Directory},
-			"objects":                {Mode: mode.Directory},
-			"objects/info":           {Mode: mode.Directory},
-			"objects/3f":             {Mode: mode.Directory},
-			"objects/3f/1":           {Mode: mode.File},
-			"objects/3f/2":           {Mode: mode.File},
-			"objects/4f":             {Mode: mode.Directory},
-			"objects/4f/3":           {Mode: mode.File},
-			"objects/pack":           {Mode: mode.Directory},
-			"objects/pack/pack.pack": {Mode: mode.File},
-			"objects/pack/pack.idx":  {Mode: mode.File},
-		})
-	}
-
-	for _, tc := range []struct {
-		desc               string
-		createTarget       func(tb testing.TB, path string)
-		expectedOperations operations
-	}{
-		{
-			desc: "empty target",
-			createTarget: func(tb testing.TB, path string) {
-				require.NoError(tb, os.Mkdir(path, mode.Directory))
-				require.NoError(tb, os.Mkdir(filepath.Join(path, "objects"), mode.Directory))
-				require.NoError(tb, os.Mkdir(filepath.Join(path, "objects/pack"), mode.Directory))
-			},
-			expectedOperations: operations{
-				recordDirectory{path: "target/objects/3f"},
-				recordLink{sourcePath: "source/objects/3f/1", destinationPath: "target/objects/3f/1"},
-				recordLink{sourcePath: "source/objects/3f/2", destinationPath: "target/objects/3f/2"},
-				recordDirectory{path: "target/objects/4f"},
-				recordLink{sourcePath: "source/objects/4f/3", destinationPath: "target/objects/4f/3"},
-				recordLink{sourcePath: "source/objects/pack/pack.idx", destinationPath: "target/objects/pack/pack.idx"},
-				recordLink{sourcePath: "source/objects/pack/pack.pack", destinationPath: "target/objects/pack/pack.pack"},
-				recordRemoval{path: "target/objects/info/alternates"},
-			},
-		},
-		{
-			desc: "target with some existing state",
-			createTarget: func(tb testing.TB, path string) {
-				testhelper.CreateFS(tb, path, fstest.MapFS{
-					".":                     {Mode: mode.Directory},
-					"objects":               {Mode: mode.Directory},
-					"objects/3f":            {Mode: mode.Directory},
-					"objects/3f/1":          {Mode: mode.File},
-					"objects/4f":            {Mode: mode.Directory},
-					"objects/4f/3":          {Mode: mode.File},
-					"objects/pack":          {Mode: mode.Directory},
-					"objects/pack/pack.idx": {Mode: mode.File},
-				})
-			},
-			expectedOperations: operations{
-				recordLink{sourcePath: "source/objects/3f/2", destinationPath: "target/objects/3f/2"},
-				recordLink{sourcePath: "source/objects/pack/pack.pack", destinationPath: "target/objects/pack/pack.pack"},
-				recordRemoval{path: "target/objects/info/alternates"},
-			},
-		},
-		{
-			desc:         "target with fully matching object state",
-			createTarget: createSourceHierarchy,
-			expectedOperations: operations{
-				recordRemoval{path: "target/objects/info/alternates"},
-			},
-		},
-	} {
-		t.Run(tc.desc, func(t *testing.T) {
-			t.Parallel()
-
-			storageRoot := t.TempDir()
-			createSourceHierarchy(t, filepath.Join(storageRoot, "source"))
-
-			tc.createTarget(t, filepath.Join(storageRoot, "target"))
-
-			fs := newMockFS(storageRoot)
-			require.NoError(t, RecordAlternateUnlink(fs, fs.Root(), "target", "../../source/objects"))
-			require.Equal(t, tc.expectedOperations, fs.operations)
 		})
 	}
 }

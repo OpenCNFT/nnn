@@ -2532,10 +2532,6 @@ func (mgr *TransactionManager) verifyAlternateUpdate(ctx context.Context, transa
 			return "", gitstorage.ErrNoAlternate
 		}
 
-		if err := storage.RecordAlternateUnlink(transaction.FS(), mgr.storagePath, transaction.relativePath, existingAlternate); err != nil {
-			return "", fmt.Errorf("record alternate unlink: %w", err)
-		}
-
 		return "", nil
 	}
 
