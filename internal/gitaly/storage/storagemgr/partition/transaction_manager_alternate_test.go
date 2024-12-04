@@ -43,7 +43,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -127,7 +127,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 					Packs:         [][]byte{setup.Commits.Second.Pack},
 					References: map[git.ReferenceName]git.ObjectID{
 						"refs/heads/new-branch": setup.Commits.Second.OID,
@@ -272,7 +272,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID:   3,
-					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
+					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
 				},
 			},
 			expectedState: StateAssertion{
@@ -365,7 +365,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -491,7 +491,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -641,154 +641,6 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 		},
 		{
-			desc: "repository's alternate must be pointed to a git repository",
-			steps: steps{
-				RemoveRepository{},
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{"repository"},
-				},
-				CreateRepository{
-					TransactionID: 1,
-					Alternate:     "../..",
-				},
-				Commit{
-					TransactionID: 1,
-					ExpectedError: storage.InvalidGitDirectoryError{MissingEntry: "objects"},
-				},
-			},
-			expectedState: StateAssertion{
-				Repositories: RepositoryStates{},
-			},
-		},
-		{
-			desc: "repository can't be connected to multiple alternates on creation",
-			steps: steps{
-				RemoveRepository{},
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{"alternate-1"},
-				},
-				CreateRepository{
-					TransactionID: 1,
-				},
-				Commit{
-					TransactionID: 1,
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{"alternate-2"},
-					ExpectedSnapshotLSN: 1,
-				},
-				CreateRepository{
-					TransactionID: 2,
-				},
-				Commit{
-					TransactionID: 2,
-				},
-				Begin{
-					TransactionID:       3,
-					RelativePaths:       []string{"repository", "alternate-1", "alternate-2"},
-					ExpectedSnapshotLSN: 2,
-				},
-				CreateRepository{
-					TransactionID: 3,
-					Alternate:     "../../alternate-1/objects\n../../alternate-2/objects\n",
-				},
-				Commit{
-					TransactionID: 3,
-					ExpectedError: gitstorage.ErrMultipleAlternates,
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN):                                storage.LSN(2).ToProto(),
-					"kv/" + string(storage.RepositoryKey("alternate-1")): string(""),
-					"kv/" + string(storage.RepositoryKey("alternate-2")): string(""),
-				},
-				Repositories: RepositoryStates{
-					"alternate-1": {
-						Objects: []git.ObjectID{},
-					},
-					"alternate-2": {
-						Objects: []git.ObjectID{},
-					},
-				},
-			},
-		},
-		{
-			desc: "repository can't be connected to multiple alternates after creation",
-			steps: steps{
-				RemoveRepository{},
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{"alternate-1"},
-				},
-				CreateRepository{
-					TransactionID: 1,
-				},
-				Commit{
-					TransactionID: 1,
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{"alternate-2"},
-					ExpectedSnapshotLSN: 1,
-				},
-				CreateRepository{
-					TransactionID: 2,
-				},
-				Commit{
-					TransactionID: 2,
-				},
-				Begin{
-					TransactionID:       3,
-					RelativePaths:       []string{"member"},
-					ExpectedSnapshotLSN: 2,
-				},
-				CreateRepository{
-					TransactionID: 3,
-				},
-				Commit{
-					TransactionID: 3,
-				},
-				Begin{
-					TransactionID:       4,
-					RelativePaths:       []string{"member", "alternate-1", "alternate-2"},
-					ExpectedSnapshotLSN: 3,
-				},
-				Commit{
-					TransactionID: 4,
-					UpdateAlternate: &alternateUpdate{
-						content: "../../alternate-1/objects\n../../alternate-2/objects\n",
-					},
-					ExpectedError: gitstorage.ErrMultipleAlternates,
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN):                                storage.LSN(3).ToProto(),
-					"kv/" + string(storage.RepositoryKey("member")):      string(""),
-					"kv/" + string(storage.RepositoryKey("alternate-1")): string(""),
-					"kv/" + string(storage.RepositoryKey("alternate-2")): string(""),
-				},
-				Repositories: RepositoryStates{
-					"member": {
-						Objects: []git.ObjectID{},
-					},
-					"alternate-1": {
-						Objects: []git.ObjectID{},
-					},
-					"alternate-2": {
-						Objects: []git.ObjectID{},
-					},
-				},
-			},
-		},
-		{
 			desc: "repository's alternate must not point to repository itself",
 			steps: steps{
 				RemoveRepository{},
@@ -799,7 +651,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 1,
-					Alternate:     "../objects",
+					Alternate:     "repository",
 				},
 				Commit{
 					TransactionID: 1,
@@ -832,7 +684,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -844,7 +696,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 3,
-					Alternate:     "../../member/objects",
+					Alternate:     "member",
 				},
 				Commit{
 					TransactionID: 3,
@@ -901,7 +753,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID:   3,
-					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
+					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
 				},
 				Begin{
 					TransactionID:       4,
@@ -910,7 +762,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID:   4,
-					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
+					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
 					ExpectedError:   errAlternateAlreadyLinked,
 				},
 			},
@@ -969,11 +821,11 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID:   3,
-					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
+					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
 				},
 				Commit{
 					TransactionID:   4,
-					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
+					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
 					ExpectedError:   errAlternateAlreadyLinked,
 				},
 			},
@@ -1053,7 +905,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1147,7 +999,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				Commit{
 					TransactionID:   3,
-					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
+					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
 					ExpectedError:   storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
@@ -1194,7 +1046,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1277,7 +1129,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1407,7 +1259,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1539,7 +1391,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1703,7 +1555,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 					TransactionID: 3,
 					// Set repository-2 as repository-3's alternate to assert the
 					// snasphotted repositories' alternates are also included.
-					Alternate: "../../repository-2/objects",
+					Alternate: "repository-2",
 				},
 				Commit{
 					TransactionID: 3,
@@ -1968,7 +1820,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 						setup.Commits.First.Pack,
 						setup.Commits.Second.Pack,
 					},
-					Alternate: "../../pool/objects",
+					Alternate: "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -2180,7 +2032,7 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 						setup.Commits.First.Pack,
 						setup.Commits.Second.Pack,
 					},
-					Alternate: "../../pool/objects",
+					Alternate: "pool",
 				},
 				Commit{
 					TransactionID: 2,
