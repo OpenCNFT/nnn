@@ -15,7 +15,6 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
@@ -1096,7 +1095,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1659,7 +1658,7 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -1915,10 +1914,11 @@ func generateHousekeepingPackRefsTests(t *testing.T, ctx context.Context, testPa
 				},
 				Commit{
 					TransactionID: 1,
-					ExpectedError: conflict.ErrRepositoryConcurrentlyDeleted,
+					ExpectedError: errConflictRepositoryDeletion,
 				},
 				AssertMetrics{histogramMetric("gitaly_housekeeping_tasks_latency"): {
 					"housekeeping_task=total,stage=prepare":     1,
+					"housekeeping_task=total,stage=verify":      1,
 					"housekeeping_task=pack-refs,stage=prepare": 1,
 				}},
 			},
@@ -4877,7 +4877,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -5098,7 +5098,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -5267,7 +5267,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
@@ -5493,7 +5493,7 @@ func generateHousekeepingRepackingConcurrentTests(t *testing.T, ctx context.Cont
 				},
 				CreateRepository{
 					TransactionID: 2,
-					Alternate:     "../../pool/objects",
+					Alternate:     "pool",
 				},
 				Commit{
 					TransactionID: 2,
