@@ -1017,12 +1017,11 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   2,
 					UpdateAlternate: &alternateUpdate{},
-					ExpectedError:   gitstorage.ErrNoAlternate,
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN):                               storage.LSN(1).ToProto(),
+					string(keyAppliedLSN):                               storage.LSN(2).ToProto(),
 					"kv/" + string(storage.RepositoryKey("repository")): string(""),
 				},
 				Repositories: RepositoryStates{

@@ -26,6 +26,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/localrepo"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/git/objectpool"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/packfile"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/stats"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/updateref"
@@ -1166,22 +1167,20 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 				)
 
 				if step.UpdateAlternate != nil {
-					transaction.MarkAlternateUpdated()
-
-					repoPath, err := rewrittenRepo.Path(ctx)
-					require.NoError(t, err)
-
-					alternatesFilePath := stats.AlternatesFilePath(repoPath)
-
-					// Ignore not exists errors as there are test cases testing removing alternate
-					// when one is not set. Additionally, if the alternate was updated, we want to
-					// remove the file first and write a new file as all files in the storage are
-					// read-only.
-					if err := os.Remove(alternatesFilePath); !errors.Is(err, fs.ErrNotExist) {
-						require.NoError(t, err)
-					}
+					require.NoError(t, objectpool.Disconnect(
+						storage.ContextWithTransaction(ctx, transaction),
+						transaction.FS(),
+						rewrittenRepo,
+						logger,
+						nil,
+					))
 
 					if step.UpdateAlternate.content != "" {
+						transaction.MarkAlternateUpdated()
+
+						repoPath, err := rewrittenRepo.Path(ctx)
+						require.NoError(t, err)
+
 						require.NoError(t, os.WriteFile(stats.AlternatesFilePath(repoPath), []byte(step.UpdateAlternate.content), fs.ModePerm))
 
 						alternates, err := stats.ReadAlternatesFile(repoPath)
