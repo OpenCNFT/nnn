@@ -1,6 +1,6 @@
 package featureflag
 
-// VerbatimPatchID disables the use of --verbatim option for patch-id call
+// VerbatimPatchID enables the use of --verbatim option so that whitespaces would not be stripped when generating a patch-id.
 var VerbatimPatchID = NewFeatureFlag(
 	"verbatim_patch_id",
 	"v17.7.0",
