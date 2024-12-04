@@ -10,8 +10,8 @@ import (
 	housekeepingcfg "gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
-	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/gitstorage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/mode"
+	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr/partition/conflict/fshistory"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
 )
 
@@ -641,149 +641,6 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 			},
 		},
 		{
-			desc: "repository's alternate must not point to repository itself",
-			steps: steps{
-				RemoveRepository{},
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{"repository", "pool"},
-				},
-				CreateRepository{
-					TransactionID: 1,
-					Alternate:     "repository",
-				},
-				Commit{
-					TransactionID: 1,
-					ExpectedError: storage.ErrAlternatePointsToSelf,
-				},
-			},
-			expectedState: StateAssertion{
-				Repositories: RepositoryStates{},
-			},
-		},
-		{
-			desc: "repository's alternate can't have an alternate itself",
-			steps: steps{
-				RemoveRepository{},
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{"pool"},
-				},
-				CreateRepository{
-					TransactionID: 1,
-				},
-				Commit{
-					TransactionID: 1,
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{"member", "pool"},
-					ExpectedSnapshotLSN: 1,
-				},
-				CreateRepository{
-					TransactionID: 2,
-					Alternate:     "pool",
-				},
-				Commit{
-					TransactionID: 2,
-				},
-				Begin{
-					TransactionID:       3,
-					RelativePaths:       []string{"recursive-member", "member"},
-					ExpectedSnapshotLSN: 2,
-				},
-				CreateRepository{
-					TransactionID: 3,
-					Alternate:     "member",
-				},
-				Commit{
-					TransactionID: 3,
-					ExpectedError: storage.ErrAlternateHasAlternate,
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN):                           storage.LSN(2).ToProto(),
-					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
-					"kv/" + string(storage.RepositoryKey("member")): string(""),
-				},
-				Repositories: RepositoryStates{
-					"pool": {
-						Objects: []git.ObjectID{},
-					},
-					"member": {
-						Objects:   []git.ObjectID{},
-						Alternate: "../../pool/objects",
-					},
-				},
-			},
-		},
-		{
-			desc: "repository can't be linked multiple times",
-			steps: steps{
-				RemoveRepository{},
-				StartManager{},
-				Begin{
-					TransactionID: 1,
-					RelativePaths: []string{"pool"},
-				},
-				CreateRepository{
-					TransactionID: 1,
-				},
-				Commit{
-					TransactionID: 1,
-				},
-				Begin{
-					TransactionID:       2,
-					RelativePaths:       []string{"member"},
-					ExpectedSnapshotLSN: 1,
-				},
-				CreateRepository{
-					TransactionID: 2,
-				},
-				Commit{
-					TransactionID: 2,
-				},
-				Begin{
-					TransactionID:       3,
-					RelativePaths:       []string{"member", "pool"},
-					ExpectedSnapshotLSN: 2,
-				},
-				Commit{
-					TransactionID:   3,
-					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
-				},
-				Begin{
-					TransactionID:       4,
-					RelativePaths:       []string{"member", "pool"},
-					ExpectedSnapshotLSN: 3,
-				},
-				Commit{
-					TransactionID:   4,
-					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
-					ExpectedError:   errAlternateAlreadyLinked,
-				},
-			},
-			expectedState: StateAssertion{
-				Database: DatabaseState{
-					string(keyAppliedLSN):                           storage.LSN(3).ToProto(),
-					"kv/" + string(storage.RepositoryKey("pool")):   string(""),
-					"kv/" + string(storage.RepositoryKey("member")): string(""),
-				},
-				Repositories: RepositoryStates{
-					"pool": {
-						Objects: []git.ObjectID{},
-					},
-					"member": {
-						Objects:   []git.ObjectID{},
-						Alternate: "../../pool/objects",
-					},
-				},
-			},
-		},
-		{
 			desc: "repository can't be linked concurrently multiple times",
 			steps: steps{
 				RemoveRepository{},
@@ -826,7 +683,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   4,
 					UpdateAlternate: &alternateUpdate{RelativePath: "pool"},
-					ExpectedError:   errAlternateAlreadyLinked,
+					ExpectedError: fshistory.NewReadWriteConflictError(
+						filepath.Join("member", "objects", "info", "alternates"), 2, 3,
+					),
 				},
 			},
 			expectedState: StateAssertion{
@@ -927,7 +786,9 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   4,
 					UpdateAlternate: &alternateUpdate{},
-					ExpectedError:   gitstorage.ErrNoAlternate,
+					ExpectedError: fshistory.NewReadWriteConflictError(
+						filepath.Join("member", "objects", "info", "alternates"), 2, 3,
+					),
 				},
 			},
 			expectedState: StateAssertion{
