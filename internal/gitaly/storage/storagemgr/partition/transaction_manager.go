@@ -1154,7 +1154,12 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 		// began. Repository creations record the entire state of the repository at the end
 		// of the transaction so ReferenceRecorder is not used. ReferenceRecorder is not used
 		// with reftables.
-		if transaction.referenceRecorder != nil {
+		//
+		// We only stage the packed-refs file if reference transactions were recorded or
+		// this was a housekeeping run. This prevents a duplicate removal being staged
+		// after a repository removal operation as the removal would look like a modification
+		// to the recorder.
+		if transaction.referenceRecorder != nil && (len(transaction.referenceUpdates) > 0 || transaction.runHousekeeping != nil) {
 			if err := transaction.referenceRecorder.StagePackedRefs(); err != nil {
 				return fmt.Errorf("stage packed refs: %w", err)
 			}

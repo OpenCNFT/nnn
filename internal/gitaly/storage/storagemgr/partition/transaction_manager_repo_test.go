@@ -730,25 +730,36 @@ func generateDeleteRepositoryTests(t *testing.T, setup testTransactionSetup) []t
 					RelativePaths: []string{setup.RelativePath},
 				},
 				Commit{
-					TransactionID:    1,
-					DeleteRepository: true,
+					TransactionID: 1,
+					ReferenceUpdates: git.ReferenceUpdates{
+						"refs/heads/main": {OldOID: setup.ObjectHash.ZeroOID, NewOID: setup.Commits.First.OID},
+					},
 				},
 				Begin{
 					TransactionID:       2,
 					RelativePaths:       []string{setup.RelativePath},
 					ExpectedSnapshotLSN: 1,
 				},
-				RepositoryAssertion{
+				RunPackRefs{
 					TransactionID: 2,
-					Repositories:  RepositoryStates{},
 				},
-				Rollback{
+				Commit{
 					TransactionID: 2,
+				},
+				Begin{
+					TransactionID:       3,
+					RelativePaths:       []string{setup.RelativePath},
+					ExpectedSnapshotLSN: 2,
+				},
+				Commit{
+					TransactionID:    3,
+					DeleteRepository: true,
+					ExpectedError:    nil,
 				},
 			},
 			expectedState: StateAssertion{
 				Database: DatabaseState{
-					string(keyAppliedLSN): storage.LSN(1).ToProto(),
+					string(keyAppliedLSN): storage.LSN(3).ToProto(),
 				},
 				Repositories: RepositoryStates{},
 			},
