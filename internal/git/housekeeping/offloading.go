@@ -3,9 +3,14 @@ package housekeeping
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	gs "cloud.google.com/go/storage"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
@@ -145,3 +150,85 @@ func PerformRepackingForOffloading(ctx context.Context, repo *localrepo.Repo, fi
 
 	return nil
 }
+
+// UploadToOffloadingStorage uploads all files under fromPath to the offloading storage, i.e. bucket with
+// toPrefix
+// 1. Move to temp folder
+// 2. all upload success, mv from tmp to real
+// 3. we need a process to cleanup the tmp folder, files are older than X days
+// file are put into a channel, workers take files from chanel, and upload to storage
+// error channel is used to address error in worker
+// Some logic is binded to GCP feature, genearalzation is considered in futeure iteration if
+// the feature is proofed to be of value.
+func UploadToOffloadingStorage(ctx context.Context, fromPath, bucket, toPrefix string) error {
+	client, err := gs.NewClient(ctx)
+
+	// check no objects with the prefix, depend on rehydration cleanup
+	// use _UPLOAD_COMPLETE_ as a marker for upload complete, simulate atomicity
+	// if error, delete what have been uploaded to keep best effort
+	// worst case, not _UPLOAD_COMPLETE_, async housekeep should delete all the file in this folder
+
+	if err != nil {
+		return err
+	}
+
+	bucketClient := client.Bucket(bucket)
+
+	fileToUpload := make([]string, 0)
+	err = filepath.Walk(fromPath, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			fileToUpload = append(fileToUpload, path)
+		}
+
+		return nil
+	})
+
+	for _, path := range fileToUpload {
+		if err := uploadObject(ctx, bucketClient, path, toPrefix); err != nil {
+			return err
+		}
+	}
+
+	err = client.Close()
+
+	return err
+}
+
+func DownloadAndRemoveFromOffloadStorage(fromPrefix string, toPath string) error {
+	return nil
+}
+
+func uploadObject(ctx context.Context, bucketClient *gs.BucketHandle, path string, bucketPrefix string) error {
+
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open file: %v", err)
+	}
+	fmt.Println("opening file " + path)
+	objectPath := fmt.Sprintf("%s/%s", bucketPrefix, filepath.Base(path))
+
+	wc := bucketClient.Object(objectPath).NewWriter(ctx)
+
+	n, err := io.Copy(wc, file)
+	fmt.Println("copying file bytes " + strconv.FormatInt(n, 10))
+	if err != nil {
+		return fmt.Errorf("io.Copy: %v", err)
+	}
+
+	if err := wc.Close(); err != nil {
+		return fmt.Errorf("Writer.Close: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("File.Close: %v", err)
+	}
+
+	return err
+}
+
+// We shoudl have retry here
+// func doDelete()
+
+// check Empty on prefix/ folder
