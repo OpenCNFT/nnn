@@ -71,6 +71,15 @@ func Link(ctx context.Context, pool, repo *localrepo.Repo, txManager transaction
 
 	if tx := storage.ExtractTransaction(ctx); tx != nil {
 		tx.MarkAlternateUpdated()
+
+		alternatesRelativePath, err := filepath.Rel(tx.FS().Root(), altPath)
+		if err != nil {
+			return fmt.Errorf("rel alternates file: %w", err)
+		}
+
+		if err := tx.FS().RecordFile(alternatesRelativePath); err != nil {
+			return fmt.Errorf("record alternates file")
+		}
 	}
 
 	return removeMemberBitmaps(ctx, pool, repo)

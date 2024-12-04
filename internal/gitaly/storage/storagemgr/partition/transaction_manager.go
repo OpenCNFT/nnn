@@ -1118,25 +1118,6 @@ func (mgr *TransactionManager) commit(ctx context.Context, transaction *Transact
 			return fmt.Errorf("preparing housekeeping: %w", err)
 		}
 
-		if transaction.alternateUpdated {
-			stagedAlternatesRelativePath := stats.AlternatesFilePath(transaction.relativePath)
-			stagedAlternatesAbsolutePath := mgr.getAbsolutePath(transaction.snapshot.RelativePath(stagedAlternatesRelativePath))
-			if _, err := os.Stat(stagedAlternatesAbsolutePath); err != nil {
-				if !errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("check alternates existence: %w", err)
-				}
-
-				// Alternates file did not exist, nothing to stage. This was an unlink operation.
-			} else {
-				if err := transaction.walEntry.CreateFile(
-					stagedAlternatesAbsolutePath,
-					stagedAlternatesRelativePath,
-				); err != nil && !errors.Is(err, fs.ErrNotExist) {
-					return fmt.Errorf("record alternates update: %w", err)
-				}
-			}
-		}
-
 		// If there were objects packed that should be committed, record the packfile's creation.
 		if transaction.packPrefix != "" {
 			packDir := filepath.Join(transaction.relativePath, "objects", "pack")

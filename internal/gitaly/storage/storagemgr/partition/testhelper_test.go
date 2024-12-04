@@ -1176,25 +1176,15 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 					))
 
 					if step.UpdateAlternate.RelativePath != "" {
-						transaction.MarkAlternateUpdated()
-
-						repoPath, err := rewrittenRepo.Path(ctx)
-						require.NoError(t, err)
-
-						alternatesContent, err := filepath.Rel(
-							filepath.Join(transaction.FS().Root(), transaction.relativePath, "objects"),
-							filepath.Join(transaction.FS().Root(), step.UpdateAlternate.RelativePath, "objects"),
-						)
-						require.NoError(t, err)
-
-						require.NoError(t, os.WriteFile(stats.AlternatesFilePath(repoPath), []byte(alternatesContent), fs.ModePerm))
-
-						alternates, err := stats.ReadAlternatesFile(repoPath)
-						require.NoError(t, err)
-
-						for _, alternate := range alternates {
-							require.DirExists(t, filepath.Join(repoPath, "objects", alternate), "alternate must be pointed to a repository: %q", alternate)
-						}
+						require.NoError(t, objectpool.Link(
+							storage.ContextWithTransaction(ctx, transaction),
+							setup.RepositoryFactory.Build(transaction.RewriteRepository(&gitalypb.Repository{
+								StorageName:  setup.Config.Storages[0].Name,
+								RelativePath: step.UpdateAlternate.RelativePath,
+							})),
+							rewrittenRepo,
+							nil,
+						))
 					}
 				}
 
