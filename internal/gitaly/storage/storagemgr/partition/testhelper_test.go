@@ -826,9 +826,9 @@ type DefaultBranchUpdate struct {
 
 // alternateUpdate models an update to the repository's alternates file.
 type alternateUpdate struct {
-	// content is the content to write in the 'objects/info/alternates' file. If empty, the file
-	// is removed instead.
-	content string
+	// RelativePath is the relative path of the pool to link the target repository
+	// via an alternate.
+	RelativePath string
 }
 
 // Commit calls Commit on a transaction.
@@ -1175,13 +1175,19 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						nil,
 					))
 
-					if step.UpdateAlternate.content != "" {
+					if step.UpdateAlternate.RelativePath != "" {
 						transaction.MarkAlternateUpdated()
 
 						repoPath, err := rewrittenRepo.Path(ctx)
 						require.NoError(t, err)
 
-						require.NoError(t, os.WriteFile(stats.AlternatesFilePath(repoPath), []byte(step.UpdateAlternate.content), fs.ModePerm))
+						alternatesContent, err := filepath.Rel(
+							filepath.Join(transaction.FS().Root(), transaction.relativePath, "objects"),
+							filepath.Join(transaction.FS().Root(), step.UpdateAlternate.RelativePath, "objects"),
+						)
+						require.NoError(t, err)
+
+						require.NoError(t, os.WriteFile(stats.AlternatesFilePath(repoPath), []byte(alternatesContent), fs.ModePerm))
 
 						alternates, err := stats.ReadAlternatesFile(repoPath)
 						require.NoError(t, err)
@@ -1391,25 +1397,20 @@ func runTransactionTest(t *testing.T, ctx context.Context, tc transactionTestCas
 						require.NoError(t, err)
 
 						alternatesPath := stats.AlternatesFilePath(repoPath)
-						require.NoError(t, os.WriteFile(alternatesPath, []byte(step.Alternate), fs.ModePerm))
+
+						alternatesContent, err := filepath.Rel(
+							filepath.Join(transaction.FS().Root(), transaction.relativePath, "objects"),
+							filepath.Join(transaction.FS().Root(), step.Alternate, "objects"),
+						)
+						require.NoError(t, err)
+
+						require.NoError(t, os.WriteFile(alternatesPath, []byte(alternatesContent), fs.ModePerm))
 					}
 
 					return nil
 				},
 				repoutil.WithObjectHash(setup.ObjectHash),
 			))
-
-			if step.Alternate != "" {
-				repoPath, err := setup.RepositoryFactory.Build(rewrittenRepository).Path(ctx)
-				require.NoError(t, err)
-
-				alternates, err := stats.ReadAlternatesFile(repoPath)
-				require.NoError(t, err)
-
-				for _, alternate := range alternates {
-					require.DirExists(t, filepath.Join(repoPath, "objects", alternate), "alternate must be pointed to a repository: %q", alternate)
-				}
-			}
 		case RunPackRefs:
 			require.Contains(t, openTransactions, step.TransactionID, "test error: pack-refs housekeeping task aborted on committed before beginning it")
 
