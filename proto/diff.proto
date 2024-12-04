@@ -68,7 +68,6 @@ service DiffService {
   // VerbatimPatchID feature flag can be switched on to enable --verbatim mode to not strip whitespace changes
   // before generating a patch ID. Whitespace changes can affect the underlying functionality of the code
   // depending on the language used so it's preferable to default to that option.
-
   rpc GetPatchID(GetPatchIDRequest) returns (GetPatchIDResponse) {
     option (op_type) = {
       op: ACCESSOR

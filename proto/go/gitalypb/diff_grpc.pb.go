@@ -58,6 +58,13 @@ type DiffServiceClient interface {
 	DiffStats(ctx context.Context, in *DiffStatsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DiffStatsResponse], error)
 	// FindChangedPaths returns a list of files changed along with the status of each file
 	FindChangedPaths(ctx context.Context, in *FindChangedPathsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FindChangedPathsResponse], error)
+	// GetPatchID computes a patch ID for a patch. Patch IDs are a unique ID computed by hashing
+	// a patch with some parameters like line numbers ignored. The patch ID can thus be used to compare
+	// whether diffs make the same change. Please refer to git-patch-id(1) for further information.
+	// If the difference between old and new change is empty then this RPC returns an error.
+	// VerbatimPatchID feature flag can be switched on to enable --verbatim mode to not strip whitespace changes
+	// before generating a patch ID. Whitespace changes can affect the underlying functionality of the code
+	// depending on the language used so it's preferable to default to that option.
 	GetPatchID(ctx context.Context, in *GetPatchIDRequest, opts ...grpc.CallOption) (*GetPatchIDResponse, error)
 	// RawRangeDiff outputs the raw range diff data for a given range specification.
 	RawRangeDiff(ctx context.Context, in *RawRangeDiffRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RawRangeDiffResponse], error)
@@ -284,6 +291,13 @@ type DiffServiceServer interface {
 	DiffStats(*DiffStatsRequest, grpc.ServerStreamingServer[DiffStatsResponse]) error
 	// FindChangedPaths returns a list of files changed along with the status of each file
 	FindChangedPaths(*FindChangedPathsRequest, grpc.ServerStreamingServer[FindChangedPathsResponse]) error
+	// GetPatchID computes a patch ID for a patch. Patch IDs are a unique ID computed by hashing
+	// a patch with some parameters like line numbers ignored. The patch ID can thus be used to compare
+	// whether diffs make the same change. Please refer to git-patch-id(1) for further information.
+	// If the difference between old and new change is empty then this RPC returns an error.
+	// VerbatimPatchID feature flag can be switched on to enable --verbatim mode to not strip whitespace changes
+	// before generating a patch ID. Whitespace changes can affect the underlying functionality of the code
+	// depending on the language used so it's preferable to default to that option.
 	GetPatchID(context.Context, *GetPatchIDRequest) (*GetPatchIDResponse, error)
 	// RawRangeDiff outputs the raw range diff data for a given range specification.
 	RawRangeDiff(*RawRangeDiffRequest, grpc.ServerStreamingServer[RawRangeDiffResponse]) error
