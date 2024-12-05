@@ -1,6 +1,7 @@
 package smarthttp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -33,7 +34,7 @@ func (s *server) InfoRefsUploadPack(in *gitalypb.InfoRefsRequest, stream gitalyp
 	}
 
 	w := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.InfoRefsResponse{Data: p})
+		return stream.Send(&gitalypb.InfoRefsResponse{Data: bytes.Clone(p)})
 	})
 
 	return s.infoRefCache.tryCache(stream.Context(), in, w, func(w io.Writer) error {

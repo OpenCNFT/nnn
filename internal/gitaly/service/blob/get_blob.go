@@ -1,6 +1,7 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -70,7 +71,7 @@ func (s *server) GetBlob(in *gitalypb.GetBlobRequest, stream gitalypb.BlobServic
 			msg = firstMessage
 			firstMessage = nil
 		}
-		msg.Data = p
+		msg.Data = bytes.Clone(p)
 		return stream.Send(msg)
 	})
 

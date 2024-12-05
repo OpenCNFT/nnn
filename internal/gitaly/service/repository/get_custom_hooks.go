@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"fmt"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/repoutil"
@@ -20,7 +21,7 @@ func (s *server) GetCustomHooks(in *gitalypb.GetCustomHooksRequest, stream gital
 	}
 
 	writer := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.GetCustomHooksResponse{Data: p})
+		return stream.Send(&gitalypb.GetCustomHooksResponse{Data: bytes.Clone(p)})
 	})
 
 	repoPath, err := s.locator.GetRepoPath(ctx, in.GetRepository())

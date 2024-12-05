@@ -49,7 +49,7 @@ func sendFastExportChunked(
 	stream gitalypb.RepositoryService_FastExportServer,
 ) error {
 	sw := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.FastExportResponse{Data: p})
+		return stream.Send(&gitalypb.FastExportResponse{Data: bytes.Clone(p)})
 	})
 
 	for {

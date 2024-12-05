@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -113,7 +114,7 @@ func sendTreeEntry(
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
-		response.Data = p
+		response.Data = bytes.Clone(p)
 
 		if err := stream.Send(response); err != nil {
 			return structerr.NewAborted("send: %w", err)

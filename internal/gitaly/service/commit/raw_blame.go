@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -37,7 +38,7 @@ func (s *server) RawBlame(in *gitalypb.RawBlameRequest, stream gitalypb.CommitSe
 	}
 
 	sw := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.RawBlameResponse{Data: p})
+		return stream.Send(&gitalypb.RawBlameResponse{Data: bytes.Clone(p)})
 	})
 
 	repo := s.localrepo(in.GetRepository())

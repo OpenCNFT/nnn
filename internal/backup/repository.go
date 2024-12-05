@@ -449,7 +449,7 @@ func (rr *remoteRepository) FetchBundle(ctx context.Context, reader io.Reader, u
 	}
 	request := &gitalypb.FetchBundleRequest{Repository: rr.repo, UpdateHead: updateHead}
 	bundle := streamio.NewWriter(func(p []byte) error {
-		request.Data = p
+		request.Data = bytes.Clone(p)
 		if err := stream.Send(request); err != nil {
 			return err
 		}

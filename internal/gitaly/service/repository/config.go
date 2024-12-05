@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -38,7 +39,7 @@ func (s *server) GetConfig(
 
 	writer := streamio.NewWriter(func(p []byte) error {
 		return stream.Send(&gitalypb.GetConfigResponse{
-			Data: p,
+			Data: bytes.Clone(p),
 		})
 	})
 

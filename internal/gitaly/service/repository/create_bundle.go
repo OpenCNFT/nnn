@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"bytes"
+
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/structerr"
 	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
@@ -22,7 +24,7 @@ func (s *server) CreateBundle(req *gitalypb.CreateBundleRequest, stream gitalypb
 	}
 
 	writer := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.CreateBundleResponse{Data: p})
+		return stream.Send(&gitalypb.CreateBundleResponse{Data: bytes.Clone(p)})
 	})
 
 	if err := repo.CreateBundle(ctx, writer, nil); err != nil {

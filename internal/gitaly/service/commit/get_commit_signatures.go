@@ -104,7 +104,7 @@ func sendResponse(
 	}
 
 	streamWriter := streamio.NewWriter(func(p []byte) error {
-		return stream.Send(&gitalypb.GetCommitSignaturesResponse{SignedText: p})
+		return stream.Send(&gitalypb.GetCommitSignaturesResponse{SignedText: bytes.Clone(p)})
 	})
 
 	msgReader := bytes.NewReader(commit.SignatureData.Payload)
