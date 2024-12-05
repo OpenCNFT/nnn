@@ -569,7 +569,7 @@ func TestReadTree(t *testing.T) {
 			// We get a NotExist error here because it's invalid to suffix an object ID
 			// which resolves to a blob with a colon (":") given that it's not possible
 			// to resolve a subpath.
-			expectedErr: git.ErrReferenceNotFound,
+			expectedErr: structerr.NewInvalidArgument("reference not found"),
 		},
 		{
 			desc:    "valid revision with invalid path",
@@ -577,7 +577,7 @@ func TestReadTree(t *testing.T) {
 			options: []ReadTreeOption{
 				WithRelativePath("does-not-exist"),
 			},
-			expectedErr: git.ErrReferenceNotFound,
+			expectedErr: structerr.NewInvalidArgument("reference not found"),
 		},
 		{
 			desc:    "valid revision with path pointing to blob",
@@ -590,7 +590,7 @@ func TestReadTree(t *testing.T) {
 		{
 			desc:        "listing nonexistent object fails",
 			treeish:     "does-not-exist",
-			expectedErr: git.ErrReferenceNotFound,
+			expectedErr: structerr.NewInvalidArgument("reference not found"),
 		},
 		{
 			desc:    "path to submodule",
@@ -606,7 +606,7 @@ func TestReadTree(t *testing.T) {
 			options: []ReadTreeOption{
 				WithRelativePath("submodule/foo"),
 			},
-			expectedErr: git.ErrReferenceNotFound,
+			expectedErr: structerr.NewInvalidArgument("reference not found"),
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {

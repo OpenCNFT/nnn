@@ -30,12 +30,12 @@ func (s *server) ListConflictFiles(request *gitalypb.ListConflictFilesRequest, s
 
 	ours, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.GetOurCommitOid()+"^{commit}"))
 	if err != nil {
-		return structerr.NewFailedPrecondition("could not lookup 'our' OID: %w", err)
+		return structerr.NewInvalidArgument("could not lookup 'our' OID: %w", err)
 	}
 
 	theirs, err := quarantineRepo.ResolveRevision(ctx, git.Revision(request.GetTheirCommitOid()+"^{commit}"))
 	if err != nil {
-		return structerr.NewFailedPrecondition("could not lookup 'their' OID: %w", err)
+		return structerr.NewInvalidArgument("could not lookup 'their' OID: %w", err)
 	}
 
 	return s.conflictFilesWithGitMergeTree(ctx, request, stream, ours, theirs, quarantineRepo)
