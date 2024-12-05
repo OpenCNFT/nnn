@@ -276,6 +276,13 @@ func testServerPostUploadPackWithSidechannelUsesPackObjectsHook(t *testing.T, ct
 }
 
 func testServerPostUploadPackUsesPackObjectsHook(t *testing.T, ctx context.Context, makeRequest requestMaker, opts ...testcfg.Option) {
+	if testhelper.IsWALEnabled() {
+		// When WAL is enabled, we use ForceWALSyncWriteRef to ensure that any pending changes are applied.
+		// The workaround writes a reference into the repository, but since we are using a custom
+		// pack-objects hook, it would abort the ref updates.
+		t.Skip("Skipping test as we are using a custom pack-objects hook and ref updates are aborted by the hook.")
+	}
+
 	cfg := testcfg.Build(t, append(opts, testcfg.WithPackObjectsCacheEnabled())...)
 
 	outputPath := filepath.Join(cfg.BinDir, "output")

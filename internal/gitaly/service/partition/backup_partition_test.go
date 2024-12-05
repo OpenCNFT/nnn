@@ -123,7 +123,9 @@ func TestBackupPartition(t *testing.T) {
 			require.NoError(t, err)
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
-			lsn := storage.LSN(1)
+			// In gittest.CreateRepository, if WAL is enabled we use ForceWALSyncWriteRef workaround to ensure
+			// that any pending changes are applied. Since the workaround is a write request the LSN will be 2.
+			lsn := storage.LSN(2)
 			relativeBackupPath := filepath.Join("partition-backups", data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tarPath := filepath.Join(backupRoot, relativeBackupPath)
 			tar, err := os.Open(tarPath)
@@ -174,7 +176,9 @@ func TestBackupPartition(t *testing.T) {
 			require.NoError(t, err)
 			testhelper.ProtoEqual(t, &gitalypb.BackupPartitionResponse{}, resp)
 
-			lsn = storage.LSN(2)
+			// In gittest.CreateRepository, if WAL is enabled we use ForceWALSyncWriteRef workaround to ensure
+			// that any pending changes are applied. Since the workaround is a write request the LSN will be 3.
+			lsn = storage.LSN(3)
 			relativeBackupPath2 := filepath.Join("partition-backups", data.storageName, data.partitionID, lsn.String()) + ".tar"
 			tarPath = filepath.Join(backupRoot, relativeBackupPath2)
 			tar2, err := os.Open(tarPath)

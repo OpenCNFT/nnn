@@ -61,12 +61,31 @@ func TestRetryPolicy(t *testing.T) {
 		return nil
 	}
 
+	request := 0
+	failSecondRequest := func() error {
+		request++
+		// only reject the second request
+		if request == 2 {
+			return retryableError
+		}
+
+		return nil
+	}
+
 	// Configure a mock service that rejects only the first RPC call with retryable status code `UNAVAILABLE`.
 	// If retries are configured correctly, a subsequent retry attempt would succeed.
 	cfg.SocketPath = testserver.RunGitalyServer(t, cfg, func(srv *grpc.Server, deps *service.Dependencies) {
 		gitalypb.RegisterRepositoryServiceServer(srv, &mockRepositoryService{
 			writeRef: func(ctx context.Context, req *gitalypb.WriteRefRequest) (*gitalypb.WriteRefResponse, error) {
-				if err := failFirstRequest(); err != nil {
+				if testhelper.IsWALEnabled() {
+					if err := failSecondRequest(); err != nil {
+						return nil, err
+					} else if err := failFirstRequest(); err != nil {
+						// We are ignoring the first request as it's coming from gittest.CreateRepository due
+						// to the ForceWALSyncWriteRef workaround.
+						return nil, nil
+					}
+				} else if err := failFirstRequest(); err != nil {
 					return nil, err
 				}
 

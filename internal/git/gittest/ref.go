@@ -1,6 +1,9 @@
 package gittest
 
 import (
+	"context"
+	"errors"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +12,7 @@ import (
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/config"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/helper/text"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/testhelper"
+	"gitlab.com/gitlab-org/gitaly/v16/proto/go/gitalypb"
 )
 
 // WriteRef writes a reference into the repository pointing to the given object ID.
@@ -58,4 +62,44 @@ func GetSymbolicRef(tb testing.TB, cfg config.Cfg, repoPath string, refname git.
 	require.NoError(tb, err)
 
 	return symref
+}
+
+// ResolveRevisionAPI resolves the revision to an object ID using the CommitService.
+func ResolveRevisionAPI(t *testing.T, ctx context.Context, commitClient gitalypb.CommitServiceClient, repo *gitalypb.Repository, revision string) (git.ObjectID, error) {
+	t.Helper()
+	resp, err := commitClient.FindCommit(ctx, &gitalypb.FindCommitRequest{
+		Repository: repo,
+		Revision:   []byte(revision),
+	})
+	if err != nil {
+		return git.ObjectID(""), err
+	}
+	return git.ObjectID(resp.GetCommit().GetId()), nil
+}
+
+// GetReferencesAPI returns references in the Git repository using the RefService.
+func GetReferencesAPI(t *testing.T, ctx context.Context, client gitalypb.RefServiceClient, repo *gitalypb.Repository, patterns [][]byte) []git.Reference {
+	t.Helper()
+
+	stream, err := client.ListRefs(ctx, &gitalypb.ListRefsRequest{
+		Repository: repo,
+		Patterns:   patterns,
+	})
+	require.NoError(t, err)
+
+	var refs []git.Reference
+	for {
+		r, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		for _, ref := range r.GetReferences() {
+			refs = append(refs, git.Reference{
+				Name:   git.ReferenceName(ref.GetName()),
+				Target: ref.GetTarget(),
+			})
+		}
+	}
+	return refs
 }

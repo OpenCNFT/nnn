@@ -1149,7 +1149,6 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   3,
 					UpdateAlternate: &alternateUpdate{content: "../../pool/objects"},
-					ExpectedError:   storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,
@@ -1229,7 +1228,6 @@ func generateAlternateTests(t *testing.T, setup testTransactionSetup) []transact
 				Commit{
 					TransactionID:   3,
 					UpdateAlternate: &alternateUpdate{},
-					ExpectedError:   storage.ErrTransactionProcessingStopped,
 				},
 				AssertManager{
 					ExpectedError: errSimulatedCrash,

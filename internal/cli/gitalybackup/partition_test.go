@@ -109,7 +109,9 @@ func TestPartitionSubcommand_Create(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			lsn := storage.LSN(1)
+			// In gittest.CreateRepository, if WAL is enabled we use ForceWALSyncWriteRef workaround to ensure
+			// that any pending changes are applied. Since the workaround is a write request the LSN will be 2.
+			lsn := storage.LSN(2)
 			tarPath := filepath.Join(path, "partition-backups", cfg.Storages[0].Name, "2", lsn.String()) + ".tar"
 			tar, err := os.Open(tarPath)
 			require.NoError(t, err)
