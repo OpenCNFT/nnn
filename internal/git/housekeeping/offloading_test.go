@@ -205,6 +205,28 @@ func TestPerformRepackingForOffloading(t *testing.T) {
 	})
 }
 
+func TestUploadToOffloadingStorage(t *testing.T) {
+	t.Parallel()
+	ctx := testhelper.Context(t)
+	//cfg := testcfg.Build(t)
+
+	tempDirFrom := testhelper.TempDir(t)
+	for i := 0; i < 10; i++ {
+		suffix := "success"
+		if i%2 == 0 {
+			suffix = "error"
+		}
+		err := os.WriteFile(filepath.Join(tempDirFrom, fmt.Sprintf("file-%d.%s", i, suffix)), []byte("content"), 0644)
+		require.NoError(t, err)
+	}
+
+	tempDirTo := testhelper.TempDir(t)
+
+	err := UploadToOffloadingStorage(ctx, tempDirFrom, "", tempDirTo)
+	require.NoError(t, err)
+
+}
+
 func setUpRepoForOffloading(t *testing.T, ctx context.Context, cfg config.Cfg) (
 	repo *localrepo.Repo,
 	commits []git.ObjectID,

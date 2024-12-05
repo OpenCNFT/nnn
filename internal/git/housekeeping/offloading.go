@@ -1,6 +1,7 @@
 package housekeeping
 
 import (
+	gs "cloud.google.com/go/storage"
 	"context"
 	"fmt"
 	"io"
@@ -9,8 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	gs "cloud.google.com/go/storage"
+	"sync"
+	"time"
 
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/gitcmd"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/git/housekeeping/config"
@@ -160,75 +161,171 @@ func PerformRepackingForOffloading(ctx context.Context, repo *localrepo.Repo, fi
 // error channel is used to address error in worker
 // Some logic is binded to GCP feature, genearalzation is considered in futeure iteration if
 // the feature is proofed to be of value.
-func UploadToOffloadingStorage(ctx context.Context, fromPath, bucket, toPrefix string) error {
-	client, err := gs.NewClient(ctx)
+func UploadToOffloadingStorage(ctx context.Context, client *gs.Client, fromPath, bucket, toPrefix string) error {
+	var err error
+	//client, err := gs.NewClient(ctx)
+	////filesUploaded := make([]string, 0)
+	//
+	////defer deleteObjects(bucket, filesUploaded)
+	//defer client.Close()
+	//if err != nil {
+	//	return fmt.Errorf("create gs client: %w", err)
+	//}
+	// TODO is the prefix empty?
+	bucketClient := client.Bucket(bucket)
+	if bucketClient == nil {
+		return fmt.Errorf("bucket client error")
+	}
 
 	// check no objects with the prefix, depend on rehydration cleanup
 	// use _UPLOAD_COMPLETE_ as a marker for upload complete, simulate atomicity
 	// if error, delete what have been uploaded to keep best effort
 	// worst case, not _UPLOAD_COMPLETE_, async housekeep should delete all the file in this folder
 
-	if err != nil {
-		return err
-	}
+	//filesUploadingCh := make(chan string)
+	//filesUploadingErrCh := make(chan error)
 
-	bucketClient := client.Bucket(bucket)
-
-	fileToUpload := make([]string, 0)
+	var filesToUpload []string
 	err = filepath.Walk(fromPath, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			fileToUpload = append(fileToUpload, path)
+			filesToUpload = append(filesToUpload, path)
 		}
-
 		return nil
 	})
-
-	for _, path := range fileToUpload {
-		if err := uploadObject(ctx, bucketClient, path, toPrefix); err != nil {
-			return err
-		}
+	if err != nil {
+		return fmt.Errorf("walk path %s: %w", fromPath, err)
 	}
 
-	err = client.Close()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	return err
+	errCh := make(chan error, 1)      // Use a buffered channel to ensure non-blocking writes
+	successCh := make(chan string, 1) // Record success info for rollback
+	// 3 pack files, each as has a go routine to upload
+
+	var wg sync.WaitGroup
+	for _, path := range filesToUpload {
+		wg.Add(1)
+		go uploadObject(ctx, bucketClient, path, toPrefix, errCh, successCh, &wg)
+	}
+
+	done := make(chan struct{})
+
+	var count int
+	var errorMsg string
+	var successMsg string
+
+	go func() {
+		for {
+			select {
+			case workerErr := <-errCh:
+				//fmt.Printf("Received error: %v. Cancelling other workers...\n", workerErr)
+				cancel()
+				errorMsg = errorMsg + " " + workerErr.Error()
+			case mgs := <-successCh:
+				count++
+				successMsg = successMsg + " " + mgs
+			case <-done:
+				fmt.Println("All workers completed")
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(done)
+
+	fmt.Println("Main: Exiting program")
+	//fmt.Printf(errorMsg)
+	//fmt.Printf(successMsg)
+
+	return nil
+
 }
 
-func DownloadAndRemoveFromOffloadStorage(fromPrefix string, toPath string) error {
+// TODO downloading
+//func DownloadAndRemoveFromOffloadStorage(fromPrefix string, toPath string) error {
+//	return nil
+//}
+
+// TODO cleanup all the fmt.print
+func uploadObject(ctx context.Context, bucketClient *gs.BucketHandle, path string, bucketPrefix string,
+	errCh chan error, sc chan string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	// Simulate random work duration
+	//workDuration := rand.Intn(2) + 1 // Random duration between 1-5 seconds
+	resCh := make(chan error)
+
+	// uploading logic
+	go func() {
+		defer close(resCh)
+		file, err := os.Open(path)
+		if err != nil {
+			resCh <- fmt.Errorf("open file: %v", err)
+			return
+		}
+		fmt.Println("opening file " + path)
+		objectPath := fmt.Sprintf("%s/%s", bucketPrefix, filepath.Base(path))
+
+		ctx, cancel := context.WithTimeout(ctx, time.Second*50)
+		defer cancel()
+
+		o := bucketClient.Object(objectPath)
+		// expect that there is no object with the same name exist
+		// prevent race condition
+		o = o.If(gs.Conditions{DoesNotExist: true})
+		wc := o.NewWriter(ctx)
+
+		n, err := io.Copy(wc, file)
+		fmt.Println("copying file bytes " + strconv.FormatInt(n, 10))
+		if err != nil {
+			resCh <- fmt.Errorf("io.Copy: %v", err)
+			return
+		}
+
+		if err := wc.Close(); err != nil {
+			resCh <- fmt.Errorf("Writer.Close: %v", err)
+			return
+		}
+		if err := file.Close(); err != nil {
+			resCh <- fmt.Errorf("File.Close: %v", err)
+			return
+		}
+		resCh <- nil
+	}()
+
+	select {
+	case err := <-resCh:
+		if err != nil {
+			errCh <- err
+		} else {
+			sc <- path
+		}
+
+	//case <-time.After(time.Duration(workDuration) * time.Second):
+	//	ext := filepath.Ext(path)
+	//	if ext == ".error" {
+	//		fmt.Printf("Worker %s encountered an error \n", path)
+	//		errCh <- fmt.Errorf("worker %s encountered an error", path)
+	//	} else {
+	//		fmt.Printf("Worker %s Completed successfully \n", path)
+	//		sc <- fmt.Sprintf("Worker %s: Completed successfully\n", path)
+	//		//fmt.Printf("Worker %s: Completed successfully\n", path)
+	//	}
+	case <-ctx.Done():
+		fmt.Printf("Worker %s: Aborted due to cancellation\n", path)
+	}
+}
+
+// TODO best effort delete, We should have retry here. If not able to clean,
+// we still have scavanger process
+// TODO need race condition
+func deleteObjects(bucket string, objects []string) error {
 	return nil
 }
-
-func uploadObject(ctx context.Context, bucketClient *gs.BucketHandle, path string, bucketPrefix string) error {
-
-	file, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("open file: %v", err)
-	}
-	fmt.Println("opening file " + path)
-	objectPath := fmt.Sprintf("%s/%s", bucketPrefix, filepath.Base(path))
-
-	wc := bucketClient.Object(objectPath).NewWriter(ctx)
-
-	n, err := io.Copy(wc, file)
-	fmt.Println("copying file bytes " + strconv.FormatInt(n, 10))
-	if err != nil {
-		return fmt.Errorf("io.Copy: %v", err)
-	}
-
-	if err := wc.Close(); err != nil {
-		return fmt.Errorf("Writer.Close: %v", err)
-	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("File.Close: %v", err)
-	}
-
-	return err
-}
-
-// We shoudl have retry here
-// func doDelete()
 
 // check Empty on prefix/ folder
