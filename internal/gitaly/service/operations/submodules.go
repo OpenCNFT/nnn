@@ -63,7 +63,7 @@ func (s *Server) UserUpdateSubmodule(ctx context.Context, req *gitalypb.UserUpda
 			return nil, structerr.NewInvalidArgument("invalid expected old object ID: %w", err).WithMetadata("old_object_id", expectedOldOID)
 		}
 
-		oldOID, err = quarantineRepo.ResolveRevision(ctx, git.Revision(fmt.Sprintf("%s^{object}", oldOID)))
+		oldOID, err = resolveRevision(ctx, quarantineRepo, oldOID, objectHash.ZeroOID)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("cannot resolve expected old object ID: %w", err).
 				WithMetadata("old_object_id", expectedOldOID)

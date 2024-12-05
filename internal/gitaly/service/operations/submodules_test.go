@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -708,6 +709,45 @@ func testUserUpdateSubmodule(t *testing.T, ctx context.Context) {
 				))
 				commitID := gittest.WriteCommit(t, cfg, subRepoPath, gittest.WithParents(subCommitID))
 
+				unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+				require.NoError(t, err)
+
+				return setupData{
+					request: &gitalypb.UserUpdateSubmoduleRequest{
+						Repository:     repoProto,
+						User:           gittest.TestUser,
+						CommitSha:      commitID.String(),
+						Branch:         []byte("master"),
+						Submodule:      []byte("sub"),
+						CommitMessage:  []byte("Updating Submodule: sub"),
+						ExpectedOldOid: unavailableOID.String(),
+					},
+					commitID: commitID.String(),
+					expectedErr: testhelper.WithInterceptedMetadata(
+						structerr.NewInvalidArgument(`cannot resolve expected old object ID: reference not found`),
+						"old_object_id", unavailableOID.String()),
+					verify: func(t *testing.T) {},
+				}
+			},
+		},
+		{
+			desc:    "failure due to expectedOldOID pointing to ZeroOID",
+			subPath: "sub",
+			branch:  "master",
+			setup: func(repoPath, subRepoPath string, repoProto, subRepoProto *gitalypb.Repository) setupData {
+				subCommitID := gittest.WriteCommit(t, cfg, subRepoPath)
+				gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("master"),
+					gittest.WithTreeEntries(
+						gittest.TreeEntry{
+							Mode:    "100644",
+							Path:    ".gitmodules",
+							Content: fmt.Sprintf(`[submodule %q]\n\tpath = %s\n\turl = file://%s`, "sub", "sub", subRepoPath),
+						},
+						gittest.TreeEntry{OID: subCommitID, Mode: "160000", Path: "sub"},
+					),
+				)
+				commitID := gittest.WriteCommit(t, cfg, subRepoPath, gittest.WithParents(subCommitID))
+
 				return setupData{
 					request: &gitalypb.UserUpdateSubmoduleRequest{
 						Repository:     repoProto,
@@ -718,11 +758,11 @@ func testUserUpdateSubmodule(t *testing.T, ctx context.Context) {
 						CommitMessage:  []byte("Updating Submodule: sub"),
 						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
 					},
+					requireResponse: equalResponse(&gitalypb.UserUpdateSubmoduleResponse{
+						CommitError: "Could not update refs/heads/master. Please refresh and try again.",
+					}),
 					commitID: commitID.String(),
-					expectedErr: testhelper.WithInterceptedMetadata(
-						structerr.NewInvalidArgument(`cannot resolve expected old object ID: reference not found`),
-						"old_object_id", gittest.DefaultObjectHash.ZeroOID.String()),
-					verify: func(t *testing.T) {},
+					verify:   func(t *testing.T) {},
 				}
 			},
 		},

@@ -177,6 +177,28 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 			desc:  "expectedOldOID not present in repo",
 			hooks: []string{},
 			setup: func(data setupData) setupResponse {
+				unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+				require.NoError(t, err)
+
+				return setupResponse{
+					firstRequest: &gitalypb.UserMergeBranchRequest{
+						Repository:     data.repoProto,
+						User:           gittest.TestUser,
+						CommitId:       data.commitToMerge,
+						Branch:         []byte(data.branch),
+						Message:        []byte(data.message),
+						ExpectedOldOid: unavailableOID.String(),
+					},
+					firstExpectedErr: testhelper.WithInterceptedMetadata(
+						structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
+						"old_object_id", unavailableOID),
+				}
+			},
+		},
+		{
+			desc:  "expectedOldOID set to ZeroOID",
+			hooks: []string{},
+			setup: func(data setupData) setupResponse {
 				return setupResponse{
 					firstRequest: &gitalypb.UserMergeBranchRequest{
 						Repository:     data.repoProto,
@@ -187,8 +209,9 @@ func testUserMergeBranch(t *testing.T, ctx context.Context) {
 						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
 					},
 					firstExpectedErr: testhelper.WithInterceptedMetadata(
-						structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
-						"old_object_id", gittest.DefaultObjectHash.ZeroOID),
+						structerr.NewInternal("merge: couldn't parse merge tree output: "),
+						"stderr", "",
+					),
 				}
 			},
 		},

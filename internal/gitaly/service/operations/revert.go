@@ -147,9 +147,7 @@ func (s *Server) UserRevert(ctx context.Context, req *gitalypb.UserRevertRequest
 			return nil, structerr.NewInvalidArgument("invalid expected old object ID: %w", err).WithMetadata("old_object_id", expectedOldOID)
 		}
 
-		oldrev, err = quarantineRepo.ResolveRevision(
-			ctx, git.Revision(fmt.Sprintf("%s^{object}", oldrev)),
-		)
+		oldrev, err = resolveRevision(ctx, quarantineRepo, oldrev, objectHash.ZeroOID)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("cannot resolve expected old object ID: %w", err).
 				WithMetadata("old_object_id", expectedOldOID)

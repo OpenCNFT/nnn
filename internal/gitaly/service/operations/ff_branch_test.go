@@ -2,6 +2,7 @@ package operations
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -248,6 +249,9 @@ func TestUserFFBranch(t *testing.T) {
 				firstCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("master"))
 				commitToMerge := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(firstCommit))
 
+				unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+				require.NoError(t, err)
+
 				return setupData{
 					repoPath: repoPath,
 					request: &gitalypb.UserFFBranchRequest{
@@ -255,11 +259,34 @@ func TestUserFFBranch(t *testing.T) {
 						CommitId:       commitToMerge.String(),
 						User:           gittest.TestUser,
 						Branch:         []byte("master"),
-						ExpectedOldOid: gittest.DefaultObjectHash.ZeroOID.String(),
+						ExpectedOldOid: unavailableOID.String(),
 					},
 					expectedErr: testhelper.WithInterceptedMetadata(
 						structerr.NewInvalidArgument("cannot resolve expected old object ID: reference not found"),
-						"old_object_id", gittest.DefaultObjectHash.ZeroOID),
+						"old_object_id", unavailableOID),
+				}
+			},
+		},
+		{
+			desc: "expectedOldOID pointing to ZeroOID",
+			setup: func(t *testing.T, ctx context.Context) setupData {
+				repoProto, repoPath := gittest.CreateRepository(t, ctx, cfg)
+
+				firstCommit := gittest.WriteCommit(t, cfg, repoPath, gittest.WithBranch("master"))
+				commitToMerge := gittest.WriteCommit(t, cfg, repoPath, gittest.WithParents(firstCommit))
+
+				zeroOID := gittest.DefaultObjectHash.ZeroOID.String()
+
+				return setupData{
+					repoPath: repoPath,
+					request: &gitalypb.UserFFBranchRequest{
+						Repository:     repoProto,
+						CommitId:       commitToMerge.String(),
+						User:           gittest.TestUser,
+						Branch:         []byte("master"),
+						ExpectedOldOid: zeroOID,
+					},
+					expectedErr: structerr.NewInternal("checking for ancestry: invalid commit: \"%s\"", zeroOID),
 				}
 			},
 		},

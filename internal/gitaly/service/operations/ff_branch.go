@@ -46,9 +46,7 @@ func (s *Server) UserFFBranch(ctx context.Context, in *gitalypb.UserFFBranchRequ
 				WithMetadata("old_object_id", expectedOldOID)
 		}
 
-		revision, err = quarantineRepo.ResolveRevision(
-			ctx, git.Revision(fmt.Sprintf("%s^{object}", revision)),
-		)
+		revision, err = resolveRevision(ctx, quarantineRepo, revision, objectHash.ZeroOID)
 		if err != nil {
 			return nil, structerr.NewInvalidArgument("cannot resolve expected old object ID: %w", err).
 				WithMetadata("old_object_id", expectedOldOID)

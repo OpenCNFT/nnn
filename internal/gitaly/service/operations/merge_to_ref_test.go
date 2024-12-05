@@ -338,6 +338,9 @@ func testUserMergeToRefFailure(t *testing.T, ctx context.Context) {
 	).String()
 	validTargetRef := []byte("refs/merge-requests/x/merge")
 
+	unavailableOID, err := gittest.DefaultObjectHash.FromHex(strings.Repeat("1", gittest.DefaultObjectHash.EncodedLen()))
+	require.NoError(t, err)
+
 	testCases := []struct {
 		desc           string
 		user           *gitalypb.User
@@ -418,6 +421,17 @@ func testUserMergeToRefFailure(t *testing.T, ctx context.Context) {
 			code:           codes.FailedPrecondition,
 			message:        []byte("some merge commit message"),
 			expectedOldOid: validSourceSha, // arbitrary value that differs from current target ref OID
+		},
+		{
+			desc:           "non-existing expected_object_id",
+			repo:           repoProto,
+			user:           gittest.TestUser,
+			branch:         []byte(validBranchName),
+			sourceSha:      validSourceSha,
+			targetRef:      validTargetRef,
+			code:           codes.InvalidArgument, // reference not found
+			message:        []byte("some merge commit message"),
+			expectedOldOid: unavailableOID.String(),
 		},
 	}
 

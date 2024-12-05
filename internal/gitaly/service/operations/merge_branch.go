@@ -47,9 +47,8 @@ func (s *Server) UserMergeBranch(stream gitalypb.OperationService_UserMergeBranc
 		if err != nil {
 			return structerr.NewInvalidArgument("invalid expected old object ID: %w", err).WithMetadata("old_object_id", expectedOldOID)
 		}
-		revision, err = quarantineRepo.ResolveRevision(
-			ctx, git.Revision(fmt.Sprintf("%s^{object}", revision)),
-		)
+
+		revision, err = resolveRevision(ctx, quarantineRepo, revision, objectHash.ZeroOID)
 		if err != nil {
 			return structerr.NewInvalidArgument("cannot resolve expected old object ID: %w", err).
 				WithMetadata("old_object_id", expectedOldOID)
