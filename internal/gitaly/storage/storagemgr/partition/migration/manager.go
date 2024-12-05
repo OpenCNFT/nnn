@@ -11,10 +11,21 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/keyvalue"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/gitaly/storage/storagemgr"
 	"gitlab.com/gitlab-org/gitaly/v16/internal/log"
+)
+
+// migrationLatency is a metric to capture latency of running migrations.
+var migrationLatency = promauto.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name: "gitaly_migration_latency_seconds",
+		Help: "Latency of a repository migration",
+	},
+	[]string{"name"},
 )
 
 // migrationState defines the state of a migration for a repository.
@@ -39,7 +50,7 @@ type migrationManager struct {
 }
 
 // NewPartition creates a migration manager that wraps the provided partition.
-func NewPartition(partition storagemgr.Partition, logger log.Logger) storagemgr.Partition {
+func NewPartition(partition storagemgr.Partition, logger log.Logger, migrations []migration) storagemgr.Partition {
 	return &migrationManager{
 		Partition:       partition,
 		logger:          logger,
@@ -141,6 +152,10 @@ func (m *migrationManager) performMigrations(ctx context.Context, relativePaths 
 	}()
 
 	for _, migration := range m.migrations {
+		timer := prometheus.NewTimer(migrationLatency.With(prometheus.Labels{
+			"name": migration.name,
+		}))
+
 		if id >= migration.id {
 			continue
 		}
@@ -155,13 +170,28 @@ func (m *migrationManager) performMigrations(ctx context.Context, relativePaths 
 		}
 
 		m.logger.WithFields(log.Fields{
-			"migration_id":  migration.id,
-			"relative_path": relativePath,
+			"migration_name": migration.name,
+			"migration_id":   migration.id,
+			"relative_path":  relativePath,
 		}).Info("running migration")
 
 		if err := migration.run(ctx, txn, relativePath); err != nil {
 			return fmt.Errorf("run migration: %w", err)
 		}
+
+		// If migration operations are successfully recorded, the last run migration ID is also recorded
+		// signifying it has been completed.
+		if err := migration.recordID(txn, relativePath); err != nil {
+			return fmt.Errorf("setting migration key: %w", err)
+		}
+
+		duration := timer.ObserveDuration()
+		m.logger.WithFields(log.Fields{
+			"migration_name": migration.name,
+			"migration_id":   migration.id,
+			"relative_path":  relativePath,
+			"duration":       duration,
+		}).Info("migration successful")
 	}
 
 	if err := txn.Commit(ctx); err != nil {
